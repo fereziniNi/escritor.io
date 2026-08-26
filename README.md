@@ -19,7 +19,7 @@ Ambiente único onde a equipe registra jornada (ponto), organiza tarefas (kanban
 
 ## Status
 
-Fase atual: **S0 — esqueleto** (ver [docs/incremental-plan.md](docs/incremental-plan.md)).
+Fase atual: **S1 — E0 Fundação** (ver [docs/incremental-plan.md](docs/incremental-plan.md)). E0 está completo: autenticação passwordless de ponta a ponta e CRUD de equipes/projetos. Próximo: E1 Ponto (S2), o núcleo do MVP.
 
 - ✅ S0.1 — backend (`/backend`): Spring Boot 4.1.x + Maven Wrapper, Flyway configurado, `GET /health`, validado por teste de integração com Testcontainers.
 - ✅ S0.2 — frontend (`/frontend`): Vite + React + TS, TanStack Query, componente `HealthStatus` consumindo `/health` via proxy de dev, testado com Vitest + Testing Library + MSW. Verificado ponta a ponta num browser real contra o backend rodando de verdade.
@@ -28,4 +28,7 @@ Fase atual: **S0 — esqueleto** (ver [docs/incremental-plan.md](docs/incrementa
 - ✅ S1.3 — login passwordless completo: `CodigoAcesso` (entidade+migração), `POST /auth/codigo` (envia código de 6 dígitos por e-mail via Mailpit, resposta idêntica exista ou não o e-mail), `POST /auth/login` (verifica código, emite JWT de acesso + refresh token em cookie httpOnly). `JwtAuthenticationFilter` liga tudo: testado ponta a ponta contra um servidor real (Testcontainers) — token de ADMIN autoriza, papel errado dá 403, sem token ou token adulterado dá 401.
 - ✅ S1.4 — `POST /auth/refresh`: rotaciona o refresh token a cada uso (hash SHA-256, permite busca direta no banco — diferente do código de login, que usa BCrypt). Reuso de um token já rotacionado é detectado e revoga *todos* os refresh tokens ativos daquele usuário (sinal de possível roubo de token), não só o reaproveitado. Testado com Testcontainers (repositório) e `@WebMvcTest` (rotação, reuso, cookie ausente).
 - ✅ S1.5 — frontend: `LoginPage` (e-mail → código, TanStack Query + Zustand para a sessão em memória), `ProtectedRoute` (redireciona sem sessão ou papel não permitido) e `SessionBootstrap` (silent refresh via `/auth/refresh` ao carregar a página, usando o cookie httpOnly). Verificado ponta a ponta com Playwright contra o backend real: e-mail não cadastrado → tela de login → código capturado de verdade no Mailpit → login → página inicial → **reload da página mantém a sessão** (prova que o cookie + silent refresh funcionam).
-- ⬜ S1.6 — próxima fatia: entidades `Equipe`, `Projeto`, `MembroEquipe`, `ProjetoEquipe` (N:N).
+- ✅ S1.6 — entidades `Equipe`, `Projeto`, `MembroEquipe`, `ProjetoEquipe` (N:N), direto do modelo do PRD. Vínculos N:N protegidos por constraint `UNIQUE` no banco. Testado com Testcontainers.
+- ✅ S1.7 — CRUD de equipe/projeto (só ADMIN) + telas `EquipesPage`/`ProjetosPage`. `adicionarMembro`/`vincularEquipe` são idempotentes (repetir a chamada não duplica linha). Novo `shared/api/http.ts`: cliente HTTP autenticado que anexa o access token e, em 401, tenta renovar via `/auth/refresh` e repete a chamada uma vez antes de desistir. Verificado ponta a ponta com Playwright + banco real: login admin → criar equipe → criar projeto → vincular equipe ao projeto, com o vínculo confirmado direto no Postgres.
+
+**E0 (Fundação) completo.** Próximo: **E1 — Ponto**, o núcleo do MVP (S2 no plano incremental).

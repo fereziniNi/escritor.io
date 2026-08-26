@@ -3,6 +3,8 @@ import { HomePage } from './app/HomePage'
 import { ProtectedRoute } from './app/ProtectedRoute'
 import { SessionBootstrap } from './app/SessionBootstrap'
 import { LoginPage } from './features/auth/LoginPage'
+import { EquipesPage } from './features/organizacao/EquipesPage'
+import { ProjetosPage } from './features/organizacao/ProjetosPage'
 
 function App() {
   return (
@@ -15,6 +17,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <HomePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/equipes"
+            element={
+              <ProtectedRoute papeisPermitidos={['ADMIN']}>
+                <EquipesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/projetos"
+            element={
+              <ProtectedRoute papeisPermitidos={['ADMIN']}>
+                <ProjetosPage />
               </ProtectedRoute>
             }
           />
