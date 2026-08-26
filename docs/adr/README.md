@@ -1,0 +1,10 @@
+# ADRs (Architecture Decision Records)
+
+| # | Decisão | Status |
+|---|---|---|
+| [0001](0001-monorepo.md) | Monorepo para backend e frontend | Aceito |
+| [0002](0002-maven.md) | Maven como build tool do backend | Aceito |
+| [0003](0003-vite.md) | Vite como scaffolding do frontend | Aceito |
+| [0004](0004-testcontainers.md) | Testcontainers para testes de integração do backend | Aceito |
+| [0005](0005-tanstack-query-zustand.md) | TanStack Query + Zustand no frontend | Aceito |
+| [0006](0006-jwt-auth-strategy.md) | Estratégia de autenticação (access em memória + refresh em cookie) | Aceito |
