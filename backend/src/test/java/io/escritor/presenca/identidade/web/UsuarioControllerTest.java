@@ -3,6 +3,7 @@ package io.escritor.presenca.identidade.web;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.service.UsuarioService;
 import io.escritor.presenca.seguranca.SecurityConfig;
+import io.escritor.presenca.seguranca.JwtService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -18,7 +19,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(UsuarioController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, JwtService.class})
 class UsuarioControllerTest {
 
     private static final String CORPO_REQUISICAO = """

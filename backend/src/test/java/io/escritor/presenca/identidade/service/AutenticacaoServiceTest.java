@@ -2,22 +2,33 @@ package io.escritor.presenca.identidade.service;
 
 import io.escritor.presenca.identidade.domain.CodigoAcesso;
 import io.escritor.presenca.identidade.domain.Papel;
+import io.escritor.presenca.identidade.domain.TokenRenovacao;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.CodigoAcessoRepository;
+import io.escritor.presenca.identidade.repository.TokenRenovacaoRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
+import io.escritor.presenca.seguranca.JwtService;
 import io.escritor.presenca.seguranca.email.EnvioEmail;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.ZoneOffset;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -32,19 +43,41 @@ class AutenticacaoServiceTest {
     private CodigoAcessoRepository codigoAcessoRepository;
 
     @Mock
+    private TokenRenovacaoRepository tokenRenovacaoRepository;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
     private EnvioEmail envioEmail;
 
+    @Mock
+    private JwtService jwtService;
+
     private AutenticacaoService autenticacaoService;
 
-    private final Usuario usuario = new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 360);
+    private final Usuario usuario = usuarioComId(1L);
 
-    @org.junit.jupiter.api.BeforeEach
+    @BeforeEach
     void setUp() {
-        autenticacaoService =
-                new AutenticacaoService(usuarioRepository, codigoAcessoRepository, passwordEncoder, envioEmail);
+        autenticacaoService = servico(Clock.systemUTC());
+    }
+
+    private static Usuario usuarioComId(Long id) {
+        Usuario usuario = new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 360);
+        ReflectionTestUtils.setField(usuario, "id", id);
+        return usuario;
+    }
+
+    private AutenticacaoService servico(Clock clock) {
+        return new AutenticacaoService(
+                usuarioRepository,
+                codigoAcessoRepository,
+                tokenRenovacaoRepository,
+                passwordEncoder,
+                envioEmail,
+                jwtService,
+                clock);
     }
 
     @Test
@@ -83,5 +116,90 @@ class AutenticacaoServiceTest {
 
         assertThat(anterior.estaUsado()).isTrue();
         verify(codigoAcessoRepository).save(anterior);
+    }
+
+    @Test
+    void codigoCorretoGeraTokensEMarcaCodigoUsado() {
+        CodigoAcesso codigo = new CodigoAcesso(usuario, "hash-certo");
+        when(usuarioRepository.findByEmailAndAtivoTrue("ana@escritor.io")).thenReturn(Optional.of(usuario));
+        when(codigoAcessoRepository.findFirstByUsuarioAndUsadoEmIsNullOrderByCriadoEmDesc(usuario))
+                .thenReturn(Optional.of(codigo));
+        when(passwordEncoder.matches("123456", "hash-certo")).thenReturn(true);
+        when(passwordEncoder.encode(anyString())).thenReturn("hash-refresh");
+        when(jwtService.gerarAccessToken(anyLong(), eq(Papel.COLABORADOR))).thenReturn("access-token-fake");
+
+        TokensAutenticacao tokens = autenticacaoService.verificarCodigo("ana@escritor.io", "123456");
+
+        assertThat(tokens.accessToken()).isEqualTo("access-token-fake");
+        assertThat(tokens.refreshToken()).isNotBlank();
+        assertThat(codigo.estaUsado()).isTrue();
+        verify(tokenRenovacaoRepository).save(any(TokenRenovacao.class));
+    }
+
+    @Test
+    void codigoErradoLancaExcecaoERegistraTentativa() {
+        CodigoAcesso codigo = new CodigoAcesso(usuario, "hash-certo");
+        when(usuarioRepository.findByEmailAndAtivoTrue("ana@escritor.io")).thenReturn(Optional.of(usuario));
+        when(codigoAcessoRepository.findFirstByUsuarioAndUsadoEmIsNullOrderByCriadoEmDesc(usuario))
+                .thenReturn(Optional.of(codigo));
+        when(passwordEncoder.matches("000000", "hash-certo")).thenReturn(false);
+
+        assertThatThrownBy(() -> autenticacaoService.verificarCodigo("ana@escritor.io", "000000"))
+                .isInstanceOf(CodigoInvalidoException.class);
+
+        assertThat(codigo.getTentativas()).isEqualTo(1);
+        verify(codigoAcessoRepository).save(codigo);
+        verifyNoInteractions(jwtService);
+    }
+
+    @Test
+    void semCodigoPendenteLancaExcecao() {
+        when(usuarioRepository.findByEmailAndAtivoTrue("ana@escritor.io")).thenReturn(Optional.of(usuario));
+        when(codigoAcessoRepository.findFirstByUsuarioAndUsadoEmIsNullOrderByCriadoEmDesc(usuario))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> autenticacaoService.verificarCodigo("ana@escritor.io", "123456"))
+                .isInstanceOf(CodigoInvalidoException.class);
+    }
+
+    @Test
+    void usuarioNaoEncontradoLancaExcecao() {
+        when(usuarioRepository.findByEmailAndAtivoTrue("fantasma@escritor.io")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> autenticacaoService.verificarCodigo("fantasma@escritor.io", "123456"))
+                .isInstanceOf(CodigoInvalidoException.class);
+    }
+
+    @Test
+    void codigoExpiradoLancaExcecaoSemChecarOValor() {
+        CodigoAcesso codigo = new CodigoAcesso(usuario, "hash-certo");
+        Clock relogioOnzeMinutosDepois =
+                Clock.fixed(codigo.getCriadoEm().plus(Duration.ofMinutes(11)), ZoneOffset.UTC);
+        AutenticacaoService servicoComRelogioFuturo = servico(relogioOnzeMinutosDepois);
+
+        when(usuarioRepository.findByEmailAndAtivoTrue("ana@escritor.io")).thenReturn(Optional.of(usuario));
+        when(codigoAcessoRepository.findFirstByUsuarioAndUsadoEmIsNullOrderByCriadoEmDesc(usuario))
+                .thenReturn(Optional.of(codigo));
+
+        assertThatThrownBy(() -> servicoComRelogioFuturo.verificarCodigo("ana@escritor.io", "123456"))
+                .isInstanceOf(CodigoInvalidoException.class);
+
+        verify(passwordEncoder, never()).matches(anyString(), anyString());
+    }
+
+    @Test
+    void tentativasExcedidasRejeitaMesmoComCodigoCorreto() {
+        CodigoAcesso codigo = new CodigoAcesso(usuario, "hash-certo");
+        for (int i = 0; i < 5; i++) {
+            codigo.registrarTentativaFalha();
+        }
+        when(usuarioRepository.findByEmailAndAtivoTrue("ana@escritor.io")).thenReturn(Optional.of(usuario));
+        when(codigoAcessoRepository.findFirstByUsuarioAndUsadoEmIsNullOrderByCriadoEmDesc(usuario))
+                .thenReturn(Optional.of(codigo));
+
+        assertThatThrownBy(() -> autenticacaoService.verificarCodigo("ana@escritor.io", "123456"))
+                .isInstanceOf(CodigoInvalidoException.class);
+
+        verify(passwordEncoder, never()).matches(anyString(), anyString());
     }
 }

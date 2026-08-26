@@ -19,6 +19,10 @@ spring:
 app:
   email:
     remetente: no-reply@escritor.io
+  jwt:
+    # Segredo de DEV apenas. Em qualquer ambiente real, sobrescrever via variável
+    # de ambiente APP_JWT_SEGREDO com um valor gerado (nunca versionar o de produção).
+    segredo: troque-este-segredo-em-producao-defina-a-variavel-app-jwt-segredo
 
 management:
   endpoints:
