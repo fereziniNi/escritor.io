@@ -24,4 +24,5 @@ Fase atual: **S0 — esqueleto** (ver [docs/incremental-plan.md](docs/incrementa
 - ✅ S0.1 — backend (`/backend`): Spring Boot 4.1.x + Maven Wrapper, Flyway configurado, `GET /health`, validado por teste de integração com Testcontainers.
 - ✅ S0.2 — frontend (`/frontend`): Vite + React + TS, TanStack Query, componente `HealthStatus` consumindo `/health` via proxy de dev, testado com Vitest + Testing Library + MSW. Verificado ponta a ponta num browser real contra o backend rodando de verdade.
 - ✅ S1.1 — entidade `Usuario` (`identidade/domain`) + migração Flyway (`V1__create_usuario.sql`), com constraints de banco para papel/carga horária/email único. Testado com Testcontainers (roundtrip de persistência + rejeição de email duplicado).
-- ⬜ S1.2 — próxima fatia: `POST /usuarios` (só ADMIN), cadastro com carga diária.
+- ✅ S1.2 — `POST /usuarios` (só ADMIN): Spring Security stateless + `@PreAuthorize`, validação Bean Validation (`carga_diaria_minutos` positiva), senha com BCrypt. Testado com `@WebMvcTest` + `@WithMockUser` (401 sem autenticação, 403 papel errado, 400 payload inválido, 201 admin).
+- ⬜ S1.3 — próxima fatia: login (`POST /auth/login`) com JWT curto + refresh, bloqueio após 5 tentativas falhas.
