@@ -19,7 +19,7 @@ Fases 2–4 (E2 Kanban, E3 Apontamento, E4 Relatórios, E5 Escritório virtual) 
 |---|---|---|
 | S1.1 ✅ | Entidade `Usuario` + migração Flyway | Repositório: roundtrip de persistência, `email` único rejeita duplicata |
 | S1.2 ✅ | `POST /usuarios` (só ADMIN) — cadastro com carga diária, sem senha | Web: 403 para papel não-admin; domínio: `carga_diaria_minutos` deve ser positiva |
-| S1.3a | Entidade `CodigoAcesso` + migração | Domínio: código de 6 dígitos, expira em 10 min, hash nunca é o código em texto puro |
+| S1.3a ✅ | Entidade `CodigoAcesso` + migração | Domínio: código de 6 dígitos, expira em 10 min, hash nunca é o código em texto puro |
 | S1.3b | `POST /auth/codigo` (solicitar código) — envia e-mail via Mailpit | Serviço: resposta idêntica para e-mail existente ou não; e-mail anterior não expirado é invalidado por um novo pedido |
 | S1.3c | `POST /auth/login` (verificar código) — JWT curto + refresh cookie | Domínio: código expirado/errado/já usado é rejeitado; 5ª tentativa errada mata o código |
 | S1.4 | `POST /auth/refresh` + rotação de refresh token | Web: refresh token usado 2x é rejeitado na segunda vez |
