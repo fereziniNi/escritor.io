@@ -22,4 +22,5 @@ Ambiente único onde a equipe registra jornada (ponto), organiza tarefas (kanban
 Fase atual: **S0 — esqueleto** (ver [docs/incremental-plan.md](docs/incremental-plan.md)).
 
 - ✅ S0.1 — backend (`/backend`): Spring Boot 4.1.x + Maven Wrapper, Flyway configurado, `GET /health`, validado por teste de integração com Testcontainers.
-- ⬜ S0.2 — frontend (`/frontend`): ainda não iniciado.
+- ✅ S0.2 — frontend (`/frontend`): Vite + React + TS, TanStack Query, componente `HealthStatus` consumindo `/health` via proxy de dev, testado com Vitest + Testing Library + MSW. Verificado ponta a ponta num browser real contra o backend rodando de verdade.
+- ⬜ S1.1 — próxima fatia: entidade `Usuario` + migração Flyway.

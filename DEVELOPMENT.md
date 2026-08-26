@@ -1,6 +1,6 @@
 # Rodando o projeto localmente
 
-> Backend existe desde a fatia S0.1 (ver [docs/incremental-plan.md](docs/incremental-plan.md)). Frontend ainda não foi criado (fatia S0.2).
+> Backend (S0.1) e frontend (S0.2) já existem como esqueleto — ver [docs/incremental-plan.md](docs/incremental-plan.md).
 
 ## Pré-requisitos
 
@@ -36,11 +36,19 @@ No Windows, sem Git Bash/WSL, use `mvnw.cmd` no lugar de `./mvnw`.
 ```bash
 cd frontend
 npm install
-npm run dev                # servidor de desenvolvimento
-npm test                   # testes unitários/componente (Vitest)
-npm run test:e2e           # Playwright, requer backend rodando
+npm run dev                # servidor de desenvolvimento (proxy /health -> backend em localhost:8080)
+npm test                   # testes unitários/componente (Vitest + Testing Library + MSW)
+npm run build               # type-check (tsc -b) + build de produção
 ```
+
+Playwright (E2E) entra na primeira fatia que tiver um fluxo crítico de verdade para cobrir (ver [docs/testing-strategy.md](docs/testing-strategy.md) §4) — ainda não configurado.
+
+O endereço do backend usado pelo proxy de dev é configurável via `VITE_BACKEND_URL` (padrão `http://localhost:8080`) — útil se a porta 8080 já estiver em uso por outro projeto na máquina.
 
 ## Ciclo de desenvolvimento (TDD)
 
 Ver [docs/testing-strategy.md](docs/testing-strategy.md) para o workflow completo. Resumo: teste de domínio no backend primeiro, depois web/repositório, depois componente no frontend, E2E só para os fluxos críticos listados lá.
+
+## Troubleshooting
+
+- **Porta 5432/8080/5173 já em uso:** se houver outro projeto local usando as mesmas portas, suba o Postgres deste projeto em outra porta (`docker compose run --service-ports -p 5433:5432 postgres` ou edite `docker-compose.yml` localmente sem commitar) e aponte `spring.datasource.url` / `VITE_BACKEND_URL` de acordo. As portas padrão do projeto (5432, 8080, 5173) continuam sendo as documentadas — o ajuste é só para rodar em paralelo com outro projeto que já as ocupa.
