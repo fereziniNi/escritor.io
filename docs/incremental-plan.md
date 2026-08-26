@@ -18,10 +18,12 @@ Fases 2–4 (E2 Kanban, E3 Apontamento, E4 Relatórios, E5 Escritório virtual) 
 | # | Fatia | Teste que vem primeiro |
 |---|---|---|
 | S1.1 ✅ | Entidade `Usuario` + migração Flyway | Repositório: roundtrip de persistência, `email` único rejeita duplicata |
-| S1.2 ✅ | `POST /usuarios` (só ADMIN) — cadastro com carga diária | Web: 403 para papel não-admin; domínio: `carga_diaria_minutos` deve ser positiva |
-| S1.3 | Login (`POST /auth/login`) — BCrypt, JWT curto + refresh cookie | Serviço: senha errada não gera token; domínio: bloqueio após 5 tentativas |
+| S1.2 ✅ | `POST /usuarios` (só ADMIN) — cadastro com carga diária, sem senha | Web: 403 para papel não-admin; domínio: `carga_diaria_minutos` deve ser positiva |
+| S1.3a | Entidade `CodigoAcesso` + migração | Domínio: código de 6 dígitos, expira em 10 min, hash nunca é o código em texto puro |
+| S1.3b | `POST /auth/codigo` (solicitar código) — envia e-mail via Mailpit | Serviço: resposta idêntica para e-mail existente ou não; e-mail anterior não expirado é invalidado por um novo pedido |
+| S1.3c | `POST /auth/login` (verificar código) — JWT curto + refresh cookie | Domínio: código expirado/errado/já usado é rejeitado; 5ª tentativa errada mata o código |
 | S1.4 | `POST /auth/refresh` + rotação de refresh token | Web: refresh token usado 2x é rejeitado na segunda vez |
-| S1.5 | Frontend: tela de login + guarda de rota por papel | Componente: redireciona se token ausente/expirado |
+| S1.5 | Frontend: tela de login (e-mail → código) + guarda de rota por papel | Componente: redireciona se token ausente/expirado |
 | S1.6 | Entidades `Equipe`, `Projeto`, `MembroEquipe`, `ProjetoEquipe` (N:N) | Repositório: constraint que impede `Quadro` órfão (ver S2, mas o vínculo N:N já nasce aqui) |
 | S1.7 | CRUD de equipe/projeto/vínculos (ADMIN) + telas correspondentes | Web: só admin cria; domínio: vínculo duplicado é idempotente, não duplica linha |
 

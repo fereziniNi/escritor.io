@@ -9,3 +9,4 @@
 | [0005](0005-tanstack-query-zustand.md) | TanStack Query + Zustand no frontend | Aceito |
 | [0006](0006-jwt-auth-strategy.md) | Estratégia de autenticação (access em memória + refresh em cookie) | Aceito |
 | [0007](0007-spring-boot-4-module-splitting.md) | Como lidar com o fatiamento de módulos do Spring Boot 4 | Aceito |
+| [0008](0008-login-passwordless-email.md) | Login passwordless por e-mail (código de acesso) | Aceito |

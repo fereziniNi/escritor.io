@@ -48,7 +48,7 @@ Regra de visibilidade dos quadros: o usuário enxerga quadros das equipes das qu
 
 ```
 Usuario
-  id, nome, email (único), senha_hash
+  id, nome, email (único)
   papel: COLABORADOR | GESTOR | ADMIN
   carga_diaria_minutos (ex.: 360 para 6h)
   ativo, criado_em
@@ -65,6 +65,18 @@ Projeto
 
 ProjetoEquipe                     -- N:N
   projeto_id, equipe_id
+```
+
+**Sem senha.** O login é passwordless: e-mail + código de acesso de uso único enviado por e-mail (ver `CodigoAcesso` abaixo). Não há `senha_hash` — não há segredo de longo prazo para vazar, phishing de senha ou reuso de senha entre sistemas para se preocupar.
+
+```
+CodigoAcesso
+  id, usuario_id
+  codigo_hash                     -- nunca o código em texto puro
+  expira_em (timestamptz)
+  usado_em (nullable)
+  tentativas                      -- incrementa a cada verificação errada
+  criado_em
 ```
 
 ### 3.2 Ponto (append-only)
@@ -182,9 +194,9 @@ Status do avatar: `DISPONIVEL | FOCO | REUNIAO | ALMOCO | AUSENTE`. `AUSENTE` é
 
 - Como **admin**, quero cadastrar usuários com carga diária, para que a jornada seja apurada corretamente.
 - Como **admin**, quero criar equipes e projetos e vinculá-los entre si (N:N), para refletir a estrutura real da empresa.
-- Como **usuário**, quero fazer login com email e senha e permanecer autenticado, para não reautenticar a cada acesso.
+- Como **usuário**, quero fazer login informando meu e-mail e o código de 6 dígitos que recebo por e-mail, e permanecer autenticado, para não reautenticar a cada acesso.
 
-**Critérios de aceite (login):** senha com BCrypt; JWT de curta duração + refresh token; rotas protegidas por papel via Spring Security; bloqueio temporário após 5 tentativas falhas.
+**Critérios de aceite (login):** login passwordless — sem senha cadastrada; código numérico de 6 dígitos, válido por 10 minutos, uso único; bloqueio do código após 5 tentativas erradas (força solicitar um novo); resposta de "solicitar código" é idêntica para e-mail existente ou não (não revela quais e-mails estão cadastrados); JWT de curta duração + refresh token; rotas protegidas por papel via Spring Security.
 
 ### E1 — Ponto ← *núcleo do MVP*
 
@@ -271,3 +283,4 @@ Cada fase deve ir para produção antes da seguinte começar. Isso vale mais que
 - **Mapa:** `layout_json` versionado no repositório na v1; editor visual só se houver demanda real.
 - **Frontend:** React + TypeScript, dnd-kit para o kanban, react-konva ou canvas puro para o mapa.
 - **Testes:** priorize o cálculo de jornada e a validação de sequência de marcações. É onde bug custa caro e onde a lógica é mais sutil.
+- **E-mail (login):** Spring Mail (SMTP) atrás de uma interface própria, para trocar de provedor sem tocar no fluxo de login. Em dev/teste, Mailpit local via docker-compose captura os e-mails sem enviar nada de verdade; produção aponta para um SMTP real (a decidir quando houver deploy).

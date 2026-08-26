@@ -4,12 +4,11 @@
 Aceito
 
 ## Contexto
-O PRD (E0) pede JWT de curta duração + refresh token, com rotas protegidas por papel. Precisa de uma decisão de onde cada token vive no cliente, já que isso tem implicação direta de segurança (XSS/CSRF).
+O PRD (E0) pede JWT de curta duração + refresh token, com rotas protegidas por papel. Precisa de uma decisão de onde cada token vive no cliente, já que isso tem implicação direta de segurança (XSS/CSRF). Esta ADR cobre só o formato/transporte dos tokens emitidos **depois** que o login já foi validado — o mecanismo de login em si (passwordless por e-mail) está na [ADR 0008](0008-login-passwordless-email.md).
 
 ## Decisão
 - **Access token:** JWT de vida curta (~15 min), enviado via header `Authorization: Bearer`, mantido apenas em memória no frontend (nunca em `localStorage`/`sessionStorage`).
 - **Refresh token:** cookie `httpOnly` + `Secure` + `SameSite=Strict`, usado só pelo endpoint `POST /auth/refresh`. Rotacionado a cada uso (refresh token antigo invalidado).
-- Bloqueio de conta por 5 tentativas falhas de login, controlado no backend.
 
 ## Alternativas consideradas
 - **Ambos os tokens em `localStorage`:** mais simples de implementar, mas expõe o refresh token (de vida longa) a qualquer XSS na aplicação — risco desproporcional para o ganho de simplicidade.

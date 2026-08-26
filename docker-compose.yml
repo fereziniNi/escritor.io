@@ -10,5 +10,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "1025:1025"   # SMTP - o backend envia e-mails de login aqui
+      - "8025:8025"   # UI web para ver os e-mails capturados
+
 volumes:
   postgres_data:

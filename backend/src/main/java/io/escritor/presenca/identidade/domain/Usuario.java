@@ -24,9 +24,6 @@ public class Usuario {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(name = "senha_hash", nullable = false)
-    private String senhaHash;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Papel papel;
@@ -44,10 +41,9 @@ public class Usuario {
         // JPA
     }
 
-    public Usuario(String nome, String email, String senhaHash, Papel papel, Integer cargaDiariaMinutos) {
+    public Usuario(String nome, String email, Papel papel, Integer cargaDiariaMinutos) {
         this.nome = nome;
         this.email = email;
-        this.senhaHash = senhaHash;
         this.papel = papel;
         this.cargaDiariaMinutos = cargaDiariaMinutos;
         this.ativo = true;
@@ -64,10 +60,6 @@ public class Usuario {
 
     public String getEmail() {
         return email;
-    }
-
-    public String getSenhaHash() {
-        return senhaHash;
     }
 
     public Papel getPapel() {

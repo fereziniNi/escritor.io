@@ -29,7 +29,7 @@ class UsuarioRepositoryIT {
 
     @Test
     void persisteERecuperaUsuarioComTodosOsCampos() {
-        Usuario usuario = new Usuario("Ana Souza", "ana@escritor.io", "hash-fake", Papel.COLABORADOR, 360);
+        Usuario usuario = new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 360);
 
         Usuario salvo = usuarioRepository.saveAndFlush(usuario);
         usuarioRepository.findById(salvo.getId()).orElseThrow();
@@ -38,7 +38,6 @@ class UsuarioRepositoryIT {
 
         assertThat(recuperado.getNome()).isEqualTo("Ana Souza");
         assertThat(recuperado.getEmail()).isEqualTo("ana@escritor.io");
-        assertThat(recuperado.getSenhaHash()).isEqualTo("hash-fake");
         assertThat(recuperado.getPapel()).isEqualTo(Papel.COLABORADOR);
         assertThat(recuperado.getCargaDiariaMinutos()).isEqualTo(360);
         assertThat(recuperado.isAtivo()).isTrue();
@@ -48,9 +47,9 @@ class UsuarioRepositoryIT {
     @Test
     void rejeitaEmailDuplicado() {
         usuarioRepository.saveAndFlush(
-                new Usuario("Ana Souza", "duplicado@escritor.io", "hash-1", Papel.COLABORADOR, 360));
+                new Usuario("Ana Souza", "duplicado@escritor.io", Papel.COLABORADOR, 360));
 
-        Usuario duplicado = new Usuario("Outra Ana", "duplicado@escritor.io", "hash-2", Papel.GESTOR, 480);
+        Usuario duplicado = new Usuario("Outra Ana", "duplicado@escritor.io", Papel.GESTOR, 480);
 
         assertThatThrownBy(() -> usuarioRepository.saveAndFlush(duplicado))
                 .isInstanceOf(DataIntegrityViolationException.class);

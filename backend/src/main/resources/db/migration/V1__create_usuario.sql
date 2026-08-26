@@ -2,7 +2,6 @@ CREATE TABLE usuario (
     id BIGSERIAL PRIMARY KEY,
     nome VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL,
-    senha_hash VARCHAR(255) NOT NULL,
     papel VARCHAR(20) NOT NULL,
     carga_diaria_minutos INTEGER NOT NULL,
     ativo BOOLEAN NOT NULL DEFAULT TRUE,

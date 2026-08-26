@@ -22,7 +22,7 @@ class CriarUsuarioRequestTest {
     @Test
     void rejeitaCargaDiariaZero() {
         CriarUsuarioRequest request =
-                new CriarUsuarioRequest("Ana Souza", "ana@escritor.io", "senha123", Papel.COLABORADOR, 0);
+                new CriarUsuarioRequest("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 0);
 
         Set<ConstraintViolation<CriarUsuarioRequest>> violacoes = validator.validate(request);
 
@@ -34,7 +34,7 @@ class CriarUsuarioRequestTest {
     @Test
     void rejeitaCargaDiariaNegativa() {
         CriarUsuarioRequest request =
-                new CriarUsuarioRequest("Ana Souza", "ana@escritor.io", "senha123", Papel.COLABORADOR, -60);
+                new CriarUsuarioRequest("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, -60);
 
         Set<ConstraintViolation<CriarUsuarioRequest>> violacoes = validator.validate(request);
 
@@ -46,7 +46,7 @@ class CriarUsuarioRequestTest {
     @Test
     void aceitaCargaDiariaPositiva() {
         CriarUsuarioRequest request =
-                new CriarUsuarioRequest("Ana Souza", "ana@escritor.io", "senha123", Papel.COLABORADOR, 360);
+                new CriarUsuarioRequest("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 360);
 
         Set<ConstraintViolation<CriarUsuarioRequest>> violacoes = validator.validate(request);
 

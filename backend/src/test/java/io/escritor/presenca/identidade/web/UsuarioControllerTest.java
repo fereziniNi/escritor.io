@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class UsuarioControllerTest {
 
     private static final String CORPO_REQUISICAO = """
-            {"nome":"Ana Souza","email":"ana@escritor.io","senha":"senha123","papel":"COLABORADOR","cargaDiariaMinutos":360}
+            {"nome":"Ana Souza","email":"ana@escritor.io","papel":"COLABORADOR","cargaDiariaMinutos":360}
             """;
 
     @Autowired
@@ -66,7 +66,7 @@ class UsuarioControllerTest {
         mockMvc.perform(post("/usuarios")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"nome":"Ana Souza","email":"ana@escritor.io","senha":"senha123","papel":"COLABORADOR","cargaDiariaMinutos":0}
+                                {"nome":"Ana Souza","email":"ana@escritor.io","papel":"COLABORADOR","cargaDiariaMinutos":0}
                                 """))
                 .andExpect(status().isBadRequest());
     }

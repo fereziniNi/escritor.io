@@ -16,7 +16,7 @@ Maven **não** precisa estar instalado — o projeto usa o Maven Wrapper (`./mvn
 docker compose up -d
 ```
 
-Sobe um Postgres em `localhost:5432` para uso do backend em modo `dev`. Os testes do backend **não** usam esse container — Testcontainers sobe um Postgres efêmero próprio a cada execução de suíte (ver [docs/adr/0004-testcontainers.md](docs/adr/0004-testcontainers.md)).
+Sobe um Postgres em `localhost:5432` e o Mailpit (SMTP fake para o login por e-mail — ver [docs/adr/0008-login-passwordless-email.md](docs/adr/0008-login-passwordless-email.md)) para uso do backend em modo `dev`. Nenhum e-mail sai de verdade: veja os códigos de login recebidos em **http://localhost:8025**. Os testes do backend **não** usam esses containers — Testcontainers sobe os seus próprios efêmeros a cada execução de suíte (ver [docs/adr/0004-testcontainers.md](docs/adr/0004-testcontainers.md)).
 
 ## Backend
 

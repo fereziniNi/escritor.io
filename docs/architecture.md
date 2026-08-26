@@ -32,10 +32,10 @@ Pacote base: `io.escritor.presenca`. Organização por **domínio** (não por ca
 
 ```
 io.escritor.presenca
-├── identidade/          # Usuario, Equipe, Projeto, MembroEquipe, ProjetoEquipe
-│   ├── domain/          # entidades JPA, regras puras
+├── identidade/          # Usuario, CodigoAcesso, Equipe, Projeto, MembroEquipe, ProjetoEquipe
+│   ├── domain/          # entidades JPA, regras puras (geração/validação de código)
 │   ├── web/             # controllers, DTOs
-│   ├── service/
+│   ├── service/         # inclui envio de e-mail de login (via seguranca.email)
 │   └── repository/
 ├── ponto/               # RegistroPonto, SolicitacaoAjustePonto, JornadaDiaria
 │   ├── domain/          # cálculo de jornada, máquina de estados de marcação, hash encadeado
@@ -69,11 +69,13 @@ Dentro de cada domínio, `domain/` contém as regras que devem ser testáveis **
 
 ### 2.4 Autenticação e autorização
 
-- Login: email + senha (BCrypt).
+- **Login passwordless por e-mail:** não existe senha em nenhum lugar do sistema. `POST /auth/codigo` (email) gera um código numérico de 6 dígitos, guarda só o hash dele em `CodigoAcesso` (mesmo `PasswordEncoder`/BCrypt usado para senha em outros projetos, aqui reaproveitado para hashear o código) e envia por e-mail. `POST /auth/login` (email + código) valida o código e emite os tokens.
+- Resposta de `POST /auth/codigo` é **sempre igual** independente de o e-mail existir ou não — evita que a própria API revele quais e-mails estão cadastrados.
+- Código válido por 10 minutos, uso único, e **inválido após 5 tentativas erradas de verificação** (não é bloqueio de conta — é o código específico que morre; basta solicitar um novo). Solicitar um novo código antes do anterior expirar invalida o anterior.
 - **Access token JWT de curta duração** (~15 min), enviado no header `Authorization: Bearer`, guardado em memória no frontend (não em `localStorage`, para reduzir superfície de XSS).
 - **Refresh token** em cookie `httpOnly` + `Secure` + `SameSite=Strict`, usado só no endpoint `/auth/refresh`. Rotação do refresh token a cada uso.
-- Bloqueio temporário após 5 tentativas falhas: contador por usuário (coluna/tabela simples — sem necessidade de Redis na escala de 10 usuários).
 - Autorização por papel (`COLABORADOR`/`GESTOR`/`ADMIN`) via `@PreAuthorize` e configuração de `SecurityFilterChain`, nunca checada só no frontend.
+- **E-mail:** Spring Mail (SMTP) atrás de uma interface `EnvioEmail` no pacote `seguranca`, para trocar de provedor sem tocar no fluxo de login. Em dev/teste, o SMTP aponta para o **Mailpit** do `docker-compose.yml` (captura tudo localmente, UI em `http://localhost:8025`, nada sai de verdade).
 
 ### 2.5 WebSocket
 

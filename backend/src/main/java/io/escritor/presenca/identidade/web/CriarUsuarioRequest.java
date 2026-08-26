@@ -9,7 +9,6 @@ import jakarta.validation.constraints.Positive;
 public record CriarUsuarioRequest(
         @NotBlank String nome,
         @NotBlank @Email String email,
-        @NotBlank String senha,
         @NotNull Papel papel,
         @NotNull @Positive Integer cargaDiariaMinutos) {
 }
