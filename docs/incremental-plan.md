@@ -17,7 +17,7 @@ Fases 2–4 (E2 Kanban, E3 Apontamento, E4 Relatórios, E5 Escritório virtual) 
 
 | # | Fatia | Teste que vem primeiro |
 |---|---|---|
-| S1.1 | Entidade `Usuario` + migração Flyway | Repositório: roundtrip de persistência, `email` único rejeita duplicata |
+| S1.1 ✅ | Entidade `Usuario` + migração Flyway | Repositório: roundtrip de persistência, `email` único rejeita duplicata |
 | S1.2 | `POST /usuarios` (só ADMIN) — cadastro com carga diária | Web: 403 para papel não-admin; domínio: `carga_diaria_minutos` deve ser positiva |
 | S1.3 | Login (`POST /auth/login`) — BCrypt, JWT curto + refresh cookie | Serviço: senha errada não gera token; domínio: bloqueio após 5 tentativas |
 | S1.4 | `POST /auth/refresh` + rotação de refresh token | Web: refresh token usado 2x é rejeitado na segunda vez |
