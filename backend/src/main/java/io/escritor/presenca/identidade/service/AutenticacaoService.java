@@ -8,6 +8,7 @@ import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.CodigoAcessoRepository;
 import io.escritor.presenca.identidade.repository.TokenRenovacaoRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
+import io.escritor.presenca.seguranca.HashSha256;
 import io.escritor.presenca.seguranca.JwtService;
 import io.escritor.presenca.seguranca.email.EnvioEmail;
 import java.time.Clock;
@@ -72,11 +73,41 @@ public class AutenticacaoService {
         return emitirTokens(usuario);
     }
 
+    public TokensAutenticacao renovarToken(String refreshTokenPlano) {
+        TokenRenovacao token = tokenRenovacaoRepository
+                .findByTokenHash(HashSha256.hash(refreshTokenPlano))
+                .orElseThrow(TokenInvalidoException::new);
+
+        Instant agora = Instant.now(clock);
+
+        if (token.estaUsado()) {
+            revogarTokensAtivos(token.getUsuario());
+            throw new TokenInvalidoException();
+        }
+
+        if (token.estaExpirado(agora)) {
+            throw new TokenInvalidoException();
+        }
+
+        token.marcarUsado(agora);
+        tokenRenovacaoRepository.save(token);
+
+        return emitirTokens(token.getUsuario());
+    }
+
+    private void revogarTokensAtivos(Usuario usuario) {
+        Instant agora = Instant.now(clock);
+        tokenRenovacaoRepository.findByUsuarioAndUsadoEmIsNull(usuario).forEach(ativo -> {
+            ativo.marcarUsado(agora);
+            tokenRenovacaoRepository.save(ativo);
+        });
+    }
+
     private TokensAutenticacao emitirTokens(Usuario usuario) {
         String accessToken = jwtService.gerarAccessToken(usuario.getId(), usuario.getPapel());
 
         String refreshTokenPlano = GeradorTokenRenovacao.gerar();
-        TokenRenovacao tokenRenovacao = new TokenRenovacao(usuario, passwordEncoder.encode(refreshTokenPlano));
+        TokenRenovacao tokenRenovacao = new TokenRenovacao(usuario, HashSha256.hash(refreshTokenPlano));
         tokenRenovacaoRepository.save(tokenRenovacao);
 
         return new TokensAutenticacao(accessToken, refreshTokenPlano);

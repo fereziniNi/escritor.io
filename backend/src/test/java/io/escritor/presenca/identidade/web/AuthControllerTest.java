@@ -2,6 +2,7 @@ package io.escritor.presenca.identidade.web;
 
 import io.escritor.presenca.identidade.service.AutenticacaoService;
 import io.escritor.presenca.identidade.service.CodigoInvalidoException;
+import io.escritor.presenca.identidade.service.TokenInvalidoException;
 import io.escritor.presenca.identidade.service.TokensAutenticacao;
 import io.escritor.presenca.seguranca.SecurityConfig;
 import io.escritor.presenca.seguranca.JwtService;
@@ -20,6 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import jakarta.servlet.http.Cookie;
 
 @WebMvcTest(AuthController.class)
 @Import({SecurityConfig.class, JwtService.class})
@@ -80,5 +82,30 @@ class AuthControllerTest {
                                 {"email":"ana@escritor.io","codigo":"000000"}
                                 """))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void refreshComTokenValidoRetornaNovoAccessTokenERotacionaCookie() throws Exception {
+        when(autenticacaoService.renovarToken("refresh-antigo"))
+                .thenReturn(new TokensAutenticacao("novo-access-token", "novo-refresh-token"));
+
+        mockMvc.perform(post("/auth/refresh").cookie(new Cookie("refresh_token", "refresh-antigo")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("novo-access-token"))
+                .andExpect(cookie().value("refresh_token", "novo-refresh-token"));
+    }
+
+    @Test
+    void refreshComTokenJaUsadoRetorna401ELimpaCookie() throws Exception {
+        when(autenticacaoService.renovarToken("refresh-reaproveitado")).thenThrow(new TokenInvalidoException());
+
+        mockMvc.perform(post("/auth/refresh").cookie(new Cookie("refresh_token", "refresh-reaproveitado")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(cookie().maxAge("refresh_token", 0));
+    }
+
+    @Test
+    void refreshSemCookieRetorna401() throws Exception {
+        mockMvc.perform(post("/auth/refresh")).andExpect(status().isUnauthorized());
     }
 }

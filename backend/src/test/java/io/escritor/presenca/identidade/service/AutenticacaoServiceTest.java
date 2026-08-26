@@ -7,11 +7,13 @@ import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.CodigoAcessoRepository;
 import io.escritor.presenca.identidade.repository.TokenRenovacaoRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
+import io.escritor.presenca.seguranca.HashSha256;
 import io.escritor.presenca.seguranca.JwtService;
 import io.escritor.presenca.seguranca.email.EnvioEmail;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -125,7 +128,6 @@ class AutenticacaoServiceTest {
         when(codigoAcessoRepository.findFirstByUsuarioAndUsadoEmIsNullOrderByCriadoEmDesc(usuario))
                 .thenReturn(Optional.of(codigo));
         when(passwordEncoder.matches("123456", "hash-certo")).thenReturn(true);
-        when(passwordEncoder.encode(anyString())).thenReturn("hash-refresh");
         when(jwtService.gerarAccessToken(anyLong(), eq(Papel.COLABORADOR))).thenReturn("access-token-fake");
 
         TokensAutenticacao tokens = autenticacaoService.verificarCodigo("ana@escritor.io", "123456");
@@ -201,5 +203,63 @@ class AutenticacaoServiceTest {
                 .isInstanceOf(CodigoInvalidoException.class);
 
         verify(passwordEncoder, never()).matches(anyString(), anyString());
+    }
+
+    @Test
+    void tokenValidoRotacionaEGeraNovosTokens() {
+        TokenRenovacao tokenAntigo = new TokenRenovacao(usuario, HashSha256.hash("token-plano-antigo"));
+        when(tokenRenovacaoRepository.findByTokenHash(HashSha256.hash("token-plano-antigo")))
+                .thenReturn(Optional.of(tokenAntigo));
+        when(jwtService.gerarAccessToken(anyLong(), eq(Papel.COLABORADOR))).thenReturn("novo-access-token");
+
+        TokensAutenticacao tokens = autenticacaoService.renovarToken("token-plano-antigo");
+
+        assertThat(tokens.accessToken()).isEqualTo("novo-access-token");
+        assertThat(tokens.refreshToken()).isNotBlank().isNotEqualTo("token-plano-antigo");
+        assertThat(tokenAntigo.estaUsado()).isTrue();
+        verify(tokenRenovacaoRepository).save(tokenAntigo);
+        verify(tokenRenovacaoRepository).save(argThat(t -> t != tokenAntigo));
+    }
+
+    @Test
+    void tokenInexistenteLancaExcecao() {
+        when(tokenRenovacaoRepository.findByTokenHash(anyString())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> autenticacaoService.renovarToken("token-desconhecido"))
+                .isInstanceOf(TokenInvalidoException.class);
+    }
+
+    @Test
+    void tokenExpiradoLancaExcecao() {
+        TokenRenovacao token = new TokenRenovacao(usuario, HashSha256.hash("token-plano"));
+        Clock relogioTrintaEUmDiasDepois =
+                Clock.fixed(token.getCriadoEm().plus(Duration.ofDays(31)), ZoneOffset.UTC);
+        AutenticacaoService servicoComRelogioFuturo = servico(relogioTrintaEUmDiasDepois);
+
+        when(tokenRenovacaoRepository.findByTokenHash(HashSha256.hash("token-plano")))
+                .thenReturn(Optional.of(token));
+
+        assertThatThrownBy(() -> servicoComRelogioFuturo.renovarToken("token-plano"))
+                .isInstanceOf(TokenInvalidoException.class);
+    }
+
+    @Test
+    void tokenJaUsadoLancaExcecaoERevogaOutrosTokensAtivosDoUsuario() {
+        TokenRenovacao tokenReaproveitado = new TokenRenovacao(usuario, HashSha256.hash("token-roubado"));
+        tokenReaproveitado.marcarUsado(tokenReaproveitado.getCriadoEm());
+
+        TokenRenovacao outroTokenAtivo = new TokenRenovacao(usuario, "outro-hash-ativo");
+
+        when(tokenRenovacaoRepository.findByTokenHash(HashSha256.hash("token-roubado")))
+                .thenReturn(Optional.of(tokenReaproveitado));
+        when(tokenRenovacaoRepository.findByUsuarioAndUsadoEmIsNull(usuario))
+                .thenReturn(List.of(outroTokenAtivo));
+
+        assertThatThrownBy(() -> autenticacaoService.renovarToken("token-roubado"))
+                .isInstanceOf(TokenInvalidoException.class);
+
+        assertThat(outroTokenAtivo.estaUsado()).isTrue();
+        verify(tokenRenovacaoRepository).save(outroTokenAtivo);
+        verifyNoInteractions(jwtService);
     }
 }
