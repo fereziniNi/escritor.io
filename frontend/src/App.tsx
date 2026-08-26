@@ -1,11 +1,26 @@
-import { HealthStatus } from './app/HealthStatus'
+import { BrowserRouter, Route, Routes } from 'react-router'
+import { HomePage } from './app/HomePage'
+import { ProtectedRoute } from './app/ProtectedRoute'
+import { SessionBootstrap } from './app/SessionBootstrap'
+import { LoginPage } from './features/auth/LoginPage'
 
 function App() {
   return (
-    <main>
-      <h1>Sistema de Presença, Ponto e Tarefas</h1>
-      <HealthStatus />
-    </main>
+    <BrowserRouter>
+      <SessionBootstrap>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <HomePage />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </SessionBootstrap>
+    </BrowserRouter>
   )
 }
 

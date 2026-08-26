@@ -6,9 +6,12 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react()],
   server: {
-    proxy: {
-      '/health': process.env.VITE_BACKEND_URL ?? 'http://localhost:8080',
-    },
+    proxy: Object.fromEntries(
+      ['/health', '/auth', '/usuarios'].map((path) => [
+        path,
+        process.env.VITE_BACKEND_URL ?? 'http://localhost:8080',
+      ]),
+    ),
   },
   test: {
     environment: 'jsdom',
