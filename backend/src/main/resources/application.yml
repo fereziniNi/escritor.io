@@ -12,6 +12,13 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+  mail:
+    host: localhost
+    port: 1025
+
+app:
+  email:
+    remetente: no-reply@escritor.io
 
 management:
   endpoints:
@@ -22,3 +29,6 @@ management:
   endpoint:
     health:
       show-details: never
+  health:
+    mail:
+      enabled: false

@@ -24,7 +24,7 @@ public class SecurityConfig {
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/health").permitAll()
+                        .requestMatchers("/health", "/auth/**").permitAll()
                         .anyRequest().authenticated());
 
         return http.build();
