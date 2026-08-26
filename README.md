@@ -19,4 +19,7 @@ Ambiente único onde a equipe registra jornada (ponto), organiza tarefas (kanban
 
 ## Status
 
-Fase atual: **documentação e planejamento**. Nenhum código foi escrito ainda — o scaffold de `/backend` e `/frontend` começa na próxima fase, seguindo a primeira fatia de [docs/incremental-plan.md](docs/incremental-plan.md).
+Fase atual: **S0 — esqueleto** (ver [docs/incremental-plan.md](docs/incremental-plan.md)).
+
+- ✅ S0.1 — backend (`/backend`): Spring Boot 4.1.x + Maven Wrapper, Flyway configurado, `GET /health`, validado por teste de integração com Testcontainers.
+- ⬜ S0.2 — frontend (`/frontend`): ainda não iniciado.

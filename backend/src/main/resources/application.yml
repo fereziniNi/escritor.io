@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: presenca-backend
+  datasource:
+    url: jdbc:postgresql://localhost:5432/presenca
+    username: presenca
+    password: presenca
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+management:
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never

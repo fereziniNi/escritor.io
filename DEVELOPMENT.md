@@ -1,13 +1,14 @@
 # Rodando o projeto localmente
 
-> Esqueleto ainda não existe (`/backend` e `/frontend` serão criados na fatia S0 do [plano incremental](docs/incremental-plan.md)). Este documento descreve como o setup vai funcionar assim que o scaffold existir — mantenha-o atualizado à medida que S0 avança.
+> Backend existe desde a fatia S0.1 (ver [docs/incremental-plan.md](docs/incremental-plan.md)). Frontend ainda não foi criado (fatia S0.2).
 
 ## Pré-requisitos
 
-- Java 21 (LTS)
-- Maven 3.9+
+- Java 21+ (JDK)
 - Node.js 20+ e npm
 - Docker (para o Postgres local **e** para os testes do backend via Testcontainers)
+
+Maven **não** precisa estar instalado — o projeto usa o Maven Wrapper (`./mvnw`, `mvnw.cmd` no Windows), que baixa a versão correta automaticamente.
 
 ## Banco de dados local
 
@@ -21,9 +22,14 @@ Sobe um Postgres em `localhost:5432` para uso do backend em modo `dev`. Os teste
 
 ```bash
 cd backend
-mvn spring-boot:run       # roda a aplicação em modo dev
-mvn test                  # roda a suíte de testes (requer Docker ativo)
+./mvnw spring-boot:run     # roda a aplicação em modo dev (requer o Postgres do docker-compose no ar)
+./mvnw test                # testes unitários (Surefire) — rápidos, sem Docker
+./mvnw verify               # unitários + integração (Failsafe/Testcontainers) — requer Docker ativo
 ```
+
+No Windows, sem Git Bash/WSL, use `mvnw.cmd` no lugar de `./mvnw`.
+
+`GET /health` (via Spring Boot Actuator) confirma que a aplicação subiu e conseguiu migrar o schema.
 
 ## Frontend
 

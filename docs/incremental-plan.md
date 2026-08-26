@@ -10,7 +10,7 @@ Fases 2–4 (E2 Kanban, E3 Apontamento, E4 Relatórios, E5 Escritório virtual) 
 
 | # | Fatia | Critério de pronto |
 |---|---|---|
-| S0.1 | Scaffold backend: Maven, Spring Boot, Flyway configurado, `docker-compose.yml` com Postgres, endpoint `GET /health` | Teste de integração (Testcontainers) confirma que o app sobe e migra o schema vazio |
+| S0.1 ✅ | Scaffold backend: Maven, Spring Boot, Flyway configurado, `docker-compose.yml` com Postgres, endpoint `GET /health` | Teste de integração (Testcontainers) confirma que o app sobe e migra o schema vazio |
 | S0.2 | Scaffold frontend: Vite + TS, TanStack Query provider, chamada à `/health` | Teste de componente confirma renderização do status |
 
 ## S1 — E0 Fundação

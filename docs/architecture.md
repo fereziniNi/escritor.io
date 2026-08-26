@@ -24,7 +24,7 @@ Backend e frontend são publicados como aplicações separadas (processos distin
 
 ## 2. Backend
 
-**Java 21 (LTS) + Spring Boot 3.x + Maven.**
+**Java 21 (LTS) + Spring Boot 4.1.x + Maven.** O projeto usa o Maven Wrapper (`./mvnw`) — não é necessário ter Maven instalado globalmente.
 
 ### 2.1 Estrutura de pacotes
 

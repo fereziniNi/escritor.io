@@ -1,0 +1,1 @@
+Migrações começam na fatia S1.1 (ver docs/incremental-plan.md). Este diretório existe desde já para que o Flyway rode (com zero migrações) e a suíte de testes valide o schema vazio.
