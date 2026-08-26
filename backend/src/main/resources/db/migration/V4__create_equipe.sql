@@ -1,0 +1,6 @@
+CREATE TABLE equipe (
+    id BIGSERIAL PRIMARY KEY,
+    nome VARCHAR(255) NOT NULL,
+    descricao TEXT,
+    ativa BOOLEAN NOT NULL DEFAULT TRUE
+);

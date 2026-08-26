@@ -24,7 +24,7 @@ Fases 2–4 (E2 Kanban, E3 Apontamento, E4 Relatórios, E5 Escritório virtual) 
 | S1.3c ✅ | `POST /auth/login` (verificar código) — JWT curto + refresh cookie | Domínio: código expirado/errado/já usado é rejeitado; 5ª tentativa errada mata o código |
 | S1.4 ✅ | `POST /auth/refresh` + rotação de refresh token | Web: refresh token usado 2x é rejeitado na segunda vez |
 | S1.5 ✅ | Frontend: tela de login (e-mail → código) + guarda de rota por papel | Componente: redireciona se token ausente/expirado |
-| S1.6 | Entidades `Equipe`, `Projeto`, `MembroEquipe`, `ProjetoEquipe` (N:N) | Repositório: constraint que impede `Quadro` órfão (ver S2, mas o vínculo N:N já nasce aqui) |
+| S1.6 ✅ | Entidades `Equipe`, `Projeto`, `MembroEquipe`, `ProjetoEquipe` (N:N) | Repositório: vínculo N:N duplicado rejeitado por constraint (`uk_membro_equipe_equipe_usuario`, `uk_projeto_equipe_projeto_equipe`) |
 | S1.7 | CRUD de equipe/projeto/vínculos (ADMIN) + telas correspondentes | Web: só admin cria; domínio: vínculo duplicado é idempotente, não duplica linha |
 
 ## S2 — E1 Ponto (núcleo do MVP)
