@@ -53,6 +53,15 @@ public class RegistroPonto {
     @Column(nullable = false)
     private String hash;
 
+    /**
+     * {@code null} = marcação normal. Preenchido só quando este registro é a correção de um
+     * ajuste aprovado (S2.12): aponta pro registro original que este substitui - o original em si
+     * nunca é editado, só ganha um "sucessor" via este campo no registro novo.
+     */
+    @ManyToOne
+    @JoinColumn(name = "substitui_id")
+    private RegistroPonto substitui;
+
     @Column(name = "criado_em", nullable = false, updatable = false)
     private Instant criadoEm;
 
@@ -68,6 +77,18 @@ public class RegistroPonto {
             String ip,
             String userAgent,
             String hashAnterior) {
+        this(usuario, tipo, momento, origem, ip, userAgent, hashAnterior, null);
+    }
+
+    public RegistroPonto(
+            Usuario usuario,
+            TipoRegistroPonto tipo,
+            Instant momento,
+            OrigemRegistroPonto origem,
+            String ip,
+            String userAgent,
+            String hashAnterior,
+            RegistroPonto substitui) {
         this.usuario = usuario;
         this.tipo = tipo;
         this.momento = momento;
@@ -76,6 +97,7 @@ public class RegistroPonto {
         this.userAgent = userAgent;
         this.hashAnterior = hashAnterior;
         this.hash = HashEncadeado.calcular(usuario.getId(), tipo, momento, origem, hashAnterior);
+        this.substitui = substitui;
         this.criadoEm = Instant.now();
     }
 
@@ -127,5 +149,9 @@ public class RegistroPonto {
 
     public Instant getCriadoEm() {
         return criadoEm;
+    }
+
+    public RegistroPonto getSubstitui() {
+        return substitui;
     }
 }

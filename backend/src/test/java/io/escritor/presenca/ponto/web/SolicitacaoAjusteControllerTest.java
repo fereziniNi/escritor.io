@@ -1,8 +1,11 @@
 package io.escritor.presenca.ponto.web;
 
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
+import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
+import io.escritor.presenca.ponto.domain.ParecerObrigatorioException;
 import io.escritor.presenca.ponto.domain.StatusSolicitacaoAjuste;
 import io.escritor.presenca.ponto.domain.TipoRegistroPonto;
+import io.escritor.presenca.ponto.service.AprovacaoAjusteService;
 import io.escritor.presenca.ponto.service.SolicitacaoAjusteService;
 import io.escritor.presenca.seguranca.JwtService;
 import io.escritor.presenca.seguranca.SecurityConfig;
@@ -32,6 +35,9 @@ class SolicitacaoAjusteControllerTest {
 
     @MockitoBean
     private SolicitacaoAjusteService solicitacaoAjusteService;
+
+    @MockitoBean
+    private AprovacaoAjusteService aprovacaoAjusteService;
 
     @MockitoBean
     private ContextoUsuarioAutenticado contextoUsuarioAutenticado;
@@ -109,6 +115,95 @@ class SolicitacaoAjusteControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"momento":"2026-01-15T09:00:00Z","justificativa":"Esqueci"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void aprovarSemAutenticacaoRetorna401() throws Exception {
+        mockMvc.perform(post("/ajustes/1/aprovar").contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "COLABORADOR")
+    void aprovarComPapelColaboradorRetorna403() throws Exception {
+        mockMvc.perform(post("/ajustes/1/aprovar").contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "GESTOR")
+    void aprovarComPapelGestorAprova() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(aprovacaoAjusteService.aprovar(eq(1L), any(), eq(null)))
+                .thenReturn(new SolicitacaoAjusteResponse(
+                        1L,
+                        TipoRegistroPonto.ENTRADA,
+                        Instant.parse("2026-01-15T09:00:00Z"),
+                        null,
+                        "Esqueci",
+                        StatusSolicitacaoAjuste.APROVADA));
+
+        mockMvc.perform(post("/ajustes/1/aprovar").contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("APROVADA"));
+    }
+
+    @Test
+    @WithMockUser(roles = "GESTOR")
+    void aprovarSolicitacaoInexistenteRetorna404() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(aprovacaoAjusteService.aprovar(eq(99L), any(), eq(null)))
+                .thenThrow(new RecursoNaoEncontradoException("não encontrada"));
+
+        mockMvc.perform(post("/ajustes/99/aprovar").contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser(roles = "COLABORADOR")
+    void rejeitarComPapelColaboradorRetorna403() throws Exception {
+        mockMvc.perform(post("/ajustes/1/rejeitar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"parecer":"Não procede"}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "GESTOR")
+    void rejeitarComPapelGestorRejeita() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(aprovacaoAjusteService.rejeitar(eq(1L), any(), eq("Não procede")))
+                .thenReturn(new SolicitacaoAjusteResponse(
+                        1L,
+                        TipoRegistroPonto.ENTRADA,
+                        Instant.parse("2026-01-15T09:00:00Z"),
+                        null,
+                        "Esqueci",
+                        StatusSolicitacaoAjuste.REJEITADA));
+
+        mockMvc.perform(post("/ajustes/1/rejeitar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"parecer":"Não procede"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REJEITADA"));
+    }
+
+    @Test
+    @WithMockUser(roles = "GESTOR")
+    void rejeitarSemParecerRetorna400() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(aprovacaoAjusteService.rejeitar(eq(1L), any(), eq("   "))).thenThrow(new ParecerObrigatorioException());
+
+        mockMvc.perform(post("/ajustes/1/rejeitar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"parecer":"   "}
                                 """))
                 .andExpect(status().isBadRequest());
     }

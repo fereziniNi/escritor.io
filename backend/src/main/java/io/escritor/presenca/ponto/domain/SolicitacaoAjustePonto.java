@@ -127,4 +127,34 @@ public class SolicitacaoAjustePonto {
     public Instant getCriadoEm() {
         return criadoEm;
     }
+
+    /**
+     * Não cria o {@link RegistroPonto} de correção - isso é responsabilidade do serviço, que
+     * também precisa do repositório pra encadear o hash. Este método só faz a transição de
+     * estado da solicitação em si.
+     */
+    public void aprovar(Usuario avaliador, Instant agora, String parecer) {
+        exigirPendente();
+        this.status = StatusSolicitacaoAjuste.APROVADA;
+        this.avaliador = avaliador;
+        this.avaliadoEm = agora;
+        this.parecer = parecer;
+    }
+
+    public void rejeitar(Usuario avaliador, Instant agora, String parecer) {
+        if (parecer == null || parecer.isBlank()) {
+            throw new ParecerObrigatorioException();
+        }
+        exigirPendente();
+        this.status = StatusSolicitacaoAjuste.REJEITADA;
+        this.avaliador = avaliador;
+        this.avaliadoEm = agora;
+        this.parecer = parecer;
+    }
+
+    private void exigirPendente() {
+        if (status != StatusSolicitacaoAjuste.PENDENTE) {
+            throw new SolicitacaoJaAvaliadaException(status);
+        }
+    }
 }

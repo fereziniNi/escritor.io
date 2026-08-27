@@ -47,6 +47,33 @@ class RegistroPontoTest {
     }
 
     @Test
+    void registroNormalNaoSubstituiNada() {
+        RegistroPonto registro = new RegistroPonto(
+                usuario, TipoRegistroPonto.ENTRADA, momento, OrigemRegistroPonto.WEB, "127.0.0.1", "junit", null);
+
+        assertThat(registro.getSubstitui()).isNull();
+    }
+
+    @Test
+    void correcaoDeAjusteApontaProRegistroOriginal() {
+        RegistroPonto original = new RegistroPonto(
+                usuario, TipoRegistroPonto.ENTRADA, momento, OrigemRegistroPonto.WEB, "127.0.0.1", "junit", null);
+
+        RegistroPonto correcao = new RegistroPonto(
+                usuario,
+                TipoRegistroPonto.ENTRADA,
+                momento.plusSeconds(600),
+                OrigemRegistroPonto.AJUSTE_APROVADO,
+                null,
+                null,
+                original.getHash(),
+                original);
+
+        assertThat(correcao.getSubstitui()).isSameAs(original);
+        assertThat(correcao.hashValido()).isTrue();
+    }
+
+    @Test
     void alterarUmCampoDoRegistroInvalidaOHash() {
         RegistroPonto registro = new RegistroPonto(
                 usuario, TipoRegistroPonto.ENTRADA, momento, OrigemRegistroPonto.WEB, "127.0.0.1", "junit", null);

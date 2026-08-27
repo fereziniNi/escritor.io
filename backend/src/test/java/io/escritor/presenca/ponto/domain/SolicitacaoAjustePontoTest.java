@@ -65,4 +65,69 @@ class SolicitacaoAjustePontoTest {
         assertThat(solicitacao.getAvaliadoEm()).isNull();
         assertThat(solicitacao.getParecer()).isNull();
     }
+
+    @Test
+    void aprovarMarcaStatusEAvaliador() {
+        var solicitacao = new SolicitacaoAjustePonto(
+                usuario, null, TipoRegistroPonto.ENTRADA, momentoSolicitado, "Esqueci de bater o ponto");
+        Usuario gestor = usuarioComId(2L);
+        Instant agora = Instant.parse("2026-01-16T10:00:00Z");
+
+        solicitacao.aprovar(gestor, agora, "Confirmado com o colaborador");
+
+        assertThat(solicitacao.getStatus()).isEqualTo(StatusSolicitacaoAjuste.APROVADA);
+        assertThat(solicitacao.getAvaliador()).isSameAs(gestor);
+        assertThat(solicitacao.getAvaliadoEm()).isEqualTo(agora);
+        assertThat(solicitacao.getParecer()).isEqualTo("Confirmado com o colaborador");
+    }
+
+    @Test
+    void aprovarSemParecerEhPermitido() {
+        var solicitacao = new SolicitacaoAjustePonto(
+                usuario, null, TipoRegistroPonto.ENTRADA, momentoSolicitado, "Esqueci de bater o ponto");
+
+        solicitacao.aprovar(usuarioComId(2L), Instant.parse("2026-01-16T10:00:00Z"), null);
+
+        assertThat(solicitacao.getStatus()).isEqualTo(StatusSolicitacaoAjuste.APROVADA);
+        assertThat(solicitacao.getParecer()).isNull();
+    }
+
+    @Test
+    void rejeitarExigeParecer() {
+        var solicitacao = new SolicitacaoAjustePonto(
+                usuario, null, TipoRegistroPonto.ENTRADA, momentoSolicitado, "Esqueci de bater o ponto");
+
+        assertThatThrownBy(() -> solicitacao.rejeitar(usuarioComId(2L), Instant.parse("2026-01-16T10:00:00Z"), "  "))
+                .isInstanceOf(ParecerObrigatorioException.class);
+        assertThat(solicitacao.getStatus()).isEqualTo(StatusSolicitacaoAjuste.PENDENTE);
+    }
+
+    @Test
+    void rejeitarComParecerMarcaStatus() {
+        var solicitacao = new SolicitacaoAjustePonto(
+                usuario, null, TipoRegistroPonto.ENTRADA, momentoSolicitado, "Esqueci de bater o ponto");
+        Usuario gestor = usuarioComId(2L);
+        Instant agora = Instant.parse("2026-01-16T10:00:00Z");
+
+        solicitacao.rejeitar(gestor, agora, "Sem registro de acesso ao prédio nesse horário");
+
+        assertThat(solicitacao.getStatus()).isEqualTo(StatusSolicitacaoAjuste.REJEITADA);
+        assertThat(solicitacao.getAvaliador()).isSameAs(gestor);
+        assertThat(solicitacao.getAvaliadoEm()).isEqualTo(agora);
+        assertThat(solicitacao.getParecer()).isEqualTo("Sem registro de acesso ao prédio nesse horário");
+    }
+
+    @Test
+    void naoConsegueAvaliarUmaSolicitacaoJaAvaliada() {
+        var solicitacao = new SolicitacaoAjustePonto(
+                usuario, null, TipoRegistroPonto.ENTRADA, momentoSolicitado, "Esqueci de bater o ponto");
+        solicitacao.aprovar(usuarioComId(2L), Instant.parse("2026-01-16T10:00:00Z"), null);
+
+        assertThatThrownBy(
+                        () -> solicitacao.aprovar(usuarioComId(2L), Instant.parse("2026-01-17T10:00:00Z"), null))
+                .isInstanceOf(SolicitacaoJaAvaliadaException.class);
+        assertThatThrownBy(() -> solicitacao.rejeitar(
+                        usuarioComId(2L), Instant.parse("2026-01-17T10:00:00Z"), "Mudei de ideia"))
+                .isInstanceOf(SolicitacaoJaAvaliadaException.class);
+    }
 }
