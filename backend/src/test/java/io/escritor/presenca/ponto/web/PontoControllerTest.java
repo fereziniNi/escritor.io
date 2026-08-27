@@ -1,8 +1,10 @@
 package io.escritor.presenca.ponto.web;
 
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
+import io.escritor.presenca.ponto.domain.EstadoDia;
 import io.escritor.presenca.ponto.domain.OrigemRegistroPonto;
 import io.escritor.presenca.ponto.domain.TipoRegistroPonto;
+import io.escritor.presenca.ponto.service.JornadaService;
 import io.escritor.presenca.ponto.service.PontoService;
 import io.escritor.presenca.ponto.service.SequenciaInvalidaException;
 import io.escritor.presenca.seguranca.JwtService;
@@ -36,6 +38,9 @@ class PontoControllerTest {
 
     @MockitoBean
     private PontoService pontoService;
+
+    @MockitoBean
+    private JornadaService jornadaService;
 
     @MockitoBean
     private ContextoUsuarioAutenticado contextoUsuarioAutenticado;
@@ -120,5 +125,27 @@ class PontoControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ultimoTipo").value("PAUSA_INICIO"))
                 .andExpect(jsonPath("$.proximasOpcoes", org.hamcrest.Matchers.contains("PAUSA_FIM")));
+    }
+
+    @Test
+    void jornadaDoDiaSemAutenticacaoRetorna401() throws Exception {
+        mockMvc.perform(get("/ponto/jornada-do-dia")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void jornadaDoDiaRetornaEstadoESaldo() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(jornadaService.jornadaDoDia(any()))
+                .thenReturn(new JornadaDoDiaResponse(
+                        java.time.LocalDate.parse("2026-01-13"), EstadoDia.FECHADA, 540, 60, 120));
+
+        mockMvc.perform(get("/ponto/jornada-do-dia"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("2026-01-13"))
+                .andExpect(jsonPath("$.estado").value("FECHADA"))
+                .andExpect(jsonPath("$.minutosTrabalhados").value(540))
+                .andExpect(jsonPath("$.saldoDia").value(60))
+                .andExpect(jsonPath("$.saldoAcumuladoNoPeriodo").value(120));
     }
 }

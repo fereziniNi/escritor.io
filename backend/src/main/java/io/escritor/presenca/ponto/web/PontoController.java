@@ -1,6 +1,7 @@
 package io.escritor.presenca.ponto.web;
 
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
+import io.escritor.presenca.ponto.service.JornadaService;
 import io.escritor.presenca.ponto.service.PontoService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -17,10 +18,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class PontoController {
 
     private final PontoService pontoService;
+    private final JornadaService jornadaService;
     private final ContextoUsuarioAutenticado contextoUsuarioAutenticado;
 
-    public PontoController(PontoService pontoService, ContextoUsuarioAutenticado contextoUsuarioAutenticado) {
+    public PontoController(
+            PontoService pontoService, JornadaService jornadaService, ContextoUsuarioAutenticado contextoUsuarioAutenticado) {
         this.pontoService = pontoService;
+        this.jornadaService = jornadaService;
         this.contextoUsuarioAutenticado = contextoUsuarioAutenticado;
     }
 
@@ -34,5 +38,10 @@ public class PontoController {
     @GetMapping("/estado-atual")
     public EstadoAtualPontoResponse estadoAtual() {
         return pontoService.estadoAtual(contextoUsuarioAutenticado.usuarioAtual());
+    }
+
+    @GetMapping("/jornada-do-dia")
+    public JornadaDoDiaResponse jornadaDoDia() {
+        return jornadaService.jornadaDoDia(contextoUsuarioAutenticado.usuarioAtual());
     }
 }
