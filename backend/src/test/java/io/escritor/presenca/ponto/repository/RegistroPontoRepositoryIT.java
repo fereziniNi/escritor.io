@@ -40,7 +40,13 @@ class RegistroPontoRepositoryIT {
         Instant momento = Instant.parse("2026-01-15T12:00:00Z");
 
         RegistroPonto salvo = registroPontoRepository.saveAndFlush(new RegistroPonto(
-                usuario, TipoRegistroPonto.ENTRADA, momento, OrigemRegistroPonto.WEB, "127.0.0.1", "junit-test"));
+                usuario,
+                TipoRegistroPonto.ENTRADA,
+                momento,
+                OrigemRegistroPonto.WEB,
+                "127.0.0.1",
+                "junit-test",
+                null));
 
         RegistroPonto recuperado = registroPontoRepository.findById(salvo.getId()).orElseThrow();
 
@@ -50,6 +56,9 @@ class RegistroPontoRepositoryIT {
         assertThat(recuperado.getOrigem()).isEqualTo(OrigemRegistroPonto.WEB);
         assertThat(recuperado.getIp()).isEqualTo("127.0.0.1");
         assertThat(recuperado.getUserAgent()).isEqualTo("junit-test");
+        assertThat(recuperado.getHashAnterior()).isNull();
+        assertThat(recuperado.getHash()).isNotBlank();
+        assertThat(recuperado.hashValido()).isTrue();
         assertThat(recuperado.getCriadoEm()).isNotNull();
     }
 }

@@ -49,8 +49,8 @@ class RegistroPontoRevogacaoIT {
             executar(
                     admin,
                     """
-                    INSERT INTO registro_ponto (usuario_id, tipo, momento, origem)
-                    VALUES (1, 'ENTRADA', now(), 'WEB')
+                    INSERT INTO registro_ponto (usuario_id, tipo, momento, origem, hash)
+                    VALUES (1, 'ENTRADA', now(), 'WEB', 'hash-de-teste')
                     """);
         }
 
@@ -67,8 +67,8 @@ class RegistroPontoRevogacaoIT {
             executar(
                     app,
                     """
-                    INSERT INTO registro_ponto (usuario_id, tipo, momento, origem)
-                    VALUES (1, 'PAUSA_INICIO', now(), 'WEB')
+                    INSERT INTO registro_ponto (usuario_id, tipo, momento, origem, hash)
+                    VALUES (1, 'PAUSA_INICIO', now(), 'WEB', 'outro-hash-de-teste')
                     """);
         }
     }

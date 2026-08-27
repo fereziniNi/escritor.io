@@ -12,6 +12,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Objects;
 
 /**
  * Append-only: a tabela revoga UPDATE/DELETE para o papel de runtime da aplicação
@@ -46,6 +47,12 @@ public class RegistroPonto {
     @Column(name = "user_agent")
     private String userAgent;
 
+    @Column(name = "hash_anterior")
+    private String hashAnterior;
+
+    @Column(nullable = false)
+    private String hash;
+
     @Column(name = "criado_em", nullable = false, updatable = false)
     private Instant criadoEm;
 
@@ -59,14 +66,27 @@ public class RegistroPonto {
             Instant momento,
             OrigemRegistroPonto origem,
             String ip,
-            String userAgent) {
+            String userAgent,
+            String hashAnterior) {
         this.usuario = usuario;
         this.tipo = tipo;
         this.momento = momento;
         this.origem = origem;
         this.ip = ip;
         this.userAgent = userAgent;
+        this.hashAnterior = hashAnterior;
+        this.hash = HashEncadeado.calcular(usuario.getId(), tipo, momento, origem, hashAnterior);
         this.criadoEm = Instant.now();
+    }
+
+    /**
+     * Recalcula o hash a partir dos campos atuais e compara com o que está gravado. Se alguém
+     * alterou um campo deste registro diretamente no banco (bypassando a aplicação), os dois
+     * hashes não batem mais.
+     */
+    public boolean hashValido() {
+        String esperado = HashEncadeado.calcular(usuario.getId(), tipo, momento, origem, hashAnterior);
+        return Objects.equals(esperado, hash);
     }
 
     public Long getId() {
@@ -95,6 +115,14 @@ public class RegistroPonto {
 
     public String getUserAgent() {
         return userAgent;
+    }
+
+    public String getHashAnterior() {
+        return hashAnterior;
+    }
+
+    public String getHash() {
+        return hash;
     }
 
     public Instant getCriadoEm() {
