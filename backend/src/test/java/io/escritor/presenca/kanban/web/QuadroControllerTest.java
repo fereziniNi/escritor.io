@@ -2,7 +2,9 @@ package io.escritor.presenca.kanban.web;
 
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
+import io.escritor.presenca.kanban.domain.OrdemColunaDuplicadaException;
 import io.escritor.presenca.kanban.domain.QuadroSemVinculoException;
+import io.escritor.presenca.kanban.service.ColunaService;
 import io.escritor.presenca.kanban.service.QuadroService;
 import io.escritor.presenca.seguranca.JwtService;
 import io.escritor.presenca.seguranca.SecurityConfig;
@@ -33,6 +35,9 @@ class QuadroControllerTest {
 
     @MockitoBean
     private QuadroService quadroService;
+
+    @MockitoBean
+    private ColunaService colunaService;
 
     @MockitoBean
     private ContextoUsuarioAutenticado contextoUsuarioAutenticado;
@@ -141,5 +146,95 @@ class QuadroControllerTest {
                                 {"nome":"Backlog","equipeId":999}
                                 """))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void criarColunaSemAutenticacaoRetorna401() throws Exception {
+        mockMvc.perform(post("/quadros/1/colunas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"A fazer","ordem":0}
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "COLABORADOR")
+    void criarColunaComPapelColaboradorRetorna403() throws Exception {
+        mockMvc.perform(post("/quadros/1/colunas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"A fazer","ordem":0}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "GESTOR")
+    void criarColunaComPapelGestorRetorna201() throws Exception {
+        when(colunaService.criar(1L, "A fazer", 0, null))
+                .thenReturn(new ColunaResponse(1L, 1L, "A fazer", 0, null));
+
+        mockMvc.perform(post("/quadros/1/colunas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"A fazer","ordem":0}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.nome").value("A fazer"))
+                .andExpect(jsonPath("$.quadroId").value(1));
+    }
+
+    @Test
+    @WithMockUser(roles = "GESTOR")
+    void criarColunaComLimiteWip() throws Exception {
+        when(colunaService.criar(1L, "Em progresso", 1, 3))
+                .thenReturn(new ColunaResponse(2L, 1L, "Em progresso", 1, 3));
+
+        mockMvc.perform(post("/quadros/1/colunas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"Em progresso","ordem":1,"limiteWip":3}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.limiteWip").value(3));
+    }
+
+    @Test
+    @WithMockUser(roles = "GESTOR")
+    void criarColunaSemNomeRetorna400() throws Exception {
+        mockMvc.perform(post("/quadros/1/colunas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"ordem":0}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "GESTOR")
+    void criarColunaEmQuadroInexistenteRetorna404() throws Exception {
+        when(colunaService.criar(999L, "A fazer", 0, null))
+                .thenThrow(new RecursoNaoEncontradoException("não encontrado"));
+
+        mockMvc.perform(post("/quadros/999/colunas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"A fazer","ordem":0}
+                                """))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser(roles = "GESTOR")
+    void criarColunaComOrdemDuplicadaRetorna409() throws Exception {
+        when(colunaService.criar(1L, "A fazer", 0, null)).thenThrow(new OrdemColunaDuplicadaException(0));
+
+        mockMvc.perform(post("/quadros/1/colunas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"A fazer","ordem":0}
+                                """))
+                .andExpect(status().isConflict());
     }
 }
