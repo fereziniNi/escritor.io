@@ -7,6 +7,8 @@ import io.escritor.presenca.ponto.domain.Marcacao;
 import io.escritor.presenca.ponto.domain.RegistroPonto;
 import io.escritor.presenca.ponto.domain.SaldoAcumulado;
 import io.escritor.presenca.ponto.repository.RegistroPontoRepository;
+import io.escritor.presenca.ponto.web.EspelhoDiaResponse;
+import io.escritor.presenca.ponto.web.EspelhoMesResponse;
 import io.escritor.presenca.ponto.web.JornadaDoDiaResponse;
 import java.time.Clock;
 import java.time.Instant;
@@ -19,9 +21,10 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 /**
- * Período de "saldo acumulado" é sempre mês corrente até hoje (dia 1 às 00:00 UTC até agora) - o
- * espelho de período arbitrário fica pra S2.14. "Dia" é sempre o dia civil em UTC: o sistema
- * ainda não tem noção de fuso horário da empresa (ver ADR 0010).
+ * Período (tanto de "saldo acumulado" quanto do espelho do mês, S2.14) é sempre mês corrente até
+ * hoje (dia 1 às 00:00 UTC até agora) - período arbitrário/mês passado fica pra depois do MVP.
+ * "Dia" é sempre o dia civil em UTC: o sistema ainda não tem noção de fuso horário da empresa
+ * (ver ADR 0010).
  */
 @Service
 public class JornadaService {
@@ -37,18 +40,7 @@ public class JornadaService {
     public JornadaDoDiaResponse jornadaDoDia(Usuario usuario) {
         Instant agora = Instant.now(clock);
         LocalDate hoje = agora.atZone(ZoneOffset.UTC).toLocalDate();
-        Instant inicioDoPeriodo = hoje.withDayOfMonth(1).atStartOfDay(ZoneOffset.UTC).toInstant();
-
-        List<RegistroPonto> registrosDoPeriodo = registroPontoRepository
-                .findByUsuarioAndMomentoGreaterThanEqualOrderByMomentoAsc(usuario, inicioDoPeriodo);
-
-        Map<LocalDate, List<Marcacao>> marcacoesPorDia = registrosDoPeriodo.stream()
-                .collect(Collectors.groupingBy(
-                        registro -> registro.getMomento().atZone(ZoneOffset.UTC).toLocalDate(),
-                        LinkedHashMap::new,
-                        Collectors.mapping(
-                                registro -> new Marcacao(registro.getTipo(), registro.getMomento()),
-                                Collectors.toList())));
+        Map<LocalDate, List<Marcacao>> marcacoesPorDia = marcacoesPorDiaNoMesCorrente(usuario, hoje);
 
         List<Marcacao> marcacoesDeHoje = marcacoesPorDia.getOrDefault(hoje, List.of());
         Instant fimDoDia = hoje.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
@@ -60,5 +52,48 @@ public class JornadaService {
         long saldoAcumuladoNoPeriodo = SaldoAcumulado.calcular(marcacoesPorDia, cargaDiariaMinutos);
 
         return new JornadaDoDiaResponse(hoje, estado, minutosTrabalhados, saldoDia, saldoAcumuladoNoPeriodo);
+    }
+
+    /**
+     * Só lista dias com pelo menos uma marcação - um dia sem nenhum registro não aparece (mesma
+     * regra que {@link io.escritor.presenca.ponto.domain.SaldoAcumulado} já segue pro acumulado).
+     */
+    public EspelhoMesResponse espelhoDoMes(Usuario usuario) {
+        Instant agora = Instant.now(clock);
+        LocalDate hoje = agora.atZone(ZoneOffset.UTC).toLocalDate();
+        Map<LocalDate, List<Marcacao>> marcacoesPorDia = marcacoesPorDiaNoMesCorrente(usuario, hoje);
+        int cargaDiariaMinutos = usuario.getCargaDiariaMinutos();
+
+        List<EspelhoDiaResponse> dias = marcacoesPorDia.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entrada -> {
+                    LocalDate data = entrada.getKey();
+                    List<Marcacao> marcacoesDoDia = entrada.getValue();
+                    Instant fimDoDia = data.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+                    EstadoDia estado = EstadoDia.calcular(marcacoesDoDia, fimDoDia, agora);
+                    long minutosTrabalhados = JornadaDiaria.minutosTrabalhados(marcacoesDoDia);
+                    long saldoDia = JornadaDiaria.saldo(marcacoesDoDia, cargaDiariaMinutos);
+                    return new EspelhoDiaResponse(data, estado, minutosTrabalhados, saldoDia);
+                })
+                .toList();
+
+        long saldoAcumuladoNoPeriodo = SaldoAcumulado.calcular(marcacoesPorDia, cargaDiariaMinutos);
+
+        return new EspelhoMesResponse(dias, saldoAcumuladoNoPeriodo);
+    }
+
+    private Map<LocalDate, List<Marcacao>> marcacoesPorDiaNoMesCorrente(Usuario usuario, LocalDate hoje) {
+        Instant inicioDoPeriodo = hoje.withDayOfMonth(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+
+        List<RegistroPonto> registrosDoPeriodo = registroPontoRepository
+                .findByUsuarioAndMomentoGreaterThanEqualOrderByMomentoAsc(usuario, inicioDoPeriodo);
+
+        return registrosDoPeriodo.stream()
+                .collect(Collectors.groupingBy(
+                        registro -> registro.getMomento().atZone(ZoneOffset.UTC).toLocalDate(),
+                        LinkedHashMap::new,
+                        Collectors.mapping(
+                                registro -> new Marcacao(registro.getTipo(), registro.getMomento()),
+                                Collectors.toList())));
     }
 }

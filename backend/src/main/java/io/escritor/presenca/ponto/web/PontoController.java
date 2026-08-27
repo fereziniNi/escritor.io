@@ -44,4 +44,9 @@ public class PontoController {
     public JornadaDoDiaResponse jornadaDoDia() {
         return jornadaService.jornadaDoDia(contextoUsuarioAutenticado.usuarioAtual());
     }
+
+    @GetMapping("/espelho-do-mes")
+    public EspelhoMesResponse espelhoDoMes() {
+        return jornadaService.espelhoDoMes(contextoUsuarioAutenticado.usuarioAtual());
+    }
 }

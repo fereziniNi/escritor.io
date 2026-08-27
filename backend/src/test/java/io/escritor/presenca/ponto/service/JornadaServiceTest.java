@@ -94,4 +94,62 @@ class JornadaServiceTest {
 
         assertThat(jornada.saldoAcumuladoNoPeriodo()).isEqualTo(60);
     }
+
+    @Test
+    void espelhoDoMesListaSoOsDiasComMarcacaoOrdenados() {
+        when(registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualOrderByMomentoAsc(any(), any()))
+                .thenReturn(List.of(
+                        registro(TipoRegistroPonto.ENTRADA, "2026-01-13T09:00:00Z"),
+                        registro(TipoRegistroPonto.SAIDA, "2026-01-13T17:00:00Z"),
+                        registro(TipoRegistroPonto.ENTRADA, "2026-01-12T09:00:00Z"),
+                        registro(TipoRegistroPonto.SAIDA, "2026-01-12T18:00:00Z")));
+
+        var espelho = jornadaService.espelhoDoMes(usuario);
+
+        assertThat(espelho.dias()).hasSize(2);
+        assertThat(espelho.dias().get(0).data()).isEqualTo("2026-01-12");
+        assertThat(espelho.dias().get(0).estado()).isEqualTo(EstadoDia.FECHADA);
+        assertThat(espelho.dias().get(0).saldoDia()).isEqualTo(60);
+        assertThat(espelho.dias().get(1).data()).isEqualTo("2026-01-13");
+        assertThat(espelho.dias().get(1).saldoDia()).isZero();
+    }
+
+    @Test
+    void espelhoDoMesIgnoraDiaSemNenhumaMarcacao() {
+        when(registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualOrderByMomentoAsc(any(), any()))
+                .thenReturn(List.of());
+
+        var espelho = jornadaService.espelhoDoMes(usuario);
+
+        assertThat(espelho.dias()).isEmpty();
+        assertThat(espelho.saldoAcumuladoNoPeriodo()).isZero();
+    }
+
+    @Test
+    void espelhoDoMesSomaDosDiasUteisBateComSaldoAcumulado() {
+        when(registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualOrderByMomentoAsc(any(), any()))
+                .thenReturn(List.of(
+                        // segunda-feira 2026-01-12: saldo +60
+                        registro(TipoRegistroPonto.ENTRADA, "2026-01-12T09:00:00Z"),
+                        registro(TipoRegistroPonto.SAIDA, "2026-01-12T18:00:00Z"),
+                        // sábado 2026-01-10: não deveria contar na soma
+                        registro(TipoRegistroPonto.ENTRADA, "2026-01-10T09:00:00Z"),
+                        registro(TipoRegistroPonto.SAIDA, "2026-01-10T13:00:00Z"),
+                        // hoje, terça-feira 2026-01-13: saldo 0
+                        registro(TipoRegistroPonto.ENTRADA, "2026-01-13T09:00:00Z"),
+                        registro(TipoRegistroPonto.SAIDA, "2026-01-13T17:00:00Z")));
+
+        var espelho = jornadaService.espelhoDoMes(usuario);
+
+        long somaDiasUteis = espelho.dias().stream()
+                .filter(dia -> {
+                    var diaDaSemana = dia.data().getDayOfWeek();
+                    return diaDaSemana != java.time.DayOfWeek.SATURDAY && diaDaSemana != java.time.DayOfWeek.SUNDAY;
+                })
+                .mapToLong(io.escritor.presenca.ponto.web.EspelhoDiaResponse::saldoDia)
+                .sum();
+
+        assertThat(somaDiasUteis).isEqualTo(espelho.saldoAcumuladoNoPeriodo());
+        assertThat(espelho.saldoAcumuladoNoPeriodo()).isEqualTo(60);
+    }
 }

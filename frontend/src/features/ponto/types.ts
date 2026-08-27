@@ -21,3 +21,15 @@ export interface JornadaDoDia {
   saldoDia: number
   saldoAcumuladoNoPeriodo: number
 }
+
+export interface EspelhoDia {
+  data: string
+  estado: EstadoDia
+  minutosTrabalhados: number
+  saldoDia: number
+}
+
+export interface EspelhoMes {
+  dias: EspelhoDia[]
+  saldoAcumuladoNoPeriodo: number
+}

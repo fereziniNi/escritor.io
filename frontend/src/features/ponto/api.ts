@@ -1,5 +1,5 @@
 import { apiFetch } from '../../shared/api/http'
-import type { EstadoAtualPonto, JornadaDoDia, RegistroPonto, TipoRegistroPonto } from './types'
+import type { EspelhoMes, EstadoAtualPonto, JornadaDoDia, RegistroPonto, TipoRegistroPonto } from './types'
 
 export async function buscarEstadoAtual(): Promise<EstadoAtualPonto> {
   const response = await apiFetch('/ponto/estado-atual')
@@ -13,6 +13,14 @@ export async function buscarJornadaDoDia(): Promise<JornadaDoDia> {
   const response = await apiFetch('/ponto/jornada-do-dia')
   if (!response.ok) {
     throw new Error('Não foi possível carregar a jornada do dia')
+  }
+  return response.json()
+}
+
+export async function buscarEspelhoDoMes(): Promise<EspelhoMes> {
+  const response = await apiFetch('/ponto/espelho-do-mes')
+  if (!response.ok) {
+    throw new Error('Não foi possível carregar o espelho do mês')
   }
   return response.json()
 }

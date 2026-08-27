@@ -148,4 +148,28 @@ class PontoControllerTest {
                 .andExpect(jsonPath("$.saldoDia").value(60))
                 .andExpect(jsonPath("$.saldoAcumuladoNoPeriodo").value(120));
     }
+
+    @Test
+    void espelhoDoMesSemAutenticacaoRetorna401() throws Exception {
+        mockMvc.perform(get("/ponto/espelho-do-mes")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void espelhoDoMesRetornaOsDiasEOSaldoAcumulado() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(jornadaService.espelhoDoMes(any()))
+                .thenReturn(new EspelhoMesResponse(
+                        java.util.List.of(
+                                new EspelhoDiaResponse(java.time.LocalDate.parse("2026-01-12"), EstadoDia.FECHADA, 540, 60),
+                                new EspelhoDiaResponse(java.time.LocalDate.parse("2026-01-13"), EstadoDia.FECHADA, 480, 0)),
+                        60));
+
+        mockMvc.perform(get("/ponto/espelho-do-mes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dias", org.hamcrest.Matchers.hasSize(2)))
+                .andExpect(jsonPath("$.dias[0].data").value("2026-01-12"))
+                .andExpect(jsonPath("$.dias[0].saldoDia").value(60))
+                .andExpect(jsonPath("$.saldoAcumuladoNoPeriodo").value(60));
+    }
 }
