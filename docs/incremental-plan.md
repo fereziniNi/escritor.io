@@ -41,7 +41,7 @@ Fases 2–4 (E2 Kanban, E3 Apontamento, E4 Relatórios, E5 Escritório virtual) 
 | S2.8 ✅ | Job/view que fecha o dia e marca `INCONSISTENTE` quando falta `SAIDA` até a virada | Domínio: dia sem saída após virada muda de `ABERTA` para `INCONSISTENTE` |
 | S2.9 ✅ | `GET /ponto/jornada-do-dia` + saldo acumulado do período | Serviço: saldo acumulado ignora dias não úteis |
 | S2.10 ✅ | Frontend: painel do colaborador (jornada do dia + saldo) | Componente: exibe saldo negativo/positivo corretamente |
-| S2.11 | `SolicitacaoAjustePonto` — criar solicitação (com ou sem `registro_alvo_id`) | Domínio: justificativa obrigatória; web: colaborador só solicita para si mesmo |
+| S2.11 ✅ | `SolicitacaoAjustePonto` — criar solicitação (com ou sem `registro_alvo_id`) | Domínio: justificativa obrigatória; web: colaborador só solicita para si mesmo |
 | S2.12 | Aprovação/rejeição pelo gestor — gera **novo** `RegistroPonto` apontando pro original, nunca edita | Domínio: aprovar uma solicitação nunca chama `UPDATE`/`DELETE`, sempre `INSERT` com `substitui_id` |
 | S2.13 | Frontend: fila de solicitações pendentes (gestor) + formulário de solicitação (colaborador) | Componente: rollback/erro ao rejeitar sem parecer |
 | S2.14 | Espelho do mês (listagem, sem PDF ainda) | Serviço: soma bate com a soma diária calculada em S2.7 |

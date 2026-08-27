@@ -1,6 +1,7 @@
 package io.escritor.presenca.infra;
 
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
+import io.escritor.presenca.ponto.domain.JustificativaObrigatoriaException;
 import io.escritor.presenca.ponto.service.SequenciaInvalidaException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,5 +19,10 @@ public class TratamentoErroGlobal {
     @ExceptionHandler(SequenciaInvalidaException.class)
     ResponseEntity<Void> tratarSequenciaInvalida() {
         return ResponseEntity.status(HttpStatus.CONFLICT).build();
+    }
+
+    @ExceptionHandler(JustificativaObrigatoriaException.class)
+    ResponseEntity<Void> tratarJustificativaObrigatoria() {
+        return ResponseEntity.badRequest().build();
     }
 }
