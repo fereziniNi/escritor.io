@@ -3,6 +3,7 @@ import { HomePage } from './app/HomePage'
 import { ProtectedRoute } from './app/ProtectedRoute'
 import { SessionBootstrap } from './app/SessionBootstrap'
 import { LoginPage } from './features/auth/LoginPage'
+import { QuadrosPage } from './features/kanban/QuadrosPage'
 import { EquipesPage } from './features/organizacao/EquipesPage'
 import { ProjetosPage } from './features/organizacao/ProjetosPage'
 
@@ -33,6 +34,14 @@ function App() {
             element={
               <ProtectedRoute papeisPermitidos={['ADMIN']}>
                 <ProjetosPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/kanban"
+            element={
+              <ProtectedRoute>
+                <QuadrosPage />
               </ProtectedRoute>
             }
           />

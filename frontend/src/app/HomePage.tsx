@@ -21,13 +21,17 @@ export function HomePage() {
 
       {(papel === 'GESTOR' || papel === 'ADMIN') && <FilaAjustesPainel />}
 
-      {papel === 'ADMIN' && (
-        <nav>
-          <Link to="/admin/equipes">Equipes</Link>
-          {' · '}
-          <Link to="/admin/projetos">Projetos</Link>
-        </nav>
-      )}
+      <nav>
+        <Link to="/kanban">Quadros</Link>
+        {papel === 'ADMIN' && (
+          <>
+            {' · '}
+            <Link to="/admin/equipes">Equipes</Link>
+            {' · '}
+            <Link to="/admin/projetos">Projetos</Link>
+          </>
+        )}
+      </nav>
     </main>
   )
 }
