@@ -47,10 +47,32 @@ Playwright (E2E) entra na primeira fatia que tiver um fluxo crítico de verdade 
 
 O endereço do backend usado pelo proxy de dev é configurável via `VITE_BACKEND_URL` (padrão `http://localhost:8080`) — útil se a porta 8080 já estiver em uso por outro projeto na máquina.
 
+## Subir tudo em container (pra testar sem instalar nada)
+
+Além do fluxo de dev acima (backend/frontend rodando direto na máquina), `docker-compose.yml` também sobe o backend e o frontend como containers — útil pra só testar a aplicação, sem precisar de JDK/Node instalados:
+
+```bash
+docker compose up -d --build
+```
+
+Isso builda as imagens (`backend/Dockerfile`, `frontend/Dockerfile`) e sobe cinco serviços: `postgres`, `mailpit`, `backend`, `frontend` (Nginx servindo o build de produção, com proxy reverso pras mesmas rotas de API que o Vite usa em dev - ver `frontend/nginx.conf`) e `seed` (roda uma vez, cria o primeiro usuário ADMIN depois que o backend migra o schema - sem isso `POST /usuarios` fica inacessível, porque exige um ADMIN que ainda não existe). O `seed` é idempotente: subir de novo sem apagar o volume não duplica nada.
+
+Acesse `http://localhost:5173`. Login: e-mail `admin@escritor.io`, código chega em `http://localhost:8025` (Mailpit). Esse usuário já nasce como membro (líder) de uma equipe ("Equipe Geral", id 1) pra já dar pra criar um quadro de teste sem precisar cadastrar mais nada primeiro.
+
+`docker compose down` derruba tudo; `docker compose down -v` também apaga o volume do Postgres (perde os dados, inclusive o seed - a próxima subida recria do zero).
+
 ## Ciclo de desenvolvimento (TDD)
 
 Ver [docs/testing-strategy.md](docs/testing-strategy.md) para o workflow completo. Resumo: teste de domínio no backend primeiro, depois web/repositório, depois componente no frontend, E2E só para os fluxos críticos listados lá.
 
 ## Troubleshooting
 
-- **Porta 5432/8080/5173 já em uso:** se houver outro projeto local usando as mesmas portas, suba o Postgres deste projeto em outra porta (`docker compose run --service-ports -p 5433:5432 postgres` ou edite `docker-compose.yml` localmente sem commitar) e aponte `spring.datasource.url` / `VITE_BACKEND_URL` de acordo. As portas padrão do projeto (5432, 8080, 5173) continuam sendo as documentadas — o ajuste é só para rodar em paralelo com outro projeto que já as ocupa.
+- **Porta 5432/8080/5173 já em uso:** as portas do host em `docker-compose.yml` (`postgres`, `backend`, `frontend`) são configuráveis via `POSTGRES_PORT`/`BACKEND_PORT`/`FRONTEND_PORT` (padrão 5432/8080/5173). Se houver outro projeto local usando as mesmas portas, crie um `.env` na raiz (já no `.gitignore` — nunca commitar) remapeando só as portas do host:
+
+  ```
+  POSTGRES_PORT=5433
+  BACKEND_PORT=8082
+  FRONTEND_PORT=5175
+  ```
+
+  O `docker compose up` já lê o `.env` automaticamente. **Não use `docker-compose.override.yml` pra isso** — listas como `ports:` se *concatenam* entre `docker-compose.yml` e o override em vez de substituir, então a porta padrão (5432) continua sendo reivindicada junto com a nova, e o conflito persiste. Rodando backend/frontend direto na máquina (fora de container), aponte `spring.datasource.url` / `VITE_BACKEND_URL` pra essas mesmas portas. As portas padrão do projeto (5432, 8080, 5173) continuam sendo as documentadas — o `.env` é só local, pra rodar em paralelo com outro projeto que já as ocupa.

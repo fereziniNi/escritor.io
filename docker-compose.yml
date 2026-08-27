@@ -6,16 +6,68 @@ services:
       POSTGRES_USER: presenca
       POSTGRES_PASSWORD: presenca
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/src/main/resources/db-init/criar-papel-app.sql:/docker-entrypoint-initdb.d/01-criar-papel-app.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U presenca"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   mailpit:
     image: axllent/mailpit
     ports:
       - "1025:1025"   # SMTP - o backend envia e-mails de login aqui
       - "8025:8025"   # UI web para ver os e-mails capturados
+
+  backend:
+    build: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Só a URL muda (localhost -> nome do serviço na rede do compose); usuário/senha continuam
+      # os mesmos de application.yml (presenca_app/presenca_app pro runtime, presenca/presenca só
+      # pro Flyway - ver ADR 0009).
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/presenca
+      SPRING_FLYWAY_URL: jdbc:postgresql://postgres:5432/presenca
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: 1025
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+
+  # Só pra ambiente de teste local: cria o primeiro usuário (ADMIN) depois que o backend migra o
+  # schema - sem isso, POST /usuarios (que cria os demais) exige um ADMIN que ainda não existe.
+  # Idempotente (docker/seed-usuario-admin.sql usa ON CONFLICT/NOT EXISTS), então reiniciar o
+  # compose sem apagar o volume não duplica nada.
+  seed:
+    image: postgres:16
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    environment:
+      PGPASSWORD: presenca
+    volumes:
+      - ./docker/seed-usuario-admin.sql:/seed.sql:ro
+    entrypoint: >
+      sh -c "
+      until psql -h postgres -U presenca -d presenca -c 'select 1 from usuario limit 1' >/dev/null 2>&1; do
+        echo 'aguardando o backend migrar o schema...';
+        sleep 2;
+      done;
+      psql -h postgres -U presenca -d presenca -f /seed.sql
+      "
 
 volumes:
   postgres_data:
