@@ -1,8 +1,8 @@
-# Plano incremental — Fase 1 (E0 + E1)
+# Plano incremental — Fases 1 e 2 (E0 + E1 + E2)
 
 Backlog ordenado de fatias verticais. Cada fatia é pequena o suficiente para caber num ciclo TDD completo (backend domínio → backend web/repo → frontend) e entrega algo demonstrável. Não pular fatias — cada uma assume que as anteriores estão testadas e verdes.
 
-Fases 2–4 (E2 Kanban, E3 Apontamento, E4 Relatórios, E5 Escritório virtual) serão detalhadas no mesmo formato quando a Fase 1 estiver em produção, conforme o roadmap do PRD (§5) — planejar tudo agora seria especular sobre o que a fase anterior vai ensinar.
+Fase 1 (E0 + E1) está completa e em uso. Fase 2 (E2 Kanban) está detalhada abaixo (S3), seguindo o mesmo formato. Fases 3–4 (E3 Apontamento, E4 Relatórios, E5 Escritório virtual) continuam para depois, conforme o roadmap do PRD (§5) — planejar tudo agora seria especular sobre o que a fase anterior vai ensinar.
 
 ---
 
@@ -46,6 +46,31 @@ Fases 2–4 (E2 Kanban, E3 Apontamento, E4 Relatórios, E5 Escritório virtual) 
 | S2.13 ✅ | Frontend: fila de solicitações pendentes (gestor) + formulário de solicitação (colaborador) | Componente: rollback/erro ao rejeitar sem parecer |
 | S2.14 ✅ | Espelho do mês (listagem, sem PDF ainda) | Serviço: soma bate com a soma diária calculada em S2.7 |
 
+## S3 — E2 Kanban (núcleo do MVP)
+
+Regra de visibilidade (PRD §2): um usuário vê quadros das equipes das quais é membro, mais quadros dos projetos aos quais essas equipes estão vinculadas. Um `Quadro` sempre tem `projeto_id` e/ou `equipe_id` preenchido — os dois nulos ao mesmo tempo é combinação inválida, bloqueada por constraint (PRD §3.3).
+
+| # | Fatia | Teste que vem primeiro |
+|---|---|---|
+| S3.1 | Entidade `Quadro` + migração com `CHECK` bloqueando `projeto_id`/`equipe_id` ambos nulos | Repositório: quadro sem projeto nem equipe é rejeitado pelo banco; domínio: as três combinações válidas persistem |
+| S3.2 | `GET /quadros` — regra de visibilidade (membro da equipe do quadro, ou de equipe vinculada ao projeto do quadro) | Serviço: colaborador não vê quadro de equipe da qual não é membro, mesmo sabendo o id |
+| S3.3 | `POST /quadros` (só `GESTOR`/`ADMIN`) | Web: 403 pra `COLABORADOR`; domínio: nome obrigatório |
+| S3.4 | Frontend: lista de quadros visíveis ao usuário logado | Componente: mostra só os quadros retornados pela API, nenhum hardcoded |
+| S3.5 | Entidade `Coluna` (`quadro_id`, nome, ordem, `limite_wip` opcional) + `POST /quadros/{id}/colunas` | Domínio: duas colunas do mesmo quadro não podem ter a mesma ordem |
+| S3.6 | Entidade `Card` com posição fracionária + `POST /colunas/{id}/cards` (título, descrição, responsável, prazo, estimativa) | Domínio: nova posição sempre fica estritamente entre os vizinhos (ou nas pontas, se a coluna estiver vazia) |
+| S3.7 | Frontend: quadro com colunas e cards em modo leitura + criar card | Componente: card criado aparece na coluna certa sem reload manual |
+| S3.8 | `PATCH /cards/{id}/mover` (nova coluna + nova posição), sem WebSocket ainda | Domínio: mover um card nunca renumera os outros da coluna, só recalcula a posição do card movido |
+| S3.9 | Frontend: drag-and-drop (`dnd-kit`) com atualização otimista | Componente: card muda de coluna na UI antes da resposta da API chegar |
+| S3.10 | Rollback do drag-and-drop quando a API de mover falha | Componente: card volta pra coluna original se `PATCH /cards/{id}/mover` retornar erro |
+| S3.11 | `/ws/quadro/{id}` — broadcast da movimentação de card | Integração: um segundo cliente conectado ao mesmo quadro recebe o evento e atualiza sem reload |
+| S3.12 | Limite de WIP: mover card pra coluna no limite é rejeitado | Domínio/Web: 409 ao mover pra coluna que já está no `limite_wip`; coluna sem limite (`null`) nunca bloqueia |
+| S3.13 | `Etiqueta` (por quadro) + `CardEtiqueta` (N:N) — criar, aplicar, remover | Domínio: etiqueta de outro quadro não pode ser aplicada a um card deste quadro |
+| S3.14 | Frontend: etiquetas no card (criar, aplicar, remover, exibir no card do quadro) | Componente: etiqueta aplicada aparece no card sem reload |
+| S3.15 | `CardComentario` — criar/listar | Web: 403 pra quem não tem acesso ao quadro do card (mesma regra de visibilidade de S3.2) |
+| S3.16 | Frontend: comentários no card (detalhe do card) | Componente: comentário novo aparece na lista sem reload |
+| S3.17 | `CardEvento` — histórico automático (criação, mudança de coluna, mudança de responsável) | Domínio: mover um card gera o evento sozinho, dentro do mesmo serviço que move — nunca é escrito manualmente por outra camada |
+| S3.18 | Frontend: histórico do card (aba/timeline no detalhe do card) | Componente: exibe os eventos em ordem cronológica com rótulo legível por tipo |
+
 ---
 
 ## Definição de pronto (para toda fatia)
@@ -53,3 +78,4 @@ Fases 2–4 (E2 Kanban, E3 Apontamento, E4 Relatórios, E5 Escritório virtual) 
 - Testes da fatia verdes, incluindo os de camadas anteriores (nenhuma regressão).
 - Sem `TODO`/código morto deixado pra depois "porque vai precisar".
 - Se a fatia toca `RegistroPonto`, nenhum caminho de código faz `UPDATE`/`DELETE` nessa tabela — isso é verificado por teste, não por revisão manual.
+- Se a fatia toca `Card.posicao` (S3), nenhum caminho de código renumera a coluna inteira pra mover um card — isso é verificado por teste, não por revisão manual.
