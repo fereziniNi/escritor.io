@@ -8,12 +8,18 @@ import io.escritor.presenca.identidade.domain.Projeto;
 import io.escritor.presenca.identidade.domain.ProjetoEquipe;
 import io.escritor.presenca.identidade.domain.StatusProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
+import io.escritor.presenca.identidade.repository.EquipeRepository;
 import io.escritor.presenca.identidade.repository.MembroEquipeRepository;
 import io.escritor.presenca.identidade.repository.ProjetoEquipeRepository;
+import io.escritor.presenca.identidade.repository.ProjetoRepository;
+import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
+import io.escritor.presenca.kanban.domain.NomeQuadroObrigatorioException;
 import io.escritor.presenca.kanban.domain.Quadro;
+import io.escritor.presenca.kanban.domain.QuadroSemVinculoException;
 import io.escritor.presenca.kanban.repository.QuadroRepository;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,7 +28,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,6 +45,12 @@ class QuadroServiceTest {
 
     @Mock
     private ProjetoEquipeRepository projetoEquipeRepository;
+
+    @Mock
+    private ProjetoRepository projetoRepository;
+
+    @Mock
+    private EquipeRepository equipeRepository;
 
     private final Usuario usuario = usuarioComId(1L);
     private final Equipe equipeDoUsuario = equipeComId(10L);
@@ -63,13 +78,14 @@ class QuadroServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new QuadroService(quadroRepository, membroEquipeRepository, projetoEquipeRepository);
-        when(membroEquipeRepository.findByUsuario(usuario))
-                .thenReturn(List.of(new MembroEquipe(equipeDoUsuario, usuario, PapelNaEquipe.MEMBRO)));
+        service = new QuadroService(
+                quadroRepository, membroEquipeRepository, projetoEquipeRepository, projetoRepository, equipeRepository);
     }
 
     @Test
     void listaQuadroDaEquipeDoUsuario() {
+        when(membroEquipeRepository.findByUsuario(usuario))
+                .thenReturn(List.of(new MembroEquipe(equipeDoUsuario, usuario, PapelNaEquipe.MEMBRO)));
         Quadro quadroDaEquipe = new Quadro("Backlog", null, equipeDoUsuario);
         when(projetoEquipeRepository.findByEquipeIn(any())).thenReturn(List.of());
         when(quadroRepository.findAll()).thenReturn(List.of(quadroDaEquipe));
@@ -82,6 +98,8 @@ class QuadroServiceTest {
 
     @Test
     void naoListaQuadroDeEquipeQueUsuarioNaoParticipa() {
+        when(membroEquipeRepository.findByUsuario(usuario))
+                .thenReturn(List.of(new MembroEquipe(equipeDoUsuario, usuario, PapelNaEquipe.MEMBRO)));
         Quadro quadroDeOutraEquipe = new Quadro("Interno", null, outraEquipe);
         when(projetoEquipeRepository.findByEquipeIn(any())).thenReturn(List.of());
         when(quadroRepository.findAll()).thenReturn(List.of(quadroDeOutraEquipe));
@@ -93,6 +111,8 @@ class QuadroServiceTest {
 
     @Test
     void listaQuadroDeProjetoVinculadoAEquipeDoUsuario() {
+        when(membroEquipeRepository.findByUsuario(usuario))
+                .thenReturn(List.of(new MembroEquipe(equipeDoUsuario, usuario, PapelNaEquipe.MEMBRO)));
         Projeto projeto = projetoComId(100L);
         Quadro quadroDoProjeto = new Quadro("Sprint atual", projeto, null);
         when(projetoEquipeRepository.findByEquipeIn(List.of(equipeDoUsuario)))
@@ -114,5 +134,61 @@ class QuadroServiceTest {
         var visiveis = service.listarVisiveis(usuario);
 
         assertThat(visiveis).isEmpty();
+    }
+
+    @Test
+    void criaQuadroDeEquipe() {
+        when(equipeRepository.findById(10L)).thenReturn(Optional.of(equipeDoUsuario));
+        when(quadroRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        var resposta = service.criar("Backlog", null, 10L);
+
+        assertThat(resposta.nome()).isEqualTo("Backlog");
+        assertThat(resposta.equipeId()).isEqualTo(10L);
+        assertThat(resposta.projetoId()).isNull();
+    }
+
+    @Test
+    void criaQuadroDeProjeto() {
+        Projeto projeto = projetoComId(100L);
+        when(projetoRepository.findById(100L)).thenReturn(Optional.of(projeto));
+        when(quadroRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        var resposta = service.criar("Sprint atual", 100L, null);
+
+        assertThat(resposta.projetoId()).isEqualTo(100L);
+        assertThat(resposta.equipeId()).isNull();
+    }
+
+    @Test
+    void criarComProjetoInexistenteLancaRecursoNaoEncontrado() {
+        when(projetoRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.criar("Backlog", 999L, null))
+                .isInstanceOf(RecursoNaoEncontradoException.class);
+
+        verify(quadroRepository, never()).save(any());
+    }
+
+    @Test
+    void criarComEquipeInexistenteLancaRecursoNaoEncontrado() {
+        when(equipeRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.criar("Backlog", null, 999L))
+                .isInstanceOf(RecursoNaoEncontradoException.class);
+    }
+
+    @Test
+    void criarSemProjetoNemEquipeLancaExcecao() {
+        assertThatThrownBy(() -> service.criar("Órfão", null, null)).isInstanceOf(QuadroSemVinculoException.class);
+
+        verify(quadroRepository, never()).save(any());
+    }
+
+    @Test
+    void criarComNomeEmBrancoLancaExcecao() {
+        when(equipeRepository.findById(10L)).thenReturn(Optional.of(equipeDoUsuario));
+
+        assertThatThrownBy(() -> service.criar("   ", null, 10L)).isInstanceOf(NomeQuadroObrigatorioException.class);
     }
 }

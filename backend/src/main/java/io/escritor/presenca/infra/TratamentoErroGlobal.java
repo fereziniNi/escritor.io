@@ -1,6 +1,8 @@
 package io.escritor.presenca.infra;
 
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
+import io.escritor.presenca.kanban.domain.NomeQuadroObrigatorioException;
+import io.escritor.presenca.kanban.domain.QuadroSemVinculoException;
 import io.escritor.presenca.ponto.domain.JustificativaObrigatoriaException;
 import io.escritor.presenca.ponto.domain.ParecerObrigatorioException;
 import io.escritor.presenca.ponto.domain.SolicitacaoJaAvaliadaException;
@@ -36,5 +38,15 @@ public class TratamentoErroGlobal {
     @ExceptionHandler(SolicitacaoJaAvaliadaException.class)
     ResponseEntity<Void> tratarSolicitacaoJaAvaliada() {
         return ResponseEntity.status(HttpStatus.CONFLICT).build();
+    }
+
+    @ExceptionHandler(QuadroSemVinculoException.class)
+    ResponseEntity<Void> tratarQuadroSemVinculo() {
+        return ResponseEntity.badRequest().build();
+    }
+
+    @ExceptionHandler(NomeQuadroObrigatorioException.class)
+    ResponseEntity<Void> tratarNomeQuadroObrigatorio() {
+        return ResponseEntity.badRequest().build();
     }
 }
