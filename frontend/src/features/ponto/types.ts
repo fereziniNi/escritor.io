@@ -11,3 +11,13 @@ export interface RegistroPonto {
   momento: string
   origem: string
 }
+
+export type EstadoDia = 'ABERTA' | 'FECHADA' | 'INCONSISTENTE'
+
+export interface JornadaDoDia {
+  data: string
+  estado: EstadoDia
+  minutosTrabalhados: number
+  saldoDia: number
+  saldoAcumuladoNoPeriodo: number
+}

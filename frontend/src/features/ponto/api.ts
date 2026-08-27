@@ -1,10 +1,18 @@
 import { apiFetch } from '../../shared/api/http'
-import type { EstadoAtualPonto, RegistroPonto, TipoRegistroPonto } from './types'
+import type { EstadoAtualPonto, JornadaDoDia, RegistroPonto, TipoRegistroPonto } from './types'
 
 export async function buscarEstadoAtual(): Promise<EstadoAtualPonto> {
   const response = await apiFetch('/ponto/estado-atual')
   if (!response.ok) {
     throw new Error('Não foi possível carregar o estado da marcação')
+  }
+  return response.json()
+}
+
+export async function buscarJornadaDoDia(): Promise<JornadaDoDia> {
+  const response = await apiFetch('/ponto/jornada-do-dia')
+  if (!response.ok) {
+    throw new Error('Não foi possível carregar a jornada do dia')
   }
   return response.json()
 }

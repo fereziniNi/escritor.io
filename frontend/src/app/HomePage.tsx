@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import { useAuthStore } from '../features/auth/authStore'
+import { JornadaPainel } from '../features/ponto/JornadaPainel'
 import { PontoWidget } from '../features/ponto/PontoWidget'
 import { HealthStatus } from './HealthStatus'
 
@@ -11,6 +12,7 @@ export function HomePage() {
       <h1>Sistema de Presença, Ponto e Tarefas</h1>
       <HealthStatus />
       <PontoWidget />
+      <JornadaPainel />
 
       {papel === 'ADMIN' && (
         <nav>

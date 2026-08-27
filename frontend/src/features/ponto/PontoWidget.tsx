@@ -18,6 +18,7 @@ export function PontoWidget() {
     mutationFn: marcarPonto,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ponto', 'estado-atual'] })
+      queryClient.invalidateQueries({ queryKey: ['ponto', 'jornada-do-dia'] })
     },
   })
 
