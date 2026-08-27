@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import { useAuthStore } from '../features/auth/authStore'
+import { PontoWidget } from '../features/ponto/PontoWidget'
 import { HealthStatus } from './HealthStatus'
 
 export function HomePage() {
@@ -9,6 +10,7 @@ export function HomePage() {
     <main>
       <h1>Sistema de Presença, Ponto e Tarefas</h1>
       <HealthStatus />
+      <PontoWidget />
 
       {papel === 'ADMIN' && (
         <nav>

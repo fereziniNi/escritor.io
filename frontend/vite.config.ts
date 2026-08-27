@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: Object.fromEntries(
-      ['/health', '/auth', '/usuarios', '/equipes', '/projetos'].map((path) => [
+      ['/health', '/auth', '/usuarios', '/equipes', '/projetos', '/ponto'].map((path) => [
         path,
         process.env.VITE_BACKEND_URL ?? 'http://localhost:8080',
       ]),
