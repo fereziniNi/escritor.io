@@ -59,4 +59,19 @@ class MembroEquipeRepositoryIT {
         assertThatThrownBy(() -> membroEquipeRepository.saveAndFlush(duplicado))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
+
+    @Test
+    void listaAsEquipesDeUmUsuarioENaoAsDeOutro() {
+        Equipe equipeA = equipeRepository.saveAndFlush(new Equipe("Backend", null));
+        Equipe equipeB = equipeRepository.saveAndFlush(new Equipe("Frontend", null));
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 360));
+        Usuario beto = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto@escritor.io", Papel.COLABORADOR, 360));
+        membroEquipeRepository.saveAndFlush(new MembroEquipe(equipeA, ana, PapelNaEquipe.MEMBRO));
+        membroEquipeRepository.saveAndFlush(new MembroEquipe(equipeB, beto, PapelNaEquipe.MEMBRO));
+
+        var membrosDeAna = membroEquipeRepository.findByUsuario(ana);
+
+        assertThat(membrosDeAna).hasSize(1);
+        assertThat(membrosDeAna.get(0).getEquipe().getId()).isEqualTo(equipeA.getId());
+    }
 }

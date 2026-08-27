@@ -53,7 +53,7 @@ Regra de visibilidade (PRD §2): um usuário vê quadros das equipes das quais �
 | # | Fatia | Teste que vem primeiro |
 |---|---|---|
 | S3.1 ✅ | Entidade `Quadro` + migração com `CHECK` bloqueando `projeto_id`/`equipe_id` ambos nulos | Repositório: quadro sem projeto nem equipe é rejeitado pelo banco; domínio: as três combinações válidas persistem |
-| S3.2 | `GET /quadros` — regra de visibilidade (membro da equipe do quadro, ou de equipe vinculada ao projeto do quadro) | Serviço: colaborador não vê quadro de equipe da qual não é membro, mesmo sabendo o id |
+| S3.2 ✅ | `GET /quadros` — regra de visibilidade (membro da equipe do quadro, ou de equipe vinculada ao projeto do quadro) | Serviço: colaborador não vê quadro de equipe da qual não é membro, mesmo sabendo o id |
 | S3.3 | `POST /quadros` (só `GESTOR`/`ADMIN`) | Web: 403 pra `COLABORADOR`; domínio: nome obrigatório |
 | S3.4 | Frontend: lista de quadros visíveis ao usuário logado | Componente: mostra só os quadros retornados pela API, nenhum hardcoded |
 | S3.5 | Entidade `Coluna` (`quadro_id`, nome, ordem, `limite_wip` opcional) + `POST /quadros/{id}/colunas` | Domínio: duas colunas do mesmo quadro não podem ter a mesma ordem |
