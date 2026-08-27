@@ -65,6 +65,7 @@ Dentro de cada domínio, `domain/` contém as regras que devem ser testáveis **
 
 - **Flyway** desde o primeiro commit (`backend/src/main/resources/db/migration`), migrações imutáveis (`V{n}__descricao.sql`).
 - **Constraints de banco fazem parte do design, não só o Java**: a revogação de `UPDATE`/`DELETE` em `registro_ponto` é feita via `REVOKE` na migração, não apenas por convenção no código — ver PRD §3.2.
+- **Dois papéis de banco:** `presenca` roda só as migrações (dono do schema); `presenca_app` é o papel de runtime da aplicação inteira, sem privilégio de dono. Necessário para o `REVOKE` acima valer alguma coisa — dono de tabela ignora `REVOKE` contra si mesmo no Postgres. Ver [ADR 0009](adr/0009-papel-de-banco-separado-para-runtime.md).
 - Todos os timestamps em `timestamptz` (UTC); conversão para `America/Sao_Paulo` só na camada de apresentação (DTO/frontend), nunca no armazenamento nem no cálculo.
 
 ### 2.4 Autenticação e autorização

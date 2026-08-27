@@ -9,6 +9,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./backend/src/main/resources/db-init/criar-papel-app.sql:/docker-entrypoint-initdb.d/01-criar-papel-app.sql:ro
 
   mailpit:
     image: axllent/mailpit

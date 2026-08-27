@@ -18,6 +18,8 @@ docker compose up -d
 
 Sobe um Postgres em `localhost:5432` e o Mailpit (SMTP fake para o login por e-mail — ver [docs/adr/0008-login-passwordless-email.md](docs/adr/0008-login-passwordless-email.md)) para uso do backend em modo `dev`. Nenhum e-mail sai de verdade: veja os códigos de login recebidos em **http://localhost:8025**. Os testes do backend **não** usam esses containers — Testcontainers sobe os seus próprios efêmeros a cada execução de suíte (ver [docs/adr/0004-testcontainers.md](docs/adr/0004-testcontainers.md)).
 
+Na **primeira** subida (volume `postgres_data` vazio), o Postgres também cria o papel `presenca_app` — o papel de runtime que a aplicação usa, sem privilégio de dono sobre as tabelas (ver [ADR 0009](docs/adr/0009-papel-de-banco-separado-para-runtime.md)). Se você já tinha um volume de antes dessa fatia (S2.1) e o backend falhar ao subir com "role presenca_app does not exist", recrie o volume: `docker compose down -v && docker compose up -d`.
+
 ## Backend
 
 ```bash

@@ -41,4 +41,6 @@ Fase atual: **S1 — E0 Fundação** (ver [docs/incremental-plan.md](docs/increm
 - Sem como voltar e corrigir o e-mail na tela de login.
 - Triplicação de `decodeJwt`+`definirSessao` — unificada em `authStore.autenticarComTokens`.
 
-Próximo: **E1 — Ponto**, o núcleo do MVP (S2 no plano incremental).
+**E1 — Ponto** (S2 no plano incremental), o núcleo do MVP:
+
+- ✅ S2.1 — entidade `RegistroPonto` (`ponto/domain`) + migração (`V8__create_registro_ponto.sql`). O `REVOKE UPDATE, DELETE` do PRD §3.2 exigiu uma peça de infraestrutura nova: dois papéis de banco (`presenca` só migra, `presenca_app` é quem a aplicação usa em runtime) — dono de tabela ignora `REVOKE` contra si mesmo no Postgres, então sem essa separação a revogação não valeria nada. Ver [ADR 0009](docs/adr/0009-papel-de-banco-separado-para-runtime.md). Provado com um teste de JDBC puro autenticado como `presenca_app` (não dá pra usar `@ServiceConnection`/JPA aqui — essa infra sempre conecta como o dono) e verificado de novo contra um docker-compose real: `UPDATE`/`DELETE` batem "permission denied", `INSERT` continua funcionando.

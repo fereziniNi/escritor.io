@@ -22,7 +22,7 @@ class TokenRenovacaoRepositoryIT {
 
     @Container
     @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16");
+    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16").withInitScript("db-init/criar-papel-app.sql");
 
     @Autowired
     private UsuarioRepository usuarioRepository;

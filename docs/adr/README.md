@@ -10,3 +10,4 @@
 | [0006](0006-jwt-auth-strategy.md) | Estratégia de autenticação (access em memória + refresh em cookie) | Aceito |
 | [0007](0007-spring-boot-4-module-splitting.md) | Como lidar com o fatiamento de módulos do Spring Boot 4 | Aceito |
 | [0008](0008-login-passwordless-email.md) | Login passwordless por e-mail (código de acesso) | Aceito |
+| [0009](0009-papel-de-banco-separado-para-runtime.md) | Papel de banco separado para runtime vs. migração | Aceito |

@@ -2,10 +2,18 @@ spring:
   application:
     name: presenca-backend
   datasource:
+    # Papel de runtime, SEM privilégio de dono sobre as tabelas (ver db-init/criar-papel-app.sql).
+    # É o papel usado por toda a aplicação em operação normal - por isso o REVOKE UPDATE/DELETE
+    # em registro_ponto (V8) realmente impede a aplicação de editar/apagar marcações de ponto.
     url: jdbc:postgresql://localhost:5432/presenca
-    username: presenca
-    password: presenca
+    username: presenca_app
+    password: presenca_app
   flyway:
+    # Papel de migração: dono das tabelas, só usado para rodar o Flyway na subida da aplicação.
+    # Nunca usado para servir requisições.
+    url: jdbc:postgresql://localhost:5432/presenca
+    user: presenca
+    password: presenca
     enabled: true
     locations: classpath:db/migration
   jpa:
