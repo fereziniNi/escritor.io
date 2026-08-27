@@ -5,11 +5,14 @@ import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.ponto.domain.OrigemRegistroPonto;
 import io.escritor.presenca.ponto.domain.RegistroPonto;
 import io.escritor.presenca.ponto.domain.SolicitacaoAjustePonto;
+import io.escritor.presenca.ponto.domain.StatusSolicitacaoAjuste;
 import io.escritor.presenca.ponto.repository.RegistroPontoRepository;
 import io.escritor.presenca.ponto.repository.SolicitacaoAjustePontoRepository;
 import io.escritor.presenca.ponto.web.SolicitacaoAjusteResponse;
+import io.escritor.presenca.ponto.web.SolicitacaoAjusteResumoResponse;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,6 +70,12 @@ public class AprovacaoAjusteService {
 
         SolicitacaoAjustePonto salva = solicitacaoAjustePontoRepository.save(solicitacao);
         return SolicitacaoAjusteResponse.de(salva);
+    }
+
+    public List<SolicitacaoAjusteResumoResponse> listarPendentes() {
+        return solicitacaoAjustePontoRepository.findByStatusOrderByCriadoEmAsc(StatusSolicitacaoAjuste.PENDENTE).stream()
+                .map(SolicitacaoAjusteResumoResponse::de)
+                .toList();
     }
 
     private SolicitacaoAjustePonto buscarSolicitacao(Long id) {

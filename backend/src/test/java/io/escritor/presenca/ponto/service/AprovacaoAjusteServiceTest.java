@@ -15,6 +15,7 @@ import io.escritor.presenca.ponto.repository.SolicitacaoAjustePontoRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -148,5 +149,19 @@ class AprovacaoAjusteServiceTest {
         when(solicitacaoAjustePontoRepository.findById(5L)).thenReturn(Optional.of(solicitacao));
 
         assertThatThrownBy(() -> service.rejeitar(5L, gestor, "   ")).isInstanceOf(ParecerObrigatorioException.class);
+    }
+
+    @Test
+    void listarPendentesRetornaResumoComNomeDoSolicitante() {
+        SolicitacaoAjustePonto solicitacao = solicitacaoComId(6L, null);
+        when(solicitacaoAjustePontoRepository.findByStatusOrderByCriadoEmAsc(StatusSolicitacaoAjuste.PENDENTE))
+                .thenReturn(List.of(solicitacao));
+
+        var resumo = service.listarPendentes();
+
+        assertThat(resumo).hasSize(1);
+        assertThat(resumo.get(0).id()).isEqualTo(6L);
+        assertThat(resumo.get(0).usuarioNome()).isEqualTo(colaborador.getNome());
+        assertThat(resumo.get(0).status()).isEqualTo(StatusSolicitacaoAjuste.PENDENTE);
     }
 }

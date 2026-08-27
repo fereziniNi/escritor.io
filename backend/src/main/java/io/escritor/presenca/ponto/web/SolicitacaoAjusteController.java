@@ -4,8 +4,10 @@ import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
 import io.escritor.presenca.ponto.service.AprovacaoAjusteService;
 import io.escritor.presenca.ponto.service.SolicitacaoAjusteService;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -55,5 +57,11 @@ public class SolicitacaoAjusteController {
             @PathVariable Long id, @RequestBody(required = false) AvaliarSolicitacaoRequest request) {
         String parecer = request == null ? null : request.parecer();
         return aprovacaoAjusteService.rejeitar(id, contextoUsuarioAutenticado.usuarioAtual(), parecer);
+    }
+
+    @GetMapping("/pendentes")
+    @PreAuthorize("hasAnyRole('GESTOR', 'ADMIN')")
+    public List<SolicitacaoAjusteResumoResponse> pendentes() {
+        return aprovacaoAjusteService.listarPendentes();
     }
 }

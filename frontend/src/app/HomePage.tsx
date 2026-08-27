@@ -1,4 +1,6 @@
 import { Link } from 'react-router'
+import { FilaAjustesPainel } from '../features/ajustes/FilaAjustesPainel'
+import { SolicitarAjusteForm } from '../features/ajustes/SolicitarAjusteForm'
 import { useAuthStore } from '../features/auth/authStore'
 import { JornadaPainel } from '../features/ponto/JornadaPainel'
 import { PontoWidget } from '../features/ponto/PontoWidget'
@@ -13,6 +15,9 @@ export function HomePage() {
       <HealthStatus />
       <PontoWidget />
       <JornadaPainel />
+      <SolicitarAjusteForm />
+
+      {(papel === 'GESTOR' || papel === 'ADMIN') && <FilaAjustesPainel />}
 
       {papel === 'ADMIN' && (
         <nav>
