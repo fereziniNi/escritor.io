@@ -38,7 +38,7 @@ Fases 2–4 (E2 Kanban, E3 Apontamento, E4 Relatórios, E5 Escritório virtual) 
 | S2.5 ✅ | `GET /ponto/estado-atual` — qual botão mostrar | Serviço: colaborador em pausa recebe apenas a opção "Retomar" |
 | S2.6 ✅ | Frontend: botão dinâmico de marcação | Componente: renderiza a ação certa conforme `estado-atual` mockado |
 | S2.7 ✅ | Cálculo de `JornadaDiaria` (minutos trabalhados, saldo) — função pura | Domínio: casos de borda (pausa sem fim, múltiplas pausas, jornada cruzando meia-noite) |
-| S2.8 | Job/view que fecha o dia e marca `INCONSISTENTE` quando falta `SAIDA` até a virada | Domínio: dia sem saída após virada muda de `ABERTA` para `INCONSISTENTE` |
+| S2.8 ✅ | Job/view que fecha o dia e marca `INCONSISTENTE` quando falta `SAIDA` até a virada | Domínio: dia sem saída após virada muda de `ABERTA` para `INCONSISTENTE` |
 | S2.9 | `GET /ponto/jornada-do-dia` + saldo acumulado do período | Serviço: saldo acumulado ignora dias não úteis |
 | S2.10 | Frontend: painel do colaborador (jornada do dia + saldo) | Componente: exibe saldo negativo/positivo corretamente |
 | S2.11 | `SolicitacaoAjustePonto` — criar solicitação (com ou sem `registro_alvo_id`) | Domínio: justificativa obrigatória; web: colaborador só solicita para si mesmo |
