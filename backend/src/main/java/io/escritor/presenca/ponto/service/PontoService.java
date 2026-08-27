@@ -6,6 +6,7 @@ import io.escritor.presenca.ponto.domain.RegistroPonto;
 import io.escritor.presenca.ponto.domain.SequenciaMarcacao;
 import io.escritor.presenca.ponto.domain.TipoRegistroPonto;
 import io.escritor.presenca.ponto.repository.RegistroPontoRepository;
+import io.escritor.presenca.ponto.web.EstadoAtualPontoResponse;
 import io.escritor.presenca.ponto.web.RegistroPontoResponse;
 import java.time.Clock;
 import java.time.Instant;
@@ -40,5 +41,13 @@ public class PontoService {
         RegistroPonto salvo = registroPontoRepository.save(novo);
 
         return RegistroPontoResponse.de(salvo);
+    }
+
+    public EstadoAtualPontoResponse estadoAtual(Usuario usuario) {
+        RegistroPonto ultimo =
+                registroPontoRepository.findFirstByUsuarioOrderByCriadoEmDesc(usuario).orElse(null);
+        TipoRegistroPonto ultimoTipo = ultimo == null ? null : ultimo.getTipo();
+
+        return new EstadoAtualPontoResponse(ultimoTipo, SequenciaMarcacao.tiposValidosApos(ultimoTipo));
     }
 }

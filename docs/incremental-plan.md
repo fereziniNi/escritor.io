@@ -35,7 +35,7 @@ Fases 2–4 (E2 Kanban, E3 Apontamento, E4 Relatórios, E5 Escritório virtual) 
 | S2.2 ✅ | Encadeamento de hash (`hash_anterior`/`hash`, SHA-256) | Domínio: alterar um campo do registro anterior quebra a verificação da cadeia |
 | S2.3 ✅ | Máquina de estados de marcação (`ENTRADA → PAUSA_INICIO → PAUSA_FIM → SAIDA`) | Domínio: tabela de casos válidos/inválidos (ex.: `SAIDA` sem `ENTRADA` aberta é rejeitada) |
 | S2.4 ✅ | `POST /ponto/marcar` — usa `momento` do servidor, nunca do cliente | Web: payload com `momento` do cliente é ignorado/rejeitado |
-| S2.5 | `GET /ponto/estado-atual` — qual botão mostrar | Serviço: colaborador em pausa recebe apenas a opção "Retomar" |
+| S2.5 ✅ | `GET /ponto/estado-atual` — qual botão mostrar | Serviço: colaborador em pausa recebe apenas a opção "Retomar" |
 | S2.6 | Frontend: botão dinâmico de marcação | Componente: renderiza a ação certa conforme `estado-atual` mockado |
 | S2.7 | Cálculo de `JornadaDiaria` (minutos trabalhados, saldo) — função pura | Domínio: casos de borda (pausa sem fim, múltiplas pausas, jornada cruzando meia-noite) |
 | S2.8 | Job/view que fecha o dia e marca `INCONSISTENTE` quando falta `SAIDA` até a virada | Domínio: dia sem saída após virada muda de `ABERTA` para `INCONSISTENTE` |

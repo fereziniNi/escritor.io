@@ -5,6 +5,7 @@ import io.escritor.presenca.ponto.service.PontoService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,5 +29,10 @@ public class PontoController {
     public RegistroPontoResponse marcar(@Valid @RequestBody MarcarPontoRequest request, HttpServletRequest http) {
         return pontoService.marcar(
                 contextoUsuarioAutenticado.usuarioAtual(), request.tipo(), http.getRemoteAddr(), http.getHeader("User-Agent"));
+    }
+
+    @GetMapping("/estado-atual")
+    public EstadoAtualPontoResponse estadoAtual() {
+        return pontoService.estadoAtual(contextoUsuarioAutenticado.usuarioAtual());
     }
 }

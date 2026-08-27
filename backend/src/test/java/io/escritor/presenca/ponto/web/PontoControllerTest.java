@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -100,5 +101,24 @@ class PontoControllerTest {
                                 {"tipo":"SAIDA"}
                                 """))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void estadoAtualSemAutenticacaoRetorna401() throws Exception {
+        mockMvc.perform(get("/ponto/estado-atual")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void estadoAtualDeQuemEstaEmPausaSoOfereceRetomar() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(pontoService.estadoAtual(any()))
+                .thenReturn(new EstadoAtualPontoResponse(
+                        TipoRegistroPonto.PAUSA_INICIO, java.util.Set.of(TipoRegistroPonto.PAUSA_FIM)));
+
+        mockMvc.perform(get("/ponto/estado-atual"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ultimoTipo").value("PAUSA_INICIO"))
+                .andExpect(jsonPath("$.proximasOpcoes", org.hamcrest.Matchers.contains("PAUSA_FIM")));
     }
 }

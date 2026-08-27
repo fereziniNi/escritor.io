@@ -112,4 +112,39 @@ class PontoServiceTest {
         assertThatThrownBy(() -> pontoService.marcar(usuario, TipoRegistroPonto.SAIDA, "127.0.0.1", "junit"))
                 .isInstanceOf(SequenciaInvalidaException.class);
     }
+
+    @Test
+    void estadoAtualDeQuemNuncaMarcouSoOfereceEntrada() {
+        when(registroPontoRepository.findFirstByUsuarioOrderByCriadoEmDesc(usuario)).thenReturn(Optional.empty());
+
+        var estado = pontoService.estadoAtual(usuario);
+
+        assertThat(estado.ultimoTipo()).isNull();
+        assertThat(estado.proximasOpcoes()).containsExactly(TipoRegistroPonto.ENTRADA);
+    }
+
+    @Test
+    void estadoAtualDeQuemEstaEmPausaSoOfereceRetomar() {
+        RegistroPonto emPausa = new RegistroPonto(
+                usuario, TipoRegistroPonto.PAUSA_INICIO, agora.minusSeconds(600), OrigemRegistroPonto.WEB, "127.0.0.1", "junit", null);
+        when(registroPontoRepository.findFirstByUsuarioOrderByCriadoEmDesc(usuario)).thenReturn(Optional.of(emPausa));
+
+        var estado = pontoService.estadoAtual(usuario);
+
+        assertThat(estado.ultimoTipo()).isEqualTo(TipoRegistroPonto.PAUSA_INICIO);
+        assertThat(estado.proximasOpcoes()).containsExactly(TipoRegistroPonto.PAUSA_FIM);
+    }
+
+    @Test
+    void estadoAtualDeQuemEstaTrabalhandoOferecePausaESaida() {
+        RegistroPonto entrada = new RegistroPonto(
+                usuario, TipoRegistroPonto.ENTRADA, agora.minusSeconds(600), OrigemRegistroPonto.WEB, "127.0.0.1", "junit", null);
+        when(registroPontoRepository.findFirstByUsuarioOrderByCriadoEmDesc(usuario)).thenReturn(Optional.of(entrada));
+
+        var estado = pontoService.estadoAtual(usuario);
+
+        assertThat(estado.ultimoTipo()).isEqualTo(TipoRegistroPonto.ENTRADA);
+        assertThat(estado.proximasOpcoes())
+                .containsExactlyInAnyOrder(TipoRegistroPonto.PAUSA_INICIO, TipoRegistroPonto.SAIDA);
+    }
 }
