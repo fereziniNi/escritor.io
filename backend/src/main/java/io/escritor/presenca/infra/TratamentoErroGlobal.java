@@ -1,11 +1,13 @@
 package io.escritor.presenca.infra;
 
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
+import io.escritor.presenca.kanban.domain.EstimativaInvalidaException;
 import io.escritor.presenca.kanban.domain.LimiteWipInvalidoException;
 import io.escritor.presenca.kanban.domain.NomeColunaObrigatorioException;
 import io.escritor.presenca.kanban.domain.NomeQuadroObrigatorioException;
 import io.escritor.presenca.kanban.domain.OrdemColunaDuplicadaException;
 import io.escritor.presenca.kanban.domain.QuadroSemVinculoException;
+import io.escritor.presenca.kanban.domain.TituloCardObrigatorioException;
 import io.escritor.presenca.ponto.domain.JustificativaObrigatoriaException;
 import io.escritor.presenca.ponto.domain.ParecerObrigatorioException;
 import io.escritor.presenca.ponto.domain.SolicitacaoJaAvaliadaException;
@@ -66,5 +68,15 @@ public class TratamentoErroGlobal {
     @ExceptionHandler(OrdemColunaDuplicadaException.class)
     ResponseEntity<Void> tratarOrdemColunaDuplicada() {
         return ResponseEntity.status(HttpStatus.CONFLICT).build();
+    }
+
+    @ExceptionHandler(TituloCardObrigatorioException.class)
+    ResponseEntity<Void> tratarTituloCardObrigatorio() {
+        return ResponseEntity.badRequest().build();
+    }
+
+    @ExceptionHandler(EstimativaInvalidaException.class)
+    ResponseEntity<Void> tratarEstimativaInvalida() {
+        return ResponseEntity.badRequest().build();
     }
 }

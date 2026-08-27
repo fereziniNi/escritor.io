@@ -1,0 +1,136 @@
+package io.escritor.presenca.kanban.domain;
+
+import io.escritor.presenca.identidade.domain.Usuario;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import java.time.Instant;
+import java.time.LocalDate;
+
+/**
+ * {@code posicao} é fracionária (PRD §3.3) - quem calcula onde encaixar é
+ * {@link CalculadoraPosicao}, não esta entidade. {@code responsavel}/{@code prazo}/
+ * {@code estimativaMinutos} são opcionais; {@code criadoPor} nunca vem do cliente (mesmo padrão
+ * de "servidor controla, não o cliente" já usado em ponto - resolvido via
+ * {@code ContextoUsuarioAutenticado} no serviço).
+ */
+@Entity
+@Table(name = "card")
+public class Card {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "coluna_id", nullable = false)
+    private Coluna coluna;
+
+    @Column(nullable = false)
+    private String titulo;
+
+    @Column(columnDefinition = "TEXT")
+    private String descricao;
+
+    @Column(nullable = false)
+    private double posicao;
+
+    @ManyToOne
+    @JoinColumn(name = "responsavel_id")
+    private Usuario responsavel;
+
+    private LocalDate prazo;
+
+    @Column(name = "estimativa_minutos")
+    private Integer estimativaMinutos;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "criado_por", nullable = false)
+    private Usuario criadoPor;
+
+    @Column(name = "criado_em", nullable = false, updatable = false)
+    private Instant criadoEm;
+
+    @Column(nullable = false)
+    private boolean arquivado;
+
+    protected Card() {
+        // JPA
+    }
+
+    public Card(
+            Coluna coluna,
+            String titulo,
+            String descricao,
+            double posicao,
+            Usuario responsavel,
+            LocalDate prazo,
+            Integer estimativaMinutos,
+            Usuario criadoPor) {
+        if (titulo == null || titulo.isBlank()) {
+            throw new TituloCardObrigatorioException();
+        }
+        if (estimativaMinutos != null && estimativaMinutos <= 0) {
+            throw new EstimativaInvalidaException();
+        }
+        this.coluna = coluna;
+        this.titulo = titulo;
+        this.descricao = descricao;
+        this.posicao = posicao;
+        this.responsavel = responsavel;
+        this.prazo = prazo;
+        this.estimativaMinutos = estimativaMinutos;
+        this.criadoPor = criadoPor;
+        this.criadoEm = Instant.now();
+        this.arquivado = false;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public Coluna getColuna() {
+        return coluna;
+    }
+
+    public String getTitulo() {
+        return titulo;
+    }
+
+    public String getDescricao() {
+        return descricao;
+    }
+
+    public double getPosicao() {
+        return posicao;
+    }
+
+    public Usuario getResponsavel() {
+        return responsavel;
+    }
+
+    public LocalDate getPrazo() {
+        return prazo;
+    }
+
+    public Integer getEstimativaMinutos() {
+        return estimativaMinutos;
+    }
+
+    public Usuario getCriadoPor() {
+        return criadoPor;
+    }
+
+    public Instant getCriadoEm() {
+        return criadoEm;
+    }
+
+    public boolean isArquivado() {
+        return arquivado;
+    }
+}

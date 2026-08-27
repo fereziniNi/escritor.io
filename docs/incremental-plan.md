@@ -57,7 +57,7 @@ Regra de visibilidade (PRD §2): um usuário vê quadros das equipes das quais �
 | S3.3 ✅ | `POST /quadros` (só `GESTOR`/`ADMIN`) | Web: 403 pra `COLABORADOR`; domínio: nome obrigatório |
 | S3.4 ✅ | Frontend: lista de quadros visíveis ao usuário logado | Componente: mostra só os quadros retornados pela API, nenhum hardcoded |
 | S3.5 ✅ | Entidade `Coluna` (`quadro_id`, nome, ordem, `limite_wip` opcional) + `POST /quadros/{id}/colunas` | Domínio: duas colunas do mesmo quadro não podem ter a mesma ordem |
-| S3.6 | Entidade `Card` com posição fracionária + `POST /colunas/{id}/cards` (título, descrição, responsável, prazo, estimativa) | Domínio: nova posição sempre fica estritamente entre os vizinhos (ou nas pontas, se a coluna estiver vazia) |
+| S3.6 ✅ | Entidade `Card` com posição fracionária + `POST /colunas/{id}/cards` (título, descrição, responsável, prazo, estimativa) | Domínio: nova posição sempre fica estritamente entre os vizinhos (ou nas pontas, se a coluna estiver vazia) |
 | S3.7 | Frontend: quadro com colunas e cards em modo leitura + criar card | Componente: card criado aparece na coluna certa sem reload manual |
 | S3.8 | `PATCH /cards/{id}/mover` (nova coluna + nova posição), sem WebSocket ainda | Domínio: mover um card nunca renumera os outros da coluna, só recalcula a posição do card movido |
 | S3.9 | Frontend: drag-and-drop (`dnd-kit`) com atualização otimista | Componente: card muda de coluna na UI antes da resposta da API chegar |
