@@ -1,6 +1,6 @@
 import { renovarSessao } from '../../features/auth/api'
 import { useAuthStore } from '../../features/auth/authStore'
-import { decodeJwt } from '../../features/auth/jwt'
+import type { TokensResponse } from '../../features/auth/types'
 
 function comAuthorization(init: RequestInit): RequestInit {
   const accessToken = useAuthStore.getState().accessToken
@@ -10,6 +10,23 @@ function comAuthorization(init: RequestInit): RequestInit {
   const headers = new Headers(init.headers)
   headers.set('Authorization', `Bearer ${accessToken}`)
   return { ...init, headers }
+}
+
+let renovacaoEmAndamento: Promise<TokensResponse | null> | null = null
+
+/**
+ * Garante que, mesmo com vários apiFetch levando 401 ao mesmo tempo, só uma chamada real a
+ * /auth/refresh sai - o refresh token é de uso único no backend, então uma segunda chamada
+ * concorrente seria tratada como reuso e derrubaria a sessão inteira (todos os refresh tokens
+ * ativos do usuário), mesmo sem nenhum ataque envolvido.
+ */
+function renovarSessaoUnica(): Promise<TokensResponse | null> {
+  if (!renovacaoEmAndamento) {
+    renovacaoEmAndamento = renovarSessao().finally(() => {
+      renovacaoEmAndamento = null
+    })
+  }
+  return renovacaoEmAndamento
 }
 
 /**
@@ -24,14 +41,13 @@ export async function apiFetch(input: string, init: RequestInit = {}): Promise<R
     return resposta
   }
 
-  const tokens = await renovarSessao()
+  const tokens = await renovarSessaoUnica()
   if (!tokens) {
     useAuthStore.getState().encerrarSessao()
     return resposta
   }
 
-  const claims = decodeJwt(tokens.accessToken)
-  useAuthStore.getState().definirSessao(tokens.accessToken, claims.papel)
+  useAuthStore.getState().autenticarComTokens(tokens)
 
   return fetch(input, comAuthorization(init))
 }

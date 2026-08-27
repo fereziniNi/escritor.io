@@ -87,4 +87,25 @@ describe('apiFetch', () => {
     expect(resposta.status).toBe(401)
     expect(useAuthStore.getState().autenticado).toBe(false)
   })
+
+  it('duas chamadas simultâneas em 401 disparam só uma renovação de sessão', async () => {
+    useAuthStore.getState().definirSessao('token-expirado', 'ADMIN')
+    let chamadasRefresh = 0
+    server.use(
+      http.get('/recurso-a', () => new HttpResponse(null, { status: 401 })),
+      http.get('/recurso-b', () => new HttpResponse(null, { status: 401 })),
+      http.post('/auth/refresh', async () => {
+        chamadasRefresh++
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        return HttpResponse.json({
+          accessToken:
+            'eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxIiwicGFwZWwiOiJBRE1JTiIsImV4cCI6MTk5OTk5OTk5OX0.assinatura',
+        })
+      }),
+    )
+
+    await Promise.all([apiFetch('/recurso-a'), apiFetch('/recurso-b')])
+
+    expect(chamadasRefresh).toBe(1)
+  })
 })

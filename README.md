@@ -31,4 +31,14 @@ Fase atual: **S1 — E0 Fundação** (ver [docs/incremental-plan.md](docs/increm
 - ✅ S1.6 — entidades `Equipe`, `Projeto`, `MembroEquipe`, `ProjetoEquipe` (N:N), direto do modelo do PRD. Vínculos N:N protegidos por constraint `UNIQUE` no banco. Testado com Testcontainers.
 - ✅ S1.7 — CRUD de equipe/projeto (só ADMIN) + telas `EquipesPage`/`ProjetosPage`. `adicionarMembro`/`vincularEquipe` são idempotentes (repetir a chamada não duplica linha). Novo `shared/api/http.ts`: cliente HTTP autenticado que anexa o access token e, em 401, tenta renovar via `/auth/refresh` e repete a chamada uma vez antes de desistir. Verificado ponta a ponta com Playwright + banco real: login admin → criar equipe → criar projeto → vincular equipe ao projeto, com o vínculo confirmado direto no Postgres.
 
-**E0 (Fundação) completo.** Próximo: **E1 — Ponto**, o núcleo do MVP (S2 no plano incremental).
+**E0 (Fundação) completo.** Passou por uma revisão de código formal (8 agentes cobrindo correção, reuso, simplificação, eficiência e convenções) logo depois, que encontrou e já teve corrigidos:
+
+- Race condition no refresh de token (chamadas 401 concorrentes derrubavam a sessão inteira) — `shared/api/http.ts` agora deduplica renovações concorrentes.
+- Falha de e-mail quebrando a garantia de resposta idêntica exista ou não o e-mail — envio agora é best-effort.
+- Falta de cooldown no reenvio de código (permitia griefing de login) — 30s de cooldown.
+- `POST /auth/refresh` não conferia se o usuário seguia ativo.
+- Canal de tempo em `POST /auth/login` revelando e-mails cadastrados — comparação fantasma para e-mail inexistente.
+- Sem como voltar e corrigir o e-mail na tela de login.
+- Triplicação de `decodeJwt`+`definirSessao` — unificada em `authStore.autenticarComTokens`.
+
+Próximo: **E1 — Ponto**, o núcleo do MVP (S2 no plano incremental).

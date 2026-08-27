@@ -108,17 +108,50 @@ class AutenticacaoServiceTest {
     }
 
     @Test
-    void invalidaCodigoAnteriorNaoUsadoAoGerarNovo() {
+    void invalidaCodigoAnteriorNaoUsadoAoGerarNovoAposCooldown() {
         CodigoAcesso anterior = new CodigoAcesso(usuario, "hash-antigo");
+        Clock relogioAposCooldown = Clock.fixed(anterior.getCriadoEm().plus(Duration.ofSeconds(31)), ZoneOffset.UTC);
+        AutenticacaoService servicoAposCooldown = servico(relogioAposCooldown);
+
         when(usuarioRepository.findByEmailAndAtivoTrue("ana@escritor.io")).thenReturn(Optional.of(usuario));
         when(codigoAcessoRepository.findFirstByUsuarioAndUsadoEmIsNullOrderByCriadoEmDesc(usuario))
                 .thenReturn(Optional.of(anterior));
         when(passwordEncoder.encode(anyString())).thenReturn("hash-novo");
 
-        autenticacaoService.solicitarCodigo("ana@escritor.io");
+        servicoAposCooldown.solicitarCodigo("ana@escritor.io");
 
         assertThat(anterior.estaUsado()).isTrue();
         verify(codigoAcessoRepository).save(anterior);
+        verify(envioEmail).enviarCodigoAcesso(eq("ana@escritor.io"), anyString());
+    }
+
+    @Test
+    void naoGeraNemReenviaCodigoDentroDoCooldown() {
+        CodigoAcesso recente = new CodigoAcesso(usuario, "hash-recente");
+        when(usuarioRepository.findByEmailAndAtivoTrue("ana@escritor.io")).thenReturn(Optional.of(usuario));
+        when(codigoAcessoRepository.findFirstByUsuarioAndUsadoEmIsNullOrderByCriadoEmDesc(usuario))
+                .thenReturn(Optional.of(recente));
+
+        autenticacaoService.solicitarCodigo("ana@escritor.io");
+
+        assertThat(recente.estaUsado()).isFalse();
+        verify(codigoAcessoRepository, never()).save(any());
+        verifyNoInteractions(envioEmail);
+    }
+
+    @Test
+    void falhaNoEnvioDeEmailNaoInterrompeSolicitarCodigo() {
+        when(usuarioRepository.findByEmailAndAtivoTrue("ana@escritor.io")).thenReturn(Optional.of(usuario));
+        when(codigoAcessoRepository.findFirstByUsuarioAndUsadoEmIsNullOrderByCriadoEmDesc(usuario))
+                .thenReturn(Optional.empty());
+        when(passwordEncoder.encode(anyString())).thenReturn("hash-do-codigo");
+        org.mockito.Mockito.doThrow(new RuntimeException("SMTP fora do ar"))
+                .when(envioEmail)
+                .enviarCodigoAcesso(anyString(), anyString());
+
+        assertThatCode(() -> autenticacaoService.solicitarCodigo("ana@escritor.io")).doesNotThrowAnyException();
+
+        verify(codigoAcessoRepository).save(any(CodigoAcesso.class));
     }
 
     @Test
@@ -165,11 +198,17 @@ class AutenticacaoServiceTest {
     }
 
     @Test
-    void usuarioNaoEncontradoLancaExcecao() {
+    void usuarioNaoEncontradoLancaExcecaoRealizandoComparacaoFantasma() {
         when(usuarioRepository.findByEmailAndAtivoTrue("fantasma@escritor.io")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> autenticacaoService.verificarCodigo("fantasma@escritor.io", "123456"))
                 .isInstanceOf(CodigoInvalidoException.class);
+
+        // mesmo sem usuário, uma comparação de hash é feita para gastar tempo equivalente ao
+        // caminho de e-mail existente e não vazar, por tempo de resposta, quais e-mails existem.
+        // any() (não anyString()) porque passwordEncoder.encode(...) não está stubado aqui e
+        // por isso retorna null - o que importa é que matches() foi chamado, não o valor exato.
+        verify(passwordEncoder).matches(eq("123456"), any());
     }
 
     @Test
@@ -241,6 +280,21 @@ class AutenticacaoServiceTest {
 
         assertThatThrownBy(() -> servicoComRelogioFuturo.renovarToken("token-plano"))
                 .isInstanceOf(TokenInvalidoException.class);
+    }
+
+    @Test
+    void tokenValidoDeUsuarioInativoLancaExcecao() {
+        Usuario usuarioInativo = new Usuario("Bruno Lima", "bruno@escritor.io", Papel.COLABORADOR, 360);
+        ReflectionTestUtils.setField(usuarioInativo, "id", 9L);
+        ReflectionTestUtils.setField(usuarioInativo, "ativo", false);
+        TokenRenovacao token = new TokenRenovacao(usuarioInativo, HashSha256.hash("token-de-inativo"));
+        when(tokenRenovacaoRepository.findByTokenHash(HashSha256.hash("token-de-inativo")))
+                .thenReturn(Optional.of(token));
+
+        assertThatThrownBy(() -> autenticacaoService.renovarToken("token-de-inativo"))
+                .isInstanceOf(TokenInvalidoException.class);
+
+        verifyNoInteractions(jwtService);
     }
 
     @Test

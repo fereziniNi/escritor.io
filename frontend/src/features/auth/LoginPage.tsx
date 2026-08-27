@@ -3,13 +3,12 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { solicitarCodigo, verificarCodigo } from './api'
 import { useAuthStore } from './authStore'
-import { decodeJwt } from './jwt'
 
 export function LoginPage() {
   const [etapa, setEtapa] = useState<'email' | 'codigo'>('email')
   const [email, setEmail] = useState('')
   const [codigo, setCodigo] = useState('')
-  const definirSessao = useAuthStore((estado) => estado.definirSessao)
+  const autenticarComTokens = useAuthStore((estado) => estado.autenticarComTokens)
   const navigate = useNavigate()
 
   const mutacaoSolicitarCodigo = useMutation({
@@ -20,8 +19,7 @@ export function LoginPage() {
   const mutacaoVerificarCodigo = useMutation({
     mutationFn: () => verificarCodigo(email, codigo),
     onSuccess: (tokens) => {
-      const claims = decodeJwt(tokens.accessToken)
-      definirSessao(tokens.accessToken, claims.papel)
+      autenticarComTokens(tokens)
       navigate('/')
     },
   })
@@ -72,6 +70,11 @@ export function LoginPage() {
         Entrar
       </button>
       {mutacaoVerificarCodigo.isError && <p>Código inválido ou expirado.</p>}
+      <p>
+        <button type="button" onClick={() => setEtapa('email')}>
+          Usar outro e-mail
+        </button>
+      </p>
     </form>
   )
 }

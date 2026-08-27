@@ -12,12 +12,19 @@ import io.escritor.presenca.seguranca.HashSha256;
 import io.escritor.presenca.seguranca.JwtService;
 import io.escritor.presenca.seguranca.email.EnvioEmail;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
 public class AutenticacaoService {
+
+    private static final Logger log = LoggerFactory.getLogger(AutenticacaoService.class);
+    private static final Duration COOLDOWN_REENVIO_CODIGO = Duration.ofSeconds(30);
 
     private final UsuarioRepository usuarioRepository;
     private final CodigoAcessoRepository codigoAcessoRepository;
@@ -26,6 +33,13 @@ public class AutenticacaoService {
     private final EnvioEmail envioEmail;
     private final JwtService jwtService;
     private final Clock clock;
+
+    /**
+     * Hash fantasma contra timing attack: quando o e-mail não existe, comparamos o código
+     * informado contra este hash mesmo assim, para que o tempo de resposta não denuncie quais
+     * e-mails estão cadastrados (ver ADR 0008).
+     */
+    private final String hashFantasma;
 
     public AutenticacaoService(
             UsuarioRepository usuarioRepository,
@@ -42,6 +56,7 @@ public class AutenticacaoService {
         this.envioEmail = envioEmail;
         this.jwtService = jwtService;
         this.clock = clock;
+        this.hashFantasma = passwordEncoder.encode("000000");
     }
 
     public void solicitarCodigo(String email) {
@@ -49,10 +64,17 @@ public class AutenticacaoService {
     }
 
     public TokensAutenticacao verificarCodigo(String email, String codigoPlano) {
-        Usuario usuario = usuarioRepository.findByEmailAndAtivoTrue(email).orElseThrow(CodigoInvalidoException::new);
+        Optional<Usuario> usuario = usuarioRepository.findByEmailAndAtivoTrue(email);
+
+        if (usuario.isEmpty()) {
+            // Comparação fantasma: gasta o mesmo tempo de um BCrypt.matches de verdade,
+            // para não vazar por tempo de resposta se o e-mail existe ou não.
+            passwordEncoder.matches(codigoPlano, hashFantasma);
+            throw new CodigoInvalidoException();
+        }
 
         CodigoAcesso codigo = codigoAcessoRepository
-                .findFirstByUsuarioAndUsadoEmIsNullOrderByCriadoEmDesc(usuario)
+                .findFirstByUsuarioAndUsadoEmIsNullOrderByCriadoEmDesc(usuario.get())
                 .orElseThrow(CodigoInvalidoException::new);
 
         Instant agora = Instant.now(clock);
@@ -70,13 +92,17 @@ public class AutenticacaoService {
         codigo.marcarUsado(agora);
         codigoAcessoRepository.save(codigo);
 
-        return emitirTokens(usuario);
+        return emitirTokens(usuario.get());
     }
 
     public TokensAutenticacao renovarToken(String refreshTokenPlano) {
         TokenRenovacao token = tokenRenovacaoRepository
                 .findByTokenHash(HashSha256.hash(refreshTokenPlano))
                 .orElseThrow(TokenInvalidoException::new);
+
+        if (!token.getUsuario().isAtivo()) {
+            throw new TokenInvalidoException();
+        }
 
         Instant agora = Instant.now(clock);
 
@@ -114,21 +140,35 @@ public class AutenticacaoService {
     }
 
     private void gerarEEnviarCodigo(Usuario usuario) {
-        invalidarCodigoAnterior(usuario);
+        Instant agora = Instant.now(clock);
+        Optional<CodigoAcesso> codigoAtual =
+                codigoAcessoRepository.findFirstByUsuarioAndUsadoEmIsNullOrderByCriadoEmDesc(usuario);
+
+        if (codigoAtual.isPresent() && aindaEmCooldown(codigoAtual.get(), agora)) {
+            return;
+        }
+
+        codigoAtual.ifPresent(anterior -> {
+            anterior.marcarUsado(agora);
+            codigoAcessoRepository.save(anterior);
+        });
 
         String codigo = GeradorCodigo.gerar();
         CodigoAcesso novo = new CodigoAcesso(usuario, passwordEncoder.encode(codigo));
         codigoAcessoRepository.save(novo);
 
-        envioEmail.enviarCodigoAcesso(usuario.getEmail(), codigo);
+        try {
+            envioEmail.enviarCodigoAcesso(usuario.getEmail(), codigo);
+        } catch (RuntimeException e) {
+            // Não deixa a solicitação de código falhar por causa do envio: a resposta ao
+            // cliente precisa continuar idêntica exista ou não o e-mail (ADR 0008), e o código
+            // já foi persistido - o usuário pode pedir um novo depois do cooldown se este e-mail
+            // não chegou.
+            log.warn("Falha ao enviar e-mail de código de acesso para {}", usuario.getEmail(), e);
+        }
     }
 
-    private void invalidarCodigoAnterior(Usuario usuario) {
-        codigoAcessoRepository
-                .findFirstByUsuarioAndUsadoEmIsNullOrderByCriadoEmDesc(usuario)
-                .ifPresent(anterior -> {
-                    anterior.marcarUsado(Instant.now(clock));
-                    codigoAcessoRepository.save(anterior);
-                });
+    private boolean aindaEmCooldown(CodigoAcesso codigo, Instant agora) {
+        return Duration.between(codigo.getCriadoEm(), agora).compareTo(COOLDOWN_REENVIO_CODIGO) < 0;
     }
 }

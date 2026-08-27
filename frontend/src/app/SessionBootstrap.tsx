@@ -1,11 +1,10 @@
 import { type ReactNode, useEffect, useState } from 'react'
 import { renovarSessao } from '../features/auth/api'
 import { useAuthStore } from '../features/auth/authStore'
-import { decodeJwt } from '../features/auth/jwt'
 
 export function SessionBootstrap({ children }: { children: ReactNode }) {
   const [carregando, setCarregando] = useState(true)
-  const definirSessao = useAuthStore((estado) => estado.definirSessao)
+  const autenticarComTokens = useAuthStore((estado) => estado.autenticarComTokens)
 
   useEffect(() => {
     let cancelado = false
@@ -15,8 +14,7 @@ export function SessionBootstrap({ children }: { children: ReactNode }) {
         if (cancelado || !tokens) {
           return
         }
-        const claims = decodeJwt(tokens.accessToken)
-        definirSessao(tokens.accessToken, claims.papel)
+        autenticarComTokens(tokens)
       })
       .finally(() => {
         if (!cancelado) {
@@ -27,7 +25,7 @@ export function SessionBootstrap({ children }: { children: ReactNode }) {
     return () => {
       cancelado = true
     }
-  }, [definirSessao])
+  }, [autenticarComTokens])
 
   if (carregando) {
     return null

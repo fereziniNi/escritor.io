@@ -11,9 +11,11 @@ O PRD original (E0) previa login com email + senha (BCrypt). O usuário decidiu,
 - Login em dois passos:
   1. `POST /auth/codigo` `{email}` — se existir um usuário ativo com esse e-mail, gera um código numérico de 6 dígitos, guarda o **hash** dele (nunca texto puro) em `CodigoAcesso` com expiração de 10 minutos, e envia por e-mail. **Resposta idêntica** exista ou não o e-mail — não dá para usar esse endpoint para descobrir quem está cadastrado.
   2. `POST /auth/login` `{email, codigo}` — valida o código (existe, não expirou, não foi usado, não passou de 5 tentativas) e emite os tokens (ver ADR 0006).
-- Um novo código pedido antes do anterior expirar invalida o anterior — só o mais recente é válido.
+- Um novo código só é gerado se o anterior já expirou **ou** se já passou um cooldown de 30s desde que foi criado — dentro do cooldown, `POST /auth/codigo` é um no-op silencioso (mesma resposta 202). Sem isso, qualquer um que soubesse o e-mail de alguém poderia spammar o endpoint pra invalidar o código da vítima toda vez que ela tentasse usá-lo, um griefing barato.
 - 5 tentativas erradas de verificação **matam aquele código específico** (não bloqueiam a conta) — o usuário só precisa pedir um novo.
-- E-mail enviado via Spring Mail, contra Mailpit em dev (`docker-compose.yml`, UI em `localhost:8025`) — nada sai de verdade localmente.
+- E-mail enviado via Spring Mail, contra Mailpit em dev (`docker-compose.yml`, UI em `localhost:8025`) — nada sai de verdade localmente. O envio é best-effort: se `mailSender.send()` lançar (SMTP fora do ar, por exemplo), a exceção é capturada e só logada — `POST /auth/codigo` continua respondendo 202 igual, porque um 500 ali só para e-mails cadastrados reabriria o oráculo que a resposta idêntica existe pra fechar.
+- `POST /auth/login` com e-mail inexistente também executa uma comparação de hash (contra um hash fantasma pré-computado) antes de rejeitar — sem isso, a ausência da chamada ao BCrypt para e-mails desconhecidos criava uma diferença de tempo de resposta mensurável, dando outro jeito de enumerar quais e-mails estão cadastrados.
+- `POST /auth/refresh` confere se o usuário do token continua ativo antes de emitir novos tokens — sem isso, um usuário desativado no futuro (quando existir esse endpoint) continuaria renovando sessão por até 30 dias com um refresh token emitido antes da desativação.
 
 ## Alternativas consideradas
 - **Manter senha + adicionar 2FA por e-mail depois:** era o plano original, mas o usuário preferiu simplificar direto para passwordless — menos superfície (nenhuma senha para vazar, resetar ou reusar entre sistemas) e mais adequado a um time de até 10 pessoas onde a fricção de "criar e lembrar senha" não compensa.

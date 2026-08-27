@@ -86,4 +86,19 @@ describe('LoginPage', () => {
     expect(await screen.findByText(/código inválido/i)).toBeInTheDocument()
     expect(useAuthStore.getState().autenticado).toBe(false)
   })
+
+  it('permite voltar e corrigir o e-mail a partir da etapa de código', async () => {
+    server.use(http.post('/auth/codigo', () => new HttpResponse(null, { status: 202 })))
+    const user = userEvent.setup()
+    renderLoginPage()
+
+    await user.type(screen.getByLabelText(/e-mail/i), 'ana@escritor.io')
+    await user.click(screen.getByRole('button', { name: /enviar código/i }))
+    await screen.findByLabelText(/código/i)
+
+    await user.click(screen.getByRole('button', { name: /usar outro e-mail/i }))
+
+    expect(screen.getByLabelText(/e-mail/i)).toHaveValue('ana@escritor.io')
+    expect(screen.queryByLabelText(/código/i)).not.toBeInTheDocument()
+  })
 })

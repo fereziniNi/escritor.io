@@ -25,6 +25,20 @@ describe('useAuthStore', () => {
     expect(estado.papel).toBe('GESTOR')
   })
 
+  it('autenticarComTokens decodifica o JWT e autentica com o papel da claim', () => {
+    useAuthStore.getState().autenticarComTokens({
+      accessToken:
+        'eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxIiwicGFwZWwiOiJBRE1JTiIsImV4cCI6MTk5OTk5OTk5OX0.assinatura',
+    })
+
+    const estado = useAuthStore.getState()
+    expect(estado.autenticado).toBe(true)
+    expect(estado.papel).toBe('ADMIN')
+    expect(estado.accessToken).toBe(
+      'eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxIiwicGFwZWwiOiJBRE1JTiIsImV4cCI6MTk5OTk5OTk5OX0.assinatura',
+    )
+  })
+
   it('encerrarSessao limpa o estado', () => {
     useAuthStore.getState().definirSessao('token-fake', 'ADMIN')
 
