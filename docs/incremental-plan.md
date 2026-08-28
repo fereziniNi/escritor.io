@@ -60,8 +60,8 @@ Regra de visibilidade (PRD §2): um usuário vê quadros das equipes das quais �
 | S3.6 ✅ | Entidade `Card` com posição fracionária + `POST /colunas/{id}/cards` (título, descrição, responsável, prazo, estimativa) | Domínio: nova posição sempre fica estritamente entre os vizinhos (ou nas pontas, se a coluna estiver vazia) |
 | S3.7 ✅ | Frontend: quadro com colunas e cards em modo leitura + criar card | Componente: card criado aparece na coluna certa sem reload manual |
 | S3.8 ✅ | `PATCH /cards/{id}/mover` (nova coluna + nova posição), sem WebSocket ainda | Domínio: mover um card nunca renumera os outros da coluna, só recalcula a posição do card movido |
-| S3.9 | Frontend: drag-and-drop (`dnd-kit`) com atualização otimista | Componente: card muda de coluna na UI antes da resposta da API chegar |
-| S3.10 | Rollback do drag-and-drop quando a API de mover falha | Componente: card volta pra coluna original se `PATCH /cards/{id}/mover` retornar erro |
+| S3.9 ✅ | Frontend: drag-and-drop (`dnd-kit`) com atualização otimista | Componente: card muda de coluna na UI antes da resposta da API chegar |
+| S3.10 ✅ | Rollback do drag-and-drop quando a API de mover falha | Componente: card volta pra coluna original se `PATCH /cards/{id}/mover` retornar erro |
 | S3.11 | `/ws/quadro/{id}` — broadcast da movimentação de card | Integração: um segundo cliente conectado ao mesmo quadro recebe o evento e atualiza sem reload |
 | S3.12 | Limite de WIP: mover card pra coluna no limite é rejeitado | Domínio/Web: 409 ao mover pra coluna que já está no `limite_wip`; coluna sem limite (`null`) nunca bloqueia |
 | S3.13 | `Etiqueta` (por quadro) + `CardEtiqueta` (N:N) — criar, aplicar, remover | Domínio: etiqueta de outro quadro não pode ser aplicada a um card deste quadro |

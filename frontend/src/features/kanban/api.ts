@@ -44,3 +44,15 @@ export async function criarCard(dados: { colunaId: number; titulo: string }): Pr
   }
   return response.json()
 }
+
+export async function moverCard(dados: { cardId: number; colunaId: number; indice: number }): Promise<Card> {
+  const response = await apiFetch(`/cards/${dados.cardId}/mover`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ colunaId: dados.colunaId, indice: dados.indice }),
+  })
+  if (!response.ok) {
+    throw new Error('Não foi possível mover o card')
+  }
+  return response.json()
+}
