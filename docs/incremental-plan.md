@@ -64,7 +64,7 @@ Regra de visibilidade (PRD §2): um usuário vê quadros das equipes das quais �
 | S3.10 ✅ | Rollback do drag-and-drop quando a API de mover falha | Componente: card volta pra coluna original se `PATCH /cards/{id}/mover` retornar erro |
 | S3.11 ✅ | `/ws/quadro/{id}` — broadcast da movimentação de card | Integração: um segundo cliente conectado ao mesmo quadro recebe o evento e atualiza sem reload |
 | S3.12 ✅ | Limite de WIP: mover card pra coluna no limite é rejeitado | Domínio/Web: 409 ao mover pra coluna que já está no `limite_wip`; coluna sem limite (`null`) nunca bloqueia |
-| S3.13 | `Etiqueta` (por quadro) + `CardEtiqueta` (N:N) — criar, aplicar, remover | Domínio: etiqueta de outro quadro não pode ser aplicada a um card deste quadro |
+| S3.13 ✅ | `Etiqueta` (por quadro) + `CardEtiqueta` (N:N) — criar, aplicar, remover | Domínio: etiqueta de outro quadro não pode ser aplicada a um card deste quadro |
 | S3.14 | Frontend: etiquetas no card (criar, aplicar, remover, exibir no card do quadro) | Componente: etiqueta aplicada aparece no card sem reload |
 | S3.15 | `CardComentario` — criar/listar | Web: 403 pra quem não tem acesso ao quadro do card (mesma regra de visibilidade de S3.2) |
 | S3.16 | Frontend: comentários no card (detalhe do card) | Componente: comentário novo aparece na lista sem reload |

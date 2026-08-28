@@ -2,6 +2,7 @@ package io.escritor.presenca.kanban.web;
 
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
 import io.escritor.presenca.kanban.service.ColunaService;
+import io.escritor.presenca.kanban.service.EtiquetaService;
 import io.escritor.presenca.kanban.service.QuadroService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -21,12 +22,17 @@ public class QuadroController {
 
     private final QuadroService quadroService;
     private final ColunaService colunaService;
+    private final EtiquetaService etiquetaService;
     private final ContextoUsuarioAutenticado contextoUsuarioAutenticado;
 
     public QuadroController(
-            QuadroService quadroService, ColunaService colunaService, ContextoUsuarioAutenticado contextoUsuarioAutenticado) {
+            QuadroService quadroService,
+            ColunaService colunaService,
+            EtiquetaService etiquetaService,
+            ContextoUsuarioAutenticado contextoUsuarioAutenticado) {
         this.quadroService = quadroService;
         this.colunaService = colunaService;
+        this.etiquetaService = etiquetaService;
         this.contextoUsuarioAutenticado = contextoUsuarioAutenticado;
     }
 
@@ -52,5 +58,12 @@ public class QuadroController {
     @PreAuthorize("hasAnyRole('GESTOR', 'ADMIN')")
     public ColunaResponse criarColuna(@PathVariable Long id, @Valid @RequestBody CriarColunaRequest request) {
         return colunaService.criar(id, request.nome(), request.ordem(), request.limiteWip());
+    }
+
+    @PostMapping("/{id}/etiquetas")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('GESTOR', 'ADMIN')")
+    public EtiquetaResponse criarEtiqueta(@PathVariable Long id, @Valid @RequestBody CriarEtiquetaRequest request) {
+        return etiquetaService.criar(id, request.nome(), request.cor());
     }
 }
