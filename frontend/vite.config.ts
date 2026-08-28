@@ -6,20 +6,28 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react()],
   server: {
-    proxy: Object.fromEntries(
-      [
-        '/health',
-        '/auth',
-        '/usuarios',
-        '/equipes',
-        '/projetos',
-        '/ponto',
-        '/ajustes',
-        '/quadros',
-        '/colunas',
-        '/cards',
-      ].map((path) => [path, process.env.VITE_BACKEND_URL ?? 'http://localhost:8080']),
-    ),
+    proxy: {
+      ...Object.fromEntries(
+        [
+          '/health',
+          '/auth',
+          '/usuarios',
+          '/equipes',
+          '/projetos',
+          '/ponto',
+          '/ajustes',
+          '/quadros',
+          '/colunas',
+          '/cards',
+        ].map((path) => [path, process.env.VITE_BACKEND_URL ?? 'http://localhost:8080']),
+      ),
+      // /ws precisa de ws: true - é upgrade de conexão (S3.11), não request HTTP normal como
+      // os prefixos acima, então não dá pra ficar na mesma lista de string->target.
+      '/ws': {
+        target: process.env.VITE_BACKEND_URL ?? 'http://localhost:8080',
+        ws: true,
+      },
+    },
   },
   test: {
     environment: 'jsdom',

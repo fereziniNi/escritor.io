@@ -9,6 +9,7 @@ import io.escritor.presenca.kanban.domain.Coluna;
 import io.escritor.presenca.kanban.repository.CardRepository;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
 import io.escritor.presenca.kanban.web.CardResponse;
+import io.escritor.presenca.kanban.ws.QuadroWebSocketHandler;
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -19,11 +20,17 @@ public class CardService {
     private final CardRepository cardRepository;
     private final ColunaRepository colunaRepository;
     private final UsuarioRepository usuarioRepository;
+    private final QuadroWebSocketHandler quadroWebSocketHandler;
 
-    public CardService(CardRepository cardRepository, ColunaRepository colunaRepository, UsuarioRepository usuarioRepository) {
+    public CardService(
+            CardRepository cardRepository,
+            ColunaRepository colunaRepository,
+            UsuarioRepository usuarioRepository,
+            QuadroWebSocketHandler quadroWebSocketHandler) {
         this.cardRepository = cardRepository;
         this.colunaRepository = colunaRepository;
         this.usuarioRepository = usuarioRepository;
+        this.quadroWebSocketHandler = quadroWebSocketHandler;
     }
 
     public CardResponse criar(
@@ -74,8 +81,11 @@ public class CardService {
 
         card.mover(novaColuna, novaPosicao);
         Card salvo = cardRepository.save(card);
+        CardResponse response = CardResponse.de(salvo);
 
-        return CardResponse.de(salvo);
+        quadroWebSocketHandler.broadcastCardMovido(novaColuna.getQuadro().getId(), response);
+
+        return response;
     }
 
     private Usuario buscarUsuario(Long id) {

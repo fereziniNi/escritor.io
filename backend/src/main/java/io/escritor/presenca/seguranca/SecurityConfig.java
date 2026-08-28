@@ -28,7 +28,12 @@ public class SecurityConfig {
                         // /error precisa ser público: o forward interno do Boot para lá depois de um 403/404
                         // reentra nesta mesma cadeia como request anônima, e sem isso o entry point troca
                         // o status original por 401 antes do corpo do erro ser escrito.
-                        .requestMatchers("/health", "/auth/**", "/error").permitAll()
+                        // /ws/** também é público aqui de propósito: o WebSocket nativo do browser não
+                        // permite setar o header Authorization no handshake, então a autenticação desse
+                        // path é feita à parte, via query param, por QuadroHandshakeInterceptor - não por
+                        // este filtro. Deixar authenticated() aqui derrubaria todo handshake com 401 antes
+                        // do interceptor sequer rodar.
+                        .requestMatchers("/health", "/auth/**", "/error", "/ws/**").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(new JwtAuthenticationFilter(jwtService), UsernamePasswordAuthenticationFilter.class);
 

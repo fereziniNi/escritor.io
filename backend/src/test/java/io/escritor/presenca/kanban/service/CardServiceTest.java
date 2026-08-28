@@ -12,6 +12,8 @@ import io.escritor.presenca.kanban.domain.Quadro;
 import io.escritor.presenca.kanban.domain.TituloCardObrigatorioException;
 import io.escritor.presenca.kanban.repository.CardRepository;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
+import io.escritor.presenca.kanban.web.CardResponse;
+import io.escritor.presenca.kanban.ws.QuadroWebSocketHandler;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,6 +42,9 @@ class CardServiceTest {
     @Mock
     private UsuarioRepository usuarioRepository;
 
+    @Mock
+    private QuadroWebSocketHandler quadroWebSocketHandler;
+
     private final Coluna coluna = colunaComId(1L);
     private final Usuario criadoPor = usuarioComId(1L);
 
@@ -66,7 +71,7 @@ class CardServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new CardService(cardRepository, colunaRepository, usuarioRepository);
+        service = new CardService(cardRepository, colunaRepository, usuarioRepository, quadroWebSocketHandler);
     }
 
     @Test
@@ -204,6 +209,34 @@ class CardServiceTest {
         when(cardRepository.findById(999L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.mover(999L, 2L, 0)).isInstanceOf(RecursoNaoEncontradoException.class);
+    }
+
+    @Test
+    void moverBroadcastaOCardMovidoPraSessoesDoQuadroDeDestino() {
+        Coluna destino = colunaComId(2L);
+        Card card = cardComId(10L, coluna, 1024.0);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(colunaRepository.findById(2L)).thenReturn(Optional.of(destino));
+        when(cardRepository.findByColunaOrderByPosicaoAsc(destino)).thenReturn(List.of());
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        service.mover(10L, 2L, 0);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(CardResponse.class);
+        verify(quadroWebSocketHandler).broadcastCardMovido(org.mockito.ArgumentMatchers.eq(destino.getQuadro().getId()), captor.capture());
+        assertThat(captor.getValue().id()).isEqualTo(10L);
+        assertThat(captor.getValue().colunaId()).isEqualTo(2L);
+    }
+
+    @Test
+    void criarNuncaBroadcasta() {
+        when(colunaRepository.findById(1L)).thenReturn(Optional.of(coluna));
+        when(cardRepository.findFirstByColunaOrderByPosicaoDesc(coluna)).thenReturn(Optional.empty());
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        service.criar(1L, "Corrigir bug", null, null, null, null, criadoPor);
+
+        verify(quadroWebSocketHandler, never()).broadcastCardMovido(any(), any());
     }
 
     @Test

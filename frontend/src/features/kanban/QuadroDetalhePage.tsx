@@ -17,6 +17,7 @@ import { buscarQuadro, criarCard, moverCard } from './api'
 import { moverCardOtimista } from './moverCardOtimista'
 import { resolverMovimento } from './resolverMovimento'
 import type { Card, ColunaComCards, QuadroDetalhe } from './types'
+import { useQuadroWebSocket } from './useQuadroWebSocket'
 
 function CardArrastavel({ card }: { card: Card }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -99,6 +100,10 @@ export function QuadroDetalhePage() {
     queryKey: ['quadros', quadroId],
     queryFn: () => buscarQuadro(quadroId),
   })
+
+  // S3.11: quando outro usuário arrasta um card neste quadro, o backend broadcasta pelo
+  // websocket e este hook invalida a query acima - o quadro atualiza sem reload manual.
+  useQuadroWebSocket(quadroId)
 
   const criarCardMutation = useMutation({
     mutationFn: criarCard,

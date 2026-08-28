@@ -72,6 +72,20 @@ public class QuadroService {
     }
 
     /**
+     * Mesma regra de {@link #buscarDetalhe}, exposta como predicado puro pra quem só precisa
+     * decidir "pode ou não" sem montar o response inteiro - caso do handshake de
+     * {@code /ws/quadro/{id}} (S3.11), que autoriza antes mesmo do upgrade pra WebSocket
+     * acontecer. Quadro inexistente é tratado igual a "não visível" (retorna {@code false}), não
+     * lança - quem decide o status HTTP é quem chama.
+     */
+    public boolean usuarioPodeVer(Long quadroId, Usuario usuario) {
+        return quadroRepository
+                .findById(quadroId)
+                .map(quadro -> visivel(quadro, calcularVisibilidade(usuario)))
+                .orElse(false);
+    }
+
+    /**
      * 404 (não 403) quando o quadro existe mas não é visível pro usuário - mesma filosofia de
      * "não revelar que o recurso existe" já usada em {@code SolicitacaoAjusteService}.
      */
