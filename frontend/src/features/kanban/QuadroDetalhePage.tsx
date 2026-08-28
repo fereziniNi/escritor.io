@@ -55,7 +55,15 @@ function ColunaComDrop({
 
   return (
     <section ref={setNodeRef}>
-      <h2>{coluna.nome}</h2>
+      <h2>
+        {coluna.nome}
+        {coluna.limiteWip !== null && (
+          <span>
+            {' '}
+            {coluna.cards.length}/{coluna.limiteWip}
+          </span>
+        )}
+      </h2>
       <SortableContext items={coluna.cards.map((card) => card.id)} strategy={verticalListSortingStrategy}>
         <ul>
           {coluna.cards.map((card) => (

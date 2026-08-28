@@ -2,6 +2,7 @@ package io.escritor.presenca.infra;
 
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.EstimativaInvalidaException;
+import io.escritor.presenca.kanban.domain.LimiteWipExcedidoException;
 import io.escritor.presenca.kanban.domain.LimiteWipInvalidoException;
 import io.escritor.presenca.kanban.domain.NomeColunaObrigatorioException;
 import io.escritor.presenca.kanban.domain.NomeQuadroObrigatorioException;
@@ -63,6 +64,11 @@ public class TratamentoErroGlobal {
     @ExceptionHandler(LimiteWipInvalidoException.class)
     ResponseEntity<Void> tratarLimiteWipInvalido() {
         return ResponseEntity.badRequest().build();
+    }
+
+    @ExceptionHandler(LimiteWipExcedidoException.class)
+    ResponseEntity<Void> tratarLimiteWipExcedido() {
+        return ResponseEntity.status(HttpStatus.CONFLICT).build();
     }
 
     @ExceptionHandler(OrdemColunaDuplicadaException.class)

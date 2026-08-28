@@ -6,6 +6,7 @@ import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.CalculadoraPosicao;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.Coluna;
+import io.escritor.presenca.kanban.domain.LimiteWipExcedidoException;
 import io.escritor.presenca.kanban.repository.CardRepository;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
 import io.escritor.presenca.kanban.web.CardResponse;
@@ -74,6 +75,13 @@ public class CardService {
         List<Card> cardsDoDestino = cardRepository.findByColunaOrderByPosicaoAsc(novaColuna).stream()
                 .filter(outro -> !outro.getId().equals(card.getId()))
                 .toList();
+
+        // cardsDoDestino já exclui o próprio card - reordenar dentro da mesma coluna nunca conta
+        // como "ocupando mais uma vaga", só entrar numa coluna diferente que já está no limite.
+        Integer limiteWip = novaColuna.getLimiteWip();
+        if (limiteWip != null && cardsDoDestino.size() >= limiteWip) {
+            throw new LimiteWipExcedidoException(novaColuna.getId(), limiteWip);
+        }
 
         Double anterior = indice <= 0 ? null : cardsDoDestino.get(indice - 1).getPosicao();
         Double proxima = indice >= cardsDoDestino.size() ? null : cardsDoDestino.get(indice).getPosicao();

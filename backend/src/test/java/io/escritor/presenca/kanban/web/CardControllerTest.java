@@ -1,6 +1,7 @@
 package io.escritor.presenca.kanban.web;
 
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
+import io.escritor.presenca.kanban.domain.LimiteWipExcedidoException;
 import io.escritor.presenca.kanban.service.CardService;
 import io.escritor.presenca.seguranca.JwtService;
 import io.escritor.presenca.seguranca.SecurityConfig;
@@ -67,6 +68,19 @@ class CardControllerTest {
                                 {"colunaId":2,"indice":0}
                                 """))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser
+    void moverParaColunaNoLimiteWipRetorna409() throws Exception {
+        when(cardService.mover(eq(1L), eq(2L), eq(0))).thenThrow(new LimiteWipExcedidoException(2L, 3));
+
+        mockMvc.perform(patch("/cards/1/mover")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"colunaId":2,"indice":0}
+                                """))
+                .andExpect(status().isConflict());
     }
 
     @Test

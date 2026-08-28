@@ -109,6 +109,31 @@ describe('QuadroDetalhePage', () => {
     expect(await screen.findByText('Escrever testes')).toBeInTheDocument()
   })
 
+  it('mostra a ocupação vs. o limite de WIP quando a coluna tem limite', async () => {
+    server.use(
+      http.get('/quadros/1', () =>
+        HttpResponse.json({
+          ...QUADRO_DETALHE,
+          colunas: [{ ...QUADRO_DETALHE.colunas[0], nome: 'Em progresso', limiteWip: 3 }],
+        }),
+      ),
+    )
+
+    renderPagina()
+
+    expect(await screen.findByText('Em progresso')).toBeInTheDocument()
+    expect(screen.getByText('1/3')).toBeInTheDocument()
+  })
+
+  it('coluna sem limite de WIP não mostra contador', async () => {
+    server.use(http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)))
+
+    renderPagina()
+
+    await screen.findByText('A fazer')
+    expect(screen.queryByText(/^\d+\/\d+$/)).not.toBeInTheDocument()
+  })
+
   it('quadro sem colunas mostra mensagem vazia', async () => {
     server.use(http.get('/quadros/1', () => HttpResponse.json({ ...QUADRO_DETALHE, colunas: [] })))
 

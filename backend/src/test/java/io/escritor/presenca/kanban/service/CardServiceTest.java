@@ -8,6 +8,7 @@ import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.CalculadoraPosicao;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.Coluna;
+import io.escritor.presenca.kanban.domain.LimiteWipExcedidoException;
 import io.escritor.presenca.kanban.domain.Quadro;
 import io.escritor.presenca.kanban.domain.TituloCardObrigatorioException;
 import io.escritor.presenca.kanban.repository.CardRepository;
@@ -51,8 +52,12 @@ class CardServiceTest {
     private CardService service;
 
     private static Coluna colunaComId(Long id) {
+        return colunaComId(id, null);
+    }
+
+    private static Coluna colunaComId(Long id, Integer limiteWip) {
         Quadro quadro = new Quadro("Backlog", null, new Equipe("Backend", null));
-        Coluna coluna = new Coluna(quadro, "A fazer", 0, null);
+        Coluna coluna = new Coluna(quadro, "A fazer", 0, limiteWip);
         ReflectionTestUtils.setField(coluna, "id", id);
         return coluna;
     }
@@ -140,6 +145,70 @@ class CardServiceTest {
                 .isInstanceOf(TituloCardObrigatorioException.class);
 
         verify(cardRepository, never()).save(any());
+    }
+
+    @Test
+    void moverParaColunaNoLimiteWipLancaLimiteWipExcedido() {
+        Coluna destino = colunaComId(2L, 2);
+        Card card = cardComId(10L, coluna, 1024.0);
+        Card outro1 = cardComId(20L, destino, 100.0);
+        Card outro2 = cardComId(21L, destino, 200.0);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(colunaRepository.findById(2L)).thenReturn(Optional.of(destino));
+        when(cardRepository.findByColunaOrderByPosicaoAsc(destino)).thenReturn(List.of(outro1, outro2));
+
+        assertThatThrownBy(() -> service.mover(10L, 2L, 0)).isInstanceOf(LimiteWipExcedidoException.class);
+
+        verify(cardRepository, never()).save(any());
+        verify(quadroWebSocketHandler, never()).broadcastCardMovido(any(), any());
+    }
+
+    @Test
+    void moverParaColunaAbaixoDoLimiteWipPermite() {
+        Coluna destino = colunaComId(2L, 3);
+        Card card = cardComId(10L, coluna, 1024.0);
+        Card outro = cardComId(20L, destino, 100.0);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(colunaRepository.findById(2L)).thenReturn(Optional.of(destino));
+        when(cardRepository.findByColunaOrderByPosicaoAsc(destino)).thenReturn(List.of(outro));
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        var resposta = service.mover(10L, 2L, 1);
+
+        assertThat(resposta.colunaId()).isEqualTo(2L);
+    }
+
+    @Test
+    void moverParaColunaSemLimiteWipNuncaBloqueia() {
+        Coluna destino = colunaComId(2L, null);
+        Card card = cardComId(10L, coluna, 1024.0);
+        Card outro1 = cardComId(20L, destino, 100.0);
+        Card outro2 = cardComId(21L, destino, 200.0);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(colunaRepository.findById(2L)).thenReturn(Optional.of(destino));
+        when(cardRepository.findByColunaOrderByPosicaoAsc(destino)).thenReturn(List.of(outro1, outro2));
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        var resposta = service.mover(10L, 2L, 2);
+
+        assertThat(resposta.colunaId()).isEqualTo(2L);
+    }
+
+    @Test
+    void moverDentroDaMesmaColunaNoLimiteWipNaoBloqueia() {
+        // a coluna já tem exatamente o limite (contando o próprio card) - reordenar dentro dela
+        // não aumenta a ocupação, só o mover pra OUTRA coluna cheia deveria ser bloqueado.
+        Coluna colunaCheia = colunaComId(1L, 2);
+        Card card = cardComId(10L, colunaCheia, 300.0);
+        Card outro = cardComId(11L, colunaCheia, 100.0);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(colunaRepository.findById(1L)).thenReturn(Optional.of(colunaCheia));
+        when(cardRepository.findByColunaOrderByPosicaoAsc(colunaCheia)).thenReturn(List.of(outro, card));
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        var resposta = service.mover(10L, 1L, 0);
+
+        assertThat(resposta.colunaId()).isEqualTo(1L);
     }
 
     @Test
