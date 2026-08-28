@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
+import { MemoryRouter } from 'react-router'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { useAuthStore } from '../auth/authStore'
 import { QuadrosPage } from './QuadrosPage'
@@ -19,7 +20,9 @@ function renderQuadrosPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   return render(
     <QueryClientProvider client={queryClient}>
-      <QuadrosPage />
+      <MemoryRouter>
+        <QuadrosPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }

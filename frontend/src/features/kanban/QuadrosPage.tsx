@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { useAuthStore } from '../auth/authStore'
 import { criarQuadro, listarQuadros } from './api'
 
@@ -65,7 +66,9 @@ export function QuadrosPage() {
       {quadrosQuery.data?.length === 0 && <p>Nenhum quadro visível ainda.</p>}
       <ul>
         {quadrosQuery.data?.map((quadro) => (
-          <li key={quadro.id}>{quadro.nome}</li>
+          <li key={quadro.id}>
+            <Link to={`/kanban/${quadro.id}`}>{quadro.nome}</Link>
+          </li>
         ))}
       </ul>
     </main>

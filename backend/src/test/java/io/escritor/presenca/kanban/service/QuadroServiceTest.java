@@ -13,9 +13,13 @@ import io.escritor.presenca.identidade.repository.MembroEquipeRepository;
 import io.escritor.presenca.identidade.repository.ProjetoEquipeRepository;
 import io.escritor.presenca.identidade.repository.ProjetoRepository;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
+import io.escritor.presenca.kanban.domain.Card;
+import io.escritor.presenca.kanban.domain.Coluna;
 import io.escritor.presenca.kanban.domain.NomeQuadroObrigatorioException;
 import io.escritor.presenca.kanban.domain.Quadro;
 import io.escritor.presenca.kanban.domain.QuadroSemVinculoException;
+import io.escritor.presenca.kanban.repository.CardRepository;
+import io.escritor.presenca.kanban.repository.ColunaRepository;
 import io.escritor.presenca.kanban.repository.QuadroRepository;
 import java.time.LocalDate;
 import java.util.List;
@@ -52,6 +56,12 @@ class QuadroServiceTest {
     @Mock
     private EquipeRepository equipeRepository;
 
+    @Mock
+    private ColunaRepository colunaRepository;
+
+    @Mock
+    private CardRepository cardRepository;
+
     private final Usuario usuario = usuarioComId(1L);
     private final Equipe equipeDoUsuario = equipeComId(10L);
     private final Equipe outraEquipe = equipeComId(20L);
@@ -79,7 +89,13 @@ class QuadroServiceTest {
     @BeforeEach
     void setUp() {
         service = new QuadroService(
-                quadroRepository, membroEquipeRepository, projetoEquipeRepository, projetoRepository, equipeRepository);
+                quadroRepository,
+                membroEquipeRepository,
+                projetoEquipeRepository,
+                projetoRepository,
+                equipeRepository,
+                colunaRepository,
+                cardRepository);
     }
 
     @Test
@@ -190,5 +206,50 @@ class QuadroServiceTest {
         when(equipeRepository.findById(10L)).thenReturn(Optional.of(equipeDoUsuario));
 
         assertThatThrownBy(() -> service.criar("   ", null, 10L)).isInstanceOf(NomeQuadroObrigatorioException.class);
+    }
+
+    @Test
+    void buscarDetalheDeQuadroVisivelTrazColunasECards() {
+        Quadro quadro = new Quadro("Backlog", null, equipeDoUsuario);
+        ReflectionTestUtils.setField(quadro, "id", 1L);
+        Coluna coluna = new Coluna(quadro, "A fazer", 0, 3);
+        ReflectionTestUtils.setField(coluna, "id", 5L);
+        Card card = new Card(coluna, "Corrigir bug", null, 1024.0, null, null, null, usuario);
+
+        when(quadroRepository.findById(1L)).thenReturn(Optional.of(quadro));
+        when(membroEquipeRepository.findByUsuario(usuario))
+                .thenReturn(List.of(new MembroEquipe(equipeDoUsuario, usuario, PapelNaEquipe.MEMBRO)));
+        when(projetoEquipeRepository.findByEquipeIn(any())).thenReturn(List.of());
+        when(colunaRepository.findByQuadroOrderByOrdemAsc(quadro)).thenReturn(List.of(coluna));
+        when(cardRepository.findByColunaOrderByPosicaoAsc(coluna)).thenReturn(List.of(card));
+
+        var detalhe = service.buscarDetalhe(1L, usuario);
+
+        assertThat(detalhe.nome()).isEqualTo("Backlog");
+        assertThat(detalhe.colunas()).hasSize(1);
+        assertThat(detalhe.colunas().get(0).nome()).isEqualTo("A fazer");
+        assertThat(detalhe.colunas().get(0).limiteWip()).isEqualTo(3);
+        assertThat(detalhe.colunas().get(0).cards()).hasSize(1);
+        assertThat(detalhe.colunas().get(0).cards().get(0).titulo()).isEqualTo("Corrigir bug");
+    }
+
+    @Test
+    void buscarDetalheDeQuadroNaoVisivelLancaRecursoNaoEncontrado() {
+        Quadro quadro = new Quadro("Interno", null, outraEquipe);
+        ReflectionTestUtils.setField(quadro, "id", 1L);
+
+        when(quadroRepository.findById(1L)).thenReturn(Optional.of(quadro));
+        when(membroEquipeRepository.findByUsuario(usuario))
+                .thenReturn(List.of(new MembroEquipe(equipeDoUsuario, usuario, PapelNaEquipe.MEMBRO)));
+        when(projetoEquipeRepository.findByEquipeIn(any())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.buscarDetalhe(1L, usuario)).isInstanceOf(RecursoNaoEncontradoException.class);
+    }
+
+    @Test
+    void buscarDetalheDeQuadroInexistenteLancaRecursoNaoEncontrado() {
+        when(quadroRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.buscarDetalhe(99L, usuario)).isInstanceOf(RecursoNaoEncontradoException.class);
     }
 }

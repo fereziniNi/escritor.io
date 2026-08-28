@@ -3,6 +3,7 @@ import { HomePage } from './app/HomePage'
 import { ProtectedRoute } from './app/ProtectedRoute'
 import { SessionBootstrap } from './app/SessionBootstrap'
 import { LoginPage } from './features/auth/LoginPage'
+import { QuadroDetalhePage } from './features/kanban/QuadroDetalhePage'
 import { QuadrosPage } from './features/kanban/QuadrosPage'
 import { EquipesPage } from './features/organizacao/EquipesPage'
 import { ProjetosPage } from './features/organizacao/ProjetosPage'
@@ -42,6 +43,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <QuadrosPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/kanban/:id"
+            element={
+              <ProtectedRoute>
+                <QuadroDetalhePage />
               </ProtectedRoute>
             }
           />

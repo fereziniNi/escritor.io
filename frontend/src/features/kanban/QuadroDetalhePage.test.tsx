@@ -1,0 +1,119 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { HttpResponse, http } from 'msw'
+import { setupServer } from 'msw/node'
+import { MemoryRouter, Route, Routes } from 'react-router'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { useAuthStore } from '../auth/authStore'
+import { QuadroDetalhePage } from './QuadroDetalhePage'
+
+const server = setupServer()
+
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
+afterEach(() => server.resetHandlers())
+afterAll(() => server.close())
+
+const ESTADO_INICIAL = useAuthStore.getState()
+
+beforeEach(() => {
+  useAuthStore.setState(ESTADO_INICIAL, true)
+  useAuthStore.getState().definirSessao('token-fake', 'COLABORADOR')
+})
+
+function renderPagina() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={['/kanban/1']}>
+        <Routes>
+          <Route path="/kanban/:id" element={<QuadroDetalhePage />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+}
+
+const QUADRO_DETALHE = {
+  id: 1,
+  nome: 'Backlog',
+  projetoId: null,
+  equipeId: 10,
+  arquivado: false,
+  colunas: [
+    {
+      id: 5,
+      nome: 'A fazer',
+      ordem: 0,
+      limiteWip: null,
+      cards: [
+        {
+          id: 7,
+          colunaId: 5,
+          titulo: 'Corrigir bug',
+          descricao: null,
+          posicao: 1024,
+          responsavelId: null,
+          prazo: null,
+          estimativaMinutos: null,
+          criadoPorId: 1,
+          criadoEm: '2026-01-15T09:00:00Z',
+          arquivado: false,
+        },
+      ],
+    },
+  ],
+}
+
+describe('QuadroDetalhePage', () => {
+  it('mostra o nome do quadro, as colunas e os cards', async () => {
+    server.use(http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)))
+
+    renderPagina()
+
+    expect(await screen.findByRole('heading', { name: 'Backlog' })).toBeInTheDocument()
+    expect(screen.getByText('A fazer')).toBeInTheDocument()
+    expect(screen.getByText('Corrigir bug')).toBeInTheDocument()
+  })
+
+  it('cria um card na coluna certa e ele aparece sem reload manual', async () => {
+    let colunas = QUADRO_DETALHE.colunas
+    server.use(
+      http.get('/quadros/1', () => HttpResponse.json({ ...QUADRO_DETALHE, colunas })),
+      http.post('/colunas/5/cards', async ({ request }) => {
+        const corpo = (await request.json()) as { titulo: string }
+        const novoCard = {
+          id: 8,
+          colunaId: 5,
+          titulo: corpo.titulo,
+          descricao: null,
+          posicao: 2048,
+          responsavelId: null,
+          prazo: null,
+          estimativaMinutos: null,
+          criadoPorId: 1,
+          criadoEm: '2026-01-15T10:00:00Z',
+          arquivado: false,
+        }
+        colunas = [{ ...colunas[0], cards: [...colunas[0].cards, novoCard] }]
+        return HttpResponse.json(novoCard, { status: 201 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.type(screen.getByLabelText(/novo card/i), 'Escrever testes')
+    await user.click(screen.getByRole('button', { name: /adicionar card/i }))
+
+    expect(await screen.findByText('Escrever testes')).toBeInTheDocument()
+  })
+
+  it('quadro sem colunas mostra mensagem vazia', async () => {
+    server.use(http.get('/quadros/1', () => HttpResponse.json({ ...QUADRO_DETALHE, colunas: [] })))
+
+    renderPagina()
+
+    expect(await screen.findByText(/nenhuma coluna/i)).toBeInTheDocument()
+  })
+})

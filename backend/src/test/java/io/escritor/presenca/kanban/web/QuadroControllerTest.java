@@ -237,4 +237,45 @@ class QuadroControllerTest {
                                 """))
                 .andExpect(status().isConflict());
     }
+
+    @Test
+    void buscarDetalheSemAutenticacaoRetorna401() throws Exception {
+        mockMvc.perform(get("/quadros/1")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void buscarDetalheRetornaColunasECards() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(quadroService.buscarDetalhe(eq(1L), any()))
+                .thenReturn(new QuadroDetalheResponse(
+                        1L,
+                        "Backlog",
+                        null,
+                        10L,
+                        false,
+                        List.of(new ColunaComCardsResponse(
+                                5L,
+                                "A fazer",
+                                0,
+                                null,
+                                List.of(new CardResponse(
+                                        7L, 5L, "Corrigir bug", null, 1024.0, null, null, null, 1L,
+                                        java.time.Instant.parse("2026-01-15T09:00:00Z"), false))))));
+
+        mockMvc.perform(get("/quadros/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nome").value("Backlog"))
+                .andExpect(jsonPath("$.colunas[0].nome").value("A fazer"))
+                .andExpect(jsonPath("$.colunas[0].cards[0].titulo").value("Corrigir bug"));
+    }
+
+    @Test
+    @WithMockUser
+    void buscarDetalheDeQuadroInexistenteRetorna404() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(quadroService.buscarDetalhe(eq(999L), any())).thenThrow(new RecursoNaoEncontradoException("não encontrado"));
+
+        mockMvc.perform(get("/quadros/999")).andExpect(status().isNotFound());
+    }
 }

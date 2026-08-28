@@ -35,6 +35,11 @@ public class QuadroController {
         return quadroService.listarVisiveis(contextoUsuarioAutenticado.usuarioAtual());
     }
 
+    @GetMapping("/{id}")
+    public QuadroDetalheResponse buscarDetalhe(@PathVariable Long id) {
+        return quadroService.buscarDetalhe(id, contextoUsuarioAutenticado.usuarioAtual());
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('GESTOR', 'ADMIN')")
