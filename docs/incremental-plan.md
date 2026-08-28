@@ -80,7 +80,7 @@ Regra central (PRD): no máximo um timer aberto por usuário — iniciar um novo
 | # | Fatia | Teste que vem primeiro |
 |---|---|---|
 | S4.1 ✅ | Entidade `Apontamento` + migração — sem `REVOKE`/hash (diferente de `RegistroPonto`, é editável de propósito) | Domínio: `fim` antes de `inicio` é rejeitado; timer aberto (`fim` nulo) não tem `minutos` calculado ainda; encerrar calcula `minutos = fim − inicio` |
-| S4.2 | `POST /cards/{id}/apontamentos/timer` — inicia timer pro usuário autenticado nesse card | Serviço: se já existe timer aberto do usuário (em qualquer card), ele é encerrado automaticamente antes de abrir o novo, com os minutos calculados corretamente |
+| S4.2 ✅ | `POST /cards/{id}/apontamentos/timer` — inicia timer pro usuário autenticado nesse card | Serviço: se já existe timer aberto do usuário (em qualquer card), ele é encerrado automaticamente antes de abrir o novo, com os minutos calculados corretamente |
 | S4.3 | `PATCH /apontamentos/{id}/parar` — encerra o timer aberto, calcula `minutos` | Web: parar um apontamento que não é do usuário autenticado, que já está fechado, ou que não existe, é rejeitado (403/409/404) |
 | S4.4 | Frontend: botão de timer no card (Iniciar/Parar) com cronômetro decorrido | Componente: iniciar troca pra "Parar" e mostra o tempo correndo; parar volta pra "Iniciar" |
 | S4.5 | `POST /cards/{id}/apontamentos` (lançamento manual, `origem=MANUAL`) — aceita `inicio`+`fim` (minutos calculado) OU `minutos` direto + `descricao` | Domínio: passar `minutos` E `inicio`/`fim` ao mesmo tempo é rejeitado — ambíguo sobre qual é a fonte da verdade |
