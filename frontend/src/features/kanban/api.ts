@@ -1,5 +1,5 @@
 import { apiFetch } from '../../shared/api/http'
-import type { Card, Comentario, Etiqueta, EventoCard, Quadro, QuadroDetalhe } from './types'
+import type { Apontamento, Card, Comentario, Etiqueta, EventoCard, Quadro, QuadroDetalhe } from './types'
 
 export async function listarQuadros(): Promise<Quadro[]> {
   const response = await apiFetch('/quadros')
@@ -120,6 +120,22 @@ export async function listarEventos(cardId: number): Promise<EventoCard[]> {
   const response = await apiFetch(`/cards/${cardId}/eventos`)
   if (!response.ok) {
     throw new Error('Não foi possível carregar o histórico')
+  }
+  return response.json()
+}
+
+export async function iniciarTimer(cardId: number): Promise<Apontamento> {
+  const response = await apiFetch(`/cards/${cardId}/apontamentos/timer`, { method: 'POST' })
+  if (!response.ok) {
+    throw new Error('Não foi possível iniciar o timer')
+  }
+  return response.json()
+}
+
+export async function pararTimer(apontamentoId: number): Promise<Apontamento> {
+  const response = await apiFetch(`/apontamentos/${apontamentoId}/parar`, { method: 'PATCH' })
+  if (!response.ok) {
+    throw new Error('Não foi possível parar o timer')
   }
   return response.json()
 }

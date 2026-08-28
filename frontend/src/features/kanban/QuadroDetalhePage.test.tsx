@@ -385,4 +385,115 @@ describe('QuadroDetalhePage', () => {
 
     expect(await screen.findByText(/não foi possível carregar o histórico/i)).toBeInTheDocument()
   })
+
+  it('inicia o timer do card e troca o botão pra Parar', async () => {
+    server.use(
+      http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)),
+      semEtiquetasDoQuadro(),
+      http.post('/cards/7/apontamentos/timer', () =>
+        HttpResponse.json(
+          {
+            id: 1,
+            usuarioId: 1,
+            cardId: 7,
+            inicio: '2026-01-15T09:00:00Z',
+            fim: null,
+            minutos: null,
+            descricao: null,
+            origem: 'TIMER',
+            criadoEm: '2026-01-15T09:00:00Z',
+            editadoEm: '2026-01-15T09:00:00Z',
+          },
+          { status: 201 },
+        ),
+      ),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.click(screen.getByRole('button', { name: /iniciar timer/i }))
+
+    expect(await screen.findByRole('button', { name: /parar timer/i })).toBeInTheDocument()
+  })
+
+  it('para o timer do card e volta pro botão Iniciar', async () => {
+    server.use(
+      http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)),
+      semEtiquetasDoQuadro(),
+      http.post('/cards/7/apontamentos/timer', () =>
+        HttpResponse.json(
+          {
+            id: 1,
+            usuarioId: 1,
+            cardId: 7,
+            inicio: '2026-01-15T09:00:00Z',
+            fim: null,
+            minutos: null,
+            descricao: null,
+            origem: 'TIMER',
+            criadoEm: '2026-01-15T09:00:00Z',
+            editadoEm: '2026-01-15T09:00:00Z',
+          },
+          { status: 201 },
+        ),
+      ),
+      http.patch('/apontamentos/1/parar', () =>
+        HttpResponse.json({
+          id: 1,
+          usuarioId: 1,
+          cardId: 7,
+          inicio: '2026-01-15T09:00:00Z',
+          fim: '2026-01-15T09:30:00Z',
+          minutos: 30,
+          descricao: null,
+          origem: 'TIMER',
+          criadoEm: '2026-01-15T09:00:00Z',
+          editadoEm: '2026-01-15T09:30:00Z',
+        }),
+      ),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.click(screen.getByRole('button', { name: /iniciar timer/i }))
+    await user.click(await screen.findByRole('button', { name: /parar timer/i }))
+
+    expect(await screen.findByRole('button', { name: /iniciar timer/i })).toBeInTheDocument()
+  })
+
+  it('timer encerrado em outro lugar mostra erro ao parar e volta pro estado inicial', async () => {
+    server.use(
+      http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)),
+      semEtiquetasDoQuadro(),
+      http.post('/cards/7/apontamentos/timer', () =>
+        HttpResponse.json(
+          {
+            id: 1,
+            usuarioId: 1,
+            cardId: 7,
+            inicio: '2026-01-15T09:00:00Z',
+            fim: null,
+            minutos: null,
+            descricao: null,
+            origem: 'TIMER',
+            criadoEm: '2026-01-15T09:00:00Z',
+            editadoEm: '2026-01-15T09:00:00Z',
+          },
+          { status: 201 },
+        ),
+      ),
+      http.patch('/apontamentos/1/parar', () => new HttpResponse(null, { status: 409 })),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.click(screen.getByRole('button', { name: /iniciar timer/i }))
+    await user.click(await screen.findByRole('button', { name: /parar timer/i }))
+
+    expect(await screen.findByText(/não foi possível parar o timer/i)).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /iniciar timer/i })).toBeInTheDocument()
+  })
 })

@@ -11,7 +11,7 @@ import {
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { useAuthStore } from '../auth/authStore'
 import {
@@ -20,12 +20,15 @@ import {
   criarCard,
   criarComentario,
   criarEtiqueta,
+  iniciarTimer,
   listarComentarios,
   listarEtiquetas,
   listarEventos,
   moverCard,
+  pararTimer,
   removerEtiqueta,
 } from './api'
+import { formatarDuracao } from './formatarDuracao'
 import { moverCardOtimista } from './moverCardOtimista'
 import { resolverMovimento } from './resolverMovimento'
 import { rotuloEvento } from './rotuloEvento'
@@ -119,6 +122,63 @@ function HistoricoDoCard({ cardId }: { cardId: number }) {
   )
 }
 
+function TimerDoCard({ cardId }: { cardId: number }) {
+  // Estado só local de propósito (S4.4): não há endpoint ainda pra "qual timer está aberto" (fica
+  // pra quando precisar), então um reload da página perde a referência de qual apontamento está
+  // rodando aqui - o timer continua aberto no servidor, só a UI "esquece" até essa fatia futura.
+  const [apontamentoAtivo, setApontamentoAtivo] = useState<{ id: number; inicio: string } | null>(null)
+  const [agora, setAgora] = useState(() => Date.now())
+
+  useEffect(() => {
+    if (!apontamentoAtivo) {
+      return undefined
+    }
+    const intervalo = setInterval(() => setAgora(Date.now()), 1000)
+    return () => clearInterval(intervalo)
+  }, [apontamentoAtivo])
+
+  const iniciarMutation = useMutation({
+    mutationFn: () => iniciarTimer(cardId),
+    onSuccess: (apontamento) => {
+      setApontamentoAtivo({ id: apontamento.id, inicio: apontamento.inicio })
+      setAgora(Date.now())
+    },
+  })
+
+  const pararMutation = useMutation({
+    mutationFn: () => pararTimer(apontamentoAtivo!.id),
+    onSuccess: () => setApontamentoAtivo(null),
+    // Se o servidor recusar (ex.: esse timer já foi encerrado por outro iniciado em outro card -
+    // S4.2/S4.3), a suposição local de "ainda está rodando" já era falsa mesmo - some daqui.
+    onError: () => setApontamentoAtivo(null),
+  })
+
+  if (!apontamentoAtivo) {
+    return (
+      <div>
+        <button type="button" onClick={() => iniciarMutation.mutate()} disabled={iniciarMutation.isPending}>
+          Iniciar timer
+        </button>
+        {iniciarMutation.isError && <p>Não foi possível iniciar o timer.</p>}
+        {/* pararMutation também pode ter errado sem apontamentoAtivo: onError já zerou o
+        estado antes desta renderização, e a mensagem precisa sobreviver a essa troca de branch. */}
+        {pararMutation.isError && <p>Não foi possível parar o timer.</p>}
+      </div>
+    )
+  }
+
+  const segundosDecorridos = (agora - new Date(apontamentoAtivo.inicio).getTime()) / 1000
+
+  return (
+    <div>
+      <span>{formatarDuracao(segundosDecorridos)}</span>
+      <button type="button" onClick={() => pararMutation.mutate()} disabled={pararMutation.isPending}>
+        Parar timer
+      </button>
+    </div>
+  )
+}
+
 function CardArrastavel({
   card,
   etiquetasDisponiveis,
@@ -188,6 +248,7 @@ function CardArrastavel({
           </button>
         </div>
       )}
+      <TimerDoCard cardId={card.id} />
       <ComentariosDoCard cardId={card.id} />
       <HistoricoDoCard cardId={card.id} />
     </li>

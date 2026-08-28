@@ -33,6 +33,19 @@ export interface EventoCard {
   criadoEm: string
 }
 
+export interface Apontamento {
+  id: number
+  usuarioId: number
+  cardId: number
+  inicio: string
+  fim: string | null
+  minutos: number | null
+  descricao: string | null
+  origem: 'TIMER' | 'MANUAL'
+  criadoEm: string
+  editadoEm: string
+}
+
 export interface Card {
   id: number
   colunaId: number
