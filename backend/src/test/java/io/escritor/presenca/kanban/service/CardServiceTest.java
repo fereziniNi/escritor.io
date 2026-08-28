@@ -7,10 +7,13 @@ import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.CalculadoraPosicao;
 import io.escritor.presenca.kanban.domain.Card;
+import io.escritor.presenca.kanban.domain.CardEvento;
 import io.escritor.presenca.kanban.domain.Coluna;
 import io.escritor.presenca.kanban.domain.LimiteWipExcedidoException;
 import io.escritor.presenca.kanban.domain.Quadro;
+import io.escritor.presenca.kanban.domain.TipoEventoCard;
 import io.escritor.presenca.kanban.domain.TituloCardObrigatorioException;
+import io.escritor.presenca.kanban.repository.CardEventoRepository;
 import io.escritor.presenca.kanban.repository.CardRepository;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
 import io.escritor.presenca.kanban.web.CardResponse;
@@ -20,6 +23,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -27,7 +31,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -45,6 +51,9 @@ class CardServiceTest {
 
     @Mock
     private QuadroWebSocketHandler quadroWebSocketHandler;
+
+    @Mock
+    private CardEventoRepository cardEventoRepository;
 
     private final Coluna coluna = colunaComId(1L);
     private final Usuario criadoPor = usuarioComId(1L);
@@ -76,7 +85,7 @@ class CardServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new CardService(cardRepository, colunaRepository, usuarioRepository, quadroWebSocketHandler);
+        service = new CardService(cardRepository, colunaRepository, usuarioRepository, quadroWebSocketHandler, cardEventoRepository);
     }
 
     @Test
@@ -148,6 +157,22 @@ class CardServiceTest {
     }
 
     @Test
+    void criarGeraEventoDeCriacao() {
+        when(colunaRepository.findById(1L)).thenReturn(Optional.of(coluna));
+        when(cardRepository.findFirstByColunaOrderByPosicaoDesc(coluna)).thenReturn(Optional.empty());
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        service.criar(1L, "Corrigir bug", null, null, null, null, criadoPor);
+
+        var captor = ArgumentCaptor.forClass(CardEvento.class);
+        verify(cardEventoRepository).save(captor.capture());
+        assertThat(captor.getValue().getTipo()).isEqualTo(TipoEventoCard.CRIACAO);
+        assertThat(captor.getValue().getDe()).isNull();
+        assertThat(captor.getValue().getPara()).isEqualTo("A fazer");
+        assertThat(captor.getValue().getAutor()).isSameAs(criadoPor);
+    }
+
+    @Test
     void moverParaColunaNoLimiteWipLancaLimiteWipExcedido() {
         Coluna destino = colunaComId(2L, 2);
         Card card = cardComId(10L, coluna, 1024.0);
@@ -157,10 +182,11 @@ class CardServiceTest {
         when(colunaRepository.findById(2L)).thenReturn(Optional.of(destino));
         when(cardRepository.findByColunaOrderByPosicaoAsc(destino)).thenReturn(List.of(outro1, outro2));
 
-        assertThatThrownBy(() -> service.mover(10L, 2L, 0)).isInstanceOf(LimiteWipExcedidoException.class);
+        assertThatThrownBy(() -> service.mover(10L, 2L, 0, criadoPor)).isInstanceOf(LimiteWipExcedidoException.class);
 
         verify(cardRepository, never()).save(any());
         verify(quadroWebSocketHandler, never()).broadcastCardMovido(any(), any());
+        verify(cardEventoRepository, never()).save(any());
     }
 
     @Test
@@ -173,7 +199,7 @@ class CardServiceTest {
         when(cardRepository.findByColunaOrderByPosicaoAsc(destino)).thenReturn(List.of(outro));
         when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
 
-        var resposta = service.mover(10L, 2L, 1);
+        var resposta = service.mover(10L, 2L, 1, criadoPor);
 
         assertThat(resposta.colunaId()).isEqualTo(2L);
     }
@@ -189,7 +215,7 @@ class CardServiceTest {
         when(cardRepository.findByColunaOrderByPosicaoAsc(destino)).thenReturn(List.of(outro1, outro2));
         when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
 
-        var resposta = service.mover(10L, 2L, 2);
+        var resposta = service.mover(10L, 2L, 2, criadoPor);
 
         assertThat(resposta.colunaId()).isEqualTo(2L);
     }
@@ -206,7 +232,7 @@ class CardServiceTest {
         when(cardRepository.findByColunaOrderByPosicaoAsc(colunaCheia)).thenReturn(List.of(outro, card));
         when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
 
-        var resposta = service.mover(10L, 1L, 0);
+        var resposta = service.mover(10L, 1L, 0, criadoPor);
 
         assertThat(resposta.colunaId()).isEqualTo(1L);
     }
@@ -220,7 +246,7 @@ class CardServiceTest {
         when(cardRepository.findByColunaOrderByPosicaoAsc(destino)).thenReturn(List.of());
         when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
 
-        var resposta = service.mover(10L, 2L, 0);
+        var resposta = service.mover(10L, 2L, 0, criadoPor);
 
         assertThat(resposta.colunaId()).isEqualTo(2L);
         assertThat(resposta.posicao()).isEqualTo(CalculadoraPosicao.POSICAO_BASE);
@@ -237,7 +263,7 @@ class CardServiceTest {
         when(cardRepository.findByColunaOrderByPosicaoAsc(destino)).thenReturn(List.of(vizinho1, vizinho2));
         when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
 
-        var resposta = service.mover(10L, 2L, 1);
+        var resposta = service.mover(10L, 2L, 1, criadoPor);
 
         assertThat(resposta.posicao()).isGreaterThan(100.0).isLessThan(200.0);
     }
@@ -252,7 +278,7 @@ class CardServiceTest {
         when(cardRepository.findByColunaOrderByPosicaoAsc(coluna)).thenReturn(List.of(outro, card));
         when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
 
-        var resposta = service.mover(10L, 1L, 0);
+        var resposta = service.mover(10L, 1L, 0, criadoPor);
 
         assertThat(resposta.posicao()).isLessThan(100.0);
     }
@@ -267,17 +293,17 @@ class CardServiceTest {
         when(cardRepository.findByColunaOrderByPosicaoAsc(destino)).thenReturn(List.of(vizinho));
         when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
 
-        service.mover(10L, 2L, 1);
+        service.mover(10L, 2L, 1, criadoPor);
 
-        verify(cardRepository, org.mockito.Mockito.times(1)).save(any());
-        verify(cardRepository, never()).save(org.mockito.ArgumentMatchers.eq(vizinho));
+        verify(cardRepository, times(1)).save(any());
+        verify(cardRepository, never()).save(eq(vizinho));
     }
 
     @Test
     void moverCardInexistenteLancaRecursoNaoEncontrado() {
         when(cardRepository.findById(999L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.mover(999L, 2L, 0)).isInstanceOf(RecursoNaoEncontradoException.class);
+        assertThatThrownBy(() -> service.mover(999L, 2L, 0, criadoPor)).isInstanceOf(RecursoNaoEncontradoException.class);
     }
 
     @Test
@@ -289,10 +315,10 @@ class CardServiceTest {
         when(cardRepository.findByColunaOrderByPosicaoAsc(destino)).thenReturn(List.of());
         when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
 
-        service.mover(10L, 2L, 0);
+        service.mover(10L, 2L, 0, criadoPor);
 
-        var captor = org.mockito.ArgumentCaptor.forClass(CardResponse.class);
-        verify(quadroWebSocketHandler).broadcastCardMovido(org.mockito.ArgumentMatchers.eq(destino.getQuadro().getId()), captor.capture());
+        var captor = ArgumentCaptor.forClass(CardResponse.class);
+        verify(quadroWebSocketHandler).broadcastCardMovido(eq(destino.getQuadro().getId()), captor.capture());
         assertThat(captor.getValue().id()).isEqualTo(10L);
         assertThat(captor.getValue().colunaId()).isEqualTo(2L);
     }
@@ -314,6 +340,41 @@ class CardServiceTest {
         when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
         when(colunaRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.mover(10L, 99L, 0)).isInstanceOf(RecursoNaoEncontradoException.class);
+        assertThatThrownBy(() -> service.mover(10L, 99L, 0, criadoPor)).isInstanceOf(RecursoNaoEncontradoException.class);
+    }
+
+    @Test
+    void moverParaOutraColunaGeraEventoDeMudancaDeColuna() {
+        Coluna destino = colunaComId(2L);
+        ReflectionTestUtils.setField(destino, "nome", "Em progresso");
+        Card card = cardComId(10L, coluna, 1024.0);
+        Usuario quemMoveu = usuarioComId(2L);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(colunaRepository.findById(2L)).thenReturn(Optional.of(destino));
+        when(cardRepository.findByColunaOrderByPosicaoAsc(destino)).thenReturn(List.of());
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        service.mover(10L, 2L, 0, quemMoveu);
+
+        var captor = ArgumentCaptor.forClass(CardEvento.class);
+        verify(cardEventoRepository).save(captor.capture());
+        assertThat(captor.getValue().getTipo()).isEqualTo(TipoEventoCard.MUDANCA_COLUNA);
+        assertThat(captor.getValue().getDe()).isEqualTo("A fazer");
+        assertThat(captor.getValue().getPara()).isEqualTo("Em progresso");
+        assertThat(captor.getValue().getAutor()).isSameAs(quemMoveu);
+    }
+
+    @Test
+    void reordenarDentroDaMesmaColunaNaoGeraEventoDeMudancaDeColuna() {
+        Card card = cardComId(10L, coluna, 300.0);
+        Card outro = cardComId(11L, coluna, 100.0);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(colunaRepository.findById(1L)).thenReturn(Optional.of(coluna));
+        when(cardRepository.findByColunaOrderByPosicaoAsc(coluna)).thenReturn(List.of(outro, card));
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        service.mover(10L, 1L, 0, criadoPor);
+
+        verify(cardEventoRepository, never()).save(any());
     }
 }

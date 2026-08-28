@@ -2,6 +2,7 @@ package io.escritor.presenca.kanban.web;
 
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
 import io.escritor.presenca.kanban.service.CardComentarioService;
+import io.escritor.presenca.kanban.service.CardEventoService;
 import io.escritor.presenca.kanban.service.CardService;
 import io.escritor.presenca.kanban.service.EtiquetaService;
 import jakarta.validation.Valid;
@@ -20,8 +21,9 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Mover/aplicar etiqueta/remover etiqueta são abertos a qualquer usuário autenticado, mesma
  * simplificação conhecida de criar card (ColunaController, S3.6) - ainda não verifica acesso ao
- * quadro dono do card. Comentar (S3.15) é diferente: exige acesso ao quadro (403 sem ele), por
- * isso é o único par de endpoints aqui que precisa de {@link ContextoUsuarioAutenticado}.
+ * quadro dono do card (mover precisa de {@link ContextoUsuarioAutenticado} mesmo assim, desde
+ * S3.17, só pra registrar quem fez a mudança de coluna no histórico). Comentar (S3.15) e ler o
+ * histórico (S3.17) exigem acesso ao quadro (403 sem ele).
  */
 @RestController
 @RequestMapping("/cards")
@@ -30,22 +32,25 @@ public class CardController {
     private final CardService cardService;
     private final EtiquetaService etiquetaService;
     private final CardComentarioService cardComentarioService;
+    private final CardEventoService cardEventoService;
     private final ContextoUsuarioAutenticado contextoUsuarioAutenticado;
 
     public CardController(
             CardService cardService,
             EtiquetaService etiquetaService,
             CardComentarioService cardComentarioService,
+            CardEventoService cardEventoService,
             ContextoUsuarioAutenticado contextoUsuarioAutenticado) {
         this.cardService = cardService;
         this.etiquetaService = etiquetaService;
         this.cardComentarioService = cardComentarioService;
+        this.cardEventoService = cardEventoService;
         this.contextoUsuarioAutenticado = contextoUsuarioAutenticado;
     }
 
     @PatchMapping("/{id}/mover")
     public CardResponse mover(@PathVariable Long id, @Valid @RequestBody MoverCardRequest request) {
-        return cardService.mover(id, request.colunaId(), request.indice());
+        return cardService.mover(id, request.colunaId(), request.indice(), contextoUsuarioAutenticado.usuarioAtual());
     }
 
     @PostMapping("/{id}/etiquetas")
@@ -68,5 +73,10 @@ public class CardController {
     @GetMapping("/{id}/comentarios")
     public List<CardComentarioResponse> listarComentarios(@PathVariable Long id) {
         return cardComentarioService.listar(id, contextoUsuarioAutenticado.usuarioAtual());
+    }
+
+    @GetMapping("/{id}/eventos")
+    public List<CardEventoResponse> listarEventos(@PathVariable Long id) {
+        return cardEventoService.listar(id, contextoUsuarioAutenticado.usuarioAtual());
     }
 }

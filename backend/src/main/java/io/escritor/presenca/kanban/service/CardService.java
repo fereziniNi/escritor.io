@@ -5,8 +5,11 @@ import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.CalculadoraPosicao;
 import io.escritor.presenca.kanban.domain.Card;
+import io.escritor.presenca.kanban.domain.CardEvento;
 import io.escritor.presenca.kanban.domain.Coluna;
 import io.escritor.presenca.kanban.domain.LimiteWipExcedidoException;
+import io.escritor.presenca.kanban.domain.TipoEventoCard;
+import io.escritor.presenca.kanban.repository.CardEventoRepository;
 import io.escritor.presenca.kanban.repository.CardRepository;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
 import io.escritor.presenca.kanban.web.CardResponse;
@@ -22,16 +25,19 @@ public class CardService {
     private final ColunaRepository colunaRepository;
     private final UsuarioRepository usuarioRepository;
     private final QuadroWebSocketHandler quadroWebSocketHandler;
+    private final CardEventoRepository cardEventoRepository;
 
     public CardService(
             CardRepository cardRepository,
             ColunaRepository colunaRepository,
             UsuarioRepository usuarioRepository,
-            QuadroWebSocketHandler quadroWebSocketHandler) {
+            QuadroWebSocketHandler quadroWebSocketHandler,
+            CardEventoRepository cardEventoRepository) {
         this.cardRepository = cardRepository;
         this.colunaRepository = colunaRepository;
         this.usuarioRepository = usuarioRepository;
         this.quadroWebSocketHandler = quadroWebSocketHandler;
+        this.cardEventoRepository = cardEventoRepository;
     }
 
     public CardResponse criar(
@@ -56,6 +62,10 @@ public class CardService {
         Card novo = new Card(coluna, titulo, descricao, posicao, responsavel, prazo, estimativaMinutos, criadoPor);
         Card salvo = cardRepository.save(novo);
 
+        // S3.17: o evento nasce aqui, dentro do mesmo serviço que cria o card - nunca é escrito
+        // manualmente por outra camada (controller, evento assíncrono, etc.).
+        cardEventoRepository.save(new CardEvento(salvo, criadoPor, TipoEventoCard.CRIACAO, null, coluna.getNome()));
+
         return CardResponse.de(salvo);
     }
 
@@ -64,7 +74,7 @@ public class CardService {
      * card, se ele já estava lá). Nunca toca nos outros cards da coluna - só recalcula a posição
      * do card movido a partir dos vizinhos no índice pedido.
      */
-    public CardResponse mover(Long cardId, Long novaColunaId, int indice) {
+    public CardResponse mover(Long cardId, Long novaColunaId, int indice, Usuario autor) {
         Card card = cardRepository
                 .findById(cardId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Card não encontrado: " + cardId));
@@ -87,9 +97,17 @@ public class CardService {
         Double proxima = indice >= cardsDoDestino.size() ? null : cardsDoDestino.get(indice).getPosicao();
         double novaPosicao = CalculadoraPosicao.entre(anterior, proxima);
 
+        Coluna colunaAnterior = card.getColuna();
         card.mover(novaColuna, novaPosicao);
         Card salvo = cardRepository.save(card);
         CardResponse response = CardResponse.de(salvo);
+
+        // S3.17: só é "mudança de coluna" de verdade quando a coluna muda - reordenar dentro da
+        // mesma coluna não gera evento (não é uma transição no fluxo do card).
+        if (!colunaAnterior.getId().equals(novaColuna.getId())) {
+            cardEventoRepository.save(
+                    new CardEvento(salvo, autor, TipoEventoCard.MUDANCA_COLUNA, colunaAnterior.getNome(), novaColuna.getNome()));
+        }
 
         quadroWebSocketHandler.broadcastCardMovido(novaColuna.getQuadro().getId(), response);
 

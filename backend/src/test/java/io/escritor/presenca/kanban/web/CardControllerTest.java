@@ -6,6 +6,7 @@ import io.escritor.presenca.kanban.domain.AcessoNegadoException;
 import io.escritor.presenca.kanban.domain.EtiquetaDeOutroQuadroException;
 import io.escritor.presenca.kanban.domain.LimiteWipExcedidoException;
 import io.escritor.presenca.kanban.service.CardComentarioService;
+import io.escritor.presenca.kanban.service.CardEventoService;
 import io.escritor.presenca.kanban.service.CardService;
 import io.escritor.presenca.kanban.service.EtiquetaService;
 import io.escritor.presenca.seguranca.JwtService;
@@ -48,6 +49,9 @@ class CardControllerTest {
     private CardComentarioService cardComentarioService;
 
     @MockitoBean
+    private CardEventoService cardEventoService;
+
+    @MockitoBean
     private ContextoUsuarioAutenticado contextoUsuarioAutenticado;
 
     @Test
@@ -63,7 +67,8 @@ class CardControllerTest {
     @Test
     @WithMockUser
     void qualquerUsuarioAutenticadoPodeMoverCard() throws Exception {
-        when(cardService.mover(eq(1L), eq(2L), eq(0)))
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(cardService.mover(eq(1L), eq(2L), eq(0), any()))
                 .thenReturn(new CardResponse(
                         1L, 2L, "Corrigir bug", null, 1024.0, null, null, null, 1L, Instant.now(), false, java.util.List.of()));
 
@@ -79,7 +84,8 @@ class CardControllerTest {
     @Test
     @WithMockUser
     void moverCardInexistenteRetorna404() throws Exception {
-        when(cardService.mover(eq(999L), eq(2L), eq(0))).thenThrow(new RecursoNaoEncontradoException("não encontrado"));
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(cardService.mover(eq(999L), eq(2L), eq(0), any())).thenThrow(new RecursoNaoEncontradoException("não encontrado"));
 
         mockMvc.perform(patch("/cards/999/mover")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -92,7 +98,8 @@ class CardControllerTest {
     @Test
     @WithMockUser
     void moverParaColunaNoLimiteWipRetorna409() throws Exception {
-        when(cardService.mover(eq(1L), eq(2L), eq(0))).thenThrow(new LimiteWipExcedidoException(2L, 3));
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(cardService.mover(eq(1L), eq(2L), eq(0), any())).thenThrow(new LimiteWipExcedidoException(2L, 3));
 
         mockMvc.perform(patch("/cards/1/mover")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -261,5 +268,40 @@ class CardControllerTest {
         when(cardComentarioService.listar(eq(1L), any())).thenThrow(new AcessoNegadoException("sem acesso"));
 
         mockMvc.perform(get("/cards/1/comentarios")).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void listarEventosSemAutenticacaoRetorna401() throws Exception {
+        mockMvc.perform(get("/cards/1/eventos")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void listaEventosQuandoTemAcesso() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(cardEventoService.listar(eq(1L), any()))
+                .thenReturn(java.util.List.of(new CardEventoResponse(1L, 1L, 2L, "CRIACAO", null, "A fazer", Instant.now())));
+
+        mockMvc.perform(get("/cards/1/eventos"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].tipo").value("CRIACAO"));
+    }
+
+    @Test
+    @WithMockUser
+    void listarEventosSemAcessoAoQuadroRetorna403() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(cardEventoService.listar(eq(1L), any())).thenThrow(new AcessoNegadoException("sem acesso"));
+
+        mockMvc.perform(get("/cards/1/eventos")).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser
+    void listarEventosDeCardInexistenteRetorna404() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(cardEventoService.listar(eq(999L), any())).thenThrow(new RecursoNaoEncontradoException("não encontrado"));
+
+        mockMvc.perform(get("/cards/999/eventos")).andExpect(status().isNotFound());
     }
 }
