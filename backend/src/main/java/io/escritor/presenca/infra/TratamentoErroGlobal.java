@@ -1,6 +1,7 @@
 package io.escritor.presenca.infra;
 
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
+import io.escritor.presenca.kanban.domain.AcessoNegadoException;
 import io.escritor.presenca.kanban.domain.CorEtiquetaObrigatoriaException;
 import io.escritor.presenca.kanban.domain.EstimativaInvalidaException;
 import io.escritor.presenca.kanban.domain.EtiquetaDeOutroQuadroException;
@@ -11,6 +12,7 @@ import io.escritor.presenca.kanban.domain.NomeEtiquetaObrigatorioException;
 import io.escritor.presenca.kanban.domain.NomeQuadroObrigatorioException;
 import io.escritor.presenca.kanban.domain.OrdemColunaDuplicadaException;
 import io.escritor.presenca.kanban.domain.QuadroSemVinculoException;
+import io.escritor.presenca.kanban.domain.TextoComentarioObrigatorioException;
 import io.escritor.presenca.kanban.domain.TituloCardObrigatorioException;
 import io.escritor.presenca.ponto.domain.JustificativaObrigatoriaException;
 import io.escritor.presenca.ponto.domain.ParecerObrigatorioException;
@@ -102,5 +104,15 @@ public class TratamentoErroGlobal {
     @ExceptionHandler(EtiquetaDeOutroQuadroException.class)
     ResponseEntity<Void> tratarEtiquetaDeOutroQuadro() {
         return ResponseEntity.badRequest().build();
+    }
+
+    @ExceptionHandler(TextoComentarioObrigatorioException.class)
+    ResponseEntity<Void> tratarTextoComentarioObrigatorio() {
+        return ResponseEntity.badRequest().build();
+    }
+
+    @ExceptionHandler(AcessoNegadoException.class)
+    ResponseEntity<Void> tratarAcessoNegado() {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
     }
 }

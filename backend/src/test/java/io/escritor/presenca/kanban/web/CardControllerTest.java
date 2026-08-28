@@ -1,8 +1,11 @@
 package io.escritor.presenca.kanban.web;
 
+import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
+import io.escritor.presenca.kanban.domain.AcessoNegadoException;
 import io.escritor.presenca.kanban.domain.EtiquetaDeOutroQuadroException;
 import io.escritor.presenca.kanban.domain.LimiteWipExcedidoException;
+import io.escritor.presenca.kanban.service.CardComentarioService;
 import io.escritor.presenca.kanban.service.CardService;
 import io.escritor.presenca.kanban.service.EtiquetaService;
 import io.escritor.presenca.seguranca.JwtService;
@@ -17,10 +20,12 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -38,6 +43,12 @@ class CardControllerTest {
 
     @MockitoBean
     private EtiquetaService etiquetaService;
+
+    @MockitoBean
+    private CardComentarioService cardComentarioService;
+
+    @MockitoBean
+    private ContextoUsuarioAutenticado contextoUsuarioAutenticado;
 
     @Test
     void moverSemAutenticacaoRetorna401() throws Exception {
@@ -159,5 +170,96 @@ class CardControllerTest {
         mockMvc.perform(delete("/cards/1/etiquetas/2")).andExpect(status().isNoContent());
 
         verify(etiquetaService).remover(1L, 2L);
+    }
+
+    @Test
+    void criarComentarioSemAutenticacaoRetorna401() throws Exception {
+        mockMvc.perform(post("/cards/1/comentarios")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"texto":"Já revisei"}
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void criaComentarioQuandoTemAcesso() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(cardComentarioService.criar(eq(1L), eq("Já revisei"), any()))
+                .thenReturn(new CardComentarioResponse(1L, 1L, 2L, "Já revisei", Instant.now()));
+
+        mockMvc.perform(post("/cards/1/comentarios")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"texto":"Já revisei"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.texto").value("Já revisei"));
+    }
+
+    @Test
+    @WithMockUser
+    void criarComentarioSemAcessoAoQuadroRetorna403() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(cardComentarioService.criar(eq(1L), eq("Já revisei"), any()))
+                .thenThrow(new AcessoNegadoException("sem acesso"));
+
+        mockMvc.perform(post("/cards/1/comentarios")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"texto":"Já revisei"}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser
+    void criarComentarioEmCardInexistenteRetorna404() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(cardComentarioService.criar(eq(999L), eq("Já revisei"), any()))
+                .thenThrow(new RecursoNaoEncontradoException("não encontrado"));
+
+        mockMvc.perform(post("/cards/999/comentarios")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"texto":"Já revisei"}
+                                """))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser
+    void criarComentarioSemTextoRetorna400() throws Exception {
+        mockMvc.perform(post("/cards/1/comentarios")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void listarComentariosSemAutenticacaoRetorna401() throws Exception {
+        mockMvc.perform(get("/cards/1/comentarios")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void listaComentariosQuandoTemAcesso() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(cardComentarioService.listar(eq(1L), any()))
+                .thenReturn(java.util.List.of(new CardComentarioResponse(1L, 1L, 2L, "Já revisei", Instant.now())));
+
+        mockMvc.perform(get("/cards/1/comentarios"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].texto").value("Já revisei"));
+    }
+
+    @Test
+    @WithMockUser
+    void listarComentariosSemAcessoAoQuadroRetorna403() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(cardComentarioService.listar(eq(1L), any())).thenThrow(new AcessoNegadoException("sem acesso"));
+
+        mockMvc.perform(get("/cards/1/comentarios")).andExpect(status().isForbidden());
     }
 }
