@@ -54,7 +54,7 @@ class CardControllerTest {
     void qualquerUsuarioAutenticadoPodeMoverCard() throws Exception {
         when(cardService.mover(eq(1L), eq(2L), eq(0)))
                 .thenReturn(new CardResponse(
-                        1L, 2L, "Corrigir bug", null, 1024.0, null, null, null, 1L, Instant.now(), false));
+                        1L, 2L, "Corrigir bug", null, 1024.0, null, null, null, 1L, Instant.now(), false, java.util.List.of()));
 
         mockMvc.perform(patch("/cards/1/mover")
                         .contentType(MediaType.APPLICATION_JSON)

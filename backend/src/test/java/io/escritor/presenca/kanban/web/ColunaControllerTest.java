@@ -51,7 +51,7 @@ class ColunaControllerTest {
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
         when(cardService.criar(any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(new CardResponse(
-                        1L, 1L, "Corrigir bug", null, 1024.0, null, null, null, 1L, Instant.now(), false));
+                        1L, 1L, "Corrigir bug", null, 1024.0, null, null, null, 1L, Instant.now(), false, java.util.List.of()));
 
         mockMvc.perform(post("/colunas/1/cards")
                         .contentType(MediaType.APPLICATION_JSON)

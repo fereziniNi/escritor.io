@@ -66,4 +66,9 @@ public class QuadroController {
     public EtiquetaResponse criarEtiqueta(@PathVariable Long id, @Valid @RequestBody CriarEtiquetaRequest request) {
         return etiquetaService.criar(id, request.nome(), request.cor());
     }
+
+    @GetMapping("/{id}/etiquetas")
+    public List<EtiquetaResponse> listarEtiquetas(@PathVariable Long id) {
+        return etiquetaService.listar(id);
+    }
 }

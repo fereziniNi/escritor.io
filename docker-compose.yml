@@ -19,8 +19,8 @@ services:
   mailpit:
     image: axllent/mailpit
     ports:
-      - "1025:1025"   # SMTP - o backend envia e-mails de login aqui
-      - "8025:8025"   # UI web para ver os e-mails capturados
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"   # SMTP - o backend envia e-mails de login aqui
+      - "${MAILPIT_UI_PORT:-8025}:8025"     # UI web para ver os e-mails capturados
 
   backend:
     build: ./backend

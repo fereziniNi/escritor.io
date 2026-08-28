@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
@@ -59,15 +59,20 @@ const QUADRO_DETALHE = {
           criadoPorId: 1,
           criadoEm: '2026-01-15T09:00:00Z',
           arquivado: false,
+          etiquetas: [],
         },
       ],
     },
   ],
 }
 
+function semEtiquetasDoQuadro() {
+  return http.get('/quadros/1/etiquetas', () => HttpResponse.json([]))
+}
+
 describe('QuadroDetalhePage', () => {
   it('mostra o nome do quadro, as colunas e os cards', async () => {
-    server.use(http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)))
+    server.use(http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)), semEtiquetasDoQuadro())
 
     renderPagina()
 
@@ -80,6 +85,7 @@ describe('QuadroDetalhePage', () => {
     let colunas = QUADRO_DETALHE.colunas
     server.use(
       http.get('/quadros/1', () => HttpResponse.json({ ...QUADRO_DETALHE, colunas })),
+      semEtiquetasDoQuadro(),
       http.post('/colunas/5/cards', async ({ request }) => {
         const corpo = (await request.json()) as { titulo: string }
         const novoCard = {
@@ -94,6 +100,7 @@ describe('QuadroDetalhePage', () => {
           criadoPorId: 1,
           criadoEm: '2026-01-15T10:00:00Z',
           arquivado: false,
+          etiquetas: [],
         }
         colunas = [{ ...colunas[0], cards: [...colunas[0].cards, novoCard] }]
         return HttpResponse.json(novoCard, { status: 201 })
@@ -117,6 +124,7 @@ describe('QuadroDetalhePage', () => {
           colunas: [{ ...QUADRO_DETALHE.colunas[0], nome: 'Em progresso', limiteWip: 3 }],
         }),
       ),
+      semEtiquetasDoQuadro(),
     )
 
     renderPagina()
@@ -126,7 +134,7 @@ describe('QuadroDetalhePage', () => {
   })
 
   it('coluna sem limite de WIP não mostra contador', async () => {
-    server.use(http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)))
+    server.use(http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)), semEtiquetasDoQuadro())
 
     renderPagina()
 
@@ -135,10 +143,123 @@ describe('QuadroDetalhePage', () => {
   })
 
   it('quadro sem colunas mostra mensagem vazia', async () => {
-    server.use(http.get('/quadros/1', () => HttpResponse.json({ ...QUADRO_DETALHE, colunas: [] })))
+    server.use(
+      http.get('/quadros/1', () => HttpResponse.json({ ...QUADRO_DETALHE, colunas: [] })),
+      semEtiquetasDoQuadro(),
+    )
 
     renderPagina()
 
     expect(await screen.findByText(/nenhuma coluna/i)).toBeInTheDocument()
+  })
+
+  it('mostra as etiquetas já aplicadas no card', async () => {
+    server.use(
+      http.get('/quadros/1', () =>
+        HttpResponse.json({
+          ...QUADRO_DETALHE,
+          colunas: [
+            {
+              ...QUADRO_DETALHE.colunas[0],
+              cards: [
+                {
+                  ...QUADRO_DETALHE.colunas[0].cards[0],
+                  etiquetas: [{ id: 2, quadroId: 1, nome: 'Urgente', cor: '#FF0000' }],
+                },
+              ],
+            },
+          ],
+        }),
+      ),
+      semEtiquetasDoQuadro(),
+    )
+
+    renderPagina()
+
+    expect(await screen.findByText('Urgente')).toBeInTheDocument()
+  })
+
+  it('gestor cria uma etiqueta nova no quadro', async () => {
+    useAuthStore.getState().definirSessao('token-fake', 'GESTOR')
+    let etiquetas: Array<{ id: number; quadroId: number; nome: string; cor: string }> = []
+    server.use(
+      http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)),
+      http.get('/quadros/1/etiquetas', () => HttpResponse.json(etiquetas)),
+      http.post('/quadros/1/etiquetas', async ({ request }) => {
+        const corpo = (await request.json()) as { nome: string; cor: string }
+        const nova = { id: 9, quadroId: 1, nome: corpo.nome, cor: corpo.cor }
+        etiquetas = [...etiquetas, nova]
+        return HttpResponse.json(nova, { status: 201 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.type(screen.getByLabelText(/nome da etiqueta/i), 'Bug')
+    await user.type(screen.getByLabelText(/cor da etiqueta/i), '#00FF00')
+    await user.click(screen.getByRole('button', { name: /criar etiqueta/i }))
+
+    expect(await screen.findByText('Bug')).toBeInTheDocument()
+  })
+
+  it('colaborador não vê o formulário de criar etiqueta', async () => {
+    server.use(http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)), semEtiquetasDoQuadro())
+
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    expect(screen.queryByLabelText(/nome da etiqueta/i)).not.toBeInTheDocument()
+  })
+
+  it('aplica uma etiqueta existente no card e ela aparece sem reload manual', async () => {
+    let etiquetasDoCard: Array<{ id: number; quadroId: number; nome: string; cor: string }> = []
+    server.use(
+      http.get('/quadros/1', () =>
+        HttpResponse.json({
+          ...QUADRO_DETALHE,
+          colunas: [{ ...QUADRO_DETALHE.colunas[0], cards: [{ ...QUADRO_DETALHE.colunas[0].cards[0], etiquetas: etiquetasDoCard }] }],
+        }),
+      ),
+      http.get('/quadros/1/etiquetas', () => HttpResponse.json([{ id: 2, quadroId: 1, nome: 'Urgente', cor: '#FF0000' }])),
+      http.post('/cards/7/etiquetas', async ({ request }) => {
+        const corpo = (await request.json()) as { etiquetaId: number }
+        expect(corpo.etiquetaId).toBe(2)
+        etiquetasDoCard = [{ id: 2, quadroId: 1, nome: 'Urgente', cor: '#FF0000' }]
+        return HttpResponse.json(etiquetasDoCard[0])
+      }),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.selectOptions(screen.getByLabelText(/aplicar etiqueta/i), '2')
+    await user.click(screen.getByRole('button', { name: /^aplicar$/i }))
+
+    expect(await screen.findByText('Urgente')).toBeInTheDocument()
+  })
+
+  it('remove uma etiqueta do card e ela some sem reload manual', async () => {
+    let etiquetasDoCard = [{ id: 2, quadroId: 1, nome: 'Urgente', cor: '#FF0000' }]
+    server.use(
+      http.get('/quadros/1', () =>
+        HttpResponse.json({
+          ...QUADRO_DETALHE,
+          colunas: [{ ...QUADRO_DETALHE.colunas[0], cards: [{ ...QUADRO_DETALHE.colunas[0].cards[0], etiquetas: etiquetasDoCard }] }],
+        }),
+      ),
+      semEtiquetasDoQuadro(),
+      http.delete('/cards/7/etiquetas/2', () => {
+        etiquetasDoCard = []
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Urgente')
+    await user.click(screen.getByRole('button', { name: /remover urgente/i }))
+
+    await waitFor(() => expect(screen.queryByText('Urgente')).not.toBeInTheDocument())
   })
 })

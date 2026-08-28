@@ -13,13 +13,28 @@ import { CSS } from '@dnd-kit/utilities'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useParams } from 'react-router'
-import { buscarQuadro, criarCard, moverCard } from './api'
+import { useAuthStore } from '../auth/authStore'
+import { aplicarEtiqueta, buscarQuadro, criarCard, criarEtiqueta, listarEtiquetas, moverCard, removerEtiqueta } from './api'
 import { moverCardOtimista } from './moverCardOtimista'
 import { resolverMovimento } from './resolverMovimento'
-import type { Card, ColunaComCards, QuadroDetalhe } from './types'
+import type { Card, ColunaComCards, Etiqueta, QuadroDetalhe } from './types'
 import { useQuadroWebSocket } from './useQuadroWebSocket'
 
-function CardArrastavel({ card }: { card: Card }) {
+function CardArrastavel({
+  card,
+  etiquetasDisponiveis,
+  etiquetaSelecionada,
+  onEtiquetaSelecionadaChange,
+  onAplicarEtiqueta,
+  onRemoverEtiqueta,
+}: {
+  card: Card
+  etiquetasDisponiveis: Etiqueta[]
+  etiquetaSelecionada: string
+  onEtiquetaSelecionadaChange: (valor: string) => void
+  onAplicarEtiqueta: () => void
+  onRemoverEtiqueta: (etiquetaId: number) => void
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
     data: { type: 'card', colunaId: card.colunaId, cardId: card.id },
@@ -31,21 +46,71 @@ function CardArrastavel({ card }: { card: Card }) {
     opacity: isDragging ? 0.5 : 1,
   }
 
+  const idsJaAplicados = new Set(card.etiquetas.map((etiqueta) => etiqueta.id))
+  const etiquetasParaAplicar = etiquetasDisponiveis.filter((etiqueta) => !idsJaAplicados.has(etiqueta.id))
+
   return (
-    <li ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      {card.titulo}
+    <li ref={setNodeRef} style={style}>
+      {/* Handle de arrastar isolado num elemento próprio: {...attributes} inclui role="button" do
+      dnd-kit, e colocar isso no <li> inteiro (que também contém o select/botões de etiqueta)
+      aninharia elementos interativos dentro de um role="button" - ARIA inválido que faz o nome
+      acessível do card "engolir" o aria-label dos botões filhos (confirmado num browser real,
+      não pego pelo jsdom dos testes de componente). */}
+      <span {...attributes} {...listeners}>
+        {card.titulo}
+      </span>
+      <ul>
+        {card.etiquetas.map((etiqueta) => (
+          <li key={etiqueta.id} style={{ backgroundColor: etiqueta.cor, display: 'inline-block' }}>
+            {etiqueta.nome}
+            <button type="button" aria-label={`Remover ${etiqueta.nome}`} onClick={() => onRemoverEtiqueta(etiqueta.id)}>
+              ×
+            </button>
+          </li>
+        ))}
+      </ul>
+      {etiquetasParaAplicar.length > 0 && (
+        <div>
+          <label htmlFor={`aplicar-etiqueta-${card.id}`}>Aplicar etiqueta</label>
+          <select
+            id={`aplicar-etiqueta-${card.id}`}
+            value={etiquetaSelecionada}
+            onChange={(evento) => onEtiquetaSelecionadaChange(evento.target.value)}
+          >
+            <option value="">Selecione…</option>
+            {etiquetasParaAplicar.map((etiqueta) => (
+              <option key={etiqueta.id} value={etiqueta.id}>
+                {etiqueta.nome}
+              </option>
+            ))}
+          </select>
+          <button type="button" disabled={etiquetaSelecionada === ''} onClick={onAplicarEtiqueta}>
+            Aplicar
+          </button>
+        </div>
+      )}
     </li>
   )
 }
 
 function ColunaComDrop({
   coluna,
+  etiquetasDisponiveis,
+  etiquetaSelecionadaPorCard,
+  onEtiquetaSelecionadaChange,
+  onAplicarEtiqueta,
+  onRemoverEtiqueta,
   tituloNovoCard,
   onTituloChange,
   onCriarCard,
   criandoCard,
 }: {
   coluna: ColunaComCards
+  etiquetasDisponiveis: Etiqueta[]
+  etiquetaSelecionadaPorCard: Record<number, string>
+  onEtiquetaSelecionadaChange: (cardId: number, valor: string) => void
+  onAplicarEtiqueta: (cardId: number) => void
+  onRemoverEtiqueta: (cardId: number, etiquetaId: number) => void
   tituloNovoCard: string
   onTituloChange: (valor: string) => void
   onCriarCard: () => void
@@ -67,7 +132,15 @@ function ColunaComDrop({
       <SortableContext items={coluna.cards.map((card) => card.id)} strategy={verticalListSortingStrategy}>
         <ul>
           {coluna.cards.map((card) => (
-            <CardArrastavel key={card.id} card={card} />
+            <CardArrastavel
+              key={card.id}
+              card={card}
+              etiquetasDisponiveis={etiquetasDisponiveis}
+              etiquetaSelecionada={etiquetaSelecionadaPorCard[card.id] ?? ''}
+              onEtiquetaSelecionadaChange={(valor) => onEtiquetaSelecionadaChange(card.id, valor)}
+              onAplicarEtiqueta={() => onAplicarEtiqueta(card.id)}
+              onRemoverEtiqueta={(etiquetaId) => onRemoverEtiqueta(card.id, etiquetaId)}
+            />
           ))}
         </ul>
       </SortableContext>
@@ -97,7 +170,13 @@ export function QuadroDetalhePage() {
   const { id } = useParams()
   const quadroId = Number(id)
   const queryClient = useQueryClient()
+  const papel = useAuthStore((estado) => estado.papel)
+  const podeCriarEtiqueta = papel === 'GESTOR' || papel === 'ADMIN'
+
   const [tituloPorColuna, setTituloPorColuna] = useState<Record<number, string>>({})
+  const [etiquetaSelecionadaPorCard, setEtiquetaSelecionadaPorCard] = useState<Record<number, string>>({})
+  const [nomeEtiqueta, setNomeEtiqueta] = useState('')
+  const [corEtiqueta, setCorEtiqueta] = useState('')
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -109,6 +188,11 @@ export function QuadroDetalhePage() {
     queryFn: () => buscarQuadro(quadroId),
   })
 
+  const etiquetasQuery = useQuery({
+    queryKey: ['quadros', quadroId, 'etiquetas'],
+    queryFn: () => listarEtiquetas(quadroId),
+  })
+
   // S3.11: quando outro usuário arrasta um card neste quadro, o backend broadcasta pelo
   // websocket e este hook invalida a query acima - o quadro atualiza sem reload manual.
   useQuadroWebSocket(quadroId)
@@ -118,6 +202,30 @@ export function QuadroDetalhePage() {
     onSuccess: (_dados, variaveis) => {
       queryClient.invalidateQueries({ queryKey: ['quadros', quadroId] })
       setTituloPorColuna((atual) => ({ ...atual, [variaveis.colunaId]: '' }))
+    },
+  })
+
+  const criarEtiquetaMutation = useMutation({
+    mutationFn: criarEtiqueta,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quadros', quadroId, 'etiquetas'] })
+      setNomeEtiqueta('')
+      setCorEtiqueta('')
+    },
+  })
+
+  const aplicarEtiquetaMutation = useMutation({
+    mutationFn: aplicarEtiqueta,
+    onSuccess: (_dados, variaveis) => {
+      queryClient.invalidateQueries({ queryKey: ['quadros', quadroId] })
+      setEtiquetaSelecionadaPorCard((atual) => ({ ...atual, [variaveis.cardId]: '' }))
+    },
+  })
+
+  const removerEtiquetaMutation = useMutation({
+    mutationFn: removerEtiqueta,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quadros', quadroId] })
     },
   })
 
@@ -173,20 +281,55 @@ export function QuadroDetalhePage() {
   }
 
   const quadro = quadroQuery.data
+  const etiquetasDisponiveis = etiquetasQuery.data ?? []
 
   return (
     <main>
       <h1>{quadro.nome}</h1>
 
+      {podeCriarEtiqueta && (
+        <form
+          onSubmit={(evento) => {
+            evento.preventDefault()
+            criarEtiquetaMutation.mutate({ quadroId, nome: nomeEtiqueta, cor: corEtiqueta })
+          }}
+        >
+          <label htmlFor="nome-etiqueta">Nome da etiqueta</label>
+          <input id="nome-etiqueta" value={nomeEtiqueta} onChange={(evento) => setNomeEtiqueta(evento.target.value)} required />
+
+          <label htmlFor="cor-etiqueta">Cor da etiqueta</label>
+          <input id="cor-etiqueta" value={corEtiqueta} onChange={(evento) => setCorEtiqueta(evento.target.value)} required />
+
+          <button type="submit" disabled={criarEtiquetaMutation.isPending}>
+            Criar etiqueta
+          </button>
+          {criarEtiquetaMutation.isError && <p>Não foi possível criar a etiqueta.</p>}
+        </form>
+      )}
+
       {quadro.colunas.length === 0 && <p>Nenhuma coluna neste quadro ainda.</p>}
 
       {moverCardMutation.isError && <p>Não foi possível mover o card.</p>}
+      {aplicarEtiquetaMutation.isError && <p>Não foi possível aplicar a etiqueta.</p>}
+      {removerEtiquetaMutation.isError && <p>Não foi possível remover a etiqueta.</p>}
 
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
         {quadro.colunas.map((coluna) => (
           <ColunaComDrop
             key={coluna.id}
             coluna={coluna}
+            etiquetasDisponiveis={etiquetasDisponiveis}
+            etiquetaSelecionadaPorCard={etiquetaSelecionadaPorCard}
+            onEtiquetaSelecionadaChange={(cardId, valor) =>
+              setEtiquetaSelecionadaPorCard((atual) => ({ ...atual, [cardId]: valor }))
+            }
+            onAplicarEtiqueta={(cardId) => {
+              const etiquetaId = Number(etiquetaSelecionadaPorCard[cardId])
+              if (etiquetaId) {
+                aplicarEtiquetaMutation.mutate({ cardId, etiquetaId })
+              }
+            }}
+            onRemoverEtiqueta={(cardId, etiquetaId) => removerEtiquetaMutation.mutate({ cardId, etiquetaId })}
             tituloNovoCard={tituloPorColuna[coluna.id] ?? ''}
             onTituloChange={(valor) => setTituloPorColuna((atual) => ({ ...atual, [coluna.id]: valor }))}
             onCriarCard={() =>

@@ -57,7 +57,7 @@ docker compose up -d --build
 
 Isso builda as imagens (`backend/Dockerfile`, `frontend/Dockerfile`) e sobe cinco serviços: `postgres`, `mailpit`, `backend`, `frontend` (Nginx servindo o build de produção, com proxy reverso pras mesmas rotas de API que o Vite usa em dev - ver `frontend/nginx.conf`) e `seed` (roda uma vez, cria o primeiro usuário ADMIN depois que o backend migra o schema - sem isso `POST /usuarios` fica inacessível, porque exige um ADMIN que ainda não existe). O `seed` é idempotente: subir de novo sem apagar o volume não duplica nada.
 
-Acesse `http://localhost:5173`. Login: e-mail `admin@escritor.io`, código chega em `http://localhost:8025` (Mailpit). Esse usuário já nasce como membro (líder) de uma equipe ("Equipe Geral", id 1) pra já dar pra criar um quadro de teste sem precisar cadastrar mais nada primeiro.
+Acesse `http://localhost:5173`. Login: e-mail `admin@escritor.io`, código chega em `http://localhost:8025` (Mailpit; se remapeada via `.env`, ver Troubleshooting abaixo, use a porta configurada em `MAILPIT_UI_PORT`). Esse usuário já nasce como membro (líder) de uma equipe ("Equipe Geral", id 1) pra já dar pra criar um quadro de teste sem precisar cadastrar mais nada primeiro.
 
 `docker compose down` derruba tudo; `docker compose down -v` também apaga o volume do Postgres (perde os dados, inclusive o seed - a próxima subida recria do zero).
 
@@ -67,12 +67,14 @@ Ver [docs/testing-strategy.md](docs/testing-strategy.md) para o workflow complet
 
 ## Troubleshooting
 
-- **Porta 5432/8080/5173 já em uso:** as portas do host em `docker-compose.yml` (`postgres`, `backend`, `frontend`) são configuráveis via `POSTGRES_PORT`/`BACKEND_PORT`/`FRONTEND_PORT` (padrão 5432/8080/5173). Se houver outro projeto local usando as mesmas portas, crie um `.env` na raiz (já no `.gitignore` — nunca commitar) remapeando só as portas do host:
+- **Porta 5432/8080/5173/1025/8025 já em uso:** as portas do host em `docker-compose.yml` (`postgres`, `backend`, `frontend`, `mailpit`) são configuráveis via `POSTGRES_PORT`/`BACKEND_PORT`/`FRONTEND_PORT`/`MAILPIT_SMTP_PORT`/`MAILPIT_UI_PORT` (padrão 5432/8080/5173/1025/8025). Se houver outro projeto local usando as mesmas portas, crie um `.env` na raiz (já no `.gitignore` — nunca commitar) remapeando só as portas do host:
 
   ```
   POSTGRES_PORT=5433
   BACKEND_PORT=8082
   FRONTEND_PORT=5175
+  MAILPIT_SMTP_PORT=1026
+  MAILPIT_UI_PORT=8026
   ```
 
-  O `docker compose up` já lê o `.env` automaticamente. **Não use `docker-compose.override.yml` pra isso** — listas como `ports:` se *concatenam* entre `docker-compose.yml` e o override em vez de substituir, então a porta padrão (5432) continua sendo reivindicada junto com a nova, e o conflito persiste. Rodando backend/frontend direto na máquina (fora de container), aponte `spring.datasource.url` / `VITE_BACKEND_URL` pra essas mesmas portas. As portas padrão do projeto (5432, 8080, 5173) continuam sendo as documentadas — o `.env` é só local, pra rodar em paralelo com outro projeto que já as ocupa.
+  O `docker compose up` já lê o `.env` automaticamente. **Não use `docker-compose.override.yml` pra isso** — listas como `ports:` se *concatenam* entre `docker-compose.yml` e o override em vez de substituir, então a porta padrão (5432) continua sendo reivindicada junto com a nova, e o conflito persiste. Rodando backend/frontend direto na máquina (fora de container), aponte `spring.datasource.url` / `VITE_BACKEND_URL` pra essas mesmas portas. As portas padrão do projeto (5432, 8080, 5173, 1025, 8025) continuam sendo as documentadas — o `.env` é só local, pra rodar em paralelo com outro projeto que já as ocupa. Só o `SPRING_MAIL_PORT` do container `backend` (`docker-compose.yml`) fica fixo em `1025` mesmo com `MAILPIT_SMTP_PORT` remapeado - é tráfego container-a-container dentro da rede do compose, não passa pela porta remapeada do host.

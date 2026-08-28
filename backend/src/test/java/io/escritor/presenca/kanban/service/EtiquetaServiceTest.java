@@ -97,6 +97,26 @@ class EtiquetaServiceTest {
     }
 
     @Test
+    void listaEtiquetasDoQuadro() {
+        Quadro quadro = quadroComId(1L);
+        when(quadroRepository.findById(1L)).thenReturn(Optional.of(quadro));
+        when(etiquetaRepository.findByQuadroOrderByNomeAsc(quadro))
+                .thenReturn(java.util.List.of(etiquetaComId(2L, quadro)));
+
+        var resposta = service.listar(1L);
+
+        assertThat(resposta).hasSize(1);
+        assertThat(resposta.get(0).nome()).isEqualTo("Urgente");
+    }
+
+    @Test
+    void listarDeQuadroInexistenteLancaRecursoNaoEncontrado() {
+        when(quadroRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.listar(99L)).isInstanceOf(RecursoNaoEncontradoException.class);
+    }
+
+    @Test
     void aplicaEtiquetaDoMesmoQuadroAoCard() {
         Quadro quadro = quadroComId(1L);
         Coluna coluna = colunaComId(5L, quadro);

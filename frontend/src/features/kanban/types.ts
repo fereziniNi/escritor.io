@@ -6,6 +6,13 @@ export interface Quadro {
   arquivado: boolean
 }
 
+export interface Etiqueta {
+  id: number
+  quadroId: number
+  nome: string
+  cor: string
+}
+
 export interface Card {
   id: number
   colunaId: number
@@ -18,6 +25,7 @@ export interface Card {
   criadoPorId: number
   criadoEm: string
   arquivado: boolean
+  etiquetas: Etiqueta[]
 }
 
 export interface ColunaComCards {

@@ -265,7 +265,7 @@ class QuadroControllerTest {
                                 null,
                                 List.of(new CardResponse(
                                         7L, 5L, "Corrigir bug", null, 1024.0, null, null, null, 1L,
-                                        java.time.Instant.parse("2026-01-15T09:00:00Z"), false))))));
+                                        java.time.Instant.parse("2026-01-15T09:00:00Z"), false, List.of()))))));
 
         mockMvc.perform(get("/quadros/1"))
                 .andExpect(status().isOk())
@@ -353,5 +353,28 @@ class QuadroControllerTest {
                                 {"nome":"Urgente","cor":"#FF0000"}
                                 """))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void listarEtiquetasSemAutenticacaoRetorna401() throws Exception {
+        mockMvc.perform(get("/quadros/1/etiquetas")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void listarEtiquetasRetornaAsDoQuadro() throws Exception {
+        when(etiquetaService.listar(1L)).thenReturn(List.of(new EtiquetaResponse(2L, 1L, "Urgente", "#FF0000")));
+
+        mockMvc.perform(get("/quadros/1/etiquetas"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].nome").value("Urgente"));
+    }
+
+    @Test
+    @WithMockUser
+    void listarEtiquetasDeQuadroInexistenteRetorna404() throws Exception {
+        when(etiquetaService.listar(999L)).thenThrow(new RecursoNaoEncontradoException("não encontrado"));
+
+        mockMvc.perform(get("/quadros/999/etiquetas")).andExpect(status().isNotFound());
     }
 }

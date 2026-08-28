@@ -9,14 +9,17 @@ import io.escritor.presenca.identidade.repository.MembroEquipeRepository;
 import io.escritor.presenca.identidade.repository.ProjetoEquipeRepository;
 import io.escritor.presenca.identidade.repository.ProjetoRepository;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
+import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.Coluna;
 import io.escritor.presenca.kanban.domain.Quadro;
 import io.escritor.presenca.kanban.domain.RegraVisibilidadeQuadro;
+import io.escritor.presenca.kanban.repository.CardEtiquetaRepository;
 import io.escritor.presenca.kanban.repository.CardRepository;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
 import io.escritor.presenca.kanban.repository.QuadroRepository;
 import io.escritor.presenca.kanban.web.CardResponse;
 import io.escritor.presenca.kanban.web.ColunaComCardsResponse;
+import io.escritor.presenca.kanban.web.EtiquetaResponse;
 import io.escritor.presenca.kanban.web.QuadroDetalheResponse;
 import io.escritor.presenca.kanban.web.QuadroResponse;
 import java.util.List;
@@ -34,6 +37,7 @@ public class QuadroService {
     private final EquipeRepository equipeRepository;
     private final ColunaRepository colunaRepository;
     private final CardRepository cardRepository;
+    private final CardEtiquetaRepository cardEtiquetaRepository;
 
     public QuadroService(
             QuadroRepository quadroRepository,
@@ -42,7 +46,8 @@ public class QuadroService {
             ProjetoRepository projetoRepository,
             EquipeRepository equipeRepository,
             ColunaRepository colunaRepository,
-            CardRepository cardRepository) {
+            CardRepository cardRepository,
+            CardEtiquetaRepository cardEtiquetaRepository) {
         this.quadroRepository = quadroRepository;
         this.membroEquipeRepository = membroEquipeRepository;
         this.projetoEquipeRepository = projetoEquipeRepository;
@@ -50,6 +55,7 @@ public class QuadroService {
         this.equipeRepository = equipeRepository;
         this.colunaRepository = colunaRepository;
         this.cardRepository = cardRepository;
+        this.cardEtiquetaRepository = cardEtiquetaRepository;
     }
 
     public List<QuadroResponse> listarVisiveis(Usuario usuario) {
@@ -105,9 +111,21 @@ public class QuadroService {
     }
 
     private ColunaComCardsResponse paraColunaComCards(Coluna coluna) {
-        List<CardResponse> cards =
-                cardRepository.findByColunaOrderByPosicaoAsc(coluna).stream().map(CardResponse::de).toList();
+        List<CardResponse> cards = cardRepository.findByColunaOrderByPosicaoAsc(coluna).stream()
+                .map(card -> CardResponse.de(card, etiquetasDoCard(card)))
+                .toList();
         return new ColunaComCardsResponse(coluna.getId(), coluna.getNome(), coluna.getOrdem(), coluna.getLimiteWip(), cards);
+    }
+
+    /**
+     * Um `findByCard` por card (N+1) em vez de um JOIN - mesma simplicidade explícita de
+     * {@link #listarVisiveis} (PRD: até 10 usuários, escala pequena o bastante pra não precisar
+     * de query complexa aqui).
+     */
+    private List<EtiquetaResponse> etiquetasDoCard(Card card) {
+        return cardEtiquetaRepository.findByCard(card).stream()
+                .map(cardEtiqueta -> EtiquetaResponse.de(cardEtiqueta.getEtiqueta()))
+                .toList();
     }
 
     private VisibilidadeUsuario calcularVisibilidade(Usuario usuario) {
