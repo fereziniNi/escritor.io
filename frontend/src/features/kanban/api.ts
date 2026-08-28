@@ -1,5 +1,5 @@
 import { apiFetch } from '../../shared/api/http'
-import type { Card, Comentario, Etiqueta, Quadro, QuadroDetalhe } from './types'
+import type { Card, Comentario, Etiqueta, EventoCard, Quadro, QuadroDetalhe } from './types'
 
 export async function listarQuadros(): Promise<Quadro[]> {
   const response = await apiFetch('/quadros')
@@ -112,6 +112,14 @@ export async function criarComentario(dados: { cardId: number; texto: string }):
   })
   if (!response.ok) {
     throw new Error('Não foi possível comentar')
+  }
+  return response.json()
+}
+
+export async function listarEventos(cardId: number): Promise<EventoCard[]> {
+  const response = await apiFetch(`/cards/${cardId}/eventos`)
+  if (!response.ok) {
+    throw new Error('Não foi possível carregar o histórico')
   }
   return response.json()
 }

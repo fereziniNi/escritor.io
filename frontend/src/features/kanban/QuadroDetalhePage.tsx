@@ -22,11 +22,13 @@ import {
   criarEtiqueta,
   listarComentarios,
   listarEtiquetas,
+  listarEventos,
   moverCard,
   removerEtiqueta,
 } from './api'
 import { moverCardOtimista } from './moverCardOtimista'
 import { resolverMovimento } from './resolverMovimento'
+import { rotuloEvento } from './rotuloEvento'
 import type { Card, ColunaComCards, Etiqueta, QuadroDetalhe } from './types'
 import { useQuadroWebSocket } from './useQuadroWebSocket'
 
@@ -82,6 +84,35 @@ function ComentariosDoCard({ cardId }: { cardId: number }) {
             </button>
             {criarComentarioMutation.isError && <p>Não foi possível comentar.</p>}
           </form>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function HistoricoDoCard({ cardId }: { cardId: number }) {
+  const [aberto, setAberto] = useState(false)
+
+  // Mesma lógica de lazy-fetch de ComentariosDoCard: só busca quando o painel está aberto.
+  const eventosQuery = useQuery({
+    queryKey: ['cards', cardId, 'eventos'],
+    queryFn: () => listarEventos(cardId),
+    enabled: aberto,
+  })
+
+  return (
+    <div>
+      <button type="button" onClick={() => setAberto((atual) => !atual)}>
+        Histórico
+      </button>
+      {aberto && (
+        <div>
+          {eventosQuery.isError && <p>Não foi possível carregar o histórico.</p>}
+          <ul aria-label="Histórico do card">
+            {eventosQuery.data?.map((evento) => (
+              <li key={evento.id}>{rotuloEvento(evento)}</li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
@@ -158,6 +189,7 @@ function CardArrastavel({
         </div>
       )}
       <ComentariosDoCard cardId={card.id} />
+      <HistoricoDoCard cardId={card.id} />
     </li>
   )
 }

@@ -21,6 +21,18 @@ export interface Comentario {
   criadoEm: string
 }
 
+export type TipoEventoCard = 'CRIACAO' | 'MUDANCA_COLUNA' | 'MUDANCA_RESPONSAVEL'
+
+export interface EventoCard {
+  id: number
+  cardId: number
+  autorId: number
+  tipo: TipoEventoCard
+  de: string | null
+  para: string | null
+  criadoEm: string
+}
+
 export interface Card {
   id: number
   colunaId: number

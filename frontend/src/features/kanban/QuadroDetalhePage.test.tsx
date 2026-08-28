@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
@@ -327,5 +327,62 @@ describe('QuadroDetalhePage', () => {
     await user.click(screen.getByRole('button', { name: /comentários/i }))
 
     expect(await screen.findByText(/não foi possível carregar os comentários/i)).toBeInTheDocument()
+  })
+
+  it('não busca o histórico antes do card ser expandido', async () => {
+    server.use(http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)), semEtiquetasDoQuadro())
+
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    expect(screen.queryByText(/card criado em/i)).not.toBeInTheDocument()
+  })
+
+  it('expande o histórico e mostra os eventos em ordem cronológica com rótulo legível', async () => {
+    server.use(
+      http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)),
+      semEtiquetasDoQuadro(),
+      http.get('/cards/7/eventos', () =>
+        HttpResponse.json([
+          { id: 1, cardId: 7, autorId: 1, tipo: 'CRIACAO', de: null, para: 'A fazer', criadoEm: '2026-01-15T09:00:00Z' },
+          {
+            id: 2,
+            cardId: 7,
+            autorId: 1,
+            tipo: 'MUDANCA_COLUNA',
+            de: 'A fazer',
+            para: 'Em progresso',
+            criadoEm: '2026-01-15T10:00:00Z',
+          },
+        ]),
+      ),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.click(screen.getByRole('button', { name: /histórico/i }))
+
+    const lista = await screen.findByRole('list', { name: /histórico do card/i })
+    const itens = within(lista).getAllByRole('listitem')
+    expect(itens.map((item) => item.textContent)).toEqual([
+      expect.stringContaining('Card criado em "A fazer"'),
+      expect.stringContaining('Movido de "A fazer" para "Em progresso"'),
+    ])
+  })
+
+  it('mostra erro quando o histórico não pode ser carregado', async () => {
+    server.use(
+      http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)),
+      semEtiquetasDoQuadro(),
+      http.get('/cards/7/eventos', () => new HttpResponse(null, { status: 403 })),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.click(screen.getByRole('button', { name: /histórico/i }))
+
+    expect(await screen.findByText(/não foi possível carregar o histórico/i)).toBeInTheDocument()
   })
 })
