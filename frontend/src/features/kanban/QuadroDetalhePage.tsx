@@ -17,10 +17,14 @@ import { useAuthStore } from '../auth/authStore'
 import {
   aplicarEtiqueta,
   buscarQuadro,
+  criarApontamentoManual,
   criarCard,
   criarComentario,
   criarEtiqueta,
+  editarApontamento,
+  excluirApontamento,
   iniciarTimer,
+  listarApontamentos,
   listarComentarios,
   listarEtiquetas,
   listarEventos,
@@ -32,7 +36,7 @@ import { formatarDuracao } from './formatarDuracao'
 import { moverCardOtimista } from './moverCardOtimista'
 import { resolverMovimento } from './resolverMovimento'
 import { rotuloEvento } from './rotuloEvento'
-import type { Card, ColunaComCards, Etiqueta, QuadroDetalhe } from './types'
+import type { Apontamento, Card, ColunaComCards, Etiqueta, QuadroDetalhe } from './types'
 import { useQuadroWebSocket } from './useQuadroWebSocket'
 
 function ComentariosDoCard({ cardId }: { cardId: number }) {
@@ -179,6 +183,181 @@ function TimerDoCard({ cardId }: { cardId: number }) {
   )
 }
 
+function LinhaApontamento({
+  apontamento,
+  emEdicao,
+  onIniciarEdicao,
+  onCancelarEdicao,
+  onSalvarEdicao,
+  salvandoEdicao,
+  onExcluir,
+}: {
+  apontamento: Apontamento
+  emEdicao: boolean
+  onIniciarEdicao: () => void
+  onCancelarEdicao: () => void
+  onSalvarEdicao: (minutos: string, descricao: string) => void
+  salvandoEdicao: boolean
+  onExcluir: () => void
+}) {
+  const [minutos, setMinutos] = useState(String(apontamento.minutos ?? ''))
+  const [descricao, setDescricao] = useState(apontamento.descricao ?? '')
+
+  if (emEdicao) {
+    return (
+      <li>
+        <form
+          onSubmit={(evento) => {
+            evento.preventDefault()
+            onSalvarEdicao(minutos, descricao)
+          }}
+        >
+          {/* fim (e portanto minutos) só existe pra apontamento já encerrado - PATCH /apontamentos/{id}
+          nunca aceita minutos direto (S4.6), então editar duração aqui recalcula fim a partir do
+          inicio original + minutos novos, mantendo o inicio intocado. Timer ainda aberto (fim nulo)
+          não tem duração pra editar ainda, só descrição. */}
+          {apontamento.fim !== null && (
+            <>
+              <label htmlFor={`minutos-edicao-${apontamento.id}`}>Minutos</label>
+              <input
+                id={`minutos-edicao-${apontamento.id}`}
+                type="number"
+                value={minutos}
+                onChange={(evento) => setMinutos(evento.target.value)}
+                required
+              />
+            </>
+          )}
+          <label htmlFor={`descricao-edicao-${apontamento.id}`}>Descrição</label>
+          <input id={`descricao-edicao-${apontamento.id}`} value={descricao} onChange={(evento) => setDescricao(evento.target.value)} />
+          <button type="submit" disabled={salvandoEdicao}>
+            Salvar
+          </button>
+          <button type="button" onClick={onCancelarEdicao}>
+            Cancelar
+          </button>
+        </form>
+      </li>
+    )
+  }
+
+  return (
+    <li>
+      <span>{apontamento.minutos !== null ? `${apontamento.minutos} min` : 'em andamento'}</span>
+      {apontamento.descricao && <span> — {apontamento.descricao}</span>}
+      <button type="button" onClick={onIniciarEdicao}>
+        Editar
+      </button>
+      <button type="button" aria-label={`Excluir apontamento ${apontamento.id}`} onClick={onExcluir}>
+        Excluir
+      </button>
+    </li>
+  )
+}
+
+function ApontamentosDoCard({ cardId }: { cardId: number }) {
+  const queryClient = useQueryClient()
+  const [aberto, setAberto] = useState(false)
+  const [editandoId, setEditandoId] = useState<number | null>(null)
+  const [minutosManual, setMinutosManual] = useState('')
+  const [descricaoManual, setDescricaoManual] = useState('')
+
+  // Mesma lógica de lazy-fetch de ComentariosDoCard/HistoricoDoCard.
+  const apontamentosQuery = useQuery({
+    queryKey: ['cards', cardId, 'apontamentos'],
+    queryFn: () => listarApontamentos(cardId),
+    enabled: aberto,
+  })
+
+  const criarManualMutation = useMutation({
+    mutationFn: criarApontamentoManual,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cards', cardId, 'apontamentos'] })
+      setMinutosManual('')
+      setDescricaoManual('')
+    },
+  })
+
+  const editarMutation = useMutation({
+    mutationFn: editarApontamento,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cards', cardId, 'apontamentos'] })
+      setEditandoId(null)
+    },
+  })
+
+  const excluirMutation = useMutation({
+    mutationFn: excluirApontamento,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cards', cardId, 'apontamentos'] })
+    },
+  })
+
+  return (
+    <div>
+      <button type="button" onClick={() => setAberto((atual) => !atual)}>
+        Apontamentos
+      </button>
+      {aberto && (
+        <div>
+          {apontamentosQuery.isError && <p>Não foi possível carregar os apontamentos.</p>}
+          <ul aria-label="Apontamentos do card">
+            {apontamentosQuery.data?.map((apontamento) => (
+              <LinhaApontamento
+                key={apontamento.id}
+                apontamento={apontamento}
+                emEdicao={editandoId === apontamento.id}
+                onIniciarEdicao={() => setEditandoId(apontamento.id)}
+                onCancelarEdicao={() => setEditandoId(null)}
+                salvandoEdicao={editarMutation.isPending}
+                onSalvarEdicao={(minutos, descricao) => {
+                  const novosMinutos = Number(minutos)
+                  const novoFim =
+                    apontamento.fim !== null
+                      ? new Date(new Date(apontamento.inicio).getTime() + novosMinutos * 60_000).toISOString()
+                      : null
+                  editarMutation.mutate({ apontamentoId: apontamento.id, inicio: null, fim: novoFim, descricao: descricao || null })
+                }}
+                onExcluir={() => excluirMutation.mutate(apontamento.id)}
+              />
+            ))}
+          </ul>
+          {editarMutation.isError && <p>Não foi possível editar o apontamento.</p>}
+          {excluirMutation.isError && <p>Não foi possível excluir o apontamento.</p>}
+
+          <form
+            onSubmit={(evento) => {
+              evento.preventDefault()
+              criarManualMutation.mutate({
+                cardId,
+                inicio: null,
+                fim: null,
+                minutos: Number(minutosManual),
+                descricao: descricaoManual || null,
+              })
+            }}
+          >
+            <label htmlFor={`minutos-manual-${cardId}`}>Minutos trabalhados</label>
+            <input
+              id={`minutos-manual-${cardId}`}
+              type="number"
+              value={minutosManual}
+              onChange={(evento) => setMinutosManual(evento.target.value)}
+              required
+            />
+            <label htmlFor={`descricao-manual-${cardId}`}>Descrição</label>
+            <input id={`descricao-manual-${cardId}`} value={descricaoManual} onChange={(evento) => setDescricaoManual(evento.target.value)} />
+            <button type="submit" disabled={criarManualMutation.isPending}>
+              Lançar
+            </button>
+            {criarManualMutation.isError && <p>Não foi possível lançar o apontamento.</p>}
+          </form>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function CardArrastavel({
   card,
   etiquetasDisponiveis,
@@ -249,6 +428,7 @@ function CardArrastavel({
         </div>
       )}
       <TimerDoCard cardId={card.id} />
+      <ApontamentosDoCard cardId={card.id} />
       <ComentariosDoCard cardId={card.id} />
       <HistoricoDoCard cardId={card.id} />
     </li>

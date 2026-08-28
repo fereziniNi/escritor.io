@@ -9,6 +9,7 @@ import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.seguranca.JwtService;
 import io.escritor.presenca.seguranca.SecurityConfig;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -24,6 +25,7 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -257,5 +259,32 @@ class ApontamentoControllerTest {
         doThrow(new RecursoNaoEncontradoException("não encontrado")).when(apontamentoService).excluir(eq(999L), any());
 
         mockMvc.perform(delete("/apontamentos/999")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void listarPorCardSemAutenticacaoRetorna401() throws Exception {
+        mockMvc.perform(get("/cards/1/apontamentos")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void listaOsApontamentosDoCard() throws Exception {
+        when(apontamentoService.listarPorCard(1L))
+                .thenReturn(List.of(new ApontamentoResponse(
+                        10L, 2L, 1L, Instant.parse("2026-01-15T12:00:00Z"), Instant.parse("2026-01-15T13:00:00Z"), 60,
+                        null, "MANUAL", Instant.parse("2026-01-15T12:00:00Z"), Instant.parse("2026-01-15T12:00:00Z"))));
+
+        mockMvc.perform(get("/cards/1/apontamentos"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(10))
+                .andExpect(jsonPath("$[0].minutos").value(60));
+    }
+
+    @Test
+    @WithMockUser
+    void listarPorCardInexistenteRetorna404() throws Exception {
+        when(apontamentoService.listarPorCard(999L)).thenThrow(new RecursoNaoEncontradoException("não encontrado"));
+
+        mockMvc.perform(get("/cards/999/apontamentos")).andExpect(status().isNotFound());
     }
 }

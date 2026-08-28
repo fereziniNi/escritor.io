@@ -139,3 +139,53 @@ export async function pararTimer(apontamentoId: number): Promise<Apontamento> {
   }
   return response.json()
 }
+
+export async function listarApontamentos(cardId: number): Promise<Apontamento[]> {
+  const response = await apiFetch(`/cards/${cardId}/apontamentos`)
+  if (!response.ok) {
+    throw new Error('Não foi possível carregar os apontamentos')
+  }
+  return response.json()
+}
+
+export async function criarApontamentoManual(dados: {
+  cardId: number
+  inicio: string | null
+  fim: string | null
+  minutos: number | null
+  descricao: string | null
+}): Promise<Apontamento> {
+  const response = await apiFetch(`/cards/${dados.cardId}/apontamentos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ inicio: dados.inicio, fim: dados.fim, minutos: dados.minutos, descricao: dados.descricao }),
+  })
+  if (!response.ok) {
+    throw new Error('Não foi possível lançar o apontamento')
+  }
+  return response.json()
+}
+
+export async function editarApontamento(dados: {
+  apontamentoId: number
+  inicio: string | null
+  fim: string | null
+  descricao: string | null
+}): Promise<Apontamento> {
+  const response = await apiFetch(`/apontamentos/${dados.apontamentoId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ inicio: dados.inicio, fim: dados.fim, descricao: dados.descricao }),
+  })
+  if (!response.ok) {
+    throw new Error('Não foi possível editar o apontamento')
+  }
+  return response.json()
+}
+
+export async function excluirApontamento(apontamentoId: number): Promise<void> {
+  const response = await apiFetch(`/apontamentos/${apontamentoId}`, { method: 'DELETE' })
+  if (!response.ok) {
+    throw new Error('Não foi possível excluir o apontamento')
+  }
+}

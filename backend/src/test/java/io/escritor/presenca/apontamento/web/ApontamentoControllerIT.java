@@ -425,4 +425,56 @@ class ApontamentoControllerIT {
 
         assertThat(apontamentoRepository.findById(apontamentoId)).isPresent();
     }
+
+    @Test
+    void listaOsApontamentosDoCardMaisRecentePrimeiroDeVerdade() {
+        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
+        Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-listar@escritor.io", Papel.COLABORADOR, 480));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
+        String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
+
+        client().post()
+                .uri("/cards/{id}/apontamentos", card.getId())
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("""
+                        {"inicio":"2026-01-15T09:00:00Z","fim":"2026-01-15T09:30:00Z","descricao":"Primeiro"}
+                        """)
+                .exchange()
+                .expectStatus().isCreated();
+
+        client().post()
+                .uri("/cards/{id}/apontamentos", card.getId())
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("""
+                        {"inicio":"2026-01-15T10:00:00Z","fim":"2026-01-15T10:30:00Z","descricao":"Segundo"}
+                        """)
+                .exchange()
+                .expectStatus().isCreated();
+
+        client().get()
+                .uri("/cards/{id}/apontamentos", card.getId())
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.length()").isEqualTo(2)
+                .jsonPath("$[0].descricao").isEqualTo("Segundo")
+                .jsonPath("$[1].descricao").isEqualTo("Primeiro");
+    }
+
+    @Test
+    void listarApontamentosDeCardInexistenteRecebe404DeVerdade() {
+        Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-listar-404@escritor.io", Papel.COLABORADOR, 480));
+        String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
+
+        client().get()
+                .uri("/cards/{id}/apontamentos", 999999)
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isNotFound();
+    }
 }

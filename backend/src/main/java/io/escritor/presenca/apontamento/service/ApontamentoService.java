@@ -13,6 +13,7 @@ import io.escritor.presenca.kanban.repository.CardRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import org.springframework.stereotype.Service;
 
 /**
@@ -34,6 +35,19 @@ public class ApontamentoService {
     }
 
     /**
+     * Instant.now() costuma ter precisão de microssegundos/nanossegundos, mas o JS Date do
+     * frontend só tem milissegundos - achado ao editar um apontamento inline num browser real
+     * (S4.7): reenviar um `fim` calculado a partir de um `inicio` reparseado pelo JS perdia os
+     * sub-milissegundos originais, fazendo `Duration.toMinutes()` truncar 1 minuto a menos.
+     * Truncar aqui, na origem de todo `inicio`/`fim` gerado pelo servidor, garante que qualquer
+     * timestamp que sai em JSON sempre volta idêntico depois de um round-trip por um cliente que
+     * só entende milissegundos.
+     */
+    private Instant agora() {
+        return Instant.now(clock).truncatedTo(ChronoUnit.MILLIS);
+    }
+
+    /**
      * PRD: "no máximo um timer aberto por usuário; iniciar um novo encerra o anterior" - o timer
      * anterior (se existir, em qualquer card) é encerrado com o mesmo instante em que o novo
      * começa, antes do novo ser criado, senão o índice único parcial de S4.1
@@ -41,7 +55,7 @@ public class ApontamentoService {
      */
     public ApontamentoResponse iniciarTimer(Long cardId, Usuario usuario) {
         Card card = cardRepository.findById(cardId).orElseThrow(() -> new RecursoNaoEncontradoException("Card não encontrado: " + cardId));
-        Instant agora = Instant.now(clock);
+        Instant agora = agora();
 
         apontamentoRepository.findFirstByUsuarioAndFimIsNull(usuario).ifPresent(timerAberto -> {
             timerAberto.encerrar(agora);
@@ -68,7 +82,7 @@ public class ApontamentoService {
             throw new ApontamentoDeOutroUsuarioException();
         }
 
-        apontamento.encerrar(Instant.now(clock));
+        apontamento.encerrar(agora());
         Apontamento salvo = apontamentoRepository.save(apontamento);
 
         return ApontamentoResponse.de(salvo);
@@ -134,7 +148,7 @@ public class ApontamentoService {
 
         Apontamento novo;
         if (temMinutos) {
-            Instant agora = Instant.now(clock);
+            Instant agora = agora();
             novo = new Apontamento(usuario, card, agora.minus(minutos, ChronoUnit.MINUTES), agora, descricao, OrigemApontamento.MANUAL);
         } else {
             novo = new Apontamento(usuario, card, inicio, fim, descricao, OrigemApontamento.MANUAL);
@@ -142,5 +156,16 @@ public class ApontamentoService {
 
         Apontamento salvo = apontamentoRepository.save(novo);
         return ApontamentoResponse.de(salvo);
+    }
+
+    /**
+     * Sem checagem de dono aqui de propósito - a lista é do card (podem ser vários usuários
+     * apontando tempo no mesmo card), não de um usuário; dono só importa pra editar/excluir um
+     * apontamento específico ({@link #editar}/{@link #excluir}), mesma simplificação de acesso ao
+     * card já usada em {@link #iniciarTimer}/{@link #criarManual}.
+     */
+    public List<ApontamentoResponse> listarPorCard(Long cardId) {
+        Card card = cardRepository.findById(cardId).orElseThrow(() -> new RecursoNaoEncontradoException("Card não encontrado: " + cardId));
+        return apontamentoRepository.findByCardOrderByInicioDesc(card).stream().map(ApontamentoResponse::de).toList();
     }
 }

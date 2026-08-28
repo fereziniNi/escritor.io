@@ -3,8 +3,10 @@ package io.escritor.presenca.apontamento.web;
 import io.escritor.presenca.apontamento.service.ApontamentoService;
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -56,5 +58,10 @@ public class ApontamentoController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void excluir(@PathVariable Long id) {
         apontamentoService.excluir(id, contextoUsuarioAutenticado.usuarioAtual());
+    }
+
+    @GetMapping("/cards/{id}/apontamentos")
+    public List<ApontamentoResponse> listarPorCard(@PathVariable Long id) {
+        return apontamentoService.listarPorCard(id);
     }
 }

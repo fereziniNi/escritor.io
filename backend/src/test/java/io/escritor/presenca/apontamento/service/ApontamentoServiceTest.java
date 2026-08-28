@@ -287,4 +287,45 @@ class ApontamentoServiceTest {
 
         assertThatThrownBy(() -> service.excluir(999L, usuario)).isInstanceOf(RecursoNaoEncontradoException.class);
     }
+
+    @Test
+    void listaOsApontamentosDoCardMaisRecentePrimeiro() {
+        Apontamento maisAntigo = new Apontamento(usuario, card, agora.minus(3, ChronoUnit.HOURS), agora.minus(2, ChronoUnit.HOURS), null, OrigemApontamento.MANUAL);
+        Apontamento maisRecente = new Apontamento(usuario, card, agora.minus(1, ChronoUnit.HOURS), agora, null, OrigemApontamento.MANUAL);
+        when(cardRepository.findById(5L)).thenReturn(Optional.of(card));
+        when(apontamentoRepository.findByCardOrderByInicioDesc(card)).thenReturn(java.util.List.of(maisRecente, maisAntigo));
+
+        var resposta = service.listarPorCard(5L);
+
+        assertThat(resposta).hasSize(2);
+        assertThat(resposta.get(0).inicio()).isEqualTo(maisRecente.getInicio());
+        assertThat(resposta.get(1).inicio()).isEqualTo(maisAntigo.getInicio());
+    }
+
+    @Test
+    void listarApontamentosDeCardInexistenteLancaRecursoNaoEncontrado() {
+        when(cardRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.listarPorCard(999L)).isInstanceOf(RecursoNaoEncontradoException.class);
+    }
+
+    @Test
+    void iniciarTimerTruncaInstantParaMilissegundosPraNaoPerderPrecisaoNoRoundTripComOFrontend() {
+        // Instant.now() do servidor costuma ter precisão de microssegundos/nanossegundos - o
+        // frontend (S4.7, editar inline) recebe esse instante via JSON, reparseia com o JS Date
+        // (só milissegundos) e reenvia num PATCH futuro. Se o inicio salvo tiver sub-milissegundos
+        // não visíveis pro cliente, o fim recalculado no browser fica alguns microssegundos ANTES
+        // do inicio de verdade, e Duration.toMinutes() trunca a duração 1 minuto a menos - achado
+        // testando a edição inline num browser real, não um artefato de teste.
+        Instant instanteComMicrossegundos = Instant.parse("2026-01-15T12:00:00.123456Z");
+        Clock clockComMicrossegundos = Clock.fixed(instanteComMicrossegundos, ZoneOffset.UTC);
+        ApontamentoService servicoComMicrossegundos = new ApontamentoService(apontamentoRepository, cardRepository, clockComMicrossegundos);
+        when(cardRepository.findById(5L)).thenReturn(Optional.of(card));
+        when(apontamentoRepository.findFirstByUsuarioAndFimIsNull(usuario)).thenReturn(Optional.empty());
+        when(apontamentoRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        var resposta = servicoComMicrossegundos.iniciarTimer(5L, usuario);
+
+        assertThat(resposta.inicio().getNano() % 1_000_000).isZero();
+    }
 }

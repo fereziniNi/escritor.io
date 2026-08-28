@@ -496,4 +496,161 @@ describe('QuadroDetalhePage', () => {
     expect(await screen.findByText(/não foi possível parar o timer/i)).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: /iniciar timer/i })).toBeInTheDocument()
   })
+
+  it('não busca apontamentos antes do card ser expandido', async () => {
+    server.use(http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)), semEtiquetasDoQuadro())
+
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    expect(screen.queryByText(/pareamento/i)).not.toBeInTheDocument()
+  })
+
+  it('expande e mostra os apontamentos existentes do card', async () => {
+    server.use(
+      http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)),
+      semEtiquetasDoQuadro(),
+      http.get('/cards/7/apontamentos', () =>
+        HttpResponse.json([
+          {
+            id: 1,
+            usuarioId: 1,
+            cardId: 7,
+            inicio: '2026-01-15T09:00:00Z',
+            fim: '2026-01-15T10:00:00Z',
+            minutos: 60,
+            descricao: 'Pareamento',
+            origem: 'MANUAL',
+            criadoEm: '2026-01-15T10:00:00Z',
+            editadoEm: '2026-01-15T10:00:00Z',
+          },
+        ]),
+      ),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.click(screen.getByRole('button', { name: /apontamentos/i }))
+
+    expect(await screen.findByText(/pareamento/i)).toBeInTheDocument()
+    expect(screen.getByText(/60 min/)).toBeInTheDocument()
+  })
+
+  it('lança um apontamento manual e ele aparece na lista sem reload manual', async () => {
+    let apontamentos: unknown[] = []
+    server.use(
+      http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)),
+      semEtiquetasDoQuadro(),
+      http.get('/cards/7/apontamentos', () => HttpResponse.json(apontamentos)),
+      http.post('/cards/7/apontamentos', async ({ request }) => {
+        const corpo = (await request.json()) as { minutos: number; descricao: string | null }
+        const novo = {
+          id: 1,
+          usuarioId: 1,
+          cardId: 7,
+          inicio: '2026-01-15T09:00:00Z',
+          fim: '2026-01-15T11:00:00Z',
+          minutos: corpo.minutos,
+          descricao: corpo.descricao,
+          origem: 'MANUAL',
+          criadoEm: '2026-01-15T11:00:00Z',
+          editadoEm: '2026-01-15T11:00:00Z',
+        }
+        apontamentos = [novo]
+        return HttpResponse.json(novo, { status: 201 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.click(screen.getByRole('button', { name: /apontamentos/i }))
+    await screen.findByLabelText(/minutos trabalhados/i)
+    await user.type(screen.getByLabelText(/minutos trabalhados/i), '120')
+    await user.type(screen.getByLabelText(/^descrição$/i), 'Revisão de código')
+    await user.click(screen.getByRole('button', { name: /^lançar$/i }))
+
+    expect(await screen.findByText(/revisão de código/i)).toBeInTheDocument()
+    expect(screen.getByText(/120 min/)).toBeInTheDocument()
+  })
+
+  it('edita a descrição e os minutos de um apontamento existente inline', async () => {
+    let apontamento = {
+      id: 1,
+      usuarioId: 1,
+      cardId: 7,
+      inicio: '2026-01-15T09:00:00Z',
+      fim: '2026-01-15T10:00:00Z',
+      minutos: 60,
+      descricao: 'Original',
+      origem: 'MANUAL',
+      criadoEm: '2026-01-15T10:00:00Z',
+      editadoEm: '2026-01-15T10:00:00Z',
+    }
+    server.use(
+      http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)),
+      semEtiquetasDoQuadro(),
+      http.get('/cards/7/apontamentos', () => HttpResponse.json([apontamento])),
+      http.patch('/apontamentos/1', async ({ request }) => {
+        const corpo = (await request.json()) as { fim: string | null; descricao: string | null }
+        apontamento = { ...apontamento, fim: corpo.fim ?? apontamento.fim, minutos: 90, descricao: corpo.descricao ?? apontamento.descricao }
+        return HttpResponse.json(apontamento)
+      }),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.click(screen.getByRole('button', { name: /apontamentos/i }))
+    await screen.findByText(/original/i)
+    await user.click(screen.getByRole('button', { name: /^editar$/i }))
+
+    const listaApontamentos = screen.getByRole('list', { name: /apontamentos do card/i })
+    const campoMinutos = within(listaApontamentos).getByLabelText(/^minutos$/i)
+    await user.clear(campoMinutos)
+    await user.type(campoMinutos, '90')
+    const campoDescricao = within(listaApontamentos).getByLabelText(/^descrição$/i)
+    await user.clear(campoDescricao)
+    await user.type(campoDescricao, 'Corrigido')
+    await user.click(screen.getByRole('button', { name: /^salvar$/i }))
+
+    expect(await screen.findByText(/corrigido/i)).toBeInTheDocument()
+    expect(screen.getByText(/90 min/)).toBeInTheDocument()
+  })
+
+  it('exclui um apontamento e ele some da lista sem reload manual', async () => {
+    let apontamentos = [
+      {
+        id: 1,
+        usuarioId: 1,
+        cardId: 7,
+        inicio: '2026-01-15T09:00:00Z',
+        fim: '2026-01-15T10:00:00Z',
+        minutos: 60,
+        descricao: 'Pareamento',
+        origem: 'MANUAL',
+        criadoEm: '2026-01-15T10:00:00Z',
+        editadoEm: '2026-01-15T10:00:00Z',
+      },
+    ]
+    server.use(
+      http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)),
+      semEtiquetasDoQuadro(),
+      http.get('/cards/7/apontamentos', () => HttpResponse.json(apontamentos)),
+      http.delete('/apontamentos/1', () => {
+        apontamentos = []
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.click(screen.getByRole('button', { name: /apontamentos/i }))
+    await screen.findByText(/pareamento/i)
+    await user.click(screen.getByRole('button', { name: /excluir apontamento 1/i }))
+
+    await waitFor(() => expect(screen.queryByText(/pareamento/i)).not.toBeInTheDocument())
+  })
 })
