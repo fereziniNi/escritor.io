@@ -138,7 +138,7 @@ class PontoControllerTest {
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
         when(jornadaService.jornadaDoDia(any()))
                 .thenReturn(new JornadaDoDiaResponse(
-                        java.time.LocalDate.parse("2026-01-13"), EstadoDia.FECHADA, 540, 60, 120));
+                        java.time.LocalDate.parse("2026-01-13"), EstadoDia.FECHADA, 540, 60, 120, 90));
 
         mockMvc.perform(get("/ponto/jornada-do-dia"))
                 .andExpect(status().isOk())
@@ -146,7 +146,8 @@ class PontoControllerTest {
                 .andExpect(jsonPath("$.estado").value("FECHADA"))
                 .andExpect(jsonPath("$.minutosTrabalhados").value(540))
                 .andExpect(jsonPath("$.saldoDia").value(60))
-                .andExpect(jsonPath("$.saldoAcumuladoNoPeriodo").value(120));
+                .andExpect(jsonPath("$.saldoAcumuladoNoPeriodo").value(120))
+                .andExpect(jsonPath("$.totalApontadoMinutos").value(90));
     }
 
     @Test

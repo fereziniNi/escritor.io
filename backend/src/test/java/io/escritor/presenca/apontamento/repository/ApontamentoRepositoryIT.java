@@ -118,4 +118,29 @@ class ApontamentoRepositoryIT {
         assertThatThrownBy(() -> apontamentoRepository.saveAndFlush(invalido))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
+
+    @Test
+    void encontraApontamentosFechadosDoUsuarioNoIntervaloEIgnoraTimerAbertoEOutroUsuario() {
+        Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480));
+        Usuario outroUsuario = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto@escritor.io", Papel.COLABORADOR, 480));
+        Card card = criarCard(usuario);
+        Instant inicioDoDia = Instant.parse("2026-01-13T00:00:00Z");
+        Instant fimDoDia = Instant.parse("2026-01-14T00:00:00Z");
+
+        Apontamento dentroDoDia = apontamentoRepository.saveAndFlush(new Apontamento(
+                usuario, card, Instant.parse("2026-01-13T09:00:00Z"), Instant.parse("2026-01-13T10:00:00Z"), null, OrigemApontamento.MANUAL));
+        // timer ainda aberto no mesmo dia - não deve entrar, mesmo com inicio dentro do intervalo.
+        apontamentoRepository.saveAndFlush(new Apontamento(usuario, card, Instant.parse("2026-01-13T11:00:00Z"), null, null, OrigemApontamento.TIMER));
+        // fechado, mas fora do intervalo do dia (dia seguinte).
+        apontamentoRepository.saveAndFlush(new Apontamento(
+                usuario, card, Instant.parse("2026-01-14T09:00:00Z"), Instant.parse("2026-01-14T10:00:00Z"), null, OrigemApontamento.MANUAL));
+        // fechado, dentro do intervalo, mas de outro usuário.
+        apontamentoRepository.saveAndFlush(new Apontamento(
+                outroUsuario, card, Instant.parse("2026-01-13T12:00:00Z"), Instant.parse("2026-01-13T13:00:00Z"), null, OrigemApontamento.MANUAL));
+
+        var encontrados = apontamentoRepository.findByUsuarioAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(
+                usuario, inicioDoDia, fimDoDia);
+
+        assertThat(encontrados).extracting(Apontamento::getId).containsExactly(dentroDoDia.getId());
+    }
 }

@@ -1,7 +1,14 @@
 package io.escritor.presenca.ponto.service;
 
+import io.escritor.presenca.apontamento.domain.Apontamento;
+import io.escritor.presenca.apontamento.domain.OrigemApontamento;
+import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
+import io.escritor.presenca.identidade.domain.Equipe;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Usuario;
+import io.escritor.presenca.kanban.domain.Card;
+import io.escritor.presenca.kanban.domain.Coluna;
+import io.escritor.presenca.kanban.domain.Quadro;
 import io.escritor.presenca.ponto.domain.EstadoDia;
 import io.escritor.presenca.ponto.domain.OrigemRegistroPonto;
 import io.escritor.presenca.ponto.domain.RegistroPonto;
@@ -20,6 +27,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,7 +36,11 @@ class JornadaServiceTest {
     @Mock
     private RegistroPontoRepository registroPontoRepository;
 
+    @Mock
+    private ApontamentoRepository apontamentoRepository;
+
     private final Usuario usuario = usuarioComId(1L, 480);
+    private final Card card = cardComId(5L);
 
     private JornadaService jornadaService;
 
@@ -36,6 +48,14 @@ class JornadaServiceTest {
         Usuario usuario = new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, cargaDiariaMinutos);
         ReflectionTestUtils.setField(usuario, "id", id);
         return usuario;
+    }
+
+    private static Card cardComId(Long id) {
+        Quadro quadro = new Quadro("Backlog", null, new Equipe("Backend", null));
+        Coluna coluna = new Coluna(quadro, "A fazer", 0, null);
+        Card card = new Card(coluna, "Corrigir bug", null, 1024.0, null, null, null, usuarioComId(1L, 480));
+        ReflectionTestUtils.setField(card, "id", id);
+        return card;
     }
 
     private RegistroPonto registro(TipoRegistroPonto tipo, String isoInstant) {
@@ -47,7 +67,12 @@ class JornadaServiceTest {
     void setUp() {
         // terça-feira 2026-01-13, 20h - já bateu entrada e saída hoje
         Clock clock = Clock.fixed(Instant.parse("2026-01-13T20:00:00Z"), ZoneOffset.UTC);
-        jornadaService = new JornadaService(registroPontoRepository, clock);
+        jornadaService = new JornadaService(registroPontoRepository, apontamentoRepository, clock);
+        // stub padrão pra não obrigar todo teste a mockar apontamentos - só sobrescrito nos testes
+        // que exercitam totalApontadoMinutos de verdade.
+        lenient()
+                .when(apontamentoRepository.findByUsuarioAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(any(), any(), any()))
+                .thenReturn(List.of());
     }
 
     @Test
@@ -63,6 +88,23 @@ class JornadaServiceTest {
         assertThat(jornada.minutosTrabalhados()).isEqualTo(9 * 60);
         assertThat(jornada.saldoDia()).isEqualTo(60);
         assertThat(jornada.saldoAcumuladoNoPeriodo()).isEqualTo(60);
+        assertThat(jornada.totalApontadoMinutos()).isZero();
+    }
+
+    @Test
+    void totalApontadoMinutosSomaSoOsApontamentosFechadosDoDia() {
+        when(registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualOrderByMomentoAsc(any(), any())).thenReturn(List.of());
+        Apontamento fechado1 = new Apontamento(
+                usuario, card, Instant.parse("2026-01-13T09:00:00Z"), Instant.parse("2026-01-13T10:00:00Z"), null, OrigemApontamento.MANUAL);
+        Apontamento fechado2 = new Apontamento(
+                usuario, card, Instant.parse("2026-01-13T11:00:00Z"), Instant.parse("2026-01-13T11:30:00Z"), null, OrigemApontamento.MANUAL);
+        when(apontamentoRepository.findByUsuarioAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(
+                        usuario, Instant.parse("2026-01-13T00:00:00Z"), Instant.parse("2026-01-14T00:00:00Z")))
+                .thenReturn(List.of(fechado1, fechado2));
+
+        var jornada = jornadaService.jornadaDoDia(usuario);
+
+        assertThat(jornada.totalApontadoMinutos()).isEqualTo(90);
     }
 
     @Test

@@ -1,5 +1,7 @@
 package io.escritor.presenca.ponto.service;
 
+import io.escritor.presenca.apontamento.domain.Apontamento;
+import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.ponto.domain.EstadoDia;
 import io.escritor.presenca.ponto.domain.JornadaDiaria;
@@ -30,19 +32,28 @@ import org.springframework.stereotype.Service;
 public class JornadaService {
 
     private final RegistroPontoRepository registroPontoRepository;
+    private final ApontamentoRepository apontamentoRepository;
     private final Clock clock;
 
-    public JornadaService(RegistroPontoRepository registroPontoRepository, Clock clock) {
+    public JornadaService(RegistroPontoRepository registroPontoRepository, ApontamentoRepository apontamentoRepository, Clock clock) {
         this.registroPontoRepository = registroPontoRepository;
+        this.apontamentoRepository = apontamentoRepository;
         this.clock = clock;
     }
 
+    /**
+     * `totalApontadoMinutos` é um cálculo paralelo ao saldo de ponto (E1), nunca o altera - PRD
+     * §3.4: apontamento é dado de gestão de card, não de jornada. Só soma apontamentos já
+     * encerrados do dia; um timer ainda aberto não entra na soma (o frontend mostra ele separado,
+     * S4.4/S4.9).
+     */
     public JornadaDoDiaResponse jornadaDoDia(Usuario usuario) {
         Instant agora = Instant.now(clock);
         LocalDate hoje = agora.atZone(ZoneOffset.UTC).toLocalDate();
         Map<LocalDate, List<Marcacao>> marcacoesPorDia = marcacoesPorDiaNoMesCorrente(usuario, hoje);
 
         List<Marcacao> marcacoesDeHoje = marcacoesPorDia.getOrDefault(hoje, List.of());
+        Instant inicioDoDia = hoje.atStartOfDay(ZoneOffset.UTC).toInstant();
         Instant fimDoDia = hoje.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
         int cargaDiariaMinutos = usuario.getCargaDiariaMinutos();
 
@@ -50,8 +61,13 @@ public class JornadaService {
         long minutosTrabalhados = JornadaDiaria.minutosTrabalhados(marcacoesDeHoje);
         long saldoDia = JornadaDiaria.saldo(marcacoesDeHoje, cargaDiariaMinutos);
         long saldoAcumuladoNoPeriodo = SaldoAcumulado.calcular(marcacoesPorDia, cargaDiariaMinutos);
+        long totalApontadoMinutos = apontamentoRepository
+                .findByUsuarioAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(usuario, inicioDoDia, fimDoDia)
+                .stream()
+                .mapToLong(Apontamento::getMinutos)
+                .sum();
 
-        return new JornadaDoDiaResponse(hoje, estado, minutosTrabalhados, saldoDia, saldoAcumuladoNoPeriodo);
+        return new JornadaDoDiaResponse(hoje, estado, minutosTrabalhados, saldoDia, saldoAcumuladoNoPeriodo, totalApontadoMinutos);
     }
 
     /**
