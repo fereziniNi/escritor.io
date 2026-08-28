@@ -3,6 +3,7 @@ package io.escritor.presenca.infra;
 import io.escritor.presenca.apontamento.domain.ApontamentoDeOutroUsuarioException;
 import io.escritor.presenca.apontamento.domain.ApontamentoJaEncerradoException;
 import io.escritor.presenca.apontamento.domain.FimAntesDoInicioException;
+import io.escritor.presenca.apontamento.domain.LancamentoManualInvalidoException;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.AcessoNegadoException;
 import io.escritor.presenca.kanban.domain.CorEtiquetaObrigatoriaException;
@@ -131,6 +132,11 @@ public class TratamentoErroGlobal {
 
     @ExceptionHandler(FimAntesDoInicioException.class)
     ResponseEntity<Void> tratarFimAntesDoInicio() {
+        return ResponseEntity.badRequest().build();
+    }
+
+    @ExceptionHandler(LancamentoManualInvalidoException.class)
+    ResponseEntity<Void> tratarLancamentoManualInvalido() {
         return ResponseEntity.badRequest().build();
     }
 }

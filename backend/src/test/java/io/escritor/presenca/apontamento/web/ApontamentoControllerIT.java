@@ -211,4 +211,72 @@ class ApontamentoControllerIT {
                 .exchange()
                 .expectStatus().isEqualTo(409);
     }
+
+    @Test
+    void criaLancamentoManualComMinutosDireto() {
+        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
+        Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-manual@escritor.io", Papel.COLABORADOR, 480));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
+        String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
+
+        client().post()
+                .uri("/cards/{id}/apontamentos", card.getId())
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("""
+                        {"minutos":120,"descricao":"Pareamento"}
+                        """)
+                .exchange()
+                .expectStatus().isCreated()
+                .expectBody()
+                .jsonPath("$.minutos").isEqualTo(120)
+                .jsonPath("$.origem").isEqualTo("MANUAL")
+                .jsonPath("$.descricao").isEqualTo("Pareamento")
+                .jsonPath("$.fim").exists();
+    }
+
+    @Test
+    void criaLancamentoManualComIntervaloExplicito() {
+        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
+        Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-manual2@escritor.io", Papel.COLABORADOR, 480));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
+        String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
+
+        client().post()
+                .uri("/cards/{id}/apontamentos", card.getId())
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("""
+                        {"inicio":"2026-01-15T09:00:00Z","fim":"2026-01-15T10:30:00Z"}
+                        """)
+                .exchange()
+                .expectStatus().isCreated()
+                .expectBody()
+                .jsonPath("$.minutos").isEqualTo(90)
+                .jsonPath("$.origem").isEqualTo("MANUAL");
+    }
+
+    @Test
+    void criarLancamentoManualComMinutosEIntervaloJuntosRecebe400DeVerdade() {
+        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
+        Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-manual3@escritor.io", Papel.COLABORADOR, 480));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
+        String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
+
+        client().post()
+                .uri("/cards/{id}/apontamentos", card.getId())
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("""
+                        {"inicio":"2026-01-15T09:00:00Z","fim":"2026-01-15T10:30:00Z","minutos":90}
+                        """)
+                .exchange()
+                .expectStatus().isBadRequest();
+    }
 }

@@ -2,6 +2,7 @@ package io.escritor.presenca.apontamento.service;
 
 import io.escritor.presenca.apontamento.domain.Apontamento;
 import io.escritor.presenca.apontamento.domain.ApontamentoDeOutroUsuarioException;
+import io.escritor.presenca.apontamento.domain.LancamentoManualInvalidoException;
 import io.escritor.presenca.apontamento.domain.OrigemApontamento;
 import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
 import io.escritor.presenca.apontamento.web.ApontamentoResponse;
@@ -11,6 +12,7 @@ import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.repository.CardRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import org.springframework.stereotype.Service;
 
 /**
@@ -69,6 +71,41 @@ public class ApontamentoService {
         apontamento.encerrar(Instant.now(clock));
         Apontamento salvo = apontamentoRepository.save(apontamento);
 
+        return ApontamentoResponse.de(salvo);
+    }
+
+    /**
+     * PRD: lançamento manual aceita `inicio`+`fim` (minutos calculado) OU `minutos` direto (pra
+     * quem só sabe "trabalhei 2h", sem hora exata). As duas fontes juntas são ambíguas de
+     * propósito - se o cliente mandar as duas, não dá pra saber qual é a verdade, então rejeita
+     * em vez de escolher uma silenciosamente. Quando só `minutos` vem, sintetiza um intervalo
+     * terminando agora (`fim = agora`, `inicio = agora − minutos`) só pra satisfazer o schema
+     * (`inicio`/`fim` não nulos quando fechado) - o registro em si já nasce fechado, nunca um
+     * timer.
+     */
+    public ApontamentoResponse criarManual(Long cardId, Instant inicio, Instant fim, Integer minutos, String descricao, Usuario usuario) {
+        // Validação de forma pura primeiro, sem tocar o banco: não depende de o card existir.
+        boolean temMinutos = minutos != null;
+        boolean temIntervalo = inicio != null && fim != null;
+        if (temMinutos && (inicio != null || fim != null)) {
+            throw new LancamentoManualInvalidoException(
+                    "Informe minutos OU início/fim pro lançamento manual, não os dois - fica ambíguo qual é a fonte da verdade");
+        }
+        if (!temMinutos && !temIntervalo) {
+            throw new LancamentoManualInvalidoException("Informe minutos, ou início e fim juntos, pra registrar um lançamento manual");
+        }
+
+        Card card = cardRepository.findById(cardId).orElseThrow(() -> new RecursoNaoEncontradoException("Card não encontrado: " + cardId));
+
+        Apontamento novo;
+        if (temMinutos) {
+            Instant agora = Instant.now(clock);
+            novo = new Apontamento(usuario, card, agora.minus(minutos, ChronoUnit.MINUTES), agora, descricao, OrigemApontamento.MANUAL);
+        } else {
+            novo = new Apontamento(usuario, card, inicio, fim, descricao, OrigemApontamento.MANUAL);
+        }
+
+        Apontamento salvo = apontamentoRepository.save(novo);
         return ApontamentoResponse.de(salvo);
     }
 }

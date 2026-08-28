@@ -3,6 +3,7 @@ package io.escritor.presenca.apontamento.service;
 import io.escritor.presenca.apontamento.domain.Apontamento;
 import io.escritor.presenca.apontamento.domain.ApontamentoDeOutroUsuarioException;
 import io.escritor.presenca.apontamento.domain.ApontamentoJaEncerradoException;
+import io.escritor.presenca.apontamento.domain.LancamentoManualInvalidoException;
 import io.escritor.presenca.apontamento.domain.OrigemApontamento;
 import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
 import io.escritor.presenca.identidade.domain.Equipe;
@@ -158,5 +159,61 @@ class ApontamentoServiceTest {
         when(apontamentoRepository.findById(999L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.parar(999L, usuario)).isInstanceOf(RecursoNaoEncontradoException.class);
+    }
+
+    @Test
+    void criaManualComIntervaloExplicitoCalculaMinutos() {
+        Instant inicio = agora.minus(2, ChronoUnit.HOURS);
+        Instant fim = agora.minus(30, ChronoUnit.MINUTES);
+        when(cardRepository.findById(5L)).thenReturn(Optional.of(card));
+        when(apontamentoRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        var resposta = service.criarManual(5L, inicio, fim, null, "Revisão de código", usuario);
+
+        assertThat(resposta.inicio()).isEqualTo(inicio);
+        assertThat(resposta.fim()).isEqualTo(fim);
+        assertThat(resposta.minutos()).isEqualTo(90);
+        assertThat(resposta.descricao()).isEqualTo("Revisão de código");
+        assertThat(resposta.origem()).isEqualTo("MANUAL");
+    }
+
+    @Test
+    void criaManualComMinutosDiretoSintetizaOIntervalo() {
+        when(cardRepository.findById(5L)).thenReturn(Optional.of(card));
+        when(apontamentoRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        var resposta = service.criarManual(5L, null, null, 120, "Pareamento", usuario);
+
+        assertThat(resposta.fim()).isEqualTo(agora);
+        assertThat(resposta.inicio()).isEqualTo(agora.minus(120, ChronoUnit.MINUTES));
+        assertThat(resposta.minutos()).isEqualTo(120);
+        assertThat(resposta.origem()).isEqualTo("MANUAL");
+    }
+
+    @Test
+    void criarManualComMinutosEIntervaloJuntosLancaExcecao() {
+        assertThatThrownBy(() -> service.criarManual(5L, agora.minus(1, ChronoUnit.HOURS), agora, 60, null, usuario))
+                .isInstanceOf(LancamentoManualInvalidoException.class);
+
+        verify(apontamentoRepository, never()).save(any());
+    }
+
+    @Test
+    void criarManualSemMinutosNemIntervaloCompletoLancaExcecao() {
+        assertThatThrownBy(() -> service.criarManual(5L, null, null, null, null, usuario))
+                .isInstanceOf(LancamentoManualInvalidoException.class);
+
+        assertThatThrownBy(() -> service.criarManual(5L, agora.minus(1, ChronoUnit.HOURS), null, null, null, usuario))
+                .isInstanceOf(LancamentoManualInvalidoException.class);
+
+        verify(apontamentoRepository, never()).save(any());
+    }
+
+    @Test
+    void criarManualEmCardInexistenteLancaRecursoNaoEncontrado() {
+        when(cardRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.criarManual(999L, null, null, 60, null, usuario))
+                .isInstanceOf(RecursoNaoEncontradoException.class);
     }
 }
