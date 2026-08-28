@@ -10,6 +10,7 @@ import io.escritor.presenca.kanban.repository.CardRepository;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
 import io.escritor.presenca.kanban.web.CardResponse;
 import java.time.LocalDate;
+import java.util.List;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -46,6 +47,33 @@ public class CardService {
 
         Card novo = new Card(coluna, titulo, descricao, posicao, responsavel, prazo, estimativaMinutos, criadoPor);
         Card salvo = cardRepository.save(novo);
+
+        return CardResponse.de(salvo);
+    }
+
+    /**
+     * {@code indice} é a posição 0-based desejada na coluna de destino (a lista já sem o próprio
+     * card, se ele já estava lá). Nunca toca nos outros cards da coluna - só recalcula a posição
+     * do card movido a partir dos vizinhos no índice pedido.
+     */
+    public CardResponse mover(Long cardId, Long novaColunaId, int indice) {
+        Card card = cardRepository
+                .findById(cardId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Card não encontrado: " + cardId));
+        Coluna novaColuna = colunaRepository
+                .findById(novaColunaId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Coluna não encontrada: " + novaColunaId));
+
+        List<Card> cardsDoDestino = cardRepository.findByColunaOrderByPosicaoAsc(novaColuna).stream()
+                .filter(outro -> !outro.getId().equals(card.getId()))
+                .toList();
+
+        Double anterior = indice <= 0 ? null : cardsDoDestino.get(indice - 1).getPosicao();
+        Double proxima = indice >= cardsDoDestino.size() ? null : cardsDoDestino.get(indice).getPosicao();
+        double novaPosicao = CalculadoraPosicao.entre(anterior, proxima);
+
+        card.mover(novaColuna, novaPosicao);
+        Card salvo = cardRepository.save(card);
 
         return CardResponse.de(salvo);
     }

@@ -133,4 +133,14 @@ public class Card {
     public boolean isArquivado() {
         return arquivado;
     }
+
+    /**
+     * Diferente de {@code RegistroPonto}, {@code Card} não é append-only - mover é um `UPDATE`
+     * de verdade (PRD E2: "arrastar cards entre colunas, com a mudança persistida"). Quem calcula
+     * {@code novaPosicao} é o serviço (via {@link CalculadoraPosicao}), não esta entidade.
+     */
+    public void mover(Coluna novaColuna, double novaPosicao) {
+        this.coluna = novaColuna;
+        this.posicao = novaPosicao;
+    }
 }

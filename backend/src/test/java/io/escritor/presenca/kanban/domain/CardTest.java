@@ -66,4 +66,25 @@ class CardTest {
         assertThatThrownBy(() -> new Card(coluna, "Corrigir bug", null, 1024.0, null, null, -30, criadoPor))
                 .isInstanceOf(EstimativaInvalidaException.class);
     }
+
+    @Test
+    void moverAtualizaColunaEPosicao() {
+        Card card = new Card(coluna, "Corrigir bug", null, 1024.0, null, null, null, criadoPor);
+        Coluna outraColuna = new Coluna(quadro, "Em progresso", 1, null);
+
+        card.mover(outraColuna, 2048.0);
+
+        assertThat(card.getColuna()).isSameAs(outraColuna);
+        assertThat(card.getPosicao()).isEqualTo(2048.0);
+    }
+
+    @Test
+    void moverDentroDaMesmaColunaSoMudaAPosicao() {
+        Card card = new Card(coluna, "Corrigir bug", null, 1024.0, null, null, null, criadoPor);
+
+        card.mover(coluna, 512.0);
+
+        assertThat(card.getColuna()).isSameAs(coluna);
+        assertThat(card.getPosicao()).isEqualTo(512.0);
+    }
 }
