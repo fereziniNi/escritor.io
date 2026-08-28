@@ -262,4 +262,70 @@ describe('QuadroDetalhePage', () => {
 
     await waitFor(() => expect(screen.queryByText('Urgente')).not.toBeInTheDocument())
   })
+
+  it('não busca comentários antes do card ser expandido', async () => {
+    server.use(http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)), semEtiquetasDoQuadro())
+
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    expect(screen.queryByText('Já revisei')).not.toBeInTheDocument()
+  })
+
+  it('expande o card e mostra os comentários existentes', async () => {
+    server.use(
+      http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)),
+      semEtiquetasDoQuadro(),
+      http.get('/cards/7/comentarios', () =>
+        HttpResponse.json([{ id: 1, cardId: 7, autorId: 1, texto: 'Já revisei', criadoEm: '2026-01-15T10:00:00Z' }]),
+      ),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.click(screen.getByRole('button', { name: /comentários/i }))
+
+    expect(await screen.findByText('Já revisei')).toBeInTheDocument()
+  })
+
+  it('adiciona um comentário novo e ele aparece na lista sem reload manual', async () => {
+    let comentarios: Array<{ id: number; cardId: number; autorId: number; texto: string; criadoEm: string }> = []
+    server.use(
+      http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)),
+      semEtiquetasDoQuadro(),
+      http.get('/cards/7/comentarios', () => HttpResponse.json(comentarios)),
+      http.post('/cards/7/comentarios', async ({ request }) => {
+        const corpo = (await request.json()) as { texto: string }
+        const novo = { id: 1, cardId: 7, autorId: 1, texto: corpo.texto, criadoEm: '2026-01-15T10:00:00Z' }
+        comentarios = [...comentarios, novo]
+        return HttpResponse.json(novo, { status: 201 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.click(screen.getByRole('button', { name: /comentários/i }))
+    await screen.findByLabelText(/novo comentário/i)
+    await user.type(screen.getByLabelText(/novo comentário/i), 'Ficou ótimo')
+    await user.click(screen.getByRole('button', { name: /^comentar$/i }))
+
+    expect(await screen.findByText('Ficou ótimo')).toBeInTheDocument()
+  })
+
+  it('mostra erro quando o usuário não tem acesso ao quadro do card', async () => {
+    server.use(
+      http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)),
+      semEtiquetasDoQuadro(),
+      http.get('/cards/7/comentarios', () => new HttpResponse(null, { status: 403 })),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.click(screen.getByRole('button', { name: /comentários/i }))
+
+    expect(await screen.findByText(/não foi possível carregar os comentários/i)).toBeInTheDocument()
+  })
 })

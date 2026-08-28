@@ -14,11 +14,79 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useParams } from 'react-router'
 import { useAuthStore } from '../auth/authStore'
-import { aplicarEtiqueta, buscarQuadro, criarCard, criarEtiqueta, listarEtiquetas, moverCard, removerEtiqueta } from './api'
+import {
+  aplicarEtiqueta,
+  buscarQuadro,
+  criarCard,
+  criarComentario,
+  criarEtiqueta,
+  listarComentarios,
+  listarEtiquetas,
+  moverCard,
+  removerEtiqueta,
+} from './api'
 import { moverCardOtimista } from './moverCardOtimista'
 import { resolverMovimento } from './resolverMovimento'
 import type { Card, ColunaComCards, Etiqueta, QuadroDetalhe } from './types'
 import { useQuadroWebSocket } from './useQuadroWebSocket'
+
+function ComentariosDoCard({ cardId }: { cardId: number }) {
+  const queryClient = useQueryClient()
+  const [aberto, setAberto] = useState(false)
+  const [texto, setTexto] = useState('')
+
+  // Só busca quando expandido - evitar um GET por card só de renderizar o quadro, mesmo espírito
+  // do N+1 já assumido em QuadroService.paraColunaComCards (S3.14).
+  const comentariosQuery = useQuery({
+    queryKey: ['cards', cardId, 'comentarios'],
+    queryFn: () => listarComentarios(cardId),
+    enabled: aberto,
+  })
+
+  const criarComentarioMutation = useMutation({
+    mutationFn: criarComentario,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cards', cardId, 'comentarios'] })
+      setTexto('')
+    },
+  })
+
+  return (
+    <div>
+      <button type="button" onClick={() => setAberto((atual) => !atual)}>
+        Comentários
+      </button>
+      {aberto && (
+        <div>
+          {comentariosQuery.isError && <p>Não foi possível carregar os comentários.</p>}
+          <ul>
+            {comentariosQuery.data?.map((comentario) => (
+              <li key={comentario.id}>{comentario.texto}</li>
+            ))}
+          </ul>
+          <form
+            onSubmit={(evento) => {
+              evento.preventDefault()
+              criarComentarioMutation.mutate({ cardId, texto })
+            }}
+          >
+            <label htmlFor={`novo-comentario-${cardId}`}>Novo comentário</label>
+            <textarea
+              id={`novo-comentario-${cardId}`}
+              value={texto}
+              onChange={(evento) => setTexto(evento.target.value)}
+              required
+            />
+            <button type="submit" disabled={criarComentarioMutation.isPending}>
+              Comentar
+            </button>
+            {criarComentarioMutation.isError && <p>Não foi possível comentar.</p>}
+          </form>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function CardArrastavel({
   card,
@@ -89,6 +157,7 @@ function CardArrastavel({
           </button>
         </div>
       )}
+      <ComentariosDoCard cardId={card.id} />
     </li>
   )
 }

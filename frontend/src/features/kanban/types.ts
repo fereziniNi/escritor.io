@@ -13,6 +13,14 @@ export interface Etiqueta {
   cor: string
 }
 
+export interface Comentario {
+  id: number
+  cardId: number
+  autorId: number
+  texto: string
+  criadoEm: string
+}
+
 export interface Card {
   id: number
   colunaId: number

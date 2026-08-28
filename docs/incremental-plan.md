@@ -67,7 +67,7 @@ Regra de visibilidade (PRD §2): um usuário vê quadros das equipes das quais �
 | S3.13 ✅ | `Etiqueta` (por quadro) + `CardEtiqueta` (N:N) — criar, aplicar, remover | Domínio: etiqueta de outro quadro não pode ser aplicada a um card deste quadro |
 | S3.14 ✅ | Frontend: etiquetas no card (criar, aplicar, remover, exibir no card do quadro) | Componente: etiqueta aplicada aparece no card sem reload |
 | S3.15 ✅ | `CardComentario` — criar/listar | Web: 403 pra quem não tem acesso ao quadro do card (mesma regra de visibilidade de S3.2) |
-| S3.16 | Frontend: comentários no card (detalhe do card) | Componente: comentário novo aparece na lista sem reload |
+| S3.16 ✅ | Frontend: comentários no card (detalhe do card) | Componente: comentário novo aparece na lista sem reload |
 | S3.17 | `CardEvento` — histórico automático (criação, mudança de coluna, mudança de responsável) | Domínio: mover um card gera o evento sozinho, dentro do mesmo serviço que move — nunca é escrito manualmente por outra camada |
 | S3.18 | Frontend: histórico do card (aba/timeline no detalhe do card) | Componente: exibe os eventos em ordem cronológica com rótulo legível por tipo |
 

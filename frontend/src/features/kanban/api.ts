@@ -1,5 +1,5 @@
 import { apiFetch } from '../../shared/api/http'
-import type { Card, Etiqueta, Quadro, QuadroDetalhe } from './types'
+import type { Card, Comentario, Etiqueta, Quadro, QuadroDetalhe } from './types'
 
 export async function listarQuadros(): Promise<Quadro[]> {
   const response = await apiFetch('/quadros')
@@ -94,4 +94,24 @@ export async function removerEtiqueta(dados: { cardId: number; etiquetaId: numbe
   if (!response.ok) {
     throw new Error('Não foi possível remover a etiqueta')
   }
+}
+
+export async function listarComentarios(cardId: number): Promise<Comentario[]> {
+  const response = await apiFetch(`/cards/${cardId}/comentarios`)
+  if (!response.ok) {
+    throw new Error('Não foi possível carregar os comentários')
+  }
+  return response.json()
+}
+
+export async function criarComentario(dados: { cardId: number; texto: string }): Promise<Comentario> {
+  const response = await apiFetch(`/cards/${dados.cardId}/comentarios`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ texto: dados.texto }),
+  })
+  if (!response.ok) {
+    throw new Error('Não foi possível comentar')
+  }
+  return response.json()
 }
