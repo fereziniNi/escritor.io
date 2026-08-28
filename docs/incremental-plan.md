@@ -1,8 +1,8 @@
-# Plano incremental — Fases 1 e 2 (E0 + E1 + E2)
+# Plano incremental — Fases 1 a 3 (E0 + E1 + E2 + E3)
 
 Backlog ordenado de fatias verticais. Cada fatia é pequena o suficiente para caber num ciclo TDD completo (backend domínio → backend web/repo → frontend) e entrega algo demonstrável. Não pular fatias — cada uma assume que as anteriores estão testadas e verdes.
 
-Fase 1 (E0 + E1) está completa e em uso. Fase 2 (E2 Kanban) está detalhada abaixo (S3), seguindo o mesmo formato. Fases 3–4 (E3 Apontamento, E4 Relatórios, E5 Escritório virtual) continuam para depois, conforme o roadmap do PRD (§5) — planejar tudo agora seria especular sobre o que a fase anterior vai ensinar.
+Fases 1 e 2 (E0 + E1 + E2) estão completas e em uso. Fase 3 (E3 Apontamento de horas) está esboçada abaixo (S4), seguindo o mesmo formato — ainda não implementada. E4 (Relatórios) e E5 (Escritório virtual) continuam para depois, conforme o roadmap do PRD (§5) — planejar tudo agora seria especular sobre o que a fase anterior vai ensinar.
 
 ---
 
@@ -71,6 +71,25 @@ Regra de visibilidade (PRD §2): um usuário vê quadros das equipes das quais �
 | S3.17 ✅ | `CardEvento` — histórico automático (criação, mudança de coluna, mudança de responsável) | Domínio: mover um card gera o evento sozinho, dentro do mesmo serviço que move — nunca é escrito manualmente por outra camada |
 | S3.18 ✅ | Frontend: histórico do card (aba/timeline no detalhe do card) | Componente: exibe os eventos em ordem cronológica com rótulo legível por tipo |
 
+## S4 — E3 Apontamento de horas
+
+PRD §3.4: `Apontamento id, usuario_id, card_id, inicio, fim (nullable = timer rodando), minutos (calculado ao encerrar), descricao, origem: TIMER | MANUAL, criado_em, editado_em`. Diferença fundamental em relação a `RegistroPonto` (S2): **apontamento é editável** — "é dado de gestão, não de jornada" (PRD). Nada de `REVOKE UPDATE/DELETE`, nada de encadeamento de hash, nada de "aprovar gera novo registro" — aqui `UPDATE`/`DELETE` de verdade são o caminho normal, com uma trava simples: só o autor mexe no próprio apontamento. A jornada continua sendo a fonte de verdade pro saldo de ponto (E1); apontamento é uma métrica paralela e informativa, nunca bloqueia nada do fluxo de ponto.
+
+Regra central (PRD): no máximo um timer aberto por usuário — iniciar um novo em qualquer card encerra automaticamente o anterior (calculando os minutos dele antes de abrir o novo), o mesmo espírito de "SAIDA implícita" que já existe conceitualmente pra sequência de marcação (S2.3), mas aplicado a um recurso editável.
+
+| # | Fatia | Teste que vem primeiro |
+|---|---|---|
+| S4.1 | Entidade `Apontamento` + migração — sem `REVOKE`/hash (diferente de `RegistroPonto`, é editável de propósito) | Domínio: `fim` antes de `inicio` é rejeitado; timer aberto (`fim` nulo) não tem `minutos` calculado ainda; encerrar calcula `minutos = fim − inicio` |
+| S4.2 | `POST /cards/{id}/apontamentos/timer` — inicia timer pro usuário autenticado nesse card | Serviço: se já existe timer aberto do usuário (em qualquer card), ele é encerrado automaticamente antes de abrir o novo, com os minutos calculados corretamente |
+| S4.3 | `PATCH /apontamentos/{id}/parar` — encerra o timer aberto, calcula `minutos` | Web: parar um apontamento que não é do usuário autenticado, que já está fechado, ou que não existe, é rejeitado (403/409/404) |
+| S4.4 | Frontend: botão de timer no card (Iniciar/Parar) com cronômetro decorrido | Componente: iniciar troca pra "Parar" e mostra o tempo correndo; parar volta pra "Iniciar" |
+| S4.5 | `POST /cards/{id}/apontamentos` (lançamento manual, `origem=MANUAL`) — aceita `inicio`+`fim` (minutos calculado) OU `minutos` direto + `descricao` | Domínio: passar `minutos` E `inicio`/`fim` ao mesmo tempo é rejeitado — ambíguo sobre qual é a fonte da verdade |
+| S4.6 | `PATCH /apontamentos/{id}` e `DELETE /apontamentos/{id}` — só o autor edita/exclui o próprio | Web: 403 pra mexer no apontamento de outro usuário; editar `inicio`/`fim` recalcula `minutos` |
+| S4.7 | Frontend: lista de apontamentos do card (editar/excluir inline) + formulário de lançamento manual | Componente: criar/editar/excluir aparece na lista sem reload manual |
+| S4.8 | `GET /ponto/jornada-do-dia` ganha `totalApontadoMinutos` do dia (reaproveita `JornadaService`, E1) | Serviço: soma só os apontamentos fechados do dia; timer ainda aberto não entra na soma (aparece separado); é um cálculo paralelo ao saldo de ponto, nunca o altera |
+| S4.9 | Frontend: `JornadaPainel` (S2.10) mostra "Total apontado hoje" ao lado da jornada, com a diferença sinalizada | Componente: diferença aparece só como informação (positiva ou negativa) — a ação de marcar `SAIDA` continua liberada independente do valor |
+| S4.10 | `GET /apontamentos?usuarioId=&inicio=&fim=` — listagem simples por pessoa e período (gestor vê a própria equipe, colaborador só os próprios) | Serviço: colaborador que tenta ver apontamentos de outro usuário recebe 403; gestor só vê membros das equipes que lidera — base mínima pro relatório completo (E4), sem construir agregação por projeto ainda |
+
 ---
 
 ## Definição de pronto (para toda fatia)
@@ -79,3 +98,4 @@ Regra de visibilidade (PRD §2): um usuário vê quadros das equipes das quais �
 - Sem `TODO`/código morto deixado pra depois "porque vai precisar".
 - Se a fatia toca `RegistroPonto`, nenhum caminho de código faz `UPDATE`/`DELETE` nessa tabela — isso é verificado por teste, não por revisão manual.
 - Se a fatia toca `Card.posicao` (S3), nenhum caminho de código renumera a coluna inteira pra mover um card — isso é verificado por teste, não por revisão manual.
+- Se a fatia toca `Apontamento` (S4), `UPDATE`/`DELETE` são esperados e permitidos — não aplicar por engano a mesma trava de imutabilidade de `RegistroPonto` aqui.
