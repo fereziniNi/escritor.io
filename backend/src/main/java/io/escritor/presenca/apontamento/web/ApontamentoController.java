@@ -3,6 +3,7 @@ package io.escritor.presenca.apontamento.web;
 import io.escritor.presenca.apontamento.service.ApontamentoService;
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -28,5 +29,10 @@ public class ApontamentoController {
     @ResponseStatus(HttpStatus.CREATED)
     public ApontamentoResponse iniciarTimer(@PathVariable Long id) {
         return apontamentoService.iniciarTimer(id, contextoUsuarioAutenticado.usuarioAtual());
+    }
+
+    @PatchMapping("/apontamentos/{id}/parar")
+    public ApontamentoResponse parar(@PathVariable Long id) {
+        return apontamentoService.parar(id, contextoUsuarioAutenticado.usuarioAtual());
     }
 }

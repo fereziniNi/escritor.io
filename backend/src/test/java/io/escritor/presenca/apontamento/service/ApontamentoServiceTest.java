@@ -1,6 +1,8 @@
 package io.escritor.presenca.apontamento.service;
 
 import io.escritor.presenca.apontamento.domain.Apontamento;
+import io.escritor.presenca.apontamento.domain.ApontamentoDeOutroUsuarioException;
+import io.escritor.presenca.apontamento.domain.ApontamentoJaEncerradoException;
 import io.escritor.presenca.apontamento.domain.OrigemApontamento;
 import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
 import io.escritor.presenca.identidade.domain.Equipe;
@@ -109,5 +111,52 @@ class ApontamentoServiceTest {
         assertThatThrownBy(() -> service.iniciarTimer(999L, usuario)).isInstanceOf(RecursoNaoEncontradoException.class);
 
         verify(apontamentoRepository, never()).save(any());
+    }
+
+    @Test
+    void pararEncerraOTimerDoProprioUsuario() {
+        Instant inicio = agora.minus(30, ChronoUnit.MINUTES);
+        Apontamento timerAberto = new Apontamento(usuario, card, inicio, null, null, OrigemApontamento.TIMER);
+        ReflectionTestUtils.setField(timerAberto, "id", 7L);
+        when(apontamentoRepository.findById(7L)).thenReturn(Optional.of(timerAberto));
+        when(apontamentoRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        var resposta = service.parar(7L, usuario);
+
+        assertThat(resposta.fim()).isEqualTo(agora);
+        assertThat(resposta.minutos()).isEqualTo(30);
+        verify(apontamentoRepository).save(timerAberto);
+    }
+
+    @Test
+    void pararApontamentoDeOutroUsuarioLancaExcecao() {
+        Usuario dono = usuarioComId(1L);
+        Usuario outro = usuarioComId(2L);
+        Apontamento timerAberto = new Apontamento(dono, card, agora.minus(10, ChronoUnit.MINUTES), null, null, OrigemApontamento.TIMER);
+        ReflectionTestUtils.setField(timerAberto, "id", 7L);
+        when(apontamentoRepository.findById(7L)).thenReturn(Optional.of(timerAberto));
+
+        assertThatThrownBy(() -> service.parar(7L, outro)).isInstanceOf(ApontamentoDeOutroUsuarioException.class);
+
+        verify(apontamentoRepository, never()).save(any());
+    }
+
+    @Test
+    void pararApontamentoJaEncerradoLancaExcecao() {
+        Apontamento jaEncerrado = new Apontamento(
+                usuario, card, agora.minus(60, ChronoUnit.MINUTES), agora.minus(30, ChronoUnit.MINUTES), null, OrigemApontamento.TIMER);
+        ReflectionTestUtils.setField(jaEncerrado, "id", 7L);
+        when(apontamentoRepository.findById(7L)).thenReturn(Optional.of(jaEncerrado));
+
+        assertThatThrownBy(() -> service.parar(7L, usuario)).isInstanceOf(ApontamentoJaEncerradoException.class);
+
+        verify(apontamentoRepository, never()).save(any());
+    }
+
+    @Test
+    void pararApontamentoInexistenteLancaRecursoNaoEncontrado() {
+        when(apontamentoRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.parar(999L, usuario)).isInstanceOf(RecursoNaoEncontradoException.class);
     }
 }

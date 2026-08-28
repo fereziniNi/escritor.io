@@ -1,6 +1,7 @@
 package io.escritor.presenca.apontamento.service;
 
 import io.escritor.presenca.apontamento.domain.Apontamento;
+import io.escritor.presenca.apontamento.domain.ApontamentoDeOutroUsuarioException;
 import io.escritor.presenca.apontamento.domain.OrigemApontamento;
 import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
 import io.escritor.presenca.apontamento.web.ApontamentoResponse;
@@ -47,6 +48,26 @@ public class ApontamentoService {
 
         Apontamento novo = new Apontamento(usuario, card, agora, null, null, OrigemApontamento.TIMER);
         Apontamento salvo = apontamentoRepository.save(novo);
+
+        return ApontamentoResponse.de(salvo);
+    }
+
+    /**
+     * Só o próprio autor encerra o próprio timer - {@code encerrar()} (S4.1) já garante que um
+     * apontamento fechado não pode ser fechado de novo (`ApontamentoJaEncerradoException`), então
+     * esta camada só precisa checar dono e delegar.
+     */
+    public ApontamentoResponse parar(Long apontamentoId, Usuario usuario) {
+        Apontamento apontamento = apontamentoRepository
+                .findById(apontamentoId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Apontamento não encontrado: " + apontamentoId));
+
+        if (!apontamento.getUsuario().getId().equals(usuario.getId())) {
+            throw new ApontamentoDeOutroUsuarioException();
+        }
+
+        apontamento.encerrar(Instant.now(clock));
+        Apontamento salvo = apontamentoRepository.save(apontamento);
 
         return ApontamentoResponse.de(salvo);
     }

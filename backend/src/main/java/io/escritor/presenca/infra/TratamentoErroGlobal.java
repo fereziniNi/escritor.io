@@ -1,5 +1,8 @@
 package io.escritor.presenca.infra;
 
+import io.escritor.presenca.apontamento.domain.ApontamentoDeOutroUsuarioException;
+import io.escritor.presenca.apontamento.domain.ApontamentoJaEncerradoException;
+import io.escritor.presenca.apontamento.domain.FimAntesDoInicioException;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.AcessoNegadoException;
 import io.escritor.presenca.kanban.domain.CorEtiquetaObrigatoriaException;
@@ -114,5 +117,20 @@ public class TratamentoErroGlobal {
     @ExceptionHandler(AcessoNegadoException.class)
     ResponseEntity<Void> tratarAcessoNegado() {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
+
+    @ExceptionHandler(ApontamentoDeOutroUsuarioException.class)
+    ResponseEntity<Void> tratarApontamentoDeOutroUsuario() {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
+
+    @ExceptionHandler(ApontamentoJaEncerradoException.class)
+    ResponseEntity<Void> tratarApontamentoJaEncerrado() {
+        return ResponseEntity.status(HttpStatus.CONFLICT).build();
+    }
+
+    @ExceptionHandler(FimAntesDoInicioException.class)
+    ResponseEntity<Void> tratarFimAntesDoInicio() {
+        return ResponseEntity.badRequest().build();
     }
 }
