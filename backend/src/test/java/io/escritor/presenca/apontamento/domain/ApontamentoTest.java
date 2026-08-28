@@ -79,4 +79,64 @@ class ApontamentoTest {
         assertThatThrownBy(() -> apontamento.encerrar(inicio.plus(60, ChronoUnit.MINUTES)))
                 .isInstanceOf(ApontamentoJaEncerradoException.class);
     }
+
+    @Test
+    void editarIntervaloRecalculaMinutos() {
+        Apontamento apontamento =
+                new Apontamento(usuario, card, inicio, inicio.plus(30, ChronoUnit.MINUTES), "Original", OrigemApontamento.MANUAL);
+
+        apontamento.editar(inicio, inicio.plus(90, ChronoUnit.MINUTES), null);
+
+        assertThat(apontamento.getFim()).isEqualTo(inicio.plus(90, ChronoUnit.MINUTES));
+        assertThat(apontamento.getMinutos()).isEqualTo(90);
+        assertThat(apontamento.getDescricao()).isEqualTo("Original");
+    }
+
+    @Test
+    void editarDescricaoNaoMexeNoIntervalo() {
+        Apontamento apontamento =
+                new Apontamento(usuario, card, inicio, inicio.plus(30, ChronoUnit.MINUTES), "Original", OrigemApontamento.MANUAL);
+
+        apontamento.editar(null, null, "Corrigido");
+
+        assertThat(apontamento.getInicio()).isEqualTo(inicio);
+        assertThat(apontamento.getFim()).isEqualTo(inicio.plus(30, ChronoUnit.MINUTES));
+        assertThat(apontamento.getMinutos()).isEqualTo(30);
+        assertThat(apontamento.getDescricao()).isEqualTo("Corrigido");
+    }
+
+    @Test
+    void editarSoOInicioMantemOFimERecalculaMinutos() {
+        Apontamento apontamento =
+                new Apontamento(usuario, card, inicio, inicio.plus(60, ChronoUnit.MINUTES), null, OrigemApontamento.MANUAL);
+
+        apontamento.editar(inicio.plus(30, ChronoUnit.MINUTES), null, null);
+
+        assertThat(apontamento.getInicio()).isEqualTo(inicio.plus(30, ChronoUnit.MINUTES));
+        assertThat(apontamento.getFim()).isEqualTo(inicio.plus(60, ChronoUnit.MINUTES));
+        assertThat(apontamento.getMinutos()).isEqualTo(30);
+    }
+
+    @Test
+    void editarComFimAntesDoInicioLancaExcecaoENaoMudaNada() {
+        Apontamento apontamento =
+                new Apontamento(usuario, card, inicio, inicio.plus(30, ChronoUnit.MINUTES), null, OrigemApontamento.MANUAL);
+
+        assertThatThrownBy(() -> apontamento.editar(inicio.plus(60, ChronoUnit.MINUTES), null, null))
+                .isInstanceOf(FimAntesDoInicioException.class);
+
+        assertThat(apontamento.getInicio()).isEqualTo(inicio);
+        assertThat(apontamento.getFim()).isEqualTo(inicio.plus(30, ChronoUnit.MINUTES));
+    }
+
+    @Test
+    void editarUmTimerAindaAbertoContinuaSemMinutos() {
+        Apontamento apontamento = new Apontamento(usuario, card, inicio, null, null, OrigemApontamento.TIMER);
+
+        apontamento.editar(inicio.plus(5, ChronoUnit.MINUTES), null, "Ajuste de início");
+
+        assertThat(apontamento.getFim()).isNull();
+        assertThat(apontamento.getMinutos()).isNull();
+        assertThat(apontamento.getDescricao()).isEqualTo("Ajuste de início");
+    }
 }

@@ -4,6 +4,7 @@ import io.escritor.presenca.apontamento.service.ApontamentoService;
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -43,5 +44,17 @@ public class ApontamentoController {
     public ApontamentoResponse criarManual(@PathVariable Long id, @Valid @RequestBody CriarApontamentoManualRequest request) {
         return apontamentoService.criarManual(
                 id, request.inicio(), request.fim(), request.minutos(), request.descricao(), contextoUsuarioAutenticado.usuarioAtual());
+    }
+
+    @PatchMapping("/apontamentos/{id}")
+    public ApontamentoResponse editar(@PathVariable Long id, @RequestBody EditarApontamentoRequest request) {
+        return apontamentoService.editar(
+                id, request.inicio(), request.fim(), request.descricao(), contextoUsuarioAutenticado.usuarioAtual());
+    }
+
+    @DeleteMapping("/apontamentos/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void excluir(@PathVariable Long id) {
+        apontamentoService.excluir(id, contextoUsuarioAutenticado.usuarioAtual());
     }
 }

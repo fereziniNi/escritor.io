@@ -279,4 +279,150 @@ class ApontamentoControllerIT {
                 .exchange()
                 .expectStatus().isBadRequest();
     }
+
+    @Test
+    void editarRecalculaMinutosEPersisteDeVerdade() {
+        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
+        Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-editar@escritor.io", Papel.COLABORADOR, 480));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
+        String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
+
+        Long apontamentoId = client().post()
+                .uri("/cards/{id}/apontamentos", card.getId())
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("""
+                        {"inicio":"2026-01-15T09:00:00Z","fim":"2026-01-15T09:30:00Z"}
+                        """)
+                .exchange()
+                .expectStatus().isCreated()
+                .expectBody(ApontamentoResponse.class)
+                .returnResult()
+                .getResponseBody()
+                .id();
+
+        client().patch()
+                .uri("/apontamentos/{id}", apontamentoId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("""
+                        {"fim":"2026-01-15T10:30:00Z","descricao":"Corrigido"}
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.minutos").isEqualTo(90)
+                .jsonPath("$.descricao").isEqualTo("Corrigido");
+
+        // recalculado e persistido de verdade em banco, não só na resposta.
+        var salvo = apontamentoRepository.findById(apontamentoId).orElseThrow();
+        assertThat(salvo.getMinutos()).isEqualTo(90);
+        assertThat(salvo.getDescricao()).isEqualTo("Corrigido");
+    }
+
+    @Test
+    void editarApontamentoDeOutroUsuarioRecebe403DeVerdadeENaoMudaNada() {
+        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
+        Usuario dono = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-editar-dono@escritor.io", Papel.COLABORADOR, 480));
+        Usuario outro = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-editar-outro@escritor.io", Papel.COLABORADOR, 480));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, dono));
+        String tokenDono = jwtService.gerarAccessToken(dono.getId(), Papel.COLABORADOR);
+        String tokenOutro = jwtService.gerarAccessToken(outro.getId(), Papel.COLABORADOR);
+
+        Long apontamentoId = client().post()
+                .uri("/cards/{id}/apontamentos", card.getId())
+                .header("Authorization", "Bearer " + tokenDono)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("""
+                        {"minutos":60,"descricao":"Original"}
+                        """)
+                .exchange()
+                .expectStatus().isCreated()
+                .expectBody(ApontamentoResponse.class)
+                .returnResult()
+                .getResponseBody()
+                .id();
+
+        client().patch()
+                .uri("/apontamentos/{id}", apontamentoId)
+                .header("Authorization", "Bearer " + tokenOutro)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("""
+                        {"descricao":"Invadido"}
+                        """)
+                .exchange()
+                .expectStatus().isForbidden();
+
+        assertThat(apontamentoRepository.findById(apontamentoId).orElseThrow().getDescricao()).isEqualTo("Original");
+    }
+
+    @Test
+    void excluirRemoveALinhaDeVerdade() {
+        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
+        Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-excluir@escritor.io", Papel.COLABORADOR, 480));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
+        String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
+
+        Long apontamentoId = client().post()
+                .uri("/cards/{id}/apontamentos", card.getId())
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("""
+                        {"minutos":30}
+                        """)
+                .exchange()
+                .expectStatus().isCreated()
+                .expectBody(ApontamentoResponse.class)
+                .returnResult()
+                .getResponseBody()
+                .id();
+
+        client().delete()
+                .uri("/apontamentos/{id}", apontamentoId)
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isNoContent();
+
+        assertThat(apontamentoRepository.findById(apontamentoId)).isEmpty();
+    }
+
+    @Test
+    void excluirApontamentoDeOutroUsuarioRecebe403DeVerdadeENaoApaga() {
+        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
+        Usuario dono = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-excluir-dono@escritor.io", Papel.COLABORADOR, 480));
+        Usuario outro = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-excluir-outro@escritor.io", Papel.COLABORADOR, 480));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, dono));
+        String tokenDono = jwtService.gerarAccessToken(dono.getId(), Papel.COLABORADOR);
+        String tokenOutro = jwtService.gerarAccessToken(outro.getId(), Papel.COLABORADOR);
+
+        Long apontamentoId = client().post()
+                .uri("/cards/{id}/apontamentos", card.getId())
+                .header("Authorization", "Bearer " + tokenDono)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("""
+                        {"minutos":30}
+                        """)
+                .exchange()
+                .expectStatus().isCreated()
+                .expectBody(ApontamentoResponse.class)
+                .returnResult()
+                .getResponseBody()
+                .id();
+
+        client().delete()
+                .uri("/apontamentos/{id}", apontamentoId)
+                .header("Authorization", "Bearer " + tokenOutro)
+                .exchange()
+                .expectStatus().isForbidden();
+
+        assertThat(apontamentoRepository.findById(apontamentoId)).isPresent();
+    }
 }

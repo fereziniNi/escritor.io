@@ -75,6 +75,41 @@ public class ApontamentoService {
     }
 
     /**
+     * PATCH parcial (S4.6) - reusa o mesmo check de dono de {@link #parar}, delega o merge pro
+     * domínio ({@link Apontamento#editar}) e recalcula `minutos` só de lá, nunca aqui.
+     */
+    public ApontamentoResponse editar(Long apontamentoId, Instant inicio, Instant fim, String descricao, Usuario usuario) {
+        Apontamento apontamento = apontamentoRepository
+                .findById(apontamentoId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Apontamento não encontrado: " + apontamentoId));
+
+        if (!apontamento.getUsuario().getId().equals(usuario.getId())) {
+            throw new ApontamentoDeOutroUsuarioException();
+        }
+
+        apontamento.editar(inicio, fim, descricao);
+        Apontamento salvo = apontamentoRepository.save(apontamento);
+
+        return ApontamentoResponse.de(salvo);
+    }
+
+    /**
+     * Exclusão de verdade (S4.6) - diferente de {@code RegistroPonto} (E1), apontamento é dado de
+     * gestão e não precisa de rastro de quem apagou o quê.
+     */
+    public void excluir(Long apontamentoId, Usuario usuario) {
+        Apontamento apontamento = apontamentoRepository
+                .findById(apontamentoId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Apontamento não encontrado: " + apontamentoId));
+
+        if (!apontamento.getUsuario().getId().equals(usuario.getId())) {
+            throw new ApontamentoDeOutroUsuarioException();
+        }
+
+        apontamentoRepository.delete(apontamento);
+    }
+
+    /**
      * PRD: lançamento manual aceita `inicio`+`fim` (minutos calculado) OU `minutos` direto (pra
      * quem só sabe "trabalhei 2h", sem hora exata). As duas fontes juntas são ambíguas de
      * propósito - se o cliente mandar as duas, não dá pra saber qual é a verdade, então rejeita

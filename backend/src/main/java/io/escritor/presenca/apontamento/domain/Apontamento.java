@@ -93,6 +93,29 @@ public class Apontamento {
         this.editadoEm = Instant.now();
     }
 
+    /**
+     * PATCH parcial (S4.6): só os campos não-nulos passados mudam - {@code inicio}/{@code fim}
+     * omitidos mantêm os valores atuais. Editando o intervalo, {@code minutos} é recalculado do
+     * zero (nunca ajustado incrementalmente), mesma fonte única de verdade que {@link #encerrar}
+     * já usa. Se o resultado ainda não tem {@code fim} (editando só o início de um timer aberto,
+     * por exemplo), continua sem `minutos` - o mesmo timer, só com um horário de início corrigido.
+     */
+    public void editar(Instant novoInicio, Instant novoFim, String novaDescricao) {
+        Instant inicioFinal = novoInicio != null ? novoInicio : this.inicio;
+        Instant fimFinal = novoFim != null ? novoFim : this.fim;
+        if (fimFinal != null && fimFinal.isBefore(inicioFinal)) {
+            throw new FimAntesDoInicioException();
+        }
+
+        this.inicio = inicioFinal;
+        this.fim = fimFinal;
+        this.minutos = fimFinal == null ? null : calcularMinutos(inicioFinal, fimFinal);
+        if (novaDescricao != null) {
+            this.descricao = novaDescricao;
+        }
+        this.editadoEm = Instant.now();
+    }
+
     private static int calcularMinutos(Instant inicio, Instant fim) {
         return (int) Duration.between(inicio, fim).toMinutes();
     }

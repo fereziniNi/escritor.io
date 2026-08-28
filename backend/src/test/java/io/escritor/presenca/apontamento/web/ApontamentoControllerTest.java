@@ -20,7 +20,10 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -171,5 +174,88 @@ class ApontamentoControllerTest {
                                 {"minutos":60}
                                 """))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void editarSemAutenticacaoRetorna401() throws Exception {
+        mockMvc.perform(patch("/apontamentos/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void donoEditaOProprioApontamento() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(apontamentoService.editar(eq(1L), any(), any(), eq("Corrigido"), any()))
+                .thenReturn(new ApontamentoResponse(
+                        1L, 2L, 5L, Instant.parse("2026-01-15T12:00:00Z"), Instant.parse("2026-01-15T13:00:00Z"), 60,
+                        "Corrigido", "MANUAL", Instant.parse("2026-01-15T12:00:00Z"), Instant.parse("2026-01-15T13:00:00Z")));
+
+        mockMvc.perform(patch("/apontamentos/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"descricao":"Corrigido"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.descricao").value("Corrigido"))
+                .andExpect(jsonPath("$.minutos").value(60));
+    }
+
+    @Test
+    @WithMockUser
+    void editarApontamentoDeOutroUsuarioRetorna403() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(apontamentoService.editar(eq(1L), any(), any(), any(), any())).thenThrow(new ApontamentoDeOutroUsuarioException());
+
+        mockMvc.perform(patch("/apontamentos/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser
+    void editarApontamentoInexistenteRetorna404() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(apontamentoService.editar(eq(999L), any(), any(), any(), any())).thenThrow(new RecursoNaoEncontradoException("não encontrado"));
+
+        mockMvc.perform(patch("/apontamentos/999")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void excluirSemAutenticacaoRetorna401() throws Exception {
+        mockMvc.perform(delete("/apontamentos/1")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void donoExcluiOProprioApontamento() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        doNothing().when(apontamentoService).excluir(eq(1L), any());
+
+        mockMvc.perform(delete("/apontamentos/1")).andExpect(status().isNoContent());
+    }
+
+    @Test
+    @WithMockUser
+    void excluirApontamentoDeOutroUsuarioRetorna403() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        doThrow(new ApontamentoDeOutroUsuarioException()).when(apontamentoService).excluir(eq(1L), any());
+
+        mockMvc.perform(delete("/apontamentos/1")).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser
+    void excluirApontamentoInexistenteRetorna404() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        doThrow(new RecursoNaoEncontradoException("não encontrado")).when(apontamentoService).excluir(eq(999L), any());
+
+        mockMvc.perform(delete("/apontamentos/999")).andExpect(status().isNotFound());
     }
 }

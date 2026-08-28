@@ -216,4 +216,75 @@ class ApontamentoServiceTest {
         assertThatThrownBy(() -> service.criarManual(999L, null, null, 60, null, usuario))
                 .isInstanceOf(RecursoNaoEncontradoException.class);
     }
+
+    @Test
+    void editaOProprioApontamentoRecalculandoMinutos() {
+        Instant inicioOriginal = agora.minus(2, ChronoUnit.HOURS);
+        Instant fimOriginal = agora.minus(90, ChronoUnit.MINUTES);
+        Apontamento existente = new Apontamento(usuario, card, inicioOriginal, fimOriginal, "Original", OrigemApontamento.MANUAL);
+        ReflectionTestUtils.setField(existente, "id", 7L);
+        when(apontamentoRepository.findById(7L)).thenReturn(Optional.of(existente));
+        when(apontamentoRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        Instant novoFim = agora.minus(1, ChronoUnit.HOURS);
+        var resposta = service.editar(7L, null, novoFim, "Corrigido", usuario);
+
+        assertThat(resposta.fim()).isEqualTo(novoFim);
+        assertThat(resposta.minutos()).isEqualTo(60);
+        assertThat(resposta.descricao()).isEqualTo("Corrigido");
+        verify(apontamentoRepository).save(existente);
+    }
+
+    @Test
+    void editarApontamentoDeOutroUsuarioLancaExcecao() {
+        Usuario dono = usuarioComId(1L);
+        Usuario outro = usuarioComId(2L);
+        Apontamento existente = new Apontamento(dono, card, agora.minus(1, ChronoUnit.HOURS), agora, null, OrigemApontamento.MANUAL);
+        ReflectionTestUtils.setField(existente, "id", 7L);
+        when(apontamentoRepository.findById(7L)).thenReturn(Optional.of(existente));
+
+        assertThatThrownBy(() -> service.editar(7L, null, null, "Tentando editar", outro))
+                .isInstanceOf(ApontamentoDeOutroUsuarioException.class);
+
+        verify(apontamentoRepository, never()).save(any());
+    }
+
+    @Test
+    void editarApontamentoInexistenteLancaRecursoNaoEncontrado() {
+        when(apontamentoRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.editar(999L, null, null, "x", usuario))
+                .isInstanceOf(RecursoNaoEncontradoException.class);
+    }
+
+    @Test
+    void excluiOProprioApontamento() {
+        Apontamento existente = new Apontamento(usuario, card, agora.minus(1, ChronoUnit.HOURS), agora, null, OrigemApontamento.MANUAL);
+        ReflectionTestUtils.setField(existente, "id", 7L);
+        when(apontamentoRepository.findById(7L)).thenReturn(Optional.of(existente));
+
+        service.excluir(7L, usuario);
+
+        verify(apontamentoRepository).delete(existente);
+    }
+
+    @Test
+    void excluirApontamentoDeOutroUsuarioLancaExcecao() {
+        Usuario dono = usuarioComId(1L);
+        Usuario outro = usuarioComId(2L);
+        Apontamento existente = new Apontamento(dono, card, agora.minus(1, ChronoUnit.HOURS), agora, null, OrigemApontamento.MANUAL);
+        ReflectionTestUtils.setField(existente, "id", 7L);
+        when(apontamentoRepository.findById(7L)).thenReturn(Optional.of(existente));
+
+        assertThatThrownBy(() -> service.excluir(7L, outro)).isInstanceOf(ApontamentoDeOutroUsuarioException.class);
+
+        verify(apontamentoRepository, never()).delete(any());
+    }
+
+    @Test
+    void excluirApontamentoInexistenteLancaRecursoNaoEncontrado() {
+        when(apontamentoRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.excluir(999L, usuario)).isInstanceOf(RecursoNaoEncontradoException.class);
+    }
 }
