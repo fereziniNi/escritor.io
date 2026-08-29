@@ -6,6 +6,8 @@ import io.escritor.presenca.ponto.service.PontoService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -49,5 +51,15 @@ public class PontoController {
     @GetMapping("/espelho-do-mes")
     public EspelhoMesResponse espelhoDoMes(@RequestParam(required = false) Long usuarioId) {
         return jornadaService.espelhoDoMes(usuarioId, contextoUsuarioAutenticado.usuarioAtual());
+    }
+
+    /**
+     * CSV primeiro que PDF (S5.3) - `params = "formato=csv"` roteia pra este método mantendo a
+     * mesma URL/query params do endpoint JSON, sem negociação de conteúdo via `Accept`.
+     */
+    @GetMapping(value = "/espelho-do-mes", params = "formato=csv")
+    public ResponseEntity<String> espelhoDoMesCsv(@RequestParam(required = false) Long usuarioId) {
+        EspelhoMesResponse espelho = jornadaService.espelhoDoMes(usuarioId, contextoUsuarioAutenticado.usuarioAtual());
+        return ResponseEntity.ok().contentType(MediaType.valueOf("text/csv")).body(EspelhoMesCsv.gerar(espelho));
     }
 }

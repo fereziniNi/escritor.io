@@ -24,6 +24,8 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /**
  * IT de ponta a ponta de propósito (S5.2): prova a regra de visibilidade de
  * {@code VisibilidadeUsuarioService} (S5.1) contra Postgres/JWT reais, não um mock ensinado a
@@ -123,5 +125,40 @@ class PontoControllerIT {
                 .header("Authorization", "Bearer " + tokenAdmin)
                 .exchange()
                 .expectStatus().isOk();
+    }
+
+    @Test
+    void colaboradorBaixaOEspelhoDoMesEmCsvDeVerdade() {
+        Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s53-csv@escritor.io", Papel.COLABORADOR, 480));
+        registroPontoRepository.saveAndFlush(new RegistroPonto(
+                usuario, TipoRegistroPonto.ENTRADA, Instant.now(), OrigemRegistroPonto.WEB, "127.0.0.1", "junit", null));
+        String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
+
+        String csv = client().get()
+                .uri("/ponto/espelho-do-mes?formato=csv")
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentType("text/csv")
+                .expectBody(String.class)
+                .returnResult()
+                .getResponseBody();
+
+        assertThat(csv).startsWith("Data,Estado,Minutos Trabalhados,Saldo\n");
+        assertThat(csv).contains("ABERTA");
+    }
+
+    @Test
+    void gestorTentandoBaixarCsvDeUsuarioForaDaEquipeQueLideraRecebe403DeVerdade() {
+        Usuario gestor = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s53-csvgestor@escritor.io", Papel.GESTOR, 480));
+        Usuario forasteiro =
+                usuarioRepository.saveAndFlush(new Usuario("Caio Reis", "caio-s53-csvforasteiro@escritor.io", Papel.COLABORADOR, 480));
+        String tokenGestor = jwtService.gerarAccessToken(gestor.getId(), Papel.GESTOR);
+
+        client().get()
+                .uri("/ponto/espelho-do-mes?formato=csv&usuarioId={usuarioId}", forasteiro.getId())
+                .header("Authorization", "Bearer " + tokenGestor)
+                .exchange()
+                .expectStatus().isForbidden();
     }
 }

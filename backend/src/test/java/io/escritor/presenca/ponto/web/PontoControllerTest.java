@@ -221,4 +221,42 @@ class PontoControllerTest {
 
         mockMvc.perform(get("/ponto/espelho-do-mes").param("usuarioId", "7")).andExpect(status().isForbidden());
     }
+
+    @Test
+    @WithMockUser
+    void espelhoDoMesComFormatoCsvRetornaTextCsv() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(jornadaService.espelhoDoMes(any(), any()))
+                .thenReturn(new EspelhoMesResponse(
+                        java.util.List.of(new EspelhoDiaResponse(java.time.LocalDate.parse("2026-01-12"), EstadoDia.FECHADA, 540, 60)), 60));
+
+        mockMvc.perform(get("/ponto/espelho-do-mes").param("formato", "csv"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().contentType("text/csv"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        .string("Data,Estado,Minutos Trabalhados,Saldo\n2026-01-12,FECHADA,540,60\n"));
+    }
+
+    @Test
+    @WithMockUser
+    void espelhoDoMesCsvComUsuarioIdRepassaOFiltroPraOServico() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(jornadaService.espelhoDoMes(eq(7L), any())).thenReturn(new EspelhoMesResponse(java.util.List.of(), 0));
+
+        mockMvc.perform(get("/ponto/espelho-do-mes").param("formato", "csv").param("usuarioId", "7")).andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser
+    void espelhoDoMesCsvDeUsuarioSemPermissaoRetorna403() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(jornadaService.espelhoDoMes(eq(7L), any())).thenThrow(new JornadaDeOutroUsuarioException());
+
+        mockMvc.perform(get("/ponto/espelho-do-mes").param("formato", "csv").param("usuarioId", "7")).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void espelhoDoMesCsvSemAutenticacaoRetorna401() throws Exception {
+        mockMvc.perform(get("/ponto/espelho-do-mes").param("formato", "csv")).andExpect(status().isUnauthorized());
+    }
 }
