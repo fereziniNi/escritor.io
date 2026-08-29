@@ -3,6 +3,7 @@ package io.escritor.presenca.ponto.service;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
+import io.escritor.presenca.identidade.service.VisibilidadeUsuarioService;
 import io.escritor.presenca.ponto.domain.OrigemRegistroPonto;
 import io.escritor.presenca.ponto.domain.ParecerObrigatorioException;
 import io.escritor.presenca.ponto.domain.RegistroPonto;
@@ -41,6 +42,9 @@ class AprovacaoAjusteServiceTest {
     @Mock
     private RegistroPontoRepository registroPontoRepository;
 
+    @Mock
+    private VisibilidadeUsuarioService visibilidadeUsuarioService;
+
     private final Usuario colaborador = usuarioComId(1L);
     private final Usuario gestor = usuarioComId(2L);
     private final Instant agora = Instant.parse("2026-01-16T10:00:00Z");
@@ -49,7 +53,11 @@ class AprovacaoAjusteServiceTest {
     private AprovacaoAjusteService service;
 
     private static Usuario usuarioComId(Long id) {
-        Usuario usuario = new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480);
+        return usuarioComId(id, Papel.COLABORADOR);
+    }
+
+    private static Usuario usuarioComId(Long id, Papel papel) {
+        Usuario usuario = new Usuario("Ana Souza", "ana@escritor.io", papel, 480);
         ReflectionTestUtils.setField(usuario, "id", id);
         return usuario;
     }
@@ -63,7 +71,8 @@ class AprovacaoAjusteServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AprovacaoAjusteService(solicitacaoAjustePontoRepository, registroPontoRepository, clock);
+        service = new AprovacaoAjusteService(
+                solicitacaoAjustePontoRepository, registroPontoRepository, visibilidadeUsuarioService, clock);
     }
 
     @Test
@@ -156,12 +165,49 @@ class AprovacaoAjusteServiceTest {
         SolicitacaoAjustePonto solicitacao = solicitacaoComId(6L, null);
         when(solicitacaoAjustePontoRepository.findByStatusOrderByCriadoEmAsc(StatusSolicitacaoAjuste.PENDENTE))
                 .thenReturn(List.of(solicitacao));
+        when(visibilidadeUsuarioService.podeVer(gestor, colaborador)).thenReturn(true);
 
-        var resumo = service.listarPendentes();
+        var resumo = service.listarPendentes(gestor);
 
         assertThat(resumo).hasSize(1);
         assertThat(resumo.get(0).id()).isEqualTo(6L);
         assertThat(resumo.get(0).usuarioNome()).isEqualTo(colaborador.getNome());
         assertThat(resumo.get(0).status()).isEqualTo(StatusSolicitacaoAjuste.PENDENTE);
+    }
+
+    @Test
+    void listarPendentesDeGestorMostraSoSolicitacoesDeQuemElePodeVer() {
+        Usuario membroDaEquipe = usuarioComId(3L);
+        Usuario forasteiro = usuarioComId(4L);
+        SolicitacaoAjustePonto doMembro = new SolicitacaoAjustePonto(
+                membroDaEquipe, null, TipoRegistroPonto.ENTRADA, Instant.parse("2026-01-15T09:00:00Z"), "Esqueci");
+        ReflectionTestUtils.setField(doMembro, "id", 7L);
+        SolicitacaoAjustePonto doForasteiro = new SolicitacaoAjustePonto(
+                forasteiro, null, TipoRegistroPonto.ENTRADA, Instant.parse("2026-01-15T09:00:00Z"), "Esqueci");
+        ReflectionTestUtils.setField(doForasteiro, "id", 8L);
+        when(solicitacaoAjustePontoRepository.findByStatusOrderByCriadoEmAsc(StatusSolicitacaoAjuste.PENDENTE))
+                .thenReturn(List.of(doMembro, doForasteiro));
+        when(visibilidadeUsuarioService.podeVer(gestor, membroDaEquipe)).thenReturn(true);
+        when(visibilidadeUsuarioService.podeVer(gestor, forasteiro)).thenReturn(false);
+
+        var resumo = service.listarPendentes(gestor);
+
+        assertThat(resumo).extracting(r -> r.id()).containsExactly(7L);
+    }
+
+    @Test
+    void listarPendentesDeAdminMostraTodasAsSolicitacoes() {
+        Usuario admin = usuarioComId(9L, Papel.ADMIN);
+        Usuario qualquerUsuario = usuarioComId(10L);
+        SolicitacaoAjustePonto solicitacao = new SolicitacaoAjustePonto(
+                qualquerUsuario, null, TipoRegistroPonto.ENTRADA, Instant.parse("2026-01-15T09:00:00Z"), "Esqueci");
+        ReflectionTestUtils.setField(solicitacao, "id", 11L);
+        when(solicitacaoAjustePontoRepository.findByStatusOrderByCriadoEmAsc(StatusSolicitacaoAjuste.PENDENTE))
+                .thenReturn(List.of(solicitacao));
+        when(visibilidadeUsuarioService.podeVer(admin, qualquerUsuario)).thenReturn(true);
+
+        var resumo = service.listarPendentes(admin);
+
+        assertThat(resumo).extracting(r -> r.id()).containsExactly(11L);
     }
 }

@@ -223,7 +223,8 @@ class SolicitacaoAjusteControllerTest {
     @Test
     @WithMockUser(roles = "GESTOR")
     void pendentesComPapelGestorListaAsSolicitacoes() throws Exception {
-        when(aprovacaoAjusteService.listarPendentes())
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(aprovacaoAjusteService.listarPendentes(any()))
                 .thenReturn(java.util.List.of(new SolicitacaoAjusteResumoResponse(
                         1L,
                         7L,

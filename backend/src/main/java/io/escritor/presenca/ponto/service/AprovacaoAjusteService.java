@@ -2,6 +2,7 @@ package io.escritor.presenca.ponto.service;
 
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
+import io.escritor.presenca.identidade.service.VisibilidadeUsuarioService;
 import io.escritor.presenca.ponto.domain.OrigemRegistroPonto;
 import io.escritor.presenca.ponto.domain.RegistroPonto;
 import io.escritor.presenca.ponto.domain.SolicitacaoAjustePonto;
@@ -27,14 +28,17 @@ public class AprovacaoAjusteService {
 
     private final SolicitacaoAjustePontoRepository solicitacaoAjustePontoRepository;
     private final RegistroPontoRepository registroPontoRepository;
+    private final VisibilidadeUsuarioService visibilidadeUsuarioService;
     private final Clock clock;
 
     public AprovacaoAjusteService(
             SolicitacaoAjustePontoRepository solicitacaoAjustePontoRepository,
             RegistroPontoRepository registroPontoRepository,
+            VisibilidadeUsuarioService visibilidadeUsuarioService,
             Clock clock) {
         this.solicitacaoAjustePontoRepository = solicitacaoAjustePontoRepository;
         this.registroPontoRepository = registroPontoRepository;
+        this.visibilidadeUsuarioService = visibilidadeUsuarioService;
         this.clock = clock;
     }
 
@@ -72,8 +76,17 @@ public class AprovacaoAjusteService {
         return SolicitacaoAjusteResponse.de(salva);
     }
 
-    public List<SolicitacaoAjusteResumoResponse> listarPendentes() {
+    /**
+     * PRD §2: "gestor vê jornada e relatórios das suas equipes" - antes de S5.6, qualquer gestor
+     * via/aprovava ajuste de qualquer equipe, lacuna que já existia desde S2.12. Reusa
+     * {@link VisibilidadeUsuarioService#podeVer} (S5.1): como este método já trata `ADMIN` como
+     * "vê todo mundo" e `requisitante == alvo` como sempre visível, filtrar com ele cobre os três
+     * papéis que chegam aqui (endpoint já restrito a gestor/admin via `@PreAuthorize`) sem
+     * precisar de um `if` de papel separado.
+     */
+    public List<SolicitacaoAjusteResumoResponse> listarPendentes(Usuario avaliador) {
         return solicitacaoAjustePontoRepository.findByStatusOrderByCriadoEmAsc(StatusSolicitacaoAjuste.PENDENTE).stream()
+                .filter(solicitacao -> visibilidadeUsuarioService.podeVer(avaliador, solicitacao.getUsuario()))
                 .map(SolicitacaoAjusteResumoResponse::de)
                 .toList();
     }

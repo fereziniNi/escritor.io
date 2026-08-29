@@ -73,8 +73,10 @@ class AprovacaoAjusteServiceIT {
                 "Bati às 9h, o relógio marcou 9h15 por engano"));
 
         Clock clock = Clock.fixed(Instant.parse("2026-01-16T10:00:00Z"), ZoneOffset.UTC);
+        // null: este teste só exercita aprovar(), que nunca consulta VisibilidadeUsuarioService
+        // (só listarPendentes usa, S5.6) - @DataJpaTest não sobe esse bean, sem sentido mockar.
         AprovacaoAjusteService service =
-                new AprovacaoAjusteService(solicitacaoAjustePontoRepository, registroPontoRepository, clock);
+                new AprovacaoAjusteService(solicitacaoAjustePontoRepository, registroPontoRepository, null, clock);
 
         service.aprovar(solicitacao.getId(), gestor, "Confirmado com a portaria");
 

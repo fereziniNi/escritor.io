@@ -62,6 +62,6 @@ public class SolicitacaoAjusteController {
     @GetMapping("/pendentes")
     @PreAuthorize("hasAnyRole('GESTOR', 'ADMIN')")
     public List<SolicitacaoAjusteResumoResponse> pendentes() {
-        return aprovacaoAjusteService.listarPendentes();
+        return aprovacaoAjusteService.listarPendentes(contextoUsuarioAutenticado.usuarioAtual());
     }
 }
