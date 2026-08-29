@@ -3,7 +3,9 @@ package io.escritor.presenca.ponto.service;
 import io.escritor.presenca.apontamento.domain.Apontamento;
 import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
 import io.escritor.presenca.identidade.domain.Usuario;
+import io.escritor.presenca.identidade.service.VisibilidadeUsuarioService;
 import io.escritor.presenca.ponto.domain.EstadoDia;
+import io.escritor.presenca.ponto.domain.JornadaDeOutroUsuarioException;
 import io.escritor.presenca.ponto.domain.JornadaDiaria;
 import io.escritor.presenca.ponto.domain.Marcacao;
 import io.escritor.presenca.ponto.domain.RegistroPonto;
@@ -33,12 +35,33 @@ public class JornadaService {
 
     private final RegistroPontoRepository registroPontoRepository;
     private final ApontamentoRepository apontamentoRepository;
+    private final VisibilidadeUsuarioService visibilidadeUsuarioService;
     private final Clock clock;
 
-    public JornadaService(RegistroPontoRepository registroPontoRepository, ApontamentoRepository apontamentoRepository, Clock clock) {
+    public JornadaService(
+            RegistroPontoRepository registroPontoRepository,
+            ApontamentoRepository apontamentoRepository,
+            VisibilidadeUsuarioService visibilidadeUsuarioService,
+            Clock clock) {
         this.registroPontoRepository = registroPontoRepository;
         this.apontamentoRepository = apontamentoRepository;
+        this.visibilidadeUsuarioService = visibilidadeUsuarioService;
         this.clock = clock;
+    }
+
+    /**
+     * PRD §2: "gestor vê jornada e relatórios das suas equipes". Entrada pública usada pelo
+     * controller (S5.2) - resolve/autoriza `usuarioId` via {@link VisibilidadeUsuarioService}
+     * (S5.1) e delega pro cálculo de sempre ({@link #jornadaDoDia(Usuario)}), que continua sem
+     * checar nada, só calculando pra quem for passado.
+     */
+    public JornadaDoDiaResponse jornadaDoDia(Long usuarioIdFiltro, Usuario usuarioAutenticado) {
+        return jornadaDoDia(visibilidadeUsuarioService.resolverAlvo(usuarioIdFiltro, usuarioAutenticado, JornadaDeOutroUsuarioException::new));
+    }
+
+    /** Mesma ideia de {@link #jornadaDoDia(Long, Usuario)}, pro espelho do mês. */
+    public EspelhoMesResponse espelhoDoMes(Long usuarioIdFiltro, Usuario usuarioAutenticado) {
+        return espelhoDoMes(visibilidadeUsuarioService.resolverAlvo(usuarioIdFiltro, usuarioAutenticado, JornadaDeOutroUsuarioException::new));
     }
 
     /**

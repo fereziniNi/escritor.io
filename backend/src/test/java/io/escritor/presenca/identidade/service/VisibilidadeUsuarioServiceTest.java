@@ -6,7 +6,9 @@ import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.PapelNaEquipe;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.MembroEquipeRepository;
+import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,6 +17,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -28,6 +34,9 @@ class VisibilidadeUsuarioServiceTest {
     @Mock
     private MembroEquipeRepository membroEquipeRepository;
 
+    @Mock
+    private UsuarioRepository usuarioRepository;
+
     private VisibilidadeUsuarioService service;
 
     private static Usuario usuarioComId(Long id, Papel papel) {
@@ -38,7 +47,7 @@ class VisibilidadeUsuarioServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new VisibilidadeUsuarioService(membroEquipeRepository);
+        service = new VisibilidadeUsuarioService(membroEquipeRepository, usuarioRepository);
     }
 
     @Test
@@ -84,5 +93,55 @@ class VisibilidadeUsuarioServiceTest {
         when(membroEquipeRepository.findByUsuarioAndPapelNaEquipe(gestor, PapelNaEquipe.LIDER)).thenReturn(List.of());
 
         assertThat(service.podeVer(gestor, forasteiro)).isFalse();
+    }
+
+    @Test
+    void resolverAlvoSemFiltroRetornaOProprioSemTocarRepositorio() {
+        Usuario usuario = usuarioComId(1L, Papel.COLABORADOR);
+
+        Usuario resolvido = service.resolverAlvo(null, usuario, IllegalStateException::new);
+
+        assertThat(resolvido).isSameAs(usuario);
+        verify(usuarioRepository, never()).findById(any());
+    }
+
+    @Test
+    void resolverAlvoComOProprioIdRetornaOProprioSemTocarRepositorio() {
+        Usuario usuario = usuarioComId(1L, Papel.COLABORADOR);
+
+        Usuario resolvido = service.resolverAlvo(1L, usuario, IllegalStateException::new);
+
+        assertThat(resolvido).isSameAs(usuario);
+        verify(usuarioRepository, never()).findById(any());
+    }
+
+    @Test
+    void resolverAlvoAutorizadoRetornaOAlvo() {
+        Usuario admin = usuarioComId(9L, Papel.ADMIN);
+        Usuario alvo = usuarioComId(2L, Papel.COLABORADOR);
+        when(usuarioRepository.findById(2L)).thenReturn(Optional.of(alvo));
+
+        Usuario resolvido = service.resolverAlvo(2L, admin, IllegalStateException::new);
+
+        assertThat(resolvido).isSameAs(alvo);
+    }
+
+    @Test
+    void resolverAlvoNaoAutorizadoLancaAExcecaoFornecida() {
+        Usuario colaborador = usuarioComId(1L, Papel.COLABORADOR);
+        Usuario outro = usuarioComId(2L, Papel.COLABORADOR);
+        when(usuarioRepository.findById(2L)).thenReturn(Optional.of(outro));
+
+        assertThatThrownBy(() -> service.resolverAlvo(2L, colaborador, IllegalStateException::new))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void resolverAlvoInexistenteLancaRecursoNaoEncontrado() {
+        Usuario admin = usuarioComId(9L, Papel.ADMIN);
+        when(usuarioRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.resolverAlvo(999L, admin, IllegalStateException::new))
+                .isInstanceOf(RecursoNaoEncontradoException.class);
     }
 }

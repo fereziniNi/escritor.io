@@ -1,7 +1,9 @@
 package io.escritor.presenca.ponto.web;
 
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
+import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.ponto.domain.EstadoDia;
+import io.escritor.presenca.ponto.domain.JornadaDeOutroUsuarioException;
 import io.escritor.presenca.ponto.domain.OrigemRegistroPonto;
 import io.escritor.presenca.ponto.domain.TipoRegistroPonto;
 import io.escritor.presenca.ponto.service.JornadaService;
@@ -136,7 +138,7 @@ class PontoControllerTest {
     @WithMockUser
     void jornadaDoDiaRetornaEstadoESaldo() throws Exception {
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
-        when(jornadaService.jornadaDoDia(any()))
+        when(jornadaService.jornadaDoDia(any(), any()))
                 .thenReturn(new JornadaDoDiaResponse(
                         java.time.LocalDate.parse("2026-01-13"), EstadoDia.FECHADA, 540, 60, 120, 90));
 
@@ -151,6 +153,34 @@ class PontoControllerTest {
     }
 
     @Test
+    @WithMockUser
+    void jornadaDoDiaComUsuarioIdRepassaOFiltroPraOServico() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(jornadaService.jornadaDoDia(eq(7L), any()))
+                .thenReturn(new JornadaDoDiaResponse(java.time.LocalDate.parse("2026-01-13"), EstadoDia.FECHADA, 0, 0, 0, 0));
+
+        mockMvc.perform(get("/ponto/jornada-do-dia").param("usuarioId", "7")).andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser
+    void jornadaDoDiaDeUsuarioSemPermissaoRetorna403() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(jornadaService.jornadaDoDia(eq(7L), any())).thenThrow(new JornadaDeOutroUsuarioException());
+
+        mockMvc.perform(get("/ponto/jornada-do-dia").param("usuarioId", "7")).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser
+    void jornadaDoDiaDeUsuarioIdInexistenteRetorna404() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(jornadaService.jornadaDoDia(eq(999L), any())).thenThrow(new RecursoNaoEncontradoException("não encontrado"));
+
+        mockMvc.perform(get("/ponto/jornada-do-dia").param("usuarioId", "999")).andExpect(status().isNotFound());
+    }
+
+    @Test
     void espelhoDoMesSemAutenticacaoRetorna401() throws Exception {
         mockMvc.perform(get("/ponto/espelho-do-mes")).andExpect(status().isUnauthorized());
     }
@@ -159,7 +189,7 @@ class PontoControllerTest {
     @WithMockUser
     void espelhoDoMesRetornaOsDiasEOSaldoAcumulado() throws Exception {
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
-        when(jornadaService.espelhoDoMes(any()))
+        when(jornadaService.espelhoDoMes(any(), any()))
                 .thenReturn(new EspelhoMesResponse(
                         java.util.List.of(
                                 new EspelhoDiaResponse(java.time.LocalDate.parse("2026-01-12"), EstadoDia.FECHADA, 540, 60),
@@ -172,5 +202,23 @@ class PontoControllerTest {
                 .andExpect(jsonPath("$.dias[0].data").value("2026-01-12"))
                 .andExpect(jsonPath("$.dias[0].saldoDia").value(60))
                 .andExpect(jsonPath("$.saldoAcumuladoNoPeriodo").value(60));
+    }
+
+    @Test
+    @WithMockUser
+    void espelhoDoMesComUsuarioIdRepassaOFiltroPraOServico() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(jornadaService.espelhoDoMes(eq(7L), any())).thenReturn(new EspelhoMesResponse(java.util.List.of(), 0));
+
+        mockMvc.perform(get("/ponto/espelho-do-mes").param("usuarioId", "7")).andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser
+    void espelhoDoMesDeUsuarioSemPermissaoRetorna403() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(jornadaService.espelhoDoMes(eq(7L), any())).thenThrow(new JornadaDeOutroUsuarioException());
+
+        mockMvc.perform(get("/ponto/espelho-do-mes").param("usuarioId", "7")).andExpect(status().isForbidden());
     }
 }

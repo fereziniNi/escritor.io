@@ -7,7 +7,6 @@ import io.escritor.presenca.apontamento.domain.OrigemApontamento;
 import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
 import io.escritor.presenca.apontamento.web.ApontamentoResponse;
 import io.escritor.presenca.identidade.domain.Usuario;
-import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.identidade.service.VisibilidadeUsuarioService;
 import io.escritor.presenca.kanban.domain.Card;
@@ -29,19 +28,16 @@ public class ApontamentoService {
     private final ApontamentoRepository apontamentoRepository;
     private final CardRepository cardRepository;
     private final VisibilidadeUsuarioService visibilidadeUsuarioService;
-    private final UsuarioRepository usuarioRepository;
     private final Clock clock;
 
     public ApontamentoService(
             ApontamentoRepository apontamentoRepository,
             CardRepository cardRepository,
             VisibilidadeUsuarioService visibilidadeUsuarioService,
-            UsuarioRepository usuarioRepository,
             Clock clock) {
         this.apontamentoRepository = apontamentoRepository;
         this.cardRepository = cardRepository;
         this.visibilidadeUsuarioService = visibilidadeUsuarioService;
-        this.usuarioRepository = usuarioRepository;
         this.clock = clock;
     }
 
@@ -181,25 +177,15 @@ public class ApontamentoService {
     }
 
     /**
-     * Base mínima pro relatório completo (E4) - sem agregação por projeto ainda. Regra de
-     * visibilidade delegada a {@link VisibilidadeUsuarioService} (S5.1) - colaborador só vê os
-     * próprios; gestor vê membros das equipes que lidera; admin vê todo mundo. `usuarioIdFiltro`
-     * nulo, ou igual ao do próprio requisitante, é sempre "eu mesmo" e nunca precisa tocar
-     * `UsuarioRepository`/checagem de equipe.
+     * Base mínima pro relatório completo (E4) - sem agregação por projeto ainda. Resolução +
+     * visibilidade delegadas a {@link VisibilidadeUsuarioService#resolverAlvo} (S5.1/S5.2) -
+     * colaborador só vê os próprios; gestor vê membros das equipes que lidera; admin vê todo
+     * mundo. `usuarioIdFiltro` nulo, ou igual ao do próprio requisitante, é sempre "eu mesmo" e
+     * nunca precisa tocar `UsuarioRepository`/checagem de equipe.
      */
     public List<ApontamentoResponse> listarPorUsuarioEPeriodo(Long usuarioIdFiltro, Instant inicio, Instant fim, Usuario usuarioAutenticado) {
-        Usuario usuarioAlvo;
-        if (usuarioIdFiltro == null || usuarioIdFiltro.equals(usuarioAutenticado.getId())) {
-            usuarioAlvo = usuarioAutenticado;
-        } else {
-            usuarioAlvo = usuarioRepository
-                    .findById(usuarioIdFiltro)
-                    .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado: " + usuarioIdFiltro));
-
-            if (!visibilidadeUsuarioService.podeVer(usuarioAutenticado, usuarioAlvo)) {
-                throw new ApontamentoDeOutroUsuarioException();
-            }
-        }
+        Usuario usuarioAlvo =
+                visibilidadeUsuarioService.resolverAlvo(usuarioIdFiltro, usuarioAutenticado, ApontamentoDeOutroUsuarioException::new);
 
         return apontamentoRepository
                 .findByUsuarioAndInicioGreaterThanEqualAndInicioLessThanOrderByInicioDesc(usuarioAlvo, inicio, fim)

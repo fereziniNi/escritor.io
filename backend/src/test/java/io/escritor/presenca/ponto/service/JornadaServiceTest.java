@@ -6,10 +6,12 @@ import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
 import io.escritor.presenca.identidade.domain.Equipe;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Usuario;
+import io.escritor.presenca.identidade.service.VisibilidadeUsuarioService;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.Coluna;
 import io.escritor.presenca.kanban.domain.Quadro;
 import io.escritor.presenca.ponto.domain.EstadoDia;
+import io.escritor.presenca.ponto.domain.JornadaDeOutroUsuarioException;
 import io.escritor.presenca.ponto.domain.OrigemRegistroPonto;
 import io.escritor.presenca.ponto.domain.RegistroPonto;
 import io.escritor.presenca.ponto.domain.TipoRegistroPonto;
@@ -26,7 +28,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
@@ -38,6 +43,9 @@ class JornadaServiceTest {
 
     @Mock
     private ApontamentoRepository apontamentoRepository;
+
+    @Mock
+    private VisibilidadeUsuarioService visibilidadeUsuarioService;
 
     private final Usuario usuario = usuarioComId(1L, 480);
     private final Card card = cardComId(5L);
@@ -59,15 +67,19 @@ class JornadaServiceTest {
     }
 
     private RegistroPonto registro(TipoRegistroPonto tipo, String isoInstant) {
+        return registro(usuario, tipo, isoInstant);
+    }
+
+    private static RegistroPonto registro(Usuario usuarioDoRegistro, TipoRegistroPonto tipo, String isoInstant) {
         return new RegistroPonto(
-                usuario, tipo, Instant.parse(isoInstant), OrigemRegistroPonto.WEB, "127.0.0.1", "junit", null);
+                usuarioDoRegistro, tipo, Instant.parse(isoInstant), OrigemRegistroPonto.WEB, "127.0.0.1", "junit", null);
     }
 
     @BeforeEach
     void setUp() {
         // terça-feira 2026-01-13, 20h - já bateu entrada e saída hoje
         Clock clock = Clock.fixed(Instant.parse("2026-01-13T20:00:00Z"), ZoneOffset.UTC);
-        jornadaService = new JornadaService(registroPontoRepository, apontamentoRepository, clock);
+        jornadaService = new JornadaService(registroPontoRepository, apontamentoRepository, visibilidadeUsuarioService, clock);
         // stub padrão pra não obrigar todo teste a mockar apontamentos - só sobrescrito nos testes
         // que exercitam totalApontadoMinutos de verdade.
         lenient()
@@ -193,5 +205,53 @@ class JornadaServiceTest {
 
         assertThat(somaDiasUteis).isEqualTo(espelho.saldoAcumuladoNoPeriodo());
         assertThat(espelho.saldoAcumuladoNoPeriodo()).isEqualTo(60);
+    }
+
+    @Test
+    void jornadaDoDiaComUsuarioIdNuloUsaOProprioRequisitante() {
+        when(visibilidadeUsuarioService.resolverAlvo(isNull(), eq(usuario), any())).thenReturn(usuario);
+        when(registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualOrderByMomentoAsc(eq(usuario), any())).thenReturn(List.of());
+
+        var jornada = jornadaService.jornadaDoDia(null, usuario);
+
+        assertThat(jornada.minutosTrabalhados()).isZero();
+    }
+
+    @Test
+    void jornadaDoDiaComUsuarioIdUsaOAlvoResolvidoInclusiveACargaDiariaDele() {
+        // carga do alvo (360) é diferente da do requisitante (480, campo `usuario`) - prova que o
+        // saldo é calculado com os dados de quem está sendo consultado, não de quem consulta.
+        Usuario alvo = usuarioComId(3L, 360);
+        when(visibilidadeUsuarioService.resolverAlvo(eq(3L), eq(usuario), any())).thenReturn(alvo);
+        when(registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualOrderByMomentoAsc(eq(alvo), any()))
+                .thenReturn(List.of(
+                        registro(alvo, TipoRegistroPonto.ENTRADA, "2026-01-13T09:00:00Z"),
+                        registro(alvo, TipoRegistroPonto.SAIDA, "2026-01-13T15:00:00Z")));
+
+        var jornada = jornadaService.jornadaDoDia(3L, usuario);
+
+        assertThat(jornada.minutosTrabalhados()).isEqualTo(6 * 60);
+        assertThat(jornada.saldoDia()).isZero();
+    }
+
+    @Test
+    void jornadaDoDiaPropagaExcecaoDeAcessoNegadoDaVisibilidade() {
+        when(visibilidadeUsuarioService.resolverAlvo(eq(2L), eq(usuario), any())).thenThrow(new JornadaDeOutroUsuarioException());
+
+        assertThatThrownBy(() -> jornadaService.jornadaDoDia(2L, usuario)).isInstanceOf(JornadaDeOutroUsuarioException.class);
+    }
+
+    @Test
+    void espelhoDoMesComUsuarioIdUsaOAlvoResolvido() {
+        Usuario alvo = usuarioComId(3L, 480);
+        when(visibilidadeUsuarioService.resolverAlvo(eq(3L), eq(usuario), any())).thenReturn(alvo);
+        when(registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualOrderByMomentoAsc(eq(alvo), any()))
+                .thenReturn(List.of(
+                        registro(alvo, TipoRegistroPonto.ENTRADA, "2026-01-12T09:00:00Z"),
+                        registro(alvo, TipoRegistroPonto.SAIDA, "2026-01-12T18:00:00Z")));
+
+        var espelho = jornadaService.espelhoDoMes(3L, usuario);
+
+        assertThat(espelho.dias()).hasSize(1);
     }
 }

@@ -9,7 +9,6 @@ import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
 import io.escritor.presenca.identidade.domain.Equipe;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Usuario;
-import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.identidade.service.VisibilidadeUsuarioService;
 import io.escritor.presenca.kanban.domain.Card;
@@ -33,6 +32,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -49,9 +49,6 @@ class ApontamentoServiceTest {
 
     @Mock
     private VisibilidadeUsuarioService visibilidadeUsuarioService;
-
-    @Mock
-    private UsuarioRepository usuarioRepository;
 
     private final Instant agora = Instant.parse("2026-01-15T12:00:00Z");
     private final Clock clock = Clock.fixed(agora, ZoneOffset.UTC);
@@ -81,7 +78,7 @@ class ApontamentoServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ApontamentoService(apontamentoRepository, cardRepository, visibilidadeUsuarioService, usuarioRepository, clock);
+        service = new ApontamentoService(apontamentoRepository, cardRepository, visibilidadeUsuarioService, clock);
     }
 
     @Test
@@ -333,7 +330,7 @@ class ApontamentoServiceTest {
         Instant instanteComMicrossegundos = Instant.parse("2026-01-15T12:00:00.123456Z");
         Clock clockComMicrossegundos = Clock.fixed(instanteComMicrossegundos, ZoneOffset.UTC);
         ApontamentoService servicoComMicrossegundos = new ApontamentoService(
-                apontamentoRepository, cardRepository, visibilidadeUsuarioService, usuarioRepository, clockComMicrossegundos);
+                apontamentoRepository, cardRepository, visibilidadeUsuarioService, clockComMicrossegundos);
         when(cardRepository.findById(5L)).thenReturn(Optional.of(card));
         when(apontamentoRepository.findFirstByUsuarioAndFimIsNull(usuario)).thenReturn(Optional.empty());
         when(apontamentoRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
@@ -343,94 +340,37 @@ class ApontamentoServiceTest {
         assertThat(resposta.inicio().getNano() % 1_000_000).isZero();
     }
 
+    /**
+     * A partir de S5.2, resolução/autorização de `usuarioIdFiltro` é inteiramente responsabilidade
+     * de {@link VisibilidadeUsuarioService#resolverAlvo} - o comportamento exaustivo por papel
+     * (colaborador/gestor/admin, equipe liderada etc.) já é coberto em `VisibilidadeUsuarioServiceTest`
+     * e não precisa ser retestado aqui; estes dois testes só provam que `ApontamentoService` usa o
+     * alvo resolvido pra consultar, e que uma exceção de `resolverAlvo` propaga sem tocar o
+     * repositório de apontamentos.
+     */
     @Test
-    void colaboradorVeOsProprosApontamentosSemInformarUsuarioId() {
+    void listarPorUsuarioEPeriodoUsaOAlvoResolvidoPelaVisibilidadeParaConsultar() {
         Instant inicio = agora.minus(1, ChronoUnit.DAYS);
-        Apontamento proprio = new Apontamento(
-                usuario, card, inicio.plus(1, ChronoUnit.HOURS), inicio.plus(2, ChronoUnit.HOURS), null, OrigemApontamento.MANUAL);
-        when(apontamentoRepository.findByUsuarioAndInicioGreaterThanEqualAndInicioLessThanOrderByInicioDesc(usuario, inicio, agora))
-                .thenReturn(List.of(proprio));
+        Usuario alvo = usuarioComId(3L, Papel.COLABORADOR);
+        Apontamento apontamentoDoAlvo = new Apontamento(
+                alvo, card, inicio.plus(1, ChronoUnit.HOURS), inicio.plus(2, ChronoUnit.HOURS), null, OrigemApontamento.MANUAL);
+        when(visibilidadeUsuarioService.resolverAlvo(eq(3L), eq(usuario), any())).thenReturn(alvo);
+        when(apontamentoRepository.findByUsuarioAndInicioGreaterThanEqualAndInicioLessThanOrderByInicioDesc(alvo, inicio, agora))
+                .thenReturn(List.of(apontamentoDoAlvo));
 
-        var resposta = service.listarPorUsuarioEPeriodo(null, inicio, agora, usuario);
+        var resposta = service.listarPorUsuarioEPeriodo(3L, inicio, agora, usuario);
 
         assertThat(resposta).hasSize(1);
-        verify(usuarioRepository, never()).findById(any());
     }
 
     @Test
-    void colaboradorVeOsProprosApontamentosInformandoOProprioIdExplicitamente() {
-        Instant inicio = agora.minus(1, ChronoUnit.DAYS);
-        when(apontamentoRepository.findByUsuarioAndInicioGreaterThanEqualAndInicioLessThanOrderByInicioDesc(usuario, inicio, agora))
-                .thenReturn(List.of());
-
-        var resposta = service.listarPorUsuarioEPeriodo(usuario.getId(), inicio, agora, usuario);
-
-        assertThat(resposta).isEmpty();
-        verify(usuarioRepository, never()).findById(any());
-    }
-
-    @Test
-    void colaboradorTentandoVerApontamentosDeOutroUsuarioLancaExcecao() {
-        Usuario outro = usuarioComId(2L, Papel.COLABORADOR);
-        when(usuarioRepository.findById(2L)).thenReturn(Optional.of(outro));
+    void listarPorUsuarioEPeriodoPropagaExcecaoDeAcessoNegadoSemConsultarApontamentos() {
+        when(visibilidadeUsuarioService.resolverAlvo(eq(2L), eq(usuario), any())).thenThrow(new ApontamentoDeOutroUsuarioException());
 
         assertThatThrownBy(() -> service.listarPorUsuarioEPeriodo(2L, agora.minus(1, ChronoUnit.DAYS), agora, usuario))
                 .isInstanceOf(ApontamentoDeOutroUsuarioException.class);
 
         verify(apontamentoRepository, never())
                 .findByUsuarioAndInicioGreaterThanEqualAndInicioLessThanOrderByInicioDesc(any(), any(), any());
-    }
-
-    @Test
-    void gestorVeApontamentosDeUmMembroDaEquipeQueLidera() {
-        Usuario gestor = usuarioComId(2L, Papel.GESTOR);
-        Usuario membro = usuarioComId(3L, Papel.COLABORADOR);
-        Instant inicio = agora.minus(1, ChronoUnit.DAYS);
-        when(usuarioRepository.findById(3L)).thenReturn(Optional.of(membro));
-        when(visibilidadeUsuarioService.podeVer(gestor, membro)).thenReturn(true);
-        when(apontamentoRepository.findByUsuarioAndInicioGreaterThanEqualAndInicioLessThanOrderByInicioDesc(membro, inicio, agora))
-                .thenReturn(List.of());
-
-        var resposta = service.listarPorUsuarioEPeriodo(3L, inicio, agora, gestor);
-
-        assertThat(resposta).isEmpty();
-    }
-
-    @Test
-    void gestorTentandoVerApontamentosDeUsuarioForaDasEquipesQueLideraLancaExcecao() {
-        Usuario gestor = usuarioComId(2L, Papel.GESTOR);
-        Usuario outroUsuario = usuarioComId(4L, Papel.COLABORADOR);
-        when(usuarioRepository.findById(4L)).thenReturn(Optional.of(outroUsuario));
-        when(visibilidadeUsuarioService.podeVer(gestor, outroUsuario)).thenReturn(false);
-
-        assertThatThrownBy(() -> service.listarPorUsuarioEPeriodo(4L, agora.minus(1, ChronoUnit.DAYS), agora, gestor))
-                .isInstanceOf(ApontamentoDeOutroUsuarioException.class);
-
-        verify(apontamentoRepository, never())
-                .findByUsuarioAndInicioGreaterThanEqualAndInicioLessThanOrderByInicioDesc(any(), any(), any());
-    }
-
-    @Test
-    void adminVeApontamentosDeQualquerUsuarioSemChecarEquipe() {
-        Usuario admin = usuarioComId(9L, Papel.ADMIN);
-        Usuario qualquerUsuario = usuarioComId(5L, Papel.COLABORADOR);
-        Instant inicio = agora.minus(1, ChronoUnit.DAYS);
-        when(usuarioRepository.findById(5L)).thenReturn(Optional.of(qualquerUsuario));
-        when(visibilidadeUsuarioService.podeVer(admin, qualquerUsuario)).thenReturn(true);
-        when(apontamentoRepository.findByUsuarioAndInicioGreaterThanEqualAndInicioLessThanOrderByInicioDesc(qualquerUsuario, inicio, agora))
-                .thenReturn(List.of());
-
-        var resposta = service.listarPorUsuarioEPeriodo(5L, inicio, agora, admin);
-
-        assertThat(resposta).isEmpty();
-    }
-
-    @Test
-    void listarPorUsuarioIdInexistenteLancaRecursoNaoEncontrado() {
-        Usuario admin = usuarioComId(9L, Papel.ADMIN);
-        when(usuarioRepository.findById(999L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.listarPorUsuarioEPeriodo(999L, agora.minus(1, ChronoUnit.DAYS), agora, admin))
-                .isInstanceOf(RecursoNaoEncontradoException.class);
     }
 }
