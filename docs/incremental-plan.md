@@ -1,8 +1,8 @@
-# Plano incremental — Fases 1 a 3 (E0 + E1 + E2 + E3)
+# Plano incremental — Fases 1 a 4 (E0 + E1 + E2 + E3 + E4)
 
 Backlog ordenado de fatias verticais. Cada fatia é pequena o suficiente para caber num ciclo TDD completo (backend domínio → backend web/repo → frontend) e entrega algo demonstrável. Não pular fatias — cada uma assume que as anteriores estão testadas e verdes.
 
-Fases 1 e 2 (E0 + E1 + E2) estão completas e em uso. Fase 3 (E3 Apontamento de horas) está esboçada abaixo (S4), seguindo o mesmo formato — ainda não implementada. E4 (Relatórios) e E5 (Escritório virtual) continuam para depois, conforme o roadmap do PRD (§5) — planejar tudo agora seria especular sobre o que a fase anterior vai ensinar.
+Fases 1, 2 e 3 (E0 + E1 + E2 + E3) estão completas e em uso. Fase 4 (E4 Relatórios) está esboçada abaixo (S5), seguindo o mesmo formato — ainda não implementada. E5 (Escritório virtual) continua para depois, conforme o roadmap do PRD (§5) — deixado por último de propósito (PRD §4, E5: "deixar por último"), é o épico mais especulativo dos cinco.
 
 ---
 
@@ -89,6 +89,26 @@ Regra central (PRD): no máximo um timer aberto por usuário — iniciar um novo
 | S4.8 ✅ | `GET /ponto/jornada-do-dia` ganha `totalApontadoMinutos` do dia (reaproveita `JornadaService`, E1) | Serviço: soma só os apontamentos fechados do dia; timer ainda aberto não entra na soma (aparece separado); é um cálculo paralelo ao saldo de ponto, nunca o altera |
 | S4.9 ✅ | Frontend: `JornadaPainel` (S2.10) mostra "Total apontado hoje" ao lado da jornada, com a diferença sinalizada | Componente: diferença aparece só como informação (positiva ou negativa) — a ação de marcar `SAIDA` continua liberada independente do valor |
 | S4.10 ✅ | `GET /apontamentos?usuarioId=&inicio=&fim=` — listagem simples por pessoa e período (gestor vê a própria equipe, colaborador só os próprios) | Serviço: colaborador que tenta ver apontamentos de outro usuário recebe 403; gestor só vê membros das equipes que lidera — base mínima pro relatório completo (E4), sem construir agregação por projeto ainda |
+
+## S5 — E4 Relatórios
+
+PRD §4 (E4): espelho de ponto individual do mês (PDF ou CSV), saldo de horas por pessoa e por período, horas apontadas por projeto/equipe/card, pendências abertas (ajustes aguardando aprovação, dias inconsistentes). Roadmap (PRD §5) trata E3+E4 como uma fase só ("Gestão de esforço e relatórios") — faz sentido emendar direto, a regra de visibilidade que E4 precisa (PRD §2: "gestor vê jornada e relatórios das suas equipes") é literalmente a mesma que S4.10 acabou de construir pra apontamento.
+
+Decisão central do épico: **S4.10 introduziu a única lógica de "gestor vê equipe" que existe no sistema hoje, direto dentro de `ApontamentoService`.** E4 precisa da mesma regra em pelo menos mais três lugares (saldo/jornada por pessoa, agregação por projeto/equipe, fila de ajustes por equipe) — duplicar o mesmo par de queries em `MembroEquipeRepository` em cada serviço novo seria o tipo de repetição que vale extrair antes de crescer, não depois. Por isso a primeira fatia (S5.1) é puramente um refactor: extrair a checagem pra um lugar compartilhado, migrar `ApontamentoService` pra usá-la, *depois* construir o resto de E4 em cima.
+
+Como em E3, relatório é informativo — nenhuma fatia daqui bloqueia ação nenhuma de ponto/kanban/apontamento; é tudo leitura agregada do que já existe.
+
+| # | Fatia | Teste que vem primeiro |
+|---|---|---|
+| S5.1 | Extrair a regra de visibilidade "usuário X pode ver dados de usuário Y" (self / gestor lidera a equipe de Y / admin vê todos) de dentro de `ApontamentoService` pra um serviço compartilhado (`identidade` ou novo pacote `relatorio`); `ApontamentoService.listarPorUsuarioEPeriodo` (S4.10) passa a usá-lo, sem mudar comportamento | Teste de regressão: todos os casos de S4.10 (colaborador/gestor/admin, 403/200) continuam passando idênticos depois do refactor — nenhum teste novo de comportamento, só a garantia de que nada quebrou |
+| S5.2 | `GET /ponto/jornada-do-dia` e `GET /ponto/espelho-do-mes` ganham `usuarioId` opcional, reusando o serviço de S5.1 | Serviço: colaborador não vê jornada de outro usuário (403); gestor vê a jornada/saldo de um membro da equipe que lidera; omitir `usuarioId` continua sendo "eu mesmo", igual antes |
+| S5.3 | Exportação do espelho do mês em CSV (`GET /ponto/espelho-do-mes?formato=csv`) — CSV primeiro que PDF, sem depender de biblioteca de geração de PDF ainda | Web: `Content-Type: text/csv`, uma linha por dia com data/estado/minutos/saldo, cabeçalho com nome de coluna em português |
+| S5.4 | Horas apontadas agregadas por **card** no período (soma de `minutos`, não lista de apontamentos) — endpoint novo ou parâmetro `agrupar=card` sobre a base de S4.10 | Serviço: soma bate com a soma manual dos apontamentos fechados do card no período; timer ainda aberto não entra na soma (mesma regra de S4.8) |
+| S5.5 | Horas apontadas agregadas por **projeto** e por **equipe** no período — a agregação que S4.10 explicitamente deixou de fora ("sem construir agregação por projeto ainda") | Serviço: soma de todos os cards de todos os quadros vinculados ao projeto/equipe bate com a soma manual; card de quadro sem projeto/equipe vinculado não quebra a agregação |
+| S5.6 | `GET /ajustes/pendentes` (S2.12, hoje sem filtro) ganha visibilidade por equipe pro gestor, reusando o serviço de S5.1 — fecha uma lacuna que já existia antes de E4: hoje qualquer gestor vê/aprova ajuste de qualquer equipe | Serviço: gestor só vê solicitações de colaboradores de equipes que lidera; admin continua vendo todas |
+| S5.7 | "Dias inconsistentes" no período, por pessoa/equipe — reusa `EstadoDia.INCONSISTENTE` (S2.8) sobre o intervalo pedido, não só o dia de hoje | Serviço: período com dias `ABERTA`/`FECHADA`/`INCONSISTENTE` mistos retorna só os inconsistentes; gestor só vê da própria equipe |
+| S5.8 | Frontend: painel de relatórios do gestor (`RelatoriosPage` ou similar) — seletor de pessoa/equipe/período, saldo, total apontado por projeto, pendências (ajustes + dias inconsistentes) | Componente: só `GESTOR`/`ADMIN` acessam a rota; trocar o filtro atualiza os dados sem reload manual |
+| S5.9 | Frontend: botão de exportar espelho do mês em CSV na tela do colaborador | Componente: clique dispara o download do CSV retornado por S5.3 |
 
 ---
 
