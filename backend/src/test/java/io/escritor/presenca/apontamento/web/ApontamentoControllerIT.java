@@ -2,9 +2,12 @@ package io.escritor.presenca.apontamento.web;
 
 import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
 import io.escritor.presenca.identidade.domain.Equipe;
+import io.escritor.presenca.identidade.domain.MembroEquipe;
 import io.escritor.presenca.identidade.domain.Papel;
+import io.escritor.presenca.identidade.domain.PapelNaEquipe;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.EquipeRepository;
+import io.escritor.presenca.identidade.repository.MembroEquipeRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.Coluna;
@@ -64,6 +67,9 @@ class ApontamentoControllerIT {
 
     @Autowired
     private ApontamentoRepository apontamentoRepository;
+
+    @Autowired
+    private MembroEquipeRepository membroEquipeRepository;
 
     private RestTestClient restTestClient;
 
@@ -474,6 +480,108 @@ class ApontamentoControllerIT {
         client().get()
                 .uri("/cards/{id}/apontamentos", 999999)
                 .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isNotFound();
+    }
+
+    @Test
+    void colaboradorVeOsProprosApontamentosNoPeriodoDeVerdade() {
+        Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s410-self@escritor.io", Papel.COLABORADOR, 480));
+        Card card = criarCard(usuario);
+        apontamentoRepository.saveAndFlush(new Apontamento(
+                usuario, card, Instant.parse("2026-01-15T09:00:00Z"), Instant.parse("2026-01-15T10:00:00Z"), null, OrigemApontamento.MANUAL));
+        String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
+
+        client().get()
+                .uri("/apontamentos?inicio={inicio}&fim={fim}", "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z")
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.length()").isEqualTo(1);
+    }
+
+    @Test
+    void colaboradorTentandoVerApontamentosDeOutroUsuarioRecebe403DeVerdade() {
+        Usuario dono = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s410-dono@escritor.io", Papel.COLABORADOR, 480));
+        Usuario outro = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s410-outro@escritor.io", Papel.COLABORADOR, 480));
+        String tokenOutro = jwtService.gerarAccessToken(outro.getId(), Papel.COLABORADOR);
+
+        client().get()
+                .uri("/apontamentos?usuarioId={usuarioId}&inicio={inicio}&fim={fim}", dono.getId(), "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z")
+                .header("Authorization", "Bearer " + tokenOutro)
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    @Test
+    void gestorVeApontamentosDeMembroDaEquipeQueLideraDeVerdade() {
+        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
+        Usuario gestor = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s410-gestor@escritor.io", Papel.GESTOR, 480));
+        Usuario membro = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s410-membro@escritor.io", Papel.COLABORADOR, 480));
+        membroEquipeRepository.saveAndFlush(new MembroEquipe(equipe, gestor, PapelNaEquipe.LIDER));
+        membroEquipeRepository.saveAndFlush(new MembroEquipe(equipe, membro, PapelNaEquipe.MEMBRO));
+        Card card = criarCard(membro);
+        apontamentoRepository.saveAndFlush(new Apontamento(
+                membro, card, Instant.parse("2026-01-15T09:00:00Z"), Instant.parse("2026-01-15T10:00:00Z"), null, OrigemApontamento.MANUAL));
+        String tokenGestor = jwtService.gerarAccessToken(gestor.getId(), Papel.GESTOR);
+
+        client().get()
+                .uri("/apontamentos?usuarioId={usuarioId}&inicio={inicio}&fim={fim}", membro.getId(), "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z")
+                .header("Authorization", "Bearer " + tokenGestor)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.length()").isEqualTo(1);
+    }
+
+    @Test
+    void gestorTentandoVerApontamentosDeUsuarioForaDaEquipeQueLideraRecebe403DeVerdade() {
+        Usuario gestor = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s410-gestorfora@escritor.io", Papel.GESTOR, 480));
+        Usuario forasteiro = usuarioRepository.saveAndFlush(new Usuario("Caio Reis", "caio-s410-forasteiro@escritor.io", Papel.COLABORADOR, 480));
+        String tokenGestor = jwtService.gerarAccessToken(gestor.getId(), Papel.GESTOR);
+
+        client().get()
+                .uri(
+                        "/apontamentos?usuarioId={usuarioId}&inicio={inicio}&fim={fim}",
+                        forasteiro.getId(),
+                        "2026-01-01T00:00:00Z",
+                        "2026-02-01T00:00:00Z")
+                .header("Authorization", "Bearer " + tokenGestor)
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    @Test
+    void adminVeApontamentosDeQualquerUsuarioDeVerdade() {
+        Usuario admin = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s410-admin@escritor.io", Papel.ADMIN, 480));
+        Usuario qualquerUsuario = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s410-qualquer@escritor.io", Papel.COLABORADOR, 480));
+        Card card = criarCard(qualquerUsuario);
+        apontamentoRepository.saveAndFlush(new Apontamento(
+                qualquerUsuario, card, Instant.parse("2026-01-15T09:00:00Z"), Instant.parse("2026-01-15T10:00:00Z"), null, OrigemApontamento.MANUAL));
+        String tokenAdmin = jwtService.gerarAccessToken(admin.getId(), Papel.ADMIN);
+
+        client().get()
+                .uri(
+                        "/apontamentos?usuarioId={usuarioId}&inicio={inicio}&fim={fim}",
+                        qualquerUsuario.getId(),
+                        "2026-01-01T00:00:00Z",
+                        "2026-02-01T00:00:00Z")
+                .header("Authorization", "Bearer " + tokenAdmin)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.length()").isEqualTo(1);
+    }
+
+    @Test
+    void listarApontamentosComUsuarioIdInexistenteRecebe404DeVerdade() {
+        Usuario admin = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s410-admin404@escritor.io", Papel.ADMIN, 480));
+        String tokenAdmin = jwtService.gerarAccessToken(admin.getId(), Papel.ADMIN);
+
+        client().get()
+                .uri("/apontamentos?usuarioId={usuarioId}&inicio={inicio}&fim={fim}", 999999, "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z")
+                .header("Authorization", "Bearer " + tokenAdmin)
                 .exchange()
                 .expectStatus().isNotFound();
     }

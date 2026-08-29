@@ -21,4 +21,12 @@ public interface ApontamentoRepository extends JpaRepository<Apontamento, Long> 
      */
     List<Apontamento> findByUsuarioAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(
             Usuario usuario, Instant inicioDoDia, Instant fimDoDia);
+
+    /**
+     * Sem `FimIsNotNull` de propósito, diferente da query acima (S4.8) - esta é uma listagem/
+     * relatório (S4.10), não uma soma, então um timer ainda aberto no período continua aparecendo
+     * (mesma escolha já feita pra listagem por card, S4.7).
+     */
+    List<Apontamento> findByUsuarioAndInicioGreaterThanEqualAndInicioLessThanOrderByInicioDesc(
+            Usuario usuario, Instant inicio, Instant fim);
 }

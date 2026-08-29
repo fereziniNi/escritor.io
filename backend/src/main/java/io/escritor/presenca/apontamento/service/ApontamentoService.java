@@ -6,7 +6,13 @@ import io.escritor.presenca.apontamento.domain.LancamentoManualInvalidoException
 import io.escritor.presenca.apontamento.domain.OrigemApontamento;
 import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
 import io.escritor.presenca.apontamento.web.ApontamentoResponse;
+import io.escritor.presenca.identidade.domain.Equipe;
+import io.escritor.presenca.identidade.domain.MembroEquipe;
+import io.escritor.presenca.identidade.domain.Papel;
+import io.escritor.presenca.identidade.domain.PapelNaEquipe;
 import io.escritor.presenca.identidade.domain.Usuario;
+import io.escritor.presenca.identidade.repository.MembroEquipeRepository;
+import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.repository.CardRepository;
@@ -26,11 +32,20 @@ public class ApontamentoService {
 
     private final ApontamentoRepository apontamentoRepository;
     private final CardRepository cardRepository;
+    private final MembroEquipeRepository membroEquipeRepository;
+    private final UsuarioRepository usuarioRepository;
     private final Clock clock;
 
-    public ApontamentoService(ApontamentoRepository apontamentoRepository, CardRepository cardRepository, Clock clock) {
+    public ApontamentoService(
+            ApontamentoRepository apontamentoRepository,
+            CardRepository cardRepository,
+            MembroEquipeRepository membroEquipeRepository,
+            UsuarioRepository usuarioRepository,
+            Clock clock) {
         this.apontamentoRepository = apontamentoRepository;
         this.cardRepository = cardRepository;
+        this.membroEquipeRepository = membroEquipeRepository;
+        this.usuarioRepository = usuarioRepository;
         this.clock = clock;
     }
 
@@ -167,5 +182,44 @@ public class ApontamentoService {
     public List<ApontamentoResponse> listarPorCard(Long cardId) {
         Card card = cardRepository.findById(cardId).orElseThrow(() -> new RecursoNaoEncontradoException("Card não encontrado: " + cardId));
         return apontamentoRepository.findByCardOrderByInicioDesc(card).stream().map(ApontamentoResponse::de).toList();
+    }
+
+    /**
+     * Base mínima pro relatório completo (E4) - sem agregação por projeto ainda. Regra de
+     * visibilidade (única do épico a diferenciar por papel dentro do serviço, não só via
+     * `@PreAuthorize` de endpoint): colaborador só vê os próprios; gestor vê qualquer usuário
+     * membro de uma equipe que ele lidera (`PapelNaEquipe.LIDER`); admin vê todo mundo, sem
+     * checar equipe. `usuarioIdFiltro` nulo, ou igual ao do próprio requisitante, é sempre "eu
+     * mesmo" e nunca precisa tocar `UsuarioRepository`/`MembroEquipeRepository`.
+     */
+    public List<ApontamentoResponse> listarPorUsuarioEPeriodo(Long usuarioIdFiltro, Instant inicio, Instant fim, Usuario usuarioAutenticado) {
+        Usuario usuarioAlvo;
+        if (usuarioIdFiltro == null || usuarioIdFiltro.equals(usuarioAutenticado.getId())) {
+            usuarioAlvo = usuarioAutenticado;
+        } else {
+            usuarioAlvo = usuarioRepository
+                    .findById(usuarioIdFiltro)
+                    .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado: " + usuarioIdFiltro));
+
+            if (usuarioAutenticado.getPapel() != Papel.ADMIN && !podeVerApontamentosDe(usuarioAutenticado, usuarioAlvo)) {
+                throw new ApontamentoDeOutroUsuarioException();
+            }
+        }
+
+        return apontamentoRepository
+                .findByUsuarioAndInicioGreaterThanEqualAndInicioLessThanOrderByInicioDesc(usuarioAlvo, inicio, fim)
+                .stream()
+                .map(ApontamentoResponse::de)
+                .toList();
+    }
+
+    private boolean podeVerApontamentosDe(Usuario gestor, Usuario usuarioAlvo) {
+        if (gestor.getPapel() != Papel.GESTOR) {
+            return false;
+        }
+        List<Equipe> equipesLideradas = membroEquipeRepository.findByUsuarioAndPapelNaEquipe(gestor, PapelNaEquipe.LIDER).stream()
+                .map(MembroEquipe::getEquipe)
+                .toList();
+        return membroEquipeRepository.existsByEquipeInAndUsuario(equipesLideradas, usuarioAlvo);
     }
 }

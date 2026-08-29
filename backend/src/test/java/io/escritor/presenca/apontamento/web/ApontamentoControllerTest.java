@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
@@ -286,5 +287,73 @@ class ApontamentoControllerTest {
         when(apontamentoService.listarPorCard(999L)).thenThrow(new RecursoNaoEncontradoException("não encontrado"));
 
         mockMvc.perform(get("/cards/999/apontamentos")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void listarPorUsuarioEPeriodoSemAutenticacaoRetorna401() throws Exception {
+        mockMvc.perform(get("/apontamentos").param("inicio", "2026-01-01T00:00:00Z").param("fim", "2026-02-01T00:00:00Z"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void listaOsProprosApontamentosSemInformarUsuarioId() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(apontamentoService.listarPorUsuarioEPeriodo(isNull(), any(), any(), any()))
+                .thenReturn(List.of(new ApontamentoResponse(
+                        1L, 2L, 7L, Instant.parse("2026-01-15T09:00:00Z"), Instant.parse("2026-01-15T10:00:00Z"), 60,
+                        null, "MANUAL", Instant.parse("2026-01-15T10:00:00Z"), Instant.parse("2026-01-15T10:00:00Z"))));
+
+        mockMvc.perform(get("/apontamentos").param("inicio", "2026-01-01T00:00:00Z").param("fim", "2026-02-01T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(1))
+                .andExpect(jsonPath("$[0].minutos").value(60));
+    }
+
+    @Test
+    @WithMockUser
+    void listaApontamentosDeOutroUsuarioComUsuarioIdInformado() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(apontamentoService.listarPorUsuarioEPeriodo(eq(7L), any(), any(), any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/apontamentos")
+                        .param("usuarioId", "7")
+                        .param("inicio", "2026-01-01T00:00:00Z")
+                        .param("fim", "2026-02-01T00:00:00Z"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser
+    void listarApontamentosDeOutroUsuarioSemPermissaoRetorna403() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(apontamentoService.listarPorUsuarioEPeriodo(eq(7L), any(), any(), any()))
+                .thenThrow(new ApontamentoDeOutroUsuarioException());
+
+        mockMvc.perform(get("/apontamentos")
+                        .param("usuarioId", "7")
+                        .param("inicio", "2026-01-01T00:00:00Z")
+                        .param("fim", "2026-02-01T00:00:00Z"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser
+    void listarApontamentosDeUsuarioIdInexistenteRetorna404() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(apontamentoService.listarPorUsuarioEPeriodo(eq(999L), any(), any(), any()))
+                .thenThrow(new RecursoNaoEncontradoException("não encontrado"));
+
+        mockMvc.perform(get("/apontamentos")
+                        .param("usuarioId", "999")
+                        .param("inicio", "2026-01-01T00:00:00Z")
+                        .param("fim", "2026-02-01T00:00:00Z"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser
+    void listarApontamentosSemInicioOuFimRetorna400() throws Exception {
+        mockMvc.perform(get("/apontamentos")).andExpect(status().isBadRequest());
     }
 }

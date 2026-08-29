@@ -74,4 +74,29 @@ class MembroEquipeRepositoryIT {
         assertThat(membrosDeAna).hasSize(1);
         assertThat(membrosDeAna.get(0).getEquipe().getId()).isEqualTo(equipeA.getId());
     }
+
+    @Test
+    void encontraSoAsEquipesQueOUsuarioLideraENaoAsQueSoEMembro() {
+        Equipe equipeLiderada = equipeRepository.saveAndFlush(new Equipe("Backend", null));
+        Equipe equipeSoMembro = equipeRepository.saveAndFlush(new Equipe("Frontend", null));
+        Usuario gestor = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana@escritor.io", Papel.GESTOR, 480));
+        membroEquipeRepository.saveAndFlush(new MembroEquipe(equipeLiderada, gestor, PapelNaEquipe.LIDER));
+        membroEquipeRepository.saveAndFlush(new MembroEquipe(equipeSoMembro, gestor, PapelNaEquipe.MEMBRO));
+
+        var lideradas = membroEquipeRepository.findByUsuarioAndPapelNaEquipe(gestor, PapelNaEquipe.LIDER);
+
+        assertThat(lideradas).extracting(m -> m.getEquipe().getId()).containsExactly(equipeLiderada.getId());
+    }
+
+    @Test
+    void existsByEquipeInAndUsuarioConfirmaMembroDeQualquerEquipeDaLista() {
+        Equipe equipeA = equipeRepository.saveAndFlush(new Equipe("Backend", null));
+        Equipe equipeB = equipeRepository.saveAndFlush(new Equipe("Frontend", null));
+        Usuario membro = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto@escritor.io", Papel.COLABORADOR, 480));
+        Usuario forasteiro = usuarioRepository.saveAndFlush(new Usuario("Caio Reis", "caio@escritor.io", Papel.COLABORADOR, 480));
+        membroEquipeRepository.saveAndFlush(new MembroEquipe(equipeB, membro, PapelNaEquipe.MEMBRO));
+
+        assertThat(membroEquipeRepository.existsByEquipeInAndUsuario(java.util.List.of(equipeA, equipeB), membro)).isTrue();
+        assertThat(membroEquipeRepository.existsByEquipeInAndUsuario(java.util.List.of(equipeA, equipeB), forasteiro)).isFalse();
+    }
 }

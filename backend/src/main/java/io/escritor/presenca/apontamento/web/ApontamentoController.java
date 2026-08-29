@@ -3,6 +3,7 @@ package io.escritor.presenca.apontamento.web;
 import io.escritor.presenca.apontamento.service.ApontamentoService;
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
 import jakarta.validation.Valid;
+import java.time.Instant;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -63,5 +65,11 @@ public class ApontamentoController {
     @GetMapping("/cards/{id}/apontamentos")
     public List<ApontamentoResponse> listarPorCard(@PathVariable Long id) {
         return apontamentoService.listarPorCard(id);
+    }
+
+    @GetMapping("/apontamentos")
+    public List<ApontamentoResponse> listarPorUsuarioEPeriodo(
+            @RequestParam(required = false) Long usuarioId, @RequestParam Instant inicio, @RequestParam Instant fim) {
+        return apontamentoService.listarPorUsuarioEPeriodo(usuarioId, inicio, fim, contextoUsuarioAutenticado.usuarioAtual());
     }
 }

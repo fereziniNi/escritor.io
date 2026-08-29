@@ -143,4 +143,30 @@ class ApontamentoRepositoryIT {
 
         assertThat(encontrados).extracting(Apontamento::getId).containsExactly(dentroDoDia.getId());
     }
+
+    @Test
+    void encontraApontamentosDoUsuarioNoPeriodoIncluindoTimerAindaAberto() {
+        Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480));
+        Usuario outroUsuario = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto@escritor.io", Papel.COLABORADOR, 480));
+        Card card = criarCard(usuario);
+        Instant inicioDoPeriodo = Instant.parse("2026-01-01T00:00:00Z");
+        Instant fimDoPeriodo = Instant.parse("2026-02-01T00:00:00Z");
+
+        Apontamento fechado = apontamentoRepository.saveAndFlush(new Apontamento(
+                usuario, card, Instant.parse("2026-01-15T09:00:00Z"), Instant.parse("2026-01-15T10:00:00Z"), null, OrigemApontamento.MANUAL));
+        // timer ainda aberto no período - listagem/relatório (diferente da soma de S4.8) inclui.
+        Apontamento aberto = apontamentoRepository.saveAndFlush(
+                new Apontamento(usuario, card, Instant.parse("2026-01-20T09:00:00Z"), null, null, OrigemApontamento.TIMER));
+        // fora do período.
+        apontamentoRepository.saveAndFlush(new Apontamento(
+                usuario, card, Instant.parse("2026-02-15T09:00:00Z"), Instant.parse("2026-02-15T10:00:00Z"), null, OrigemApontamento.MANUAL));
+        // dentro do período, mas de outro usuário.
+        apontamentoRepository.saveAndFlush(new Apontamento(
+                outroUsuario, card, Instant.parse("2026-01-16T09:00:00Z"), Instant.parse("2026-01-16T10:00:00Z"), null, OrigemApontamento.MANUAL));
+
+        var encontrados = apontamentoRepository.findByUsuarioAndInicioGreaterThanEqualAndInicioLessThanOrderByInicioDesc(
+                usuario, inicioDoPeriodo, fimDoPeriodo);
+
+        assertThat(encontrados).extracting(Apontamento::getId).containsExactly(aberto.getId(), fechado.getId());
+    }
 }
