@@ -1,5 +1,7 @@
 package io.escritor.presenca.apontamento.web;
 
+import io.escritor.presenca.apontamento.domain.Apontamento;
+import io.escritor.presenca.apontamento.domain.OrigemApontamento;
 import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
 import io.escritor.presenca.identidade.domain.Equipe;
 import io.escritor.presenca.identidade.domain.MembroEquipe;
@@ -16,6 +18,7 @@ import io.escritor.presenca.kanban.repository.CardRepository;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
 import io.escritor.presenca.kanban.repository.QuadroRepository;
 import io.escritor.presenca.seguranca.JwtService;
+import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -486,8 +489,11 @@ class ApontamentoControllerIT {
 
     @Test
     void colaboradorVeOsProprosApontamentosNoPeriodoDeVerdade() {
+        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s410-self@escritor.io", Papel.COLABORADOR, 480));
-        Card card = criarCard(usuario);
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Card card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         apontamentoRepository.saveAndFlush(new Apontamento(
                 usuario, card, Instant.parse("2026-01-15T09:00:00Z"), Instant.parse("2026-01-15T10:00:00Z"), null, OrigemApontamento.MANUAL));
         String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
@@ -521,7 +527,9 @@ class ApontamentoControllerIT {
         Usuario membro = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s410-membro@escritor.io", Papel.COLABORADOR, 480));
         membroEquipeRepository.saveAndFlush(new MembroEquipe(equipe, gestor, PapelNaEquipe.LIDER));
         membroEquipeRepository.saveAndFlush(new MembroEquipe(equipe, membro, PapelNaEquipe.MEMBRO));
-        Card card = criarCard(membro);
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Card card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, membro));
         apontamentoRepository.saveAndFlush(new Apontamento(
                 membro, card, Instant.parse("2026-01-15T09:00:00Z"), Instant.parse("2026-01-15T10:00:00Z"), null, OrigemApontamento.MANUAL));
         String tokenGestor = jwtService.gerarAccessToken(gestor.getId(), Papel.GESTOR);
@@ -554,9 +562,12 @@ class ApontamentoControllerIT {
 
     @Test
     void adminVeApontamentosDeQualquerUsuarioDeVerdade() {
+        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
         Usuario admin = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s410-admin@escritor.io", Papel.ADMIN, 480));
         Usuario qualquerUsuario = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s410-qualquer@escritor.io", Papel.COLABORADOR, 480));
-        Card card = criarCard(qualquerUsuario);
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Card card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, qualquerUsuario));
         apontamentoRepository.saveAndFlush(new Apontamento(
                 qualquerUsuario, card, Instant.parse("2026-01-15T09:00:00Z"), Instant.parse("2026-01-15T10:00:00Z"), null, OrigemApontamento.MANUAL));
         String tokenAdmin = jwtService.gerarAccessToken(admin.getId(), Papel.ADMIN);
