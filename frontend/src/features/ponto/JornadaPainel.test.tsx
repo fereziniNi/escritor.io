@@ -38,6 +38,7 @@ describe('JornadaPainel', () => {
           minutosTrabalhados: 540,
           saldoDia: 60,
           saldoAcumuladoNoPeriodo: 120,
+          totalApontadoMinutos: 540,
         }),
       ),
     )
@@ -58,6 +59,7 @@ describe('JornadaPainel', () => {
           minutosTrabalhados: 180,
           saldoDia: -300,
           saldoAcumuladoNoPeriodo: -45,
+          totalApontadoMinutos: 180,
         }),
       ),
     )
@@ -77,6 +79,7 @@ describe('JornadaPainel', () => {
           minutosTrabalhados: 0,
           saldoDia: -480,
           saldoAcumuladoNoPeriodo: -480,
+          totalApontadoMinutos: 0,
         }),
       ),
     )
@@ -84,5 +87,45 @@ describe('JornadaPainel', () => {
     renderJornadaPainel()
 
     expect(await screen.findByText(/inconsistente/i)).toBeInTheDocument()
+  })
+
+  it('mostra o total apontado hoje e a diferença em relação ao trabalhado', async () => {
+    server.use(
+      http.get('/ponto/jornada-do-dia', () =>
+        HttpResponse.json({
+          data: '2026-01-13',
+          estado: 'FECHADA',
+          minutosTrabalhados: 540,
+          saldoDia: 60,
+          saldoAcumuladoNoPeriodo: 120,
+          totalApontadoMinutos: 480,
+        }),
+      ),
+    )
+
+    renderJornadaPainel()
+
+    expect(await screen.findByText('Total apontado hoje: 8h00')).toBeInTheDocument()
+    expect(screen.getByText('Diferença apontado vs. trabalhado: -1h00')).toBeInTheDocument()
+  })
+
+  it('diferença positiva quando o apontado é maior que o trabalhado', async () => {
+    server.use(
+      http.get('/ponto/jornada-do-dia', () =>
+        HttpResponse.json({
+          data: '2026-01-13',
+          estado: 'ABERTA',
+          minutosTrabalhados: 180,
+          saldoDia: -300,
+          saldoAcumuladoNoPeriodo: -45,
+          totalApontadoMinutos: 210,
+        }),
+      ),
+    )
+
+    renderJornadaPainel()
+
+    expect(await screen.findByText('Total apontado hoje: 3h30')).toBeInTheDocument()
+    expect(screen.getByText('Diferença apontado vs. trabalhado: +0h30')).toBeInTheDocument()
   })
 })

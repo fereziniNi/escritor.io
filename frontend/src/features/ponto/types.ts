@@ -20,6 +20,7 @@ export interface JornadaDoDia {
   minutosTrabalhados: number
   saldoDia: number
   saldoAcumuladoNoPeriodo: number
+  totalApontadoMinutos: number
 }
 
 export interface EspelhoDia {
