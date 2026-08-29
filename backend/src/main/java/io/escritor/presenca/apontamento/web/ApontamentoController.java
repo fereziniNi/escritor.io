@@ -72,4 +72,14 @@ public class ApontamentoController {
             @RequestParam(required = false) Long usuarioId, @RequestParam Instant inicio, @RequestParam Instant fim) {
         return apontamentoService.listarPorUsuarioEPeriodo(usuarioId, inicio, fim, contextoUsuarioAutenticado.usuarioAtual());
     }
+
+    /**
+     * "Onde o tempo foi" (S5.4) - `params = "agrupar=card"` roteia pra este método na mesma
+     * URL/query params do endpoint de listagem, mesmo padrão de `formato=csv` em S5.3.
+     */
+    @GetMapping(value = "/apontamentos", params = "agrupar=card")
+    public List<TotalPorCardResponse> listarTotalPorCard(
+            @RequestParam(required = false) Long usuarioId, @RequestParam Instant inicio, @RequestParam Instant fim) {
+        return apontamentoService.listarTotalPorCard(usuarioId, inicio, fim, contextoUsuarioAutenticado.usuarioAtual());
+    }
 }

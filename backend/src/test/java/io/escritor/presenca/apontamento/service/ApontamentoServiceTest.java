@@ -6,6 +6,7 @@ import io.escritor.presenca.apontamento.domain.ApontamentoJaEncerradoException;
 import io.escritor.presenca.apontamento.domain.LancamentoManualInvalidoException;
 import io.escritor.presenca.apontamento.domain.OrigemApontamento;
 import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
+import io.escritor.presenca.apontamento.web.TotalPorCardResponse;
 import io.escritor.presenca.identidade.domain.Equipe;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Usuario;
@@ -33,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -372,5 +374,43 @@ class ApontamentoServiceTest {
 
         verify(apontamentoRepository, never())
                 .findByUsuarioAndInicioGreaterThanEqualAndInicioLessThanOrderByInicioDesc(any(), any(), any());
+    }
+
+    @Test
+    void listarTotalPorCardSomaOsMinutosDeCadaCardSeparadamente() {
+        Instant inicio = agora.minus(1, ChronoUnit.DAYS);
+        Card outroCard = cardComId(6L);
+        Apontamento primeiroDoCard5 = new Apontamento(
+                usuario, card, inicio.plus(1, ChronoUnit.HOURS), inicio.plus(2, ChronoUnit.HOURS), null, OrigemApontamento.MANUAL);
+        Apontamento segundoDoCard5 = new Apontamento(
+                usuario, card, inicio.plus(3, ChronoUnit.HOURS), inicio.plus(3, ChronoUnit.HOURS).plusSeconds(1800), null, OrigemApontamento.MANUAL);
+        Apontamento doOutroCard = new Apontamento(
+                usuario, outroCard, inicio.plus(5, ChronoUnit.HOURS), inicio.plus(5, ChronoUnit.HOURS).plusSeconds(900), null, OrigemApontamento.MANUAL);
+        when(visibilidadeUsuarioService.resolverAlvo(isNull(), eq(usuario), any())).thenReturn(usuario);
+        when(apontamentoRepository.findByUsuarioAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(usuario, inicio, agora))
+                .thenReturn(List.of(primeiroDoCard5, segundoDoCard5, doOutroCard));
+
+        var resposta = service.listarTotalPorCard(null, inicio, agora, usuario);
+
+        assertThat(resposta).hasSize(2);
+        assertThat(resposta)
+                .filteredOn(item -> item.cardId().equals(5L))
+                .extracting(TotalPorCardResponse::totalMinutos)
+                .containsExactly(90L);
+        assertThat(resposta)
+                .filteredOn(item -> item.cardId().equals(6L))
+                .extracting(TotalPorCardResponse::totalMinutos)
+                .containsExactly(15L);
+    }
+
+    @Test
+    void listarTotalPorCardPropagaExcecaoDeAcessoNegadoSemConsultarApontamentos() {
+        when(visibilidadeUsuarioService.resolverAlvo(eq(2L), eq(usuario), any())).thenThrow(new ApontamentoDeOutroUsuarioException());
+
+        assertThatThrownBy(() -> service.listarTotalPorCard(2L, agora.minus(1, ChronoUnit.DAYS), agora, usuario))
+                .isInstanceOf(ApontamentoDeOutroUsuarioException.class);
+
+        verify(apontamentoRepository, never())
+                .findByUsuarioAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(any(), any(), any());
     }
 }

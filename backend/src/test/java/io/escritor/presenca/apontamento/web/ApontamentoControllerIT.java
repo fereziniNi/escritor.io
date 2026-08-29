@@ -596,4 +596,35 @@ class ApontamentoControllerIT {
                 .exchange()
                 .expectStatus().isNotFound();
     }
+
+    @Test
+    void listaOTotalApontadoPorCardDeVerdadeIgnorandoTimerAberto() {
+        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
+        Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s54-porcard@escritor.io", Papel.COLABORADOR, 480));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Card cardA = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
+        Card cardB = cardRepository.saveAndFlush(new Card(coluna, "Card B", null, 2048.0, null, null, null, usuario));
+        apontamentoRepository.saveAndFlush(new Apontamento(
+                usuario, cardA, Instant.parse("2026-01-15T09:00:00Z"), Instant.parse("2026-01-15T10:00:00Z"), null, OrigemApontamento.MANUAL));
+        apontamentoRepository.saveAndFlush(new Apontamento(
+                usuario, cardA, Instant.parse("2026-01-16T09:00:00Z"), Instant.parse("2026-01-16T09:30:00Z"), null, OrigemApontamento.MANUAL));
+        apontamentoRepository.saveAndFlush(new Apontamento(
+                usuario, cardB, Instant.parse("2026-01-17T09:00:00Z"), Instant.parse("2026-01-17T09:15:00Z"), null, OrigemApontamento.MANUAL));
+        // timer ainda aberto no mesmo período - não deve entrar na soma.
+        apontamentoRepository.saveAndFlush(new Apontamento(usuario, cardB, Instant.parse("2026-01-18T09:00:00Z"), null, null, OrigemApontamento.TIMER));
+        String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
+
+        client().get()
+                .uri("/apontamentos?agrupar=card&inicio={inicio}&fim={fim}", "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z")
+                .header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.length()").isEqualTo(2)
+                .jsonPath("$[0].cardId").isEqualTo(cardA.getId())
+                .jsonPath("$[0].totalMinutos").isEqualTo(90)
+                .jsonPath("$[1].cardId").isEqualTo(cardB.getId())
+                .jsonPath("$[1].totalMinutos").isEqualTo(15);
+    }
 }

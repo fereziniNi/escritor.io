@@ -6,6 +6,7 @@ import io.escritor.presenca.apontamento.domain.LancamentoManualInvalidoException
 import io.escritor.presenca.apontamento.domain.OrigemApontamento;
 import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
 import io.escritor.presenca.apontamento.web.ApontamentoResponse;
+import io.escritor.presenca.apontamento.web.TotalPorCardResponse;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.identidade.service.VisibilidadeUsuarioService;
@@ -14,7 +15,10 @@ import io.escritor.presenca.kanban.repository.CardRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 /**
@@ -191,6 +195,29 @@ public class ApontamentoService {
                 .findByUsuarioAndInicioGreaterThanEqualAndInicioLessThanOrderByInicioDesc(usuarioAlvo, inicio, fim)
                 .stream()
                 .map(ApontamentoResponse::de)
+                .toList();
+    }
+
+    /**
+     * "Onde o tempo foi" (S5.4) - agregação em cima da mesma base de {@link #listarPorUsuarioEPeriodo}
+     * (mesma resolução/visibilidade), mas soma `minutos` por card em vez de listar cada apontamento.
+     * Reusa a query de {@code fim} não nulo já criada em S4.8 (soma de `totalApontadoMinutos` do
+     * dia) - um timer ainda aberto no período não tem `minutos` calculado ainda, então não entraria
+     * na soma mesmo se estivesse na lista. Ordenado do card com mais tempo apontado pro com menos -
+     * leitura natural de um relatório ("onde foi o esforço").
+     */
+    public List<TotalPorCardResponse> listarTotalPorCard(Long usuarioIdFiltro, Instant inicio, Instant fim, Usuario usuarioAutenticado) {
+        Usuario usuarioAlvo =
+                visibilidadeUsuarioService.resolverAlvo(usuarioIdFiltro, usuarioAutenticado, ApontamentoDeOutroUsuarioException::new);
+
+        Map<Long, Long> totalPorCardId = apontamentoRepository
+                .findByUsuarioAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(usuarioAlvo, inicio, fim)
+                .stream()
+                .collect(Collectors.groupingBy(a -> a.getCard().getId(), Collectors.summingLong(Apontamento::getMinutos)));
+
+        return totalPorCardId.entrySet().stream()
+                .map(entrada -> new TotalPorCardResponse(entrada.getKey(), entrada.getValue()))
+                .sorted(Comparator.comparingLong(TotalPorCardResponse::totalMinutos).reversed())
                 .toList();
     }
 }

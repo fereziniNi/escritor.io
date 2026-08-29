@@ -356,4 +356,45 @@ class ApontamentoControllerTest {
     void listarApontamentosSemInicioOuFimRetorna400() throws Exception {
         mockMvc.perform(get("/apontamentos")).andExpect(status().isBadRequest());
     }
+
+    @Test
+    void listarTotalPorCardSemAutenticacaoRetorna401() throws Exception {
+        mockMvc.perform(get("/apontamentos")
+                        .param("agrupar", "card")
+                        .param("inicio", "2026-01-01T00:00:00Z")
+                        .param("fim", "2026-02-01T00:00:00Z"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void listaOTotalApontadoPorCard() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(apontamentoService.listarTotalPorCard(isNull(), any(), any(), any()))
+                .thenReturn(List.of(new TotalPorCardResponse(5L, 90), new TotalPorCardResponse(6L, 15)));
+
+        mockMvc.perform(get("/apontamentos")
+                        .param("agrupar", "card")
+                        .param("inicio", "2026-01-01T00:00:00Z")
+                        .param("fim", "2026-02-01T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].cardId").value(5))
+                .andExpect(jsonPath("$[0].totalMinutos").value(90))
+                .andExpect(jsonPath("$[1].cardId").value(6))
+                .andExpect(jsonPath("$[1].totalMinutos").value(15));
+    }
+
+    @Test
+    @WithMockUser
+    void listarTotalPorCardDeUsuarioSemPermissaoRetorna403() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(apontamentoService.listarTotalPorCard(eq(7L), any(), any(), any())).thenThrow(new ApontamentoDeOutroUsuarioException());
+
+        mockMvc.perform(get("/apontamentos")
+                        .param("agrupar", "card")
+                        .param("usuarioId", "7")
+                        .param("inicio", "2026-01-01T00:00:00Z")
+                        .param("fim", "2026-02-01T00:00:00Z"))
+                .andExpect(status().isForbidden());
+    }
 }
