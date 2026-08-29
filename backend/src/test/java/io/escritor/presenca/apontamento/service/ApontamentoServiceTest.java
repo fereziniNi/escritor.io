@@ -3,13 +3,18 @@ package io.escritor.presenca.apontamento.service;
 import io.escritor.presenca.apontamento.domain.Apontamento;
 import io.escritor.presenca.apontamento.domain.ApontamentoDeOutroUsuarioException;
 import io.escritor.presenca.apontamento.domain.ApontamentoJaEncerradoException;
+import io.escritor.presenca.apontamento.domain.FiltroRelatorioInvalidoException;
 import io.escritor.presenca.apontamento.domain.LancamentoManualInvalidoException;
 import io.escritor.presenca.apontamento.domain.OrigemApontamento;
 import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
 import io.escritor.presenca.apontamento.web.TotalPorCardResponse;
 import io.escritor.presenca.identidade.domain.Equipe;
 import io.escritor.presenca.identidade.domain.Papel;
+import io.escritor.presenca.identidade.domain.Projeto;
+import io.escritor.presenca.identidade.domain.StatusProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
+import io.escritor.presenca.identidade.repository.EquipeRepository;
+import io.escritor.presenca.identidade.repository.ProjetoRepository;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.identidade.service.VisibilidadeUsuarioService;
 import io.escritor.presenca.kanban.domain.Card;
@@ -52,6 +57,12 @@ class ApontamentoServiceTest {
     @Mock
     private VisibilidadeUsuarioService visibilidadeUsuarioService;
 
+    @Mock
+    private ProjetoRepository projetoRepository;
+
+    @Mock
+    private EquipeRepository equipeRepository;
+
     private final Instant agora = Instant.parse("2026-01-15T12:00:00Z");
     private final Clock clock = Clock.fixed(agora, ZoneOffset.UTC);
 
@@ -80,7 +91,8 @@ class ApontamentoServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ApontamentoService(apontamentoRepository, cardRepository, visibilidadeUsuarioService, clock);
+        service = new ApontamentoService(
+                apontamentoRepository, cardRepository, visibilidadeUsuarioService, projetoRepository, equipeRepository, clock);
     }
 
     @Test
@@ -332,7 +344,7 @@ class ApontamentoServiceTest {
         Instant instanteComMicrossegundos = Instant.parse("2026-01-15T12:00:00.123456Z");
         Clock clockComMicrossegundos = Clock.fixed(instanteComMicrossegundos, ZoneOffset.UTC);
         ApontamentoService servicoComMicrossegundos = new ApontamentoService(
-                apontamentoRepository, cardRepository, visibilidadeUsuarioService, clockComMicrossegundos);
+                apontamentoRepository, cardRepository, visibilidadeUsuarioService, projetoRepository, equipeRepository, clockComMicrossegundos);
         when(cardRepository.findById(5L)).thenReturn(Optional.of(card));
         when(apontamentoRepository.findFirstByUsuarioAndFimIsNull(usuario)).thenReturn(Optional.empty());
         when(apontamentoRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
@@ -412,5 +424,84 @@ class ApontamentoServiceTest {
 
         verify(apontamentoRepository, never())
                 .findByUsuarioAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(any(), any(), any());
+    }
+
+    private static Projeto projetoComId(Long id) {
+        Projeto projeto = new Projeto("Projeto X", "Cliente", StatusProjeto.ATIVO, java.time.LocalDate.now(), null);
+        ReflectionTestUtils.setField(projeto, "id", id);
+        return projeto;
+    }
+
+    private static Equipe equipeComId(Long id) {
+        Equipe equipe = new Equipe("Equipe X", null);
+        ReflectionTestUtils.setField(equipe, "id", id);
+        return equipe;
+    }
+
+    @Test
+    void totalApontadoPorProjetoSomaOsApontamentosFechadosDosCardsDosQuadrosVinculados() {
+        Projeto projeto = projetoComId(20L);
+        Instant inicio = agora.minus(1, ChronoUnit.DAYS);
+        Apontamento primeiro = new Apontamento(
+                usuario, card, inicio.plus(1, ChronoUnit.HOURS), inicio.plus(2, ChronoUnit.HOURS), null, OrigemApontamento.MANUAL);
+        Apontamento segundo = new Apontamento(
+                usuario, card, inicio.plus(3, ChronoUnit.HOURS), inicio.plus(3, ChronoUnit.HOURS).plusSeconds(1800), null, OrigemApontamento.MANUAL);
+        when(projetoRepository.findById(20L)).thenReturn(Optional.of(projeto));
+        when(apontamentoRepository.findByCard_Coluna_Quadro_ProjetoAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(
+                        projeto, inicio, agora))
+                .thenReturn(List.of(primeiro, segundo));
+
+        var resposta = service.totalApontadoPorProjetoOuEquipe(20L, null, inicio, agora);
+
+        assertThat(resposta.totalMinutos()).isEqualTo(90);
+    }
+
+    @Test
+    void totalApontadoPorEquipeSomaOsApontamentosFechadosDosCardsDosQuadrosVinculados() {
+        Equipe equipe = equipeComId(30L);
+        Instant inicio = agora.minus(1, ChronoUnit.DAYS);
+        Apontamento apontamento = new Apontamento(
+                usuario, card, inicio.plus(1, ChronoUnit.HOURS), inicio.plus(1, ChronoUnit.HOURS).plusSeconds(900), null, OrigemApontamento.MANUAL);
+        when(equipeRepository.findById(30L)).thenReturn(Optional.of(equipe));
+        when(apontamentoRepository.findByCard_Coluna_Quadro_EquipeAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(
+                        equipe, inicio, agora))
+                .thenReturn(List.of(apontamento));
+
+        var resposta = service.totalApontadoPorProjetoOuEquipe(null, 30L, inicio, agora);
+
+        assertThat(resposta.totalMinutos()).isEqualTo(15);
+    }
+
+    @Test
+    void totalApontadoSemProjetoIdNemEquipeIdLancaExcecao() {
+        assertThatThrownBy(() -> service.totalApontadoPorProjetoOuEquipe(null, null, agora.minus(1, ChronoUnit.DAYS), agora))
+                .isInstanceOf(FiltroRelatorioInvalidoException.class);
+
+        verify(apontamentoRepository, never())
+                .findByCard_Coluna_Quadro_ProjetoAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(any(), any(), any());
+        verify(apontamentoRepository, never())
+                .findByCard_Coluna_Quadro_EquipeAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(any(), any(), any());
+    }
+
+    @Test
+    void totalApontadoComProjetoIdEEquipeIdJuntosLancaExcecao() {
+        assertThatThrownBy(() -> service.totalApontadoPorProjetoOuEquipe(20L, 30L, agora.minus(1, ChronoUnit.DAYS), agora))
+                .isInstanceOf(FiltroRelatorioInvalidoException.class);
+    }
+
+    @Test
+    void totalApontadoPorProjetoInexistenteLancaRecursoNaoEncontrado() {
+        when(projetoRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.totalApontadoPorProjetoOuEquipe(999L, null, agora.minus(1, ChronoUnit.DAYS), agora))
+                .isInstanceOf(RecursoNaoEncontradoException.class);
+    }
+
+    @Test
+    void totalApontadoPorEquipeInexistenteLancaRecursoNaoEncontrado() {
+        when(equipeRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.totalApontadoPorProjetoOuEquipe(null, 999L, agora.minus(1, ChronoUnit.DAYS), agora))
+                .isInstanceOf(RecursoNaoEncontradoException.class);
     }
 }

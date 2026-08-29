@@ -2,6 +2,7 @@ package io.escritor.presenca.apontamento.web;
 
 import io.escritor.presenca.apontamento.domain.ApontamentoDeOutroUsuarioException;
 import io.escritor.presenca.apontamento.domain.ApontamentoJaEncerradoException;
+import io.escritor.presenca.apontamento.domain.FiltroRelatorioInvalidoException;
 import io.escritor.presenca.apontamento.domain.LancamentoManualInvalidoException;
 import io.escritor.presenca.apontamento.service.ApontamentoService;
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
@@ -396,5 +397,79 @@ class ApontamentoControllerTest {
                         .param("inicio", "2026-01-01T00:00:00Z")
                         .param("fim", "2026-02-01T00:00:00Z"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void totalApontadoPorProjetoOuEquipeSemAutenticacaoRetorna401() throws Exception {
+        mockMvc.perform(get("/apontamentos/relatorio")
+                        .param("projetoId", "20")
+                        .param("inicio", "2026-01-01T00:00:00Z")
+                        .param("fim", "2026-02-01T00:00:00Z"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "COLABORADOR")
+    void totalApontadoPorProjetoOuEquipeComPapelColaboradorRetorna403() throws Exception {
+        mockMvc.perform(get("/apontamentos/relatorio")
+                        .param("projetoId", "20")
+                        .param("inicio", "2026-01-01T00:00:00Z")
+                        .param("fim", "2026-02-01T00:00:00Z"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "GESTOR")
+    void gestorConsultaOTotalApontadoPorProjeto() throws Exception {
+        when(apontamentoService.totalApontadoPorProjetoOuEquipe(eq(20L), isNull(), any(), any()))
+                .thenReturn(new TotalApontadoResponse(90));
+
+        mockMvc.perform(get("/apontamentos/relatorio")
+                        .param("projetoId", "20")
+                        .param("inicio", "2026-01-01T00:00:00Z")
+                        .param("fim", "2026-02-01T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalMinutos").value(90));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void adminConsultaOTotalApontadoPorEquipe() throws Exception {
+        when(apontamentoService.totalApontadoPorProjetoOuEquipe(isNull(), eq(30L), any(), any()))
+                .thenReturn(new TotalApontadoResponse(15));
+
+        mockMvc.perform(get("/apontamentos/relatorio")
+                        .param("equipeId", "30")
+                        .param("inicio", "2026-01-01T00:00:00Z")
+                        .param("fim", "2026-02-01T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalMinutos").value(15));
+    }
+
+    @Test
+    @WithMockUser(roles = "GESTOR")
+    void totalApontadoComProjetoIdEEquipeIdJuntosRetorna400() throws Exception {
+        when(apontamentoService.totalApontadoPorProjetoOuEquipe(eq(20L), eq(30L), any(), any()))
+                .thenThrow(new FiltroRelatorioInvalidoException("ambíguo"));
+
+        mockMvc.perform(get("/apontamentos/relatorio")
+                        .param("projetoId", "20")
+                        .param("equipeId", "30")
+                        .param("inicio", "2026-01-01T00:00:00Z")
+                        .param("fim", "2026-02-01T00:00:00Z"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "GESTOR")
+    void totalApontadoPorProjetoInexistenteRetorna404() throws Exception {
+        when(apontamentoService.totalApontadoPorProjetoOuEquipe(eq(999L), isNull(), any(), any()))
+                .thenThrow(new RecursoNaoEncontradoException("não encontrado"));
+
+        mockMvc.perform(get("/apontamentos/relatorio")
+                        .param("projetoId", "999")
+                        .param("inicio", "2026-01-01T00:00:00Z")
+                        .param("fim", "2026-02-01T00:00:00Z"))
+                .andExpect(status().isNotFound());
     }
 }

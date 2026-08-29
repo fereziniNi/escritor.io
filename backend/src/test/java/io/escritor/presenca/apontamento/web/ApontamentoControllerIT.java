@@ -7,9 +7,12 @@ import io.escritor.presenca.identidade.domain.Equipe;
 import io.escritor.presenca.identidade.domain.MembroEquipe;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.PapelNaEquipe;
+import io.escritor.presenca.identidade.domain.Projeto;
+import io.escritor.presenca.identidade.domain.StatusProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.EquipeRepository;
 import io.escritor.presenca.identidade.repository.MembroEquipeRepository;
+import io.escritor.presenca.identidade.repository.ProjetoRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.Coluna;
@@ -73,6 +76,9 @@ class ApontamentoControllerIT {
 
     @Autowired
     private MembroEquipeRepository membroEquipeRepository;
+
+    @Autowired
+    private ProjetoRepository projetoRepository;
 
     private RestTestClient restTestClient;
 
@@ -626,5 +632,38 @@ class ApontamentoControllerIT {
                 .jsonPath("$[0].totalMinutos").isEqualTo(90)
                 .jsonPath("$[1].cardId").isEqualTo(cardB.getId())
                 .jsonPath("$[1].totalMinutos").isEqualTo(15);
+    }
+
+    @Test
+    void gestorConsultaOTotalApontadoPorProjetoDeVerdade() {
+        Usuario gestor = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s55-gestor@escritor.io", Papel.GESTOR, 480));
+        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Projeto S55", "Cliente", StatusProjeto.ATIVO, java.time.LocalDate.now(), null));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", projeto, null));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Card card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, gestor));
+        apontamentoRepository.saveAndFlush(new Apontamento(
+                gestor, card, Instant.parse("2026-01-15T09:00:00Z"), Instant.parse("2026-01-15T10:00:00Z"), null, OrigemApontamento.MANUAL));
+        String tokenGestor = jwtService.gerarAccessToken(gestor.getId(), Papel.GESTOR);
+
+        client().get()
+                .uri("/apontamentos/relatorio?projetoId={projetoId}&inicio={inicio}&fim={fim}", projeto.getId(), "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z")
+                .header("Authorization", "Bearer " + tokenGestor)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.totalMinutos").isEqualTo(60);
+    }
+
+    @Test
+    void colaboradorTentandoConsultarRelatorioPorEquipeRecebe403DeVerdade() {
+        Usuario colaborador = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s55-colaborador@escritor.io", Papel.COLABORADOR, 480));
+        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
+        String tokenColaborador = jwtService.gerarAccessToken(colaborador.getId(), Papel.COLABORADOR);
+
+        client().get()
+                .uri("/apontamentos/relatorio?equipeId={equipeId}&inicio={inicio}&fim={fim}", equipe.getId(), "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z")
+                .header("Authorization", "Bearer " + tokenColaborador)
+                .exchange()
+                .expectStatus().isForbidden();
     }
 }

@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -81,5 +82,21 @@ public class ApontamentoController {
     public List<TotalPorCardResponse> listarTotalPorCard(
             @RequestParam(required = false) Long usuarioId, @RequestParam Instant inicio, @RequestParam Instant fim) {
         return apontamentoService.listarTotalPorCard(usuarioId, inicio, fim, contextoUsuarioAutenticado.usuarioAtual());
+    }
+
+    /**
+     * "Onde o esforço foi" por projeto/equipe (S5.5) - agregação de todo mundo que apontou tempo
+     * nos cards vinculados, não só de um usuário (diferente de {@link #listarTotalPorCard}), por
+     * isso restrito a gestor/admin aqui - `VisibilidadeUsuarioService` não se aplica, é sobre
+     * "ver dados de outro usuário", um eixo diferente de "ver dados de uma equipe/projeto".
+     */
+    @GetMapping("/apontamentos/relatorio")
+    @PreAuthorize("hasAnyRole('GESTOR', 'ADMIN')")
+    public TotalApontadoResponse totalApontadoPorProjetoOuEquipe(
+            @RequestParam(required = false) Long projetoId,
+            @RequestParam(required = false) Long equipeId,
+            @RequestParam Instant inicio,
+            @RequestParam Instant fim) {
+        return apontamentoService.totalApontadoPorProjetoOuEquipe(projetoId, equipeId, inicio, fim);
     }
 }

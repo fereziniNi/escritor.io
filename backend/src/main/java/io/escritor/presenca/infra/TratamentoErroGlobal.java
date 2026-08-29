@@ -2,6 +2,7 @@ package io.escritor.presenca.infra;
 
 import io.escritor.presenca.apontamento.domain.ApontamentoDeOutroUsuarioException;
 import io.escritor.presenca.apontamento.domain.ApontamentoJaEncerradoException;
+import io.escritor.presenca.apontamento.domain.FiltroRelatorioInvalidoException;
 import io.escritor.presenca.apontamento.domain.FimAntesDoInicioException;
 import io.escritor.presenca.apontamento.domain.LancamentoManualInvalidoException;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
@@ -144,5 +145,10 @@ public class TratamentoErroGlobal {
     @ExceptionHandler(JornadaDeOutroUsuarioException.class)
     ResponseEntity<Void> tratarJornadaDeOutroUsuario() {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
+
+    @ExceptionHandler(FiltroRelatorioInvalidoException.class)
+    ResponseEntity<Void> tratarFiltroRelatorioInvalido() {
+        return ResponseEntity.badRequest().build();
     }
 }
