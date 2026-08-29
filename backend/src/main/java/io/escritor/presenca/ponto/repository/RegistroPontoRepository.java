@@ -12,4 +12,12 @@ public interface RegistroPontoRepository extends JpaRepository<RegistroPonto, Lo
     Optional<RegistroPonto> findFirstByUsuarioOrderByCriadoEmDesc(Usuario usuario);
 
     List<RegistroPonto> findByUsuarioAndMomentoGreaterThanEqualOrderByMomentoAsc(Usuario usuario, Instant desde);
+
+    /**
+     * Diferente da query acima (só limite inferior, usada pra "mês corrente até agora") - esta
+     * tem os dois limites, pra consultar um período arbitrário/passado (S5.7) sem trazer
+     * registros de fora dele.
+     */
+    List<RegistroPonto> findByUsuarioAndMomentoGreaterThanEqualAndMomentoLessThanOrderByMomentoAsc(
+            Usuario usuario, Instant inicio, Instant fim);
 }

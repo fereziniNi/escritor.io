@@ -24,6 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -258,5 +259,60 @@ class PontoControllerTest {
     @Test
     void espelhoDoMesCsvSemAutenticacaoRetorna401() throws Exception {
         mockMvc.perform(get("/ponto/espelho-do-mes").param("formato", "csv")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void diasInconsistentesSemAutenticacaoRetorna401() throws Exception {
+        mockMvc.perform(get("/ponto/dias-inconsistentes")
+                        .param("inicio", "2026-01-01T00:00:00Z")
+                        .param("fim", "2026-02-01T00:00:00Z"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void diasInconsistentesRetornaAsDatas() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(jornadaService.diasInconsistentes(isNull(), any(), any(), any()))
+                .thenReturn(java.util.List.of(java.time.LocalDate.parse("2026-01-11"), java.time.LocalDate.parse("2026-01-12")));
+
+        mockMvc.perform(get("/ponto/dias-inconsistentes")
+                        .param("inicio", "2026-01-01T00:00:00Z")
+                        .param("fim", "2026-02-01T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value("2026-01-11"))
+                .andExpect(jsonPath("$[1]").value("2026-01-12"));
+    }
+
+    @Test
+    @WithMockUser
+    void diasInconsistentesComUsuarioIdRepassaOFiltroPraOServico() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(jornadaService.diasInconsistentes(eq(7L), any(), any(), any())).thenReturn(java.util.List.of());
+
+        mockMvc.perform(get("/ponto/dias-inconsistentes")
+                        .param("usuarioId", "7")
+                        .param("inicio", "2026-01-01T00:00:00Z")
+                        .param("fim", "2026-02-01T00:00:00Z"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser
+    void diasInconsistentesDeUsuarioSemPermissaoRetorna403() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(jornadaService.diasInconsistentes(eq(7L), any(), any(), any())).thenThrow(new JornadaDeOutroUsuarioException());
+
+        mockMvc.perform(get("/ponto/dias-inconsistentes")
+                        .param("usuarioId", "7")
+                        .param("inicio", "2026-01-01T00:00:00Z")
+                        .param("fim", "2026-02-01T00:00:00Z"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser
+    void diasInconsistentesSemInicioOuFimRetorna400() throws Exception {
+        mockMvc.perform(get("/ponto/dias-inconsistentes")).andExpect(status().isBadRequest());
     }
 }

@@ -161,4 +161,48 @@ class PontoControllerIT {
                 .exchange()
                 .expectStatus().isForbidden();
     }
+
+    @Test
+    void gestorConsultaOsDiasInconsistentesDeUmMembroDaEquipeQueLideraDeVerdade() {
+        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
+        Usuario gestor = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s57-gestor@escritor.io", Papel.GESTOR, 480));
+        Usuario membro = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s57-membro@escritor.io", Papel.COLABORADOR, 480));
+        membroEquipeRepository.saveAndFlush(new MembroEquipe(equipe, gestor, PapelNaEquipe.LIDER));
+        membroEquipeRepository.saveAndFlush(new MembroEquipe(equipe, membro, PapelNaEquipe.MEMBRO));
+        // só ENTRADA, dia bem no passado - com certeza já virou.
+        registroPontoRepository.saveAndFlush(new RegistroPonto(
+                membro, TipoRegistroPonto.ENTRADA, Instant.parse("2026-01-11T09:00:00Z"), OrigemRegistroPonto.WEB, "127.0.0.1", "junit", null));
+        String tokenGestor = jwtService.gerarAccessToken(gestor.getId(), Papel.GESTOR);
+
+        client().get()
+                .uri(
+                        "/ponto/dias-inconsistentes?usuarioId={usuarioId}&inicio={inicio}&fim={fim}",
+                        membro.getId(),
+                        "2026-01-01T00:00:00Z",
+                        "2026-02-01T00:00:00Z")
+                .header("Authorization", "Bearer " + tokenGestor)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.length()").isEqualTo(1)
+                .jsonPath("$[0]").isEqualTo("2026-01-11");
+    }
+
+    @Test
+    void gestorTentandoVerDiasInconsistentesDeUsuarioForaDaEquipeQueLideraRecebe403DeVerdade() {
+        Usuario gestor = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s57-gestorfora@escritor.io", Papel.GESTOR, 480));
+        Usuario forasteiro =
+                usuarioRepository.saveAndFlush(new Usuario("Caio Reis", "caio-s57-forasteiro@escritor.io", Papel.COLABORADOR, 480));
+        String tokenGestor = jwtService.gerarAccessToken(gestor.getId(), Papel.GESTOR);
+
+        client().get()
+                .uri(
+                        "/ponto/dias-inconsistentes?usuarioId={usuarioId}&inicio={inicio}&fim={fim}",
+                        forasteiro.getId(),
+                        "2026-01-01T00:00:00Z",
+                        "2026-02-01T00:00:00Z")
+                .header("Authorization", "Bearer " + tokenGestor)
+                .exchange()
+                .expectStatus().isForbidden();
+    }
 }

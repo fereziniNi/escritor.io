@@ -18,6 +18,7 @@ import io.escritor.presenca.ponto.domain.TipoRegistroPonto;
 import io.escritor.presenca.ponto.repository.RegistroPontoRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -253,5 +254,53 @@ class JornadaServiceTest {
         var espelho = jornadaService.espelhoDoMes(3L, usuario);
 
         assertThat(espelho.dias()).hasSize(1);
+    }
+
+    @Test
+    void diasInconsistentesRetornaSoOsDiasSemSaidaAposAVirada() {
+        // terça-feira 2026-01-13, 20h (clock fixo do setUp) - "hoje" ainda não virou.
+        Instant inicioDoPeriodo = Instant.parse("2026-01-10T00:00:00Z");
+        Instant fimDoPeriodo = Instant.parse("2026-01-14T00:00:00Z");
+        when(visibilidadeUsuarioService.resolverAlvo(isNull(), eq(usuario), any())).thenReturn(usuario);
+        when(registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualAndMomentoLessThanOrderByMomentoAsc(
+                        usuario, inicioDoPeriodo, fimDoPeriodo))
+                .thenReturn(List.of(
+                        // 01-10: fechada (tem SAIDA) - não deve aparecer.
+                        registro(TipoRegistroPonto.ENTRADA, "2026-01-10T09:00:00Z"),
+                        registro(TipoRegistroPonto.SAIDA, "2026-01-10T18:00:00Z"),
+                        // 01-11: só ENTRADA, dia já virou - inconsistente.
+                        registro(TipoRegistroPonto.ENTRADA, "2026-01-11T09:00:00Z"),
+                        // 01-12: só ENTRADA, dia já virou - inconsistente.
+                        registro(TipoRegistroPonto.ENTRADA, "2026-01-12T09:00:00Z"),
+                        // 01-13 (hoje, 20h): só ENTRADA, mas o dia ainda não virou - aberta, não inconsistente.
+                        registro(TipoRegistroPonto.ENTRADA, "2026-01-13T09:00:00Z")));
+
+        var dias = jornadaService.diasInconsistentes(null, inicioDoPeriodo, fimDoPeriodo, usuario);
+
+        assertThat(dias).containsExactly(LocalDate.parse("2026-01-11"), LocalDate.parse("2026-01-12"));
+    }
+
+    @Test
+    void diasInconsistentesComUsuarioIdUsaOAlvoResolvido() {
+        Usuario alvo = usuarioComId(3L, 480);
+        Instant inicioDoPeriodo = Instant.parse("2026-01-10T00:00:00Z");
+        Instant fimDoPeriodo = Instant.parse("2026-01-14T00:00:00Z");
+        when(visibilidadeUsuarioService.resolverAlvo(eq(3L), eq(usuario), any())).thenReturn(alvo);
+        when(registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualAndMomentoLessThanOrderByMomentoAsc(
+                        alvo, inicioDoPeriodo, fimDoPeriodo))
+                .thenReturn(List.of(registro(alvo, TipoRegistroPonto.ENTRADA, "2026-01-11T09:00:00Z")));
+
+        var dias = jornadaService.diasInconsistentes(3L, inicioDoPeriodo, fimDoPeriodo, usuario);
+
+        assertThat(dias).containsExactly(LocalDate.parse("2026-01-11"));
+    }
+
+    @Test
+    void diasInconsistentesPropagaExcecaoDeAcessoNegadoDaVisibilidade() {
+        when(visibilidadeUsuarioService.resolverAlvo(eq(2L), eq(usuario), any())).thenThrow(new JornadaDeOutroUsuarioException());
+
+        assertThatThrownBy(() -> jornadaService.diasInconsistentes(
+                        2L, Instant.parse("2026-01-01T00:00:00Z"), Instant.parse("2026-02-01T00:00:00Z"), usuario))
+                .isInstanceOf(JornadaDeOutroUsuarioException.class);
     }
 }

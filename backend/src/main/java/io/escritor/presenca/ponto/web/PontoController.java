@@ -5,6 +5,9 @@ import io.escritor.presenca.ponto.service.JornadaService;
 import io.escritor.presenca.ponto.service.PontoService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -61,5 +64,11 @@ public class PontoController {
     public ResponseEntity<String> espelhoDoMesCsv(@RequestParam(required = false) Long usuarioId) {
         EspelhoMesResponse espelho = jornadaService.espelhoDoMes(usuarioId, contextoUsuarioAutenticado.usuarioAtual());
         return ResponseEntity.ok().contentType(MediaType.valueOf("text/csv")).body(EspelhoMesCsv.gerar(espelho));
+    }
+
+    @GetMapping("/dias-inconsistentes")
+    public List<LocalDate> diasInconsistentes(
+            @RequestParam(required = false) Long usuarioId, @RequestParam Instant inicio, @RequestParam Instant fim) {
+        return jornadaService.diasInconsistentes(usuarioId, inicio, fim, contextoUsuarioAutenticado.usuarioAtual());
     }
 }

@@ -61,4 +61,29 @@ class RegistroPontoRepositoryIT {
         assertThat(recuperado.hashValido()).isTrue();
         assertThat(recuperado.getCriadoEm()).isNotNull();
     }
+
+    @Test
+    void encontraRegistrosDoUsuarioDentroDoPeriodoEIgnoraForaEOutroUsuario() {
+        Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-periodo@escritor.io", Papel.COLABORADOR, 480));
+        Usuario outroUsuario = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-periodo@escritor.io", Papel.COLABORADOR, 480));
+        Instant inicioDoPeriodo = Instant.parse("2026-01-10T00:00:00Z");
+        Instant fimDoPeriodo = Instant.parse("2026-01-14T00:00:00Z");
+
+        RegistroPonto dentro = registroPontoRepository.saveAndFlush(
+                new RegistroPonto(usuario, TipoRegistroPonto.ENTRADA, Instant.parse("2026-01-11T09:00:00Z"), OrigemRegistroPonto.WEB, "127.0.0.1", "junit", null));
+        // fora do período (antes).
+        registroPontoRepository.saveAndFlush(
+                new RegistroPonto(usuario, TipoRegistroPonto.ENTRADA, Instant.parse("2026-01-09T09:00:00Z"), OrigemRegistroPonto.WEB, "127.0.0.1", "junit", null));
+        // fora do período (depois, no limite exclusivo).
+        registroPontoRepository.saveAndFlush(
+                new RegistroPonto(usuario, TipoRegistroPonto.ENTRADA, Instant.parse("2026-01-14T00:00:00Z"), OrigemRegistroPonto.WEB, "127.0.0.1", "junit", null));
+        // dentro do período, mas de outro usuário.
+        registroPontoRepository.saveAndFlush(
+                new RegistroPonto(outroUsuario, TipoRegistroPonto.ENTRADA, Instant.parse("2026-01-11T09:00:00Z"), OrigemRegistroPonto.WEB, "127.0.0.1", "junit", null));
+
+        var encontrados = registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualAndMomentoLessThanOrderByMomentoAsc(
+                usuario, inicioDoPeriodo, fimDoPeriodo);
+
+        assertThat(encontrados).extracting(RegistroPonto::getId).containsExactly(dentro.getId());
+    }
 }

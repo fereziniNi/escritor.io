@@ -121,13 +121,43 @@ public class JornadaService {
         return new EspelhoMesResponse(dias, saldoAcumuladoNoPeriodo);
     }
 
+    /**
+     * Dias inconsistentes (S5.7) num período arbitrário - diferente de {@link #jornadaDoDia}, que
+     * só olha "hoje", isso vale pra qualquer intervalo passado. Reusa {@link EstadoDia#calcular}
+     * (S2.8) por dia; um dia sem nenhuma marcação nunca é "inconsistente" (nem aparece no mapa
+     * agrupado), mesma convenção de {@link #espelhoDoMes(Usuario)} ("só lista dias com pelo menos
+     * uma marcação").
+     */
+    public List<LocalDate> diasInconsistentes(Long usuarioIdFiltro, Instant inicio, Instant fim, Usuario usuarioAutenticado) {
+        Usuario usuarioAlvo =
+                visibilidadeUsuarioService.resolverAlvo(usuarioIdFiltro, usuarioAutenticado, JornadaDeOutroUsuarioException::new);
+        Instant agora = Instant.now(clock);
+
+        Map<LocalDate, List<Marcacao>> marcacoesPorDia = agruparPorDia(
+                registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualAndMomentoLessThanOrderByMomentoAsc(
+                        usuarioAlvo, inicio, fim));
+
+        return marcacoesPorDia.entrySet().stream()
+                .filter(entrada -> {
+                    Instant fimDoDia = entrada.getKey().plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+                    return EstadoDia.calcular(entrada.getValue(), fimDoDia, agora) == EstadoDia.INCONSISTENTE;
+                })
+                .map(Map.Entry::getKey)
+                .sorted()
+                .toList();
+    }
+
     private Map<LocalDate, List<Marcacao>> marcacoesPorDiaNoMesCorrente(Usuario usuario, LocalDate hoje) {
         Instant inicioDoPeriodo = hoje.withDayOfMonth(1).atStartOfDay(ZoneOffset.UTC).toInstant();
 
         List<RegistroPonto> registrosDoPeriodo = registroPontoRepository
                 .findByUsuarioAndMomentoGreaterThanEqualOrderByMomentoAsc(usuario, inicioDoPeriodo);
 
-        return registrosDoPeriodo.stream()
+        return agruparPorDia(registrosDoPeriodo);
+    }
+
+    private static Map<LocalDate, List<Marcacao>> agruparPorDia(List<RegistroPonto> registros) {
+        return registros.stream()
                 .collect(Collectors.groupingBy(
                         registro -> registro.getMomento().atZone(ZoneOffset.UTC).toLocalDate(),
                         LinkedHashMap::new,
