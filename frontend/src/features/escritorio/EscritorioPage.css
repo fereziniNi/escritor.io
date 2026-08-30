@@ -1,7 +1,10 @@
 .escritorio-pagina {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 1.5rem 1rem 3rem;
+  width: 100%;
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 1.25rem 1.5rem 2rem;
+  display: flex;
+  flex-direction: column;
 }
 
 .escritorio-titulo {
@@ -24,21 +27,31 @@
 
 .escritorio-layout {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 1.25rem;
   flex-wrap: wrap;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .escritorio-coluna-mapa {
-  flex: 2 1 560px;
+  flex: 1 1 560px;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .escritorio-coluna-lista {
-  flex: 1 1 260px;
-  min-width: 240px;
-  position: sticky;
-  top: 1rem;
+  flex: 0 1 300px;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+}
+
+.escritorio-coluna-lista .escritorio-lista-presenca {
+  flex: 1;
+  overflow-y: auto;
 }
 
 /* ---------- moldura + piso ---------- */
@@ -51,17 +64,26 @@
   box-shadow: var(--sombra-cartao);
   overflow: auto;
   max-width: 100%;
+  max-height: 100%;
 }
 
 .escritorio-mapa {
+  --tamanho-tile: 40px;
   position: relative;
   background-color: #d9b98a;
   background-image:
-    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.05) 0, rgba(0, 0, 0, 0.05) 2px, transparent 2px, transparent 64px),
-    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.06) 0, rgba(0, 0, 0, 0.06) 1px, transparent 1px, transparent 32px),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0 32px, transparent 32px 64px);
+    repeating-linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.05) 0,
+      rgba(0, 0, 0, 0.05) 2px,
+      transparent 2px,
+      transparent calc(var(--tamanho-tile) * 2)
+    ),
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.06) 0, rgba(0, 0, 0, 0.06) 1px, transparent 1px, transparent var(--tamanho-tile)),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0 var(--tamanho-tile), transparent var(--tamanho-tile) calc(var(--tamanho-tile) * 2));
   border: 3px solid #2b1f16;
   border-radius: 8px;
+  flex: none;
 }
 
 /* ---------- salas ---------- */

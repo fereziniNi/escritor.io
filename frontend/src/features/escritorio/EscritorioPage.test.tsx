@@ -122,7 +122,7 @@ describe('EscritorioPage', () => {
     fireEvent.keyDown(window, { key: 'ArrowRight' })
 
     await waitFor(() => {
-      expect(screen.getByTestId('avatar-1')).toHaveStyle({ left: '192px', top: '160px' }); // (6*32, 5*32)
+      expect(screen.getByTestId('avatar-1')).toHaveStyle({ left: '240px', top: '200px' }); // (6*40, 5*40)
     })
     // nenhuma resposta do servidor foi simulada - a posição já mudou só com a predição local
     expect(WebSocketFalso.instancias[0].mensagensEnviadas).toContain(JSON.stringify({ tipo: 'POSICAO', x: 6, y: 5 }))

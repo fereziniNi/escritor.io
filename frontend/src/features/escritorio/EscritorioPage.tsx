@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties, RefObject } from 'react'
 import { HealthStatus } from '../../app/HealthStatus'
 import { useAuthStore } from '../auth/authStore'
 import { EquipesPage } from '../organizacao/EquipesPage'
@@ -28,7 +29,12 @@ const TITULO_PAINEL: Record<PainelId, string> = {
   projetos: '📁 Projetos',
 }
 
-const TAMANHO_TILE_PX = 32
+/** Usado como valor inicial/fallback (inclusive em teste, onde `ResizeObserver` não existe no
+ * jsdom) - o tamanho real vem de `useTamanhoTileResponsivo` quando há um `ResizeObserver` de
+ * verdade medindo o espaço disponível. */
+const TAMANHO_TILE_PADRAO_PX = 40
+const TAMANHO_TILE_MINIMO_PX = 24
+const TAMANHO_TILE_MAXIMO_PX = 72
 
 const TECLA_PARA_DELTA: Record<string, readonly [number, number]> = {
   ArrowUp: [0, -1],
@@ -68,7 +74,7 @@ function useAnimacaoPersonagem(x: number) {
   return { direcao, andando }
 }
 
-function AvatarNoMapa({ usuario, ehEu }: { usuario: EstadoPresencaUsuario; ehEu: boolean }) {
+function AvatarNoMapa({ usuario, ehEu, tamanhoTile }: { usuario: EstadoPresencaUsuario; ehEu: boolean; tamanhoTile: number }) {
   const { direcao, andando } = useAnimacaoPersonagem(usuario.x)
 
   return (
@@ -77,9 +83,9 @@ function AvatarNoMapa({ usuario, ehEu }: { usuario: EstadoPresencaUsuario; ehEu:
       data-testid={`avatar-${usuario.usuarioId}`}
       title={`${usuario.nome} - ${ROTULO_STATUS[usuario.status]}`}
       style={{
-        left: usuario.x * TAMANHO_TILE_PX,
-        top: usuario.y * TAMANHO_TILE_PX,
-        width: TAMANHO_TILE_PX,
+        left: usuario.x * tamanhoTile,
+        top: usuario.y * tamanhoTile,
+        width: tamanhoTile,
       }}
     >
       <span className="escritorio-personagem-corpo">
@@ -89,6 +95,43 @@ function AvatarNoMapa({ usuario, ehEu }: { usuario: EstadoPresencaUsuario; ehEu:
       <span className="escritorio-avatar-nome">{usuario.nome}</span>
     </div>
   )
+}
+
+/**
+ * Tamanho de tile responsivo: mede quanto espaço `.escritorio-coluna-mapa` tem disponível (o
+ * dock/sidebar já ocupam o resto via flexbox) e escolhe o maior tile que ainda cabe o mapa
+ * inteiro sem cortar, dentro de um mínimo/máximo razoável - assim o mapa realmente preenche a
+ * janela em telas grandes, em vez de ficar um retângulo pequeno flutuando no meio de um espaço
+ * vazio. Sem `ResizeObserver` (jsdom nos testes, ou um navegador muito antigo) fica no valor
+ * padrão fixo - mesmo tamanho que a página sempre teve, então nenhuma asserção de pixel exato
+ * nos testes muda.
+ */
+function useTamanhoTileResponsivo(containerRef: RefObject<HTMLDivElement | null>, larguraTiles: number, alturaTiles: number) {
+  const [tamanho, setTamanho] = useState(TAMANHO_TILE_PADRAO_PX)
+
+  useEffect(() => {
+    const elemento = containerRef.current
+    if (!elemento || typeof ResizeObserver === 'undefined') {
+      return undefined
+    }
+
+    const observer = new ResizeObserver((entradas) => {
+      const entrada = entradas[0]
+      if (!entrada) {
+        return
+      }
+      const { width, height } = entrada.contentRect
+      if (width <= 0 || height <= 0) {
+        return
+      }
+      const calculado = Math.floor(Math.min(width / larguraTiles, height / alturaTiles))
+      setTamanho(Math.max(TAMANHO_TILE_MINIMO_PX, Math.min(TAMANHO_TILE_MAXIMO_PX, calculado)))
+    })
+    observer.observe(elemento)
+    return () => observer.disconnect()
+  }, [containerRef, larguraTiles, alturaTiles])
+
+  return tamanho
 }
 
 /**
@@ -111,6 +154,8 @@ export function EscritorioPage() {
   const { usuarios, meuUsuarioId, mover, definirStatus } = usePresencaWebSocket()
   const papel = useAuthStore((estado) => estado.papel)
   const [painelAberto, setPainelAberto] = useState<PainelId | null>(null)
+  const colunaMapaRef = useRef<HTMLDivElement>(null)
+  const tamanhoTile = useTamanhoTileResponsivo(colunaMapaRef, mapaQuery.data?.larguraTiles ?? 1, mapaQuery.data?.alturaTiles ?? 1)
 
   useEffect(() => {
     const mapa = mapaQuery.data
@@ -206,15 +251,18 @@ export function EscritorioPage() {
       )}
 
       <div className="escritorio-layout">
-        <div className="escritorio-coluna-mapa">
+        <div className="escritorio-coluna-mapa" ref={colunaMapaRef}>
           <div className="escritorio-mapa-moldura">
             <div
               className="escritorio-mapa"
               data-testid="mapa"
-              style={{
-                width: mapa.larguraTiles * TAMANHO_TILE_PX,
-                height: mapa.alturaTiles * TAMANHO_TILE_PX,
-              }}
+              style={
+                {
+                  width: mapa.larguraTiles * tamanhoTile,
+                  height: mapa.alturaTiles * tamanhoTile,
+                  '--tamanho-tile': `${tamanhoTile}px`,
+                } as CSSProperties
+              }
             >
               {mapa.zonas.map((zona) => (
                 <div
@@ -223,10 +271,10 @@ export function EscritorioPage() {
                   title={zona.nome}
                   data-testid={`zona-${zona.id}`}
                   style={{
-                    left: zona.x * TAMANHO_TILE_PX,
-                    top: zona.y * TAMANHO_TILE_PX,
-                    width: zona.largura * TAMANHO_TILE_PX,
-                    height: zona.altura * TAMANHO_TILE_PX,
+                    left: zona.x * tamanhoTile,
+                    top: zona.y * tamanhoTile,
+                    width: zona.largura * tamanhoTile,
+                    height: zona.altura * tamanhoTile,
                     background: COR_POR_TIPO_ZONA[zona.tipo],
                   }}
                 >
@@ -243,7 +291,7 @@ export function EscritorioPage() {
               ))}
 
               {Object.values(usuarios).map((usuario) => (
-                <AvatarNoMapa key={usuario.usuarioId} usuario={usuario} ehEu={usuario.usuarioId === meuUsuarioId} />
+                <AvatarNoMapa key={usuario.usuarioId} usuario={usuario} ehEu={usuario.usuarioId === meuUsuarioId} tamanhoTile={tamanhoTile} />
               ))}
             </div>
           </div>
