@@ -237,6 +237,93 @@ class PresencaWebSocketIT {
     }
 
     @Test
+    void entrarNumaZonaFocoAtualizaOStatusAutomaticamente() throws Exception {
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s67a@escritor.io", Papel.COLABORADOR, 480));
+        String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
+        BlockingQueue<String> mensagensAna = new LinkedBlockingQueue<>();
+
+        WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
+        try {
+            mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
+
+            // zona "Sala de foco" seedada por V21__create_zona.sql cobre x em [0,4) e y em [0,4)
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":1,\"y\":1}"));
+
+            String recebido = mensagensAna.poll(5, TimeUnit.SECONDS);
+            assertThat(recebido).isNotNull().contains("\"status\":\"FOCO\"");
+        } finally {
+            sessaoAna.close();
+        }
+    }
+
+    @Test
+    void sairDaZonaSemTrocaManualRestauraOStatusDeAntesDeEntrar() throws Exception {
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s67b@escritor.io", Papel.COLABORADOR, 480));
+        String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
+        BlockingQueue<String> mensagensAna = new LinkedBlockingQueue<>();
+
+        WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
+        try {
+            mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":1,\"y\":1}")); // entra na zona de foco
+            String dentro = mensagensAna.poll(5, TimeUnit.SECONDS);
+            assertThat(dentro).isNotNull().contains("\"status\":\"FOCO\"");
+
+            // (8,8) não cai em nenhuma zona seedada (foco/reunião/café ficam todas em y < 5)
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":8,\"y\":8}"));
+
+            String fora = mensagensAna.poll(5, TimeUnit.SECONDS);
+            assertThat(fora).isNotNull().contains("\"status\":\"DISPONIVEL\"");
+        } finally {
+            sessaoAna.close();
+        }
+    }
+
+    @Test
+    void statusTrocadoManualmenteDentroDaZonaSobreviveASaida() throws Exception {
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s67c@escritor.io", Papel.COLABORADOR, 480));
+        String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
+        BlockingQueue<String> mensagensAna = new LinkedBlockingQueue<>();
+
+        WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
+        try {
+            mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":1,\"y\":1}")); // entra na zona de foco
+            mensagensAna.poll(5, TimeUnit.SECONDS);
+
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"STATUS\",\"status\":\"ALMOCO\"}")); // troca manual, ainda dentro da zona
+            mensagensAna.poll(5, TimeUnit.SECONDS);
+
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":8,\"y\":8}")); // sai da zona pro espaço aberto
+
+            String fora = mensagensAna.poll(5, TimeUnit.SECONDS);
+            assertThat(fora).isNotNull().contains("\"status\":\"ALMOCO\"");
+        } finally {
+            sessaoAna.close();
+        }
+    }
+
+    @Test
+    void entrarNumaZonaSemStatusCorrespondenteNaoMudaOStatus() throws Exception {
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s67d@escritor.io", Papel.COLABORADOR, 480));
+        String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
+        BlockingQueue<String> mensagensAna = new LinkedBlockingQueue<>();
+
+        WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
+        try {
+            mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
+
+            // zona "Café" seedada por V21__create_zona.sql cobre x em [11,15) e y em [0,4) - sem StatusAvatar.CAFE
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":12,\"y\":1}"));
+
+            String recebido = mensagensAna.poll(5, TimeUnit.SECONDS);
+            assertThat(recebido).isNotNull().contains("\"status\":\"DISPONIVEL\"");
+        } finally {
+            sessaoAna.close();
+        }
+    }
+
+    @Test
     void desconectarRemoveOUsuarioDoEstado() throws Exception {
         Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s63c@escritor.io", Papel.COLABORADOR, 480));
         Usuario beto = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s63c@escritor.io", Papel.COLABORADOR, 480));
