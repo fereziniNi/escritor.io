@@ -12,6 +12,11 @@ function handlerPontoAberto() {
   return http.get('/ponto/estado-atual', () => HttpResponse.json({ ultimoTipo: 'ENTRADA', proximasOpcoes: ['PAUSA_INICIO', 'SAIDA'] }))
 }
 
+/** `HealthStatus` (S6, reskin "uma tela só") agora mora dentro de `EscritorioPage`. */
+function handlerHealthOk() {
+  return http.get('/health', () => HttpResponse.json({ status: 'UP' }))
+}
+
 function base64UrlEncode(json: object): string {
   const base64 = btoa(JSON.stringify(json))
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -93,7 +98,7 @@ function renderPagina() {
 
 describe('EscritorioPage', () => {
   it('renderiza o mapa e as zonas retornadas pela API', async () => {
-    server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto())
+    server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto(), handlerHealthOk())
 
     renderPagina()
 
@@ -102,7 +107,7 @@ describe('EscritorioPage', () => {
   })
 
   it('seta pressionada move o próprio avatar localmente de imediato, sem esperar resposta do servidor', async () => {
-    server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto())
+    server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto(), handlerHealthOk())
     renderPagina()
     await screen.findByText(/Escritório/)
 
@@ -124,7 +129,7 @@ describe('EscritorioPage', () => {
   })
 
   it('trocar o status no seletor atualiza o próprio avatar e manda a mudança pro servidor', async () => {
-    server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto())
+    server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto(), handlerHealthOk())
     renderPagina()
     await screen.findByText(/Escritório/)
 
@@ -145,7 +150,7 @@ describe('EscritorioPage', () => {
   })
 
   it('não deixa o avatar sair dos limites do mapa ao mover na borda', async () => {
-    server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto())
+    server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto(), handlerHealthOk())
     renderPagina()
     await screen.findByText(/Escritório/)
 
@@ -166,7 +171,7 @@ describe('EscritorioPage', () => {
   })
 
   it('a lista de presença reflete entrar/sair de zona e troca de status sem reload', async () => {
-    server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto())
+    server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto(), handlerHealthOk())
     renderPagina()
     await screen.findByText(/Escritório/)
 
@@ -193,6 +198,65 @@ describe('EscritorioPage', () => {
       expect(screen.getByTestId('presenca-zona-10')).toHaveTextContent('Foco')
     })
     expect(screen.getByTestId('presenca-zona-aberto')).not.toHaveTextContent('Ana')
+  })
+
+  it('abrir o painel de ponto pelo dock mostra o widget de ponto, sem sair da tela', async () => {
+    server.use(
+      http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)),
+      handlerPontoAberto(),
+      handlerHealthOk(),
+      http.get('/ponto/jornada-do-dia', () =>
+        HttpResponse.json({ data: '2026-08-30', estado: 'ABERTA', minutosTrabalhados: 0, saldoDia: 0, saldoAcumuladoNoPeriodo: 0, totalApontadoMinutos: 0 }),
+      ),
+      http.get('/ponto/espelho-do-mes', () => HttpResponse.json({ dias: [], saldoAcumuladoNoPeriodo: 0 })),
+    )
+    renderPagina()
+    await screen.findByText(/Escritório/)
+
+    fireEvent.click(screen.getByRole('button', { name: /Ponto/ }))
+
+    expect(await screen.findByRole('dialog', { name: /Ponto/ })).toBeInTheDocument()
+    // ponto aberto (ENTRADA) - PontoWidget deve oferecer pausa/saída, não "Entrada" de novo
+    expect(await screen.findByRole('button', { name: 'Saída' })).toBeInTheDocument()
+  })
+
+  it('fecha o painel ao clicar em Fechar', async () => {
+    server.use(
+      http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)),
+      handlerPontoAberto(),
+      handlerHealthOk(),
+      http.get('/ponto/jornada-do-dia', () =>
+        HttpResponse.json({ data: '2026-08-30', estado: 'ABERTA', minutosTrabalhados: 0, saldoDia: 0, saldoAcumuladoNoPeriodo: 0, totalApontadoMinutos: 0 }),
+      ),
+      http.get('/ponto/espelho-do-mes', () => HttpResponse.json({ dias: [], saldoAcumuladoNoPeriodo: 0 })),
+    )
+    renderPagina()
+    await screen.findByText(/Escritório/)
+
+    fireEvent.click(screen.getByRole('button', { name: /Ponto/ }))
+    await screen.findByRole('dialog', { name: /Ponto/ })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fechar' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('clicar no aviso de registrar entrada abre o painel de ponto', async () => {
+    server.use(
+      http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)),
+      http.get('/ponto/estado-atual', () => HttpResponse.json({ ultimoTipo: null, proximasOpcoes: ['ENTRADA'] })),
+      handlerHealthOk(),
+      http.get('/ponto/jornada-do-dia', () =>
+        HttpResponse.json({ data: '2026-08-30', estado: 'ABERTA', minutosTrabalhados: 0, saldoDia: 0, saldoAcumuladoNoPeriodo: 0, totalApontadoMinutos: 0 }),
+      ),
+      http.get('/ponto/espelho-do-mes', () => HttpResponse.json({ dias: [], saldoAcumuladoNoPeriodo: 0 })),
+    )
+    renderPagina()
+    await screen.findByText(/Escritório/)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ir pra tela de ponto' }))
+
+    expect(await screen.findByRole('dialog', { name: /Ponto/ })).toBeInTheDocument()
   })
 
   it('mostra erro quando não há mapa ativo', async () => {

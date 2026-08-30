@@ -1,9 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
-import { MemoryRouter } from 'react-router'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { SugestaoRegistrarEntrada } from './SugestaoRegistrarEntrada'
 
 const server = setupServer()
@@ -12,13 +11,11 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
-function renderComponente() {
+function renderComponente(aoClicarRegistrar: () => void = () => {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
-        <SugestaoRegistrarEntrada />
-      </MemoryRouter>
+      <SugestaoRegistrarEntrada aoClicarRegistrar={aoClicarRegistrar} />
     </QueryClientProvider>,
   )
   return queryClient
@@ -46,6 +43,16 @@ describe('SugestaoRegistrarEntrada', () => {
     renderComponente()
 
     expect(await screen.findByRole('alert')).toBeInTheDocument()
+  })
+
+  it('clicar no botão do aviso chama aoClicarRegistrar, pra abrir o painel de ponto', async () => {
+    server.use(http.get('/ponto/estado-atual', () => HttpResponse.json({ ultimoTipo: null, proximasOpcoes: ['ENTRADA'] })))
+    const aoClicarRegistrar = vi.fn()
+
+    renderComponente(aoClicarRegistrar)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ir pra tela de ponto' }))
+    expect(aoClicarRegistrar).toHaveBeenCalledOnce()
   })
 
   it('não mostra nada quando o ponto está aberto (ENTRADA)', async () => {

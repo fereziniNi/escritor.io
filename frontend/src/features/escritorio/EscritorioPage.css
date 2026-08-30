@@ -211,11 +211,12 @@
 .escritorio-dock {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
+  flex-wrap: wrap;
+  gap: 0.6rem;
   background: #2b2b3a;
   color: #fff;
   border-radius: 999px;
-  padding: 0.5rem 1rem;
+  padding: 0.5rem 0.9rem;
   margin-bottom: 0.9rem;
   box-shadow: var(--sombra-cartao);
   width: fit-content;
@@ -236,9 +237,97 @@
   border: 2px solid #52526a;
 }
 
+.escritorio-dock-separador {
+  width: 1px;
+  align-self: stretch;
+  background: #4a4a60;
+  margin: 0 0.1rem;
+}
+
+.escritorio-dock-botao {
+  background: #3c3c50;
+  border: 2px solid #52526a;
+  box-shadow: none;
+  padding: 0.4em 0.85em;
+  font-size: 0.82rem;
+  border-radius: 999px;
+}
+
+.escritorio-dock-botao:hover:not(:disabled) {
+  background: #4a4a63;
+  transform: none;
+  box-shadow: none;
+}
+
+.escritorio-dock-botao:active:not(:disabled) {
+  background: var(--cor-acento);
+  border-color: var(--cor-acento-escuro);
+}
+
 .escritorio-dock-dica {
   font-size: 0.75rem;
   color: #a9a9bd;
+  white-space: nowrap;
+}
+
+/* ---------- painel flutuante (dock -> funções integradas) ---------- */
+
+.escritorio-painel-fundo {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 18, 15, 0.55);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 3vh 1rem;
+  z-index: 50;
+  overflow-y: auto;
+}
+
+.escritorio-painel {
+  background: var(--cor-fundo);
+  border-radius: var(--raio-borda);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  width: min(760px, 100%);
+  max-height: 94vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.escritorio-painel-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1.1rem;
+  background: #2b2b3a;
+  color: #fff;
+}
+
+.escritorio-painel-cabecalho h3 {
+  margin: 0;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.escritorio-painel-cabecalho button {
+  background: #3c3c50;
+  box-shadow: none;
+  padding: 0.3em 0.7em;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.escritorio-painel-corpo {
+  padding: 1.1rem 1.25rem 1.5rem;
+  overflow-y: auto;
+}
+
+.escritorio-rodape {
+  margin-top: 1.25rem;
+  font-size: 0.75rem;
+  color: var(--cor-texto-suave);
 }
 
 /* ---------- lista de presença ---------- */

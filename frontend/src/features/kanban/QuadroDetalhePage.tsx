@@ -508,9 +508,15 @@ function ColunaComDrop({
   )
 }
 
-export function QuadroDetalhePage() {
+/**
+ * `quadroIdProp` é opcional - só existe pro `PainelKanban` (dock do Escritório, "uma tela só")
+ * poder passar o id direto, sem precisar de uma rota `/kanban/:id` de verdade. `useParams()`
+ * continua sendo chamado incondicionalmente (regra dos hooks), só o resultado é ignorado quando
+ * `quadroIdProp` vem preenchido.
+ */
+export function QuadroDetalhePage({ quadroIdProp }: { quadroIdProp?: number } = {}) {
   const { id } = useParams()
-  const quadroId = Number(id)
+  const quadroId = quadroIdProp ?? Number(id)
   const queryClient = useQueryClient()
   const papel = useAuthStore((estado) => estado.papel)
   const podeCriarEtiqueta = papel === 'GESTOR' || papel === 'ADMIN'

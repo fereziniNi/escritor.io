@@ -4,7 +4,12 @@ import { Link } from 'react-router'
 import { useAuthStore } from '../auth/authStore'
 import { criarQuadro, listarQuadros } from './api'
 
-export function QuadrosPage() {
+/**
+ * `aoSelecionarQuadro` é opcional - só existe pro `PainelKanban` (dock do Escritório, "uma tela
+ * só") poder trocar de visão sem navegar de verdade. Sem ele (uso direto via rota `/kanban`,
+ * como sempre foi), o clique continua sendo um `<Link>` normal.
+ */
+export function QuadrosPage({ aoSelecionarQuadro }: { aoSelecionarQuadro?: (id: number) => void } = {}) {
   const queryClient = useQueryClient()
   const papel = useAuthStore((estado) => estado.papel)
   const podeCriar = papel === 'GESTOR' || papel === 'ADMIN'
@@ -67,7 +72,13 @@ export function QuadrosPage() {
       <ul>
         {quadrosQuery.data?.map((quadro) => (
           <li key={quadro.id}>
-            <Link to={`/kanban/${quadro.id}`}>{quadro.nome}</Link>
+            {aoSelecionarQuadro ? (
+              <button type="button" onClick={() => aoSelecionarQuadro(quadro.id)}>
+                {quadro.nome}
+              </button>
+            ) : (
+              <Link to={`/kanban/${quadro.id}`}>{quadro.nome}</Link>
+            )}
           </li>
         ))}
       </ul>

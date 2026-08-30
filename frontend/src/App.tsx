@@ -1,15 +1,18 @@
 import { BrowserRouter, Route, Routes } from 'react-router'
-import { HomePage } from './app/HomePage'
 import { ProtectedRoute } from './app/ProtectedRoute'
 import { SessionBootstrap } from './app/SessionBootstrap'
 import { LoginPage } from './features/auth/LoginPage'
 import { EscritorioPage } from './features/escritorio/EscritorioPage'
-import { QuadroDetalhePage } from './features/kanban/QuadroDetalhePage'
-import { QuadrosPage } from './features/kanban/QuadrosPage'
-import { EquipesPage } from './features/organizacao/EquipesPage'
-import { ProjetosPage } from './features/organizacao/ProjetosPage'
-import { RelatoriosPage } from './features/relatorios/RelatoriosPage'
 
+/**
+ * Uma tela só depois de logado (pedido do usuário): o Escritório é a `HomePage` agora - ponto,
+ * quadros, relatórios e admin de equipes/projetos viraram painéis do dock dentro dela (ver
+ * `EscritorioPage`/`PainelFlutuante`), não rotas separadas pra navegar. As páginas que alimentam
+ * esses painéis (`QuadrosPage`, `QuadroDetalhePage`, `RelatoriosPage`, `EquipesPage`,
+ * `ProjetosPage`) continuam existindo como componentes normais, só não têm mais rota própria aqui
+ * - `PainelKanban` usa um `MemoryRouter` isolado só pra elas continuarem navegando entre si sem
+ * tocar a URL do navegador.
+ */
 function App() {
   return (
     <BrowserRouter>
@@ -20,55 +23,7 @@ function App() {
             path="/"
             element={
               <ProtectedRoute>
-                <HomePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/equipes"
-            element={
-              <ProtectedRoute papeisPermitidos={['ADMIN']}>
-                <EquipesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/projetos"
-            element={
-              <ProtectedRoute papeisPermitidos={['ADMIN']}>
-                <ProjetosPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/kanban"
-            element={
-              <ProtectedRoute>
-                <QuadrosPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/kanban/:id"
-            element={
-              <ProtectedRoute>
-                <QuadroDetalhePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/escritorio"
-            element={
-              <ProtectedRoute>
                 <EscritorioPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/relatorios"
-            element={
-              <ProtectedRoute papeisPermitidos={['GESTOR', 'ADMIN']}>
-                <RelatoriosPage />
               </ProtectedRoute>
             }
           />
