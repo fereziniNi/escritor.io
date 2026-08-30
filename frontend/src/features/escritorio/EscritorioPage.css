@@ -1,50 +1,67 @@
+/**
+ * Pedido do usuário: "só a escritorio-coluna-mapa deve estar na tela, o resto sobrescrito" - o
+ * mapa passa a ser a única coisa que realmente ocupa espaço de layout (`position: relative`,
+ * 100vw/100vh, sem padding roubando área dele); título, aviso, dock e lista de presença viram
+ * overlays `position: absolute` flutuando por cima (mesmo espírito do HUD de um jogo de verdade -
+ * o "tabuleiro" enche a tela, os controles ficam desenhados por cima dele, não ao lado).
+ */
 .escritorio-pagina {
-  width: 100%;
-  min-height: 100vh;
-  box-sizing: border-box;
-  padding: 1.25rem 1.5rem 2rem;
-  display: flex;
-  flex-direction: column;
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .escritorio-titulo {
+  position: absolute;
+  top: 0.9rem;
+  left: 1rem;
+  z-index: 10;
   font-family: var(--fonte-jogo);
-  font-size: 1rem;
+  font-size: 0.9rem;
   line-height: 1.6;
   color: var(--cor-primaria-escura);
-  margin-bottom: 1rem;
+  margin: 0;
+  background: rgba(244, 241, 230, 0.88);
+  padding: 0.4rem 0.7rem;
+  border-radius: 10px;
+  box-shadow: var(--sombra-cartao);
 }
 
 .escritorio-aviso {
+  position: absolute;
+  top: 3.6rem;
+  left: 1rem;
+  z-index: 10;
+  max-width: min(320px, calc(100vw - 2rem));
   background: #fff3e0;
   border: 2px solid var(--cor-acento);
   border-radius: var(--raio-borda);
   padding: 0.7rem 1rem;
-  margin-bottom: 1rem;
   font-weight: 700;
   color: var(--cor-acento-escuro);
 }
 
 .escritorio-layout {
-  display: flex;
-  align-items: stretch;
-  gap: 1.25rem;
-  flex-wrap: wrap;
-  flex: 1 1 auto;
-  min-height: 0;
+  position: absolute;
+  inset: 0;
 }
 
 .escritorio-coluna-mapa {
-  flex: 1 1 560px;
-  min-width: 0;
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .escritorio-coluna-lista {
-  flex: 0 1 300px;
-  min-width: 260px;
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 10;
+  width: min(300px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
   display: flex;
   flex-direction: column;
 }
@@ -52,6 +69,7 @@
 .escritorio-coluna-lista .escritorio-lista-presenca {
   flex: 1;
   overflow-y: auto;
+  background: rgba(255, 255, 255, 0.94);
 }
 
 /* ---------- moldura + piso ---------- */
@@ -231,18 +249,23 @@
 /* ---------- HUD (dock de status) ---------- */
 
 .escritorio-dock {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 0.6rem;
   background: #2b2b3a;
   color: #fff;
-  border-radius: 999px;
+  border-radius: 20px;
   padding: 0.5rem 0.9rem;
-  margin-bottom: 0.9rem;
   box-shadow: var(--sombra-cartao);
-  width: fit-content;
-  max-width: 100%;
+  width: max-content;
+  max-width: calc(100vw - 2rem);
 }
 
 .escritorio-dock-rotulo {
@@ -347,9 +370,15 @@
 }
 
 .escritorio-rodape {
-  margin-top: 1.25rem;
-  font-size: 0.75rem;
+  position: absolute;
+  bottom: 0.5rem;
+  left: 1rem;
+  z-index: 10;
+  font-size: 0.72rem;
   color: var(--cor-texto-suave);
+  background: rgba(244, 241, 230, 0.8);
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
 }
 
 /* ---------- lista de presença ---------- */
@@ -416,6 +445,7 @@
 
 @media (max-width: 720px) {
   .escritorio-coluna-lista {
-    position: static;
+    width: calc(100vw - 2rem);
+    max-height: 40vh;
   }
 }
