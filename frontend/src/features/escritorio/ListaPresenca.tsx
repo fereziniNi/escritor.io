@@ -1,7 +1,17 @@
-import { ICONE_STATUS, ICONE_ZONA } from './icones'
+import { COR_STATUS, ICONE_STATUS, ICONE_ZONA } from './icones'
 import { localizarZona } from './localizarZona'
 import { ROTULO_STATUS } from './statusAvatar'
 import type { EstadoPresencaUsuario, Zona } from './types'
+
+function ItemUsuario({ usuario, souEu }: { usuario: EstadoPresencaUsuario; souEu: boolean }) {
+  return (
+    <li>
+      <span className="escritorio-lista-avatar-swatch" style={{ background: COR_STATUS[usuario.status] }} />
+      {ICONE_STATUS[usuario.status]} {usuario.nome}
+      {souEu ? ' (você)' : ''} - {ROTULO_STATUS[usuario.status]}
+    </li>
+  )
+}
 
 /**
  * Puramente presentacional - recebe `usuarios` já resolvido de `usePresencaWebSocket` (S6.5/S6.6),
@@ -45,10 +55,7 @@ export function ListaPresenca({
           ) : (
             <ul>
               {(usuariosPorZonaId.get(zona.id) ?? []).map((usuario) => (
-                <li key={usuario.usuarioId}>
-                  {ICONE_STATUS[usuario.status]} {usuario.nome}
-                  {usuario.usuarioId === meuUsuarioId ? ' (você)' : ''} - {ROTULO_STATUS[usuario.status]}
-                </li>
+                <ItemUsuario key={usuario.usuarioId} usuario={usuario} souEu={usuario.usuarioId === meuUsuarioId} />
               ))}
             </ul>
           )}
@@ -61,10 +68,7 @@ export function ListaPresenca({
         ) : (
           <ul>
             {semZona.map((usuario) => (
-              <li key={usuario.usuarioId}>
-                {ICONE_STATUS[usuario.status]} {usuario.nome}
-                {usuario.usuarioId === meuUsuarioId ? ' (você)' : ''} - {ROTULO_STATUS[usuario.status]}
-              </li>
+              <ItemUsuario key={usuario.usuarioId} usuario={usuario} souEu={usuario.usuarioId === meuUsuarioId} />
             ))}
           </ul>
         )}

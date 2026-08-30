@@ -1,13 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { buscarMapaAtivo } from './api'
 import './EscritorioPage.css'
-import { ICONE_STATUS, ICONE_ZONA } from './icones'
+import { COR_STATUS, ICONE_STATUS, ICONE_ZONA, PROPS_ZONA } from './icones'
 import { ListaPresenca } from './ListaPresenca'
+import { PixelCharacterSvg } from './PixelCharacterSvg'
 import { OPCOES_STATUS, ROTULO_STATUS } from './statusAvatar'
 import { SugestaoRegistrarEntrada } from './SugestaoRegistrarEntrada'
 import { usePresencaWebSocket } from './usePresencaWebSocket'
-import type { StatusAvatar, TipoZona } from './types'
+import type { EstadoPresencaUsuario, StatusAvatar, TipoZona } from './types'
 
 const TAMANHO_TILE_PX = 32
 
@@ -26,22 +27,66 @@ const COR_POR_TIPO_ZONA: Record<TipoZona, string> = {
   LIVRE: '#dbe8d6',
 }
 
+/** Rastreia pra qual lado o personagem andou por último e se está em movimento agora, só a
+ * partir da posição que o servidor manda - sem sprite sheet de caminhada de verdade, é uma
+ * inferência visual (delta de x entre um render e outro), suficiente pra dar vida ao personagem. */
+function useAnimacaoPersonagem(x: number) {
+  const xAnteriorRef = useRef(x)
+  const [direcao, setDirecao] = useState<'esquerda' | 'direita'>('direita')
+  const [andando, setAndando] = useState(false)
+
+  useEffect(() => {
+    const anterior = xAnteriorRef.current
+    xAnteriorRef.current = x
+    if (x === anterior) {
+      return undefined
+    }
+    setDirecao(x < anterior ? 'esquerda' : 'direita')
+    setAndando(true)
+    const timeout = setTimeout(() => setAndando(false), 260)
+    return () => clearTimeout(timeout)
+  }, [x])
+
+  return { direcao, andando }
+}
+
+function AvatarNoMapa({ usuario, ehEu }: { usuario: EstadoPresencaUsuario; ehEu: boolean }) {
+  const { direcao, andando } = useAnimacaoPersonagem(usuario.x)
+
+  return (
+    <div
+      className="escritorio-avatar"
+      data-testid={`avatar-${usuario.usuarioId}`}
+      title={`${usuario.nome} - ${ROTULO_STATUS[usuario.status]}`}
+      style={{
+        left: usuario.x * TAMANHO_TILE_PX,
+        top: usuario.y * TAMANHO_TILE_PX,
+        width: TAMANHO_TILE_PX,
+      }}
+    >
+      <span className="escritorio-personagem-corpo">
+        <PixelCharacterSvg corCorpo={COR_STATUS[usuario.status]} direcao={direcao} andando={andando} destaque={ehEu} />
+        <span className="escritorio-avatar-status">{ICONE_STATUS[usuario.status]}</span>
+      </span>
+      <span className="escritorio-avatar-nome">{usuario.nome}</span>
+    </div>
+  )
+}
+
 /**
- * Renderização com `<div>`s posicionados via `position: absolute` em vez de `<canvas>`/Konva
- * (PRD §6 deixa a escolha em aberto: "react-konva ou canvas puro"): jsdom não implementa um
- * canvas 2D de verdade (`getContext` volta `null` sem uma lib de mock dedicada), e testar via
- * DOM real de qualquer jeito é consistente com o resto do projeto (RTL cobre o comportamento,
- * Playwright cobre o visual de verdade em navegador real) - sem precisar de uma dependência nova
- * só pra viabilizar teste. Em 20×15 tiles isso são no máximo algumas centenas de elementos,
- * irrelevante de performance.
+ * Renderização com `<div>`s/SVG posicionados via `position: absolute` em vez de um `<canvas>`
+ * completo (PRD §6 deixa a escolha em aberto: "react-konva ou canvas puro"): jsdom não implementa
+ * um canvas 2D de verdade, e testar via DOM real é consistente com o resto do projeto - sem
+ * precisar de uma dependência nova (biblioteca de jogo/sprite sheet) só pra viabilizar teste.
+ * `PixelCharacterSvg` desenha o personagem em SVG puro (retângulos com contorno), então dá pra ter
+ * um visual bem mais próximo de "gente de verdade" que um círculo, sem nenhum asset de imagem.
  *
  * Movimento por seta atualiza a posição local de imediato via `mover` (predição, S6.4/PRD) - o
  * clamp contra `larguraTiles`/`alturaTiles` aqui é só uma cortesia visual (o servidor já valida
  * de verdade e ignora silenciosamente qualquer posição fora dos limites, ver
- * `ValidadorPosicaoMapa`); sem ele, a predição local deixaria o avatar visualmente sair do mapa
- * até a próxima correção. O visual (piso quadriculado, avatares-personagem, ícones de sala) é
- * puramente decorativo - `left`/`top`/`data-testid` continuam sendo os únicos contratos que os
- * testes e o resto do app dependem.
+ * `ValidadorPosicaoMapa`). O visual (piso de madeira, sala mobiliada, personagem, dock de status)
+ * é puramente decorativo - `left`/`top`/`data-testid`/`title` continuam sendo os únicos contratos
+ * que os testes e o resto do app dependem.
  */
 export function EscritorioPage() {
   const mapaQuery = useQuery({ queryKey: ['mapas', 'ativo'], queryFn: buscarMapaAtivo })
@@ -85,8 +130,8 @@ export function EscritorioPage() {
       <h2 className="escritorio-titulo fonte-jogo">🏢 {mapa.nome}</h2>
       <SugestaoRegistrarEntrada />
 
-      <div className="escritorio-hud">
-        <span className="escritorio-hud-rotulo">Meu status</span>
+      <div className="escritorio-dock">
+        <span className="escritorio-dock-rotulo">Meu status</span>
         <select
           aria-label="Status"
           value={meuStatus ?? 'DISPONIVEL'}
@@ -98,62 +143,57 @@ export function EscritorioPage() {
             </option>
           ))}
         </select>
-        <span style={{ fontSize: '0.8rem', color: 'var(--cor-texto-suave)' }}>
-          Mova com as setas do teclado ⬅️⬆️➡️⬇️
-        </span>
+        <span className="escritorio-dock-dica">⬅️⬆️➡️⬇️ pra andar</span>
       </div>
 
-      <div className="escritorio-mapa-moldura">
-        <div
-          className="escritorio-mapa"
-          data-testid="mapa"
-          style={{
-            width: mapa.larguraTiles * TAMANHO_TILE_PX,
-            height: mapa.alturaTiles * TAMANHO_TILE_PX,
-          }}
-        >
-          {mapa.zonas.map((zona) => (
+      <div className="escritorio-layout">
+        <div className="escritorio-coluna-mapa">
+          <div className="escritorio-mapa-moldura">
             <div
-              key={zona.id}
-              className="escritorio-zona"
-              title={zona.nome}
-              data-testid={`zona-${zona.id}`}
+              className="escritorio-mapa"
+              data-testid="mapa"
               style={{
-                left: zona.x * TAMANHO_TILE_PX,
-                top: zona.y * TAMANHO_TILE_PX,
-                width: zona.largura * TAMANHO_TILE_PX,
-                height: zona.altura * TAMANHO_TILE_PX,
-                background: COR_POR_TIPO_ZONA[zona.tipo],
+                width: mapa.larguraTiles * TAMANHO_TILE_PX,
+                height: mapa.alturaTiles * TAMANHO_TILE_PX,
               }}
             >
-              <span className="escritorio-zona-icone">{ICONE_ZONA[zona.tipo]}</span>
-              <span>{zona.nome}</span>
-            </div>
-          ))}
+              {mapa.zonas.map((zona) => (
+                <div
+                  key={zona.id}
+                  className="escritorio-zona"
+                  title={zona.nome}
+                  data-testid={`zona-${zona.id}`}
+                  style={{
+                    left: zona.x * TAMANHO_TILE_PX,
+                    top: zona.y * TAMANHO_TILE_PX,
+                    width: zona.largura * TAMANHO_TILE_PX,
+                    height: zona.altura * TAMANHO_TILE_PX,
+                    background: COR_POR_TIPO_ZONA[zona.tipo],
+                  }}
+                >
+                  <span className="escritorio-zona-rotulo">
+                    <span className="escritorio-zona-icone">{ICONE_ZONA[zona.tipo]}</span>
+                    <span>{zona.nome}</span>
+                  </span>
+                  <span className="escritorio-zona-props">
+                    {PROPS_ZONA[zona.tipo].map((prop) => (
+                      <span key={prop}>{prop}</span>
+                    ))}
+                  </span>
+                </div>
+              ))}
 
-          {Object.values(usuarios).map((usuario) => (
-            <div
-              key={usuario.usuarioId}
-              className={`escritorio-avatar${usuario.usuarioId === meuUsuarioId ? ' escritorio-avatar--eu' : ''}`}
-              data-testid={`avatar-${usuario.usuarioId}`}
-              title={`${usuario.nome} - ${ROTULO_STATUS[usuario.status]}`}
-              style={{
-                left: usuario.x * TAMANHO_TILE_PX,
-                top: usuario.y * TAMANHO_TILE_PX,
-                width: TAMANHO_TILE_PX,
-              }}
-            >
-              <span className="escritorio-avatar-corpo">
-                {usuario.nome.charAt(0).toUpperCase()}
-                <span className="escritorio-avatar-status">{ICONE_STATUS[usuario.status]}</span>
-              </span>
-              <span className="escritorio-avatar-nome">{usuario.nome}</span>
+              {Object.values(usuarios).map((usuario) => (
+                <AvatarNoMapa key={usuario.usuarioId} usuario={usuario} ehEu={usuario.usuarioId === meuUsuarioId} />
+              ))}
             </div>
-          ))}
+          </div>
+        </div>
+
+        <div className="escritorio-coluna-lista">
+          <ListaPresenca zonas={mapa.zonas} usuarios={Object.values(usuarios)} meuUsuarioId={meuUsuarioId} />
         </div>
       </div>
-
-      <ListaPresenca zonas={mapa.zonas} usuarios={Object.values(usuarios)} meuUsuarioId={meuUsuarioId} />
     </section>
   )
 }

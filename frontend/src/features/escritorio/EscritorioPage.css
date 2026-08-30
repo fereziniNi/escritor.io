@@ -1,5 +1,5 @@
 .escritorio-pagina {
-  max-width: 900px;
+  max-width: 1100px;
   margin: 0 auto;
   padding: 1.5rem 1rem 3rem;
 }
@@ -12,27 +12,6 @@
   margin-bottom: 1rem;
 }
 
-.escritorio-hud {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  background: var(--cor-superficie);
-  border: 1px solid var(--cor-borda);
-  border-radius: var(--raio-borda);
-  padding: 0.7rem 1rem;
-  margin-bottom: 1rem;
-  box-shadow: var(--sombra-cartao);
-  width: fit-content;
-}
-
-.escritorio-hud-rotulo {
-  font-weight: 800;
-  font-size: 0.85rem;
-  color: var(--cor-texto-suave);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
 .escritorio-aviso {
   background: #fff3e0;
   border: 2px solid var(--cor-acento);
@@ -43,58 +22,96 @@
   color: var(--cor-acento-escuro);
 }
 
+.escritorio-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.escritorio-coluna-mapa {
+  flex: 2 1 560px;
+  min-width: 0;
+}
+
+.escritorio-coluna-lista {
+  flex: 1 1 260px;
+  min-width: 240px;
+  position: sticky;
+  top: 1rem;
+}
+
+/* ---------- moldura + piso ---------- */
+
 .escritorio-mapa-moldura {
-  display: inline-block;
   padding: 10px;
-  background: #5b4636;
+  background: #4a3626;
+  background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.04) 0 2px, transparent 2px 6px);
   border-radius: 16px;
   box-shadow: var(--sombra-cartao);
-  margin-bottom: 1.5rem;
   overflow: auto;
   max-width: 100%;
 }
 
 .escritorio-mapa {
   position: relative;
-  background-color: #cfe8b8;
+  background-color: #d9b98a;
   background-image:
-    linear-gradient(45deg, #c3dfa9 25%, transparent 25%),
-    linear-gradient(-45deg, #c3dfa9 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #c3dfa9 75%),
-    linear-gradient(-45deg, transparent 75%, #c3dfa9 75%);
-  background-size: 32px 32px;
-  background-position:
-    0 0,
-    0 16px,
-    16px -16px,
-    -16px 0;
-  border: 3px solid #3d2f22;
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.05) 0, rgba(0, 0, 0, 0.05) 2px, transparent 2px, transparent 64px),
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.06) 0, rgba(0, 0, 0, 0.06) 1px, transparent 1px, transparent 32px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0 32px, transparent 32px 64px);
+  border: 3px solid #2b1f16;
   border-radius: 8px;
 }
+
+/* ---------- salas ---------- */
 
 .escritorio-zona {
   position: absolute;
-  border-radius: 8px;
-  border: 3px solid rgba(0, 0, 0, 0.28);
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.55);
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 3px;
-  font-weight: 800;
-  font-size: 0.6rem;
-  line-height: 1.1;
-  color: rgba(30, 25, 15, 0.8);
-  padding: 3px 5px;
+  border-radius: 6px;
+  border: 4px solid rgba(0, 0, 0, 0.32);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5);
   overflow: hidden;
-  background-clip: padding-box;
+}
+
+.escritorio-zona-rotulo {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(255, 255, 255, 0.82);
+  border-radius: 5px;
+  padding: 1px 5px;
+  font-weight: 800;
+  font-size: 0.58rem;
+  line-height: 1.2;
+  color: rgba(30, 25, 15, 0.85);
+  white-space: nowrap;
+  max-width: calc(100% - 6px);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .escritorio-zona-icone {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   line-height: 1;
 }
+
+.escritorio-zona-props {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  display: flex;
+  gap: 3px;
+  font-size: 1.1rem;
+  line-height: 1;
+  opacity: 0.85;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
+}
+
+/* ---------- personagens ---------- */
 
 .escritorio-avatar {
   position: absolute;
@@ -104,35 +121,38 @@
   transition:
     left 150ms ease-out,
     top 150ms ease-out;
+  z-index: 2;
 }
 
-.escritorio-avatar-corpo {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #6b6b7d;
-  border: 2px solid rgba(0, 0, 0, 0.35);
-  box-shadow: 0 3px 3px rgba(0, 0, 0, 0.3);
+.escritorio-personagem-corpo {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.8rem;
-  position: relative;
   animation: escritorio-bob 1.8s ease-in-out infinite;
 }
 
-.escritorio-avatar--eu .escritorio-avatar-corpo {
-  background: var(--cor-acento);
-  box-shadow:
-    0 0 0 2px #fff,
-    0 0 0 4px var(--cor-acento),
-    0 3px 3px rgba(0, 0, 0, 0.3);
+.escritorio-personagem-svg {
+  overflow: visible;
+}
+
+.escritorio-perna {
+  transform-box: fill-box;
+  transform-origin: top center;
+}
+
+.escritorio-personagem-svg--andando .escritorio-perna--esquerda {
+  animation: escritorio-passo-esquerda 300ms ease-in-out infinite;
+}
+
+.escritorio-personagem-svg--andando .escritorio-perna--direita {
+  animation: escritorio-passo-direita 300ms ease-in-out infinite;
 }
 
 .escritorio-avatar-status {
   position: absolute;
-  top: -5px;
-  right: -5px;
+  top: -4px;
+  right: -6px;
   width: 15px;
   height: 15px;
   border-radius: 50%;
@@ -140,16 +160,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.6rem;
+  font-size: 0.58rem;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  z-index: 3;
 }
 
 .escritorio-avatar-nome {
-  margin-top: 2px;
+  margin-top: 1px;
   font-size: 0.52rem;
   font-weight: 800;
   color: #fff;
-  background: rgba(43, 43, 58, 0.78);
+  background: rgba(43, 43, 58, 0.8);
   padding: 1px 5px;
   border-radius: 6px;
   white-space: nowrap;
@@ -165,16 +186,73 @@
   }
 }
 
+@keyframes escritorio-passo-esquerda {
+  0%,
+  100% {
+    transform: rotate(-18deg);
+  }
+  50% {
+    transform: rotate(18deg);
+  }
+}
+
+@keyframes escritorio-passo-direita {
+  0%,
+  100% {
+    transform: rotate(18deg);
+  }
+  50% {
+    transform: rotate(-18deg);
+  }
+}
+
+/* ---------- HUD (dock de status) ---------- */
+
+.escritorio-dock {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  background: #2b2b3a;
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  margin-bottom: 0.9rem;
+  box-shadow: var(--sombra-cartao);
+  width: fit-content;
+  max-width: 100%;
+}
+
+.escritorio-dock-rotulo {
+  font-weight: 800;
+  font-size: 0.75rem;
+  color: #c9c9da;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.escritorio-dock select {
+  background: #3c3c50;
+  color: #fff;
+  border: 2px solid #52526a;
+}
+
+.escritorio-dock-dica {
+  font-size: 0.75rem;
+  color: #a9a9bd;
+}
+
+/* ---------- lista de presença ---------- */
+
 .escritorio-lista-presenca {
   background: var(--cor-superficie);
   border: 1px solid var(--cor-borda);
   border-radius: var(--raio-borda);
   box-shadow: var(--sombra-cartao);
-  padding: 1rem 1.25rem;
+  padding: 1rem 1.15rem;
 }
 
 .escritorio-lista-presenca h3 {
-  font-size: 1rem;
+  font-size: 0.95rem;
   margin-bottom: 0.75rem;
 }
 
@@ -183,7 +261,7 @@
 }
 
 .escritorio-lista-grupo h4 {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 800;
   color: var(--cor-primaria-escura);
   display: flex;
@@ -202,14 +280,31 @@
 }
 
 .escritorio-lista-grupo li {
-  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
   background: var(--cor-primaria-clara);
   border-radius: 8px;
-  padding: 0.3em 0.6em;
+  padding: 0.28em 0.6em;
+}
+
+.escritorio-lista-avatar-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  flex: none;
 }
 
 .escritorio-lista-grupo p {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--cor-texto-suave);
   margin: 0;
+}
+
+@media (max-width: 720px) {
+  .escritorio-coluna-lista {
+    position: static;
+  }
 }
