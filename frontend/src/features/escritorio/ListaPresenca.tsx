@@ -1,3 +1,4 @@
+import { ICONE_STATUS, ICONE_ZONA } from './icones'
 import { localizarZona } from './localizarZona'
 import { ROTULO_STATUS } from './statusAvatar'
 import type { EstadoPresencaUsuario, Zona } from './types'
@@ -31,32 +32,42 @@ export function ListaPresenca({
   }
 
   return (
-    <section aria-label="Lista de presença">
-      <h3>Quem está no escritório</h3>
+    <section className="escritorio-lista-presenca" aria-label="Lista de presença">
+      <h3>🧭 Quem está no escritório</h3>
       {usuarios.length === 0 && <p>Ninguém conectado.</p>}
       {zonas.map((zona) => (
-        <div key={zona.id} data-testid={`presenca-zona-${zona.id}`}>
-          <h4>{zona.nome}</h4>
+        <div key={zona.id} className="escritorio-lista-grupo" data-testid={`presenca-zona-${zona.id}`}>
+          <h4>
+            {ICONE_ZONA[zona.tipo]} {zona.nome}
+          </h4>
+          {(usuariosPorZonaId.get(zona.id) ?? []).length === 0 ? (
+            <p>Ninguém por aqui agora.</p>
+          ) : (
+            <ul>
+              {(usuariosPorZonaId.get(zona.id) ?? []).map((usuario) => (
+                <li key={usuario.usuarioId}>
+                  {ICONE_STATUS[usuario.status]} {usuario.nome}
+                  {usuario.usuarioId === meuUsuarioId ? ' (você)' : ''} - {ROTULO_STATUS[usuario.status]}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
+      <div className="escritorio-lista-grupo" data-testid="presenca-zona-aberto">
+        <h4>🌤️ Espaço aberto</h4>
+        {semZona.length === 0 ? (
+          <p>Ninguém por aqui agora.</p>
+        ) : (
           <ul>
-            {(usuariosPorZonaId.get(zona.id) ?? []).map((usuario) => (
+            {semZona.map((usuario) => (
               <li key={usuario.usuarioId}>
-                {usuario.nome}
+                {ICONE_STATUS[usuario.status]} {usuario.nome}
                 {usuario.usuarioId === meuUsuarioId ? ' (você)' : ''} - {ROTULO_STATUS[usuario.status]}
               </li>
             ))}
           </ul>
-        </div>
-      ))}
-      <div data-testid="presenca-zona-aberto">
-        <h4>Espaço aberto</h4>
-        <ul>
-          {semZona.map((usuario) => (
-            <li key={usuario.usuarioId}>
-              {usuario.nome}
-              {usuario.usuarioId === meuUsuarioId ? ' (você)' : ''} - {ROTULO_STATUS[usuario.status]}
-            </li>
-          ))}
-        </ul>
+        )}
       </div>
     </section>
   )

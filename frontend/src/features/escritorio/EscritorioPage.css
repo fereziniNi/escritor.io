@@ -1,0 +1,215 @@
+.escritorio-pagina {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.escritorio-titulo {
+  font-family: var(--fonte-jogo);
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--cor-primaria-escura);
+  margin-bottom: 1rem;
+}
+
+.escritorio-hud {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  padding: 0.7rem 1rem;
+  margin-bottom: 1rem;
+  box-shadow: var(--sombra-cartao);
+  width: fit-content;
+}
+
+.escritorio-hud-rotulo {
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.escritorio-aviso {
+  background: #fff3e0;
+  border: 2px solid var(--cor-acento);
+  border-radius: var(--raio-borda);
+  padding: 0.7rem 1rem;
+  margin-bottom: 1rem;
+  font-weight: 700;
+  color: var(--cor-acento-escuro);
+}
+
+.escritorio-mapa-moldura {
+  display: inline-block;
+  padding: 10px;
+  background: #5b4636;
+  border-radius: 16px;
+  box-shadow: var(--sombra-cartao);
+  margin-bottom: 1.5rem;
+  overflow: auto;
+  max-width: 100%;
+}
+
+.escritorio-mapa {
+  position: relative;
+  background-color: #cfe8b8;
+  background-image:
+    linear-gradient(45deg, #c3dfa9 25%, transparent 25%),
+    linear-gradient(-45deg, #c3dfa9 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #c3dfa9 75%),
+    linear-gradient(-45deg, transparent 75%, #c3dfa9 75%);
+  background-size: 32px 32px;
+  background-position:
+    0 0,
+    0 16px,
+    16px -16px,
+    -16px 0;
+  border: 3px solid #3d2f22;
+  border-radius: 8px;
+}
+
+.escritorio-zona {
+  position: absolute;
+  border-radius: 8px;
+  border: 3px solid rgba(0, 0, 0, 0.28);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.55);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 3px;
+  font-weight: 800;
+  font-size: 0.6rem;
+  line-height: 1.1;
+  color: rgba(30, 25, 15, 0.8);
+  padding: 3px 5px;
+  overflow: hidden;
+  background-clip: padding-box;
+}
+
+.escritorio-zona-icone {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.escritorio-avatar {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition:
+    left 150ms ease-out,
+    top 150ms ease-out;
+}
+
+.escritorio-avatar-corpo {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #6b6b7d;
+  border: 2px solid rgba(0, 0, 0, 0.35);
+  box-shadow: 0 3px 3px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  position: relative;
+  animation: escritorio-bob 1.8s ease-in-out infinite;
+}
+
+.escritorio-avatar--eu .escritorio-avatar-corpo {
+  background: var(--cor-acento);
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 4px var(--cor-acento),
+    0 3px 3px rgba(0, 0, 0, 0.3);
+}
+
+.escritorio-avatar-status {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.escritorio-avatar-nome {
+  margin-top: 2px;
+  font-size: 0.52rem;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(43, 43, 58, 0.78);
+  padding: 1px 5px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+@keyframes escritorio-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+.escritorio-lista-presenca {
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  box-shadow: var(--sombra-cartao);
+  padding: 1rem 1.25rem;
+}
+
+.escritorio-lista-presenca h3 {
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.escritorio-lista-grupo {
+  margin-bottom: 0.85rem;
+}
+
+.escritorio-lista-grupo h4 {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--cor-primaria-escura);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.3rem;
+}
+
+.escritorio-lista-grupo ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.escritorio-lista-grupo li {
+  font-size: 0.85rem;
+  background: var(--cor-primaria-clara);
+  border-radius: 8px;
+  padding: 0.3em 0.6em;
+}
+
+.escritorio-lista-grupo p {
+  font-size: 0.8rem;
+  color: var(--cor-texto-suave);
+  margin: 0;
+}

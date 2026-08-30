@@ -1,8 +1,123 @@
 :root {
-  color-scheme: light dark;
-  font: 16px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: light;
+
+  --cor-fundo: #f4f1e6;
+  --cor-superficie: #ffffff;
+  --cor-texto: #2b2b3a;
+  --cor-texto-suave: #6b6b7d;
+  --cor-borda: #d8d2bd;
+
+  --cor-primaria: #4f8f6f;
+  --cor-primaria-escura: #3a6d53;
+  --cor-primaria-clara: #e4f3ec;
+  --cor-acento: #f2a541;
+  --cor-acento-escuro: #cf7f1f;
+  --cor-perigo: #d1573e;
+
+  --fonte-jogo: 'Press Start 2P', 'Courier New', monospace;
+  --fonte-corpo: 'Nunito', system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  --raio-borda: 12px;
+  --sombra-cartao: 0 2px 0 var(--cor-borda), 0 6px 16px rgba(43, 43, 58, 0.08);
+
+  font: 16px/1.55 var(--fonte-corpo);
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
 }
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--fonte-corpo);
+  font-weight: 800;
+  color: var(--cor-primaria-escura);
+  margin: 0 0 0.6em;
+}
+
+a {
+  color: var(--cor-primaria-escura);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  font-family: var(--fonte-corpo);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #fff;
+  background: var(--cor-primaria);
+  border: none;
+  border-radius: 999px;
+  padding: 0.55em 1.3em;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--cor-primaria-escura);
+  transition:
+    transform 80ms ease-out,
+    box-shadow 80ms ease-out;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 var(--cor-primaria-escura);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--cor-primaria-escura);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+input,
+select,
+textarea {
+  font-family: var(--fonte-corpo);
+  font-size: 0.95rem;
+  border: 2px solid var(--cor-borda);
+  border-radius: 8px;
+  padding: 0.5em 0.7em;
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 3px solid var(--cor-acento);
+  outline-offset: 1px;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+.fonte-jogo {
+  font-family: var(--fonte-jogo);
+}
+
+.cartao {
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  box-shadow: var(--sombra-cartao);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.25rem;
+}
+

@@ -97,14 +97,14 @@ describe('EscritorioPage', () => {
 
     renderPagina()
 
-    expect(await screen.findByText('Escritório')).toBeInTheDocument()
+    expect(await screen.findByText(/Escritório/)).toBeInTheDocument()
     expect(screen.getByTestId('zona-10')).toHaveTextContent('Sala de foco')
   })
 
   it('seta pressionada move o próprio avatar localmente de imediato, sem esperar resposta do servidor', async () => {
     server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto())
     renderPagina()
-    await screen.findByText('Escritório')
+    await screen.findByText(/Escritório/)
 
     act(() => {
       WebSocketFalso.instancias[0].disparaMensagem({
@@ -126,7 +126,7 @@ describe('EscritorioPage', () => {
   it('trocar o status no seletor atualiza o próprio avatar e manda a mudança pro servidor', async () => {
     server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto())
     renderPagina()
-    await screen.findByText('Escritório')
+    await screen.findByText(/Escritório/)
 
     act(() => {
       WebSocketFalso.instancias[0].disparaMensagem({
@@ -147,7 +147,7 @@ describe('EscritorioPage', () => {
   it('não deixa o avatar sair dos limites do mapa ao mover na borda', async () => {
     server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto())
     renderPagina()
-    await screen.findByText('Escritório')
+    await screen.findByText(/Escritório/)
 
     act(() => {
       WebSocketFalso.instancias[0].disparaMensagem({
@@ -168,7 +168,7 @@ describe('EscritorioPage', () => {
   it('a lista de presença reflete entrar/sair de zona e troca de status sem reload', async () => {
     server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto())
     renderPagina()
-    await screen.findByText('Escritório')
+    await screen.findByText(/Escritório/)
 
     act(() => {
       WebSocketFalso.instancias[0].disparaMensagem({

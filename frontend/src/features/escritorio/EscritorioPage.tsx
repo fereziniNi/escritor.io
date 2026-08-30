@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { buscarMapaAtivo } from './api'
+import './EscritorioPage.css'
+import { ICONE_STATUS, ICONE_ZONA } from './icones'
 import { ListaPresenca } from './ListaPresenca'
 import { OPCOES_STATUS, ROTULO_STATUS } from './statusAvatar'
 import { SugestaoRegistrarEntrada } from './SugestaoRegistrarEntrada'
@@ -17,11 +19,11 @@ const TECLA_PARA_DELTA: Record<string, readonly [number, number]> = {
 }
 
 const COR_POR_TIPO_ZONA: Record<TipoZona, string> = {
-  FOCO: '#cdeccd',
-  REUNIAO: '#cddcec',
-  CAFE: '#ecdccd',
-  ATENDIMENTO: '#eccdcd',
-  LIVRE: '#e8e8e8',
+  FOCO: '#bfe3c4',
+  REUNIAO: '#bfd6ec',
+  CAFE: '#eccfa8',
+  ATENDIMENTO: '#eac1c8',
+  LIVRE: '#dbe8d6',
 }
 
 /**
@@ -37,7 +39,9 @@ const COR_POR_TIPO_ZONA: Record<TipoZona, string> = {
  * clamp contra `larguraTiles`/`alturaTiles` aqui é só uma cortesia visual (o servidor já valida
  * de verdade e ignora silenciosamente qualquer posição fora dos limites, ver
  * `ValidadorPosicaoMapa`); sem ele, a predição local deixaria o avatar visualmente sair do mapa
- * até a próxima correção.
+ * até a próxima correção. O visual (piso quadriculado, avatares-personagem, ícones de sala) é
+ * puramente decorativo - `left`/`top`/`data-testid` continuam sendo os únicos contratos que os
+ * testes e o resto do app dependem.
  */
 export function EscritorioPage() {
   const mapaQuery = useQuery({ queryKey: ['mapas', 'ativo'], queryFn: buscarMapaAtivo })
@@ -77,71 +81,78 @@ export function EscritorioPage() {
   const meuStatus = meuUsuarioId !== null ? usuarios[meuUsuarioId]?.status : undefined
 
   return (
-    <section>
-      <h2>{mapa.nome}</h2>
+    <section className="escritorio-pagina">
+      <h2 className="escritorio-titulo fonte-jogo">🏢 {mapa.nome}</h2>
       <SugestaoRegistrarEntrada />
-      <label>
-        Status
+
+      <div className="escritorio-hud">
+        <span className="escritorio-hud-rotulo">Meu status</span>
         <select
+          aria-label="Status"
           value={meuStatus ?? 'DISPONIVEL'}
           onChange={(evento) => definirStatus(evento.target.value as StatusAvatar)}
         >
           {OPCOES_STATUS.map((status) => (
             <option key={status} value={status}>
-              {ROTULO_STATUS[status]}
+              {ICONE_STATUS[status]} {ROTULO_STATUS[status]}
             </option>
           ))}
         </select>
-      </label>
-      <div
-        data-testid="mapa"
-        style={{
-          position: 'relative',
-          width: mapa.larguraTiles * TAMANHO_TILE_PX,
-          height: mapa.alturaTiles * TAMANHO_TILE_PX,
-          border: '1px solid #999',
-        }}
-      >
-        {mapa.zonas.map((zona) => (
-          <div
-            key={zona.id}
-            title={zona.nome}
-            data-testid={`zona-${zona.id}`}
-            style={{
-              position: 'absolute',
-              left: zona.x * TAMANHO_TILE_PX,
-              top: zona.y * TAMANHO_TILE_PX,
-              width: zona.largura * TAMANHO_TILE_PX,
-              height: zona.altura * TAMANHO_TILE_PX,
-              background: COR_POR_TIPO_ZONA[zona.tipo],
-            }}
-          >
-            {zona.nome}
-          </div>
-        ))}
-
-        {Object.values(usuarios).map((usuario) => (
-          <div
-            key={usuario.usuarioId}
-            data-testid={`avatar-${usuario.usuarioId}`}
-            title={`${usuario.nome} - ${ROTULO_STATUS[usuario.status]}`}
-            style={{
-              position: 'absolute',
-              left: usuario.x * TAMANHO_TILE_PX,
-              top: usuario.y * TAMANHO_TILE_PX,
-              width: TAMANHO_TILE_PX,
-              height: TAMANHO_TILE_PX,
-              borderRadius: '50%',
-              background: usuario.usuarioId === meuUsuarioId ? '#3366ff' : '#666',
-              color: '#fff',
-              fontSize: '10px',
-              textAlign: 'center',
-            }}
-          >
-            {usuario.nome}
-          </div>
-        ))}
+        <span style={{ fontSize: '0.8rem', color: 'var(--cor-texto-suave)' }}>
+          Mova com as setas do teclado ⬅️⬆️➡️⬇️
+        </span>
       </div>
+
+      <div className="escritorio-mapa-moldura">
+        <div
+          className="escritorio-mapa"
+          data-testid="mapa"
+          style={{
+            width: mapa.larguraTiles * TAMANHO_TILE_PX,
+            height: mapa.alturaTiles * TAMANHO_TILE_PX,
+          }}
+        >
+          {mapa.zonas.map((zona) => (
+            <div
+              key={zona.id}
+              className="escritorio-zona"
+              title={zona.nome}
+              data-testid={`zona-${zona.id}`}
+              style={{
+                left: zona.x * TAMANHO_TILE_PX,
+                top: zona.y * TAMANHO_TILE_PX,
+                width: zona.largura * TAMANHO_TILE_PX,
+                height: zona.altura * TAMANHO_TILE_PX,
+                background: COR_POR_TIPO_ZONA[zona.tipo],
+              }}
+            >
+              <span className="escritorio-zona-icone">{ICONE_ZONA[zona.tipo]}</span>
+              <span>{zona.nome}</span>
+            </div>
+          ))}
+
+          {Object.values(usuarios).map((usuario) => (
+            <div
+              key={usuario.usuarioId}
+              className={`escritorio-avatar${usuario.usuarioId === meuUsuarioId ? ' escritorio-avatar--eu' : ''}`}
+              data-testid={`avatar-${usuario.usuarioId}`}
+              title={`${usuario.nome} - ${ROTULO_STATUS[usuario.status]}`}
+              style={{
+                left: usuario.x * TAMANHO_TILE_PX,
+                top: usuario.y * TAMANHO_TILE_PX,
+                width: TAMANHO_TILE_PX,
+              }}
+            >
+              <span className="escritorio-avatar-corpo">
+                {usuario.nome.charAt(0).toUpperCase()}
+                <span className="escritorio-avatar-status">{ICONE_STATUS[usuario.status]}</span>
+              </span>
+              <span className="escritorio-avatar-nome">{usuario.nome}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <ListaPresenca zonas={mapa.zonas} usuarios={Object.values(usuarios)} meuUsuarioId={meuUsuarioId} />
     </section>
   )
