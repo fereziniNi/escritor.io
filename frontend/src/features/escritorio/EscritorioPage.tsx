@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { buscarMapaAtivo } from './api'
 import { ListaPresenca } from './ListaPresenca'
 import { OPCOES_STATUS, ROTULO_STATUS } from './statusAvatar'
+import { SugestaoRegistrarEntrada } from './SugestaoRegistrarEntrada'
 import { usePresencaWebSocket } from './usePresencaWebSocket'
 import type { StatusAvatar, TipoZona } from './types'
 
@@ -78,6 +79,7 @@ export function EscritorioPage() {
   return (
     <section>
       <h2>{mapa.nome}</h2>
+      <SugestaoRegistrarEntrada />
       <label>
         Status
         <select

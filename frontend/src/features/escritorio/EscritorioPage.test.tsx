@@ -2,9 +2,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
+import { MemoryRouter } from 'react-router'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAuthStore } from '../auth/authStore'
 import { EscritorioPage } from './EscritorioPage'
+
+/** Ponto aberto de propósito, pra `SugestaoRegistrarEntrada` (S6.11) não interferir nestes testes. */
+function handlerPontoAberto() {
+  return http.get('/ponto/estado-atual', () => HttpResponse.json({ ultimoTipo: 'ENTRADA', proximasOpcoes: ['PAUSA_INICIO', 'SAIDA'] }))
+}
 
 function base64UrlEncode(json: object): string {
   const base64 = btoa(JSON.stringify(json))
@@ -78,14 +84,16 @@ function renderPagina() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={queryClient}>
-      <EscritorioPage />
+      <MemoryRouter>
+        <EscritorioPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
 
 describe('EscritorioPage', () => {
   it('renderiza o mapa e as zonas retornadas pela API', async () => {
-    server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)))
+    server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto())
 
     renderPagina()
 
@@ -94,7 +102,7 @@ describe('EscritorioPage', () => {
   })
 
   it('seta pressionada move o próprio avatar localmente de imediato, sem esperar resposta do servidor', async () => {
-    server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)))
+    server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto())
     renderPagina()
     await screen.findByText('Escritório')
 
@@ -116,7 +124,7 @@ describe('EscritorioPage', () => {
   })
 
   it('trocar o status no seletor atualiza o próprio avatar e manda a mudança pro servidor', async () => {
-    server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)))
+    server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto())
     renderPagina()
     await screen.findByText('Escritório')
 
@@ -137,7 +145,7 @@ describe('EscritorioPage', () => {
   })
 
   it('não deixa o avatar sair dos limites do mapa ao mover na borda', async () => {
-    server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)))
+    server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto())
     renderPagina()
     await screen.findByText('Escritório')
 
@@ -158,7 +166,7 @@ describe('EscritorioPage', () => {
   })
 
   it('a lista de presença reflete entrar/sair de zona e troca de status sem reload', async () => {
-    server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)))
+    server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto())
     renderPagina()
     await screen.findByText('Escritório')
 

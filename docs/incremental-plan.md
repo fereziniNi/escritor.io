@@ -132,7 +132,7 @@ Decisão de sequenciamento: o mapa (S6.1-S6.2) e o canal de tempo real (S6.3-S6.
 | S6.8 ✅ | `AUSENTE` automático após 5 minutos sem input do usuário (nem movimento, nem troca manual de status) — PRD | Integração: usuário sem qualquer mensagem por 5 min tem o status forçado pra `AUSENTE` pelo servidor; qualquer input novo tira do `AUSENTE` |
 | S6.9 ✅ | Frontend: lista de presença (quem está em cada zona + status), atualizada em tempo real | Componente: entrar/sair de zona e trocar de status reflete na lista sem reload |
 | S6.10 ✅ | Reconexão automática do WebSocket com backoff exponencial (PRD) | Componente: conexão perdida tenta reconectar com atraso crescente; ao reconectar, ressincroniza pelo snapshot do estado |
-| S6.11 | Ao entrar no mapa sem ponto aberto, exibir sugestão — nunca automação — de registrar entrada (PRD) | Componente: usuário sem `ENTRADA` aberta vê o aviso ao acessar o mapa; usuário com ponto aberto não vê nada |
+| S6.11 ✅ | Ao entrar no mapa sem ponto aberto, exibir sugestão — nunca automação — de registrar entrada (PRD) | Componente: usuário sem `ENTRADA` aberta vê o aviso ao acessar o mapa; usuário com ponto aberto não vê nada |
 | S6.12 | `EventoPresenca` (opcional, PRD §3.5) — registra entrada/saída de zona pra relatório futuro, sem bloquear nem atrasar o fluxo em tempo real | Domínio: entrar/sair de uma zona grava `entrou_em`/`saiu_em`; a escrita não interfere na resposta em tempo real do WS |
 
 ## Definição de pronto (para toda fatia)
