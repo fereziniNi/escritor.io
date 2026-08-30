@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuthStore } from '../auth/authStore'
 import { decodeJwt } from '../auth/jwt'
+import { calcularAtrasoReconexao } from './backoffReconexao'
 import { construirUrlWebSocketPresenca } from './presencaSocket'
 import { criarEnviadorComThrottle } from './throttlePosicao'
 import type { EstadoPresencaUsuario, StatusAvatar } from './types'
 
-const ATRASO_RECONEXAO_MS = 2000
+const ATRASO_RECONEXAO_BASE_MS = 1000
+const ATRASO_RECONEXAO_MAXIMO_MS = 30_000
 const ATRASO_ENVIO_POSICAO_MS = 100
 
 interface EventoPresencaWs {
@@ -19,8 +21,13 @@ interface EventoPresencaWs {
  * o servidor) e agenda o envio pela rede com throttle (`criarEnviadorComThrottle`, máx. a cada
  * 100ms - PRD); `definirStatus` (S6.6) faz o mesmo pro status manual, mas sem throttle - trocar
  * de status não é um fluxo de alta frequência como mover o avatar a cada tecla, então não tem
- * janela de rede pra respeitar aqui. Reconecta com atraso fixo, mesmo padrão de
- * `useQuadroWebSocket` (kanban, S3.11) - backoff exponencial fica pra S6.10.
+ * janela de rede pra respeitar aqui. Reconecta com backoff exponencial (`calcularAtrasoReconexao`,
+ * S6.10, PRD) - dobra a cada tentativa sucessiva sem conseguir reconectar, até um teto, e reseta
+ * pro atraso base assim que uma conexão abre de verdade (`onopen`), pra uma queda futura não
+ * herdar o atraso já escalado de uma queda anterior e resolvida. Ao reconectar, o servidor manda
+ * um `SNAPSHOT` de novo (mesmo em toda conexão nova, S6.3) - `usuarios` é *substituído* inteiro
+ * nesse caso (não mesclado), então a ressincronização já vem de graça da lógica de `onmessage`
+ * que já existia, sem nada especial pra escrever aqui.
  */
 export function usePresencaWebSocket() {
   const accessToken = useAuthStore((state) => state.accessToken)
@@ -38,11 +45,16 @@ export function usePresencaWebSocket() {
     let socket: WebSocket | null = null
     let timeoutReconexao: ReturnType<typeof setTimeout> | null = null
     let desmontado = false
+    let tentativasReconexao = 0
 
     function conectar() {
       socket = new WebSocket(construirUrlWebSocketPresenca(accessToken!, window.location.origin))
       const socketDestaConexao = socket
       socketRef.current = socket
+
+      socket.onopen = () => {
+        tentativasReconexao = 0
+      }
 
       socket.onmessage = (evento) => {
         const dados = JSON.parse(evento.data as string) as EventoPresencaWs
@@ -57,7 +69,9 @@ export function usePresencaWebSocket() {
 
       socket.onclose = () => {
         if (!desmontado) {
-          timeoutReconexao = setTimeout(conectar, ATRASO_RECONEXAO_MS)
+          const atraso = calcularAtrasoReconexao(tentativasReconexao, ATRASO_RECONEXAO_BASE_MS, ATRASO_RECONEXAO_MAXIMO_MS)
+          tentativasReconexao += 1
+          timeoutReconexao = setTimeout(conectar, atraso)
         }
       }
 
