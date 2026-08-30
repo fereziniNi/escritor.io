@@ -35,50 +35,58 @@ export function FilaAjustesPainel() {
   })
 
   if (pendentesQuery.isPending) {
-    return <p>Carregando…</p>
+    return <p className="mensagem-carregando">Carregando…</p>
   }
 
   if (pendentesQuery.isError) {
-    return <p>Não foi possível carregar as solicitações pendentes.</p>
+    return <p className="mensagem-erro">Não foi possível carregar as solicitações pendentes.</p>
   }
 
   return (
-    <section>
-      <h2>Solicitações pendentes</h2>
-      {pendentesQuery.data.length === 0 && <p>Nenhuma solicitação pendente.</p>}
-      <ul>
+    <section className="secao">
+      <h2 className="secao-titulo">📥 Solicitações pendentes</h2>
+      {pendentesQuery.data.length === 0 && <p className="mensagem-vazia">Nenhuma solicitação pendente.</p>}
+      <ul className="lista-cartoes">
         {pendentesQuery.data.map((solicitacao) => (
-          <li key={solicitacao.id}>
-            <p>{solicitacao.usuarioNome}</p>
-            <p>
-              {RÓTULOS_TIPO[solicitacao.tipoSolicitado]} em {solicitacao.momentoSolicitado}
-            </p>
-            <p>{solicitacao.justificativa}</p>
+          <li key={solicitacao.id} className="cartao-item">
+            <div className="cartao-item-cabecalho">
+              <span className="cartao-item-titulo">{solicitacao.usuarioNome}</span>
+              <span className="badge">{RÓTULOS_TIPO[solicitacao.tipoSolicitado]}</span>
+            </div>
+            <div className="cartao-item-corpo">
+              <p className="cartao-item-meta">{solicitacao.momentoSolicitado}</p>
+              <p>{solicitacao.justificativa}</p>
 
-            <button type="button" onClick={() => aprovarMutation.mutate(solicitacao.id)}>
-              Aprovar
-            </button>
+              <div className="linha-botoes">
+                <button type="button" onClick={() => aprovarMutation.mutate(solicitacao.id)}>
+                  ✅ Aprovar
+                </button>
 
-            <label htmlFor={`parecer-${solicitacao.id}`}>Parecer</label>
-            <input
-              id={`parecer-${solicitacao.id}`}
-              value={pareceres[solicitacao.id] ?? ''}
-              onChange={(evento) =>
-                setPareceres((atual) => ({ ...atual, [solicitacao.id]: evento.target.value }))
-              }
-            />
-            <button
-              type="button"
-              onClick={() =>
-                rejeitarMutation.mutate({ id: solicitacao.id, parecer: pareceres[solicitacao.id] ?? '' })
-              }
-            >
-              Rejeitar
-            </button>
+                <div className="campo" style={{ flex: 1, minWidth: '160px' }}>
+                  <label htmlFor={`parecer-${solicitacao.id}`}>Parecer</label>
+                  <input
+                    id={`parecer-${solicitacao.id}`}
+                    value={pareceres[solicitacao.id] ?? ''}
+                    onChange={(evento) =>
+                      setPareceres((atual) => ({ ...atual, [solicitacao.id]: evento.target.value }))
+                    }
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="botao-perigo"
+                  onClick={() =>
+                    rejeitarMutation.mutate({ id: solicitacao.id, parecer: pareceres[solicitacao.id] ?? '' })
+                  }
+                >
+                  ❌ Rejeitar
+                </button>
+              </div>
 
-            {rejeitarMutation.isError && rejeitarMutation.variables?.id === solicitacao.id && (
-              <p>Não foi possível rejeitar: informe um parecer.</p>
-            )}
+              {rejeitarMutation.isError && rejeitarMutation.variables?.id === solicitacao.id && (
+                <p className="mensagem-erro">Não foi possível rejeitar: informe um parecer.</p>
+              )}
+            </div>
           </li>
         ))}
       </ul>

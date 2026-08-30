@@ -255,7 +255,11 @@ export function EscritorioPage() {
       </div>
 
       {painelAberto && (
-        <PainelFlutuante titulo={TITULO_PAINEL[painelAberto]} aoFechar={() => setPainelAberto(null)}>
+        <PainelFlutuante
+          titulo={TITULO_PAINEL[painelAberto]}
+          aoFechar={() => setPainelAberto(null)}
+          largo={painelAberto === 'kanban'}
+        >
           {painelAberto === 'ponto' && <PainelPonto />}
           {painelAberto === 'kanban' && <PainelKanban />}
           {painelAberto === 'relatorios' && <RelatoriosPage />}

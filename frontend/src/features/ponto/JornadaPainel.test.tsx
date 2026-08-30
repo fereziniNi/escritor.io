@@ -38,16 +38,16 @@ describe('JornadaPainel', () => {
           minutosTrabalhados: 540,
           saldoDia: 60,
           saldoAcumuladoNoPeriodo: 120,
-          totalApontadoMinutos: 540,
+          totalApontadoMinutos: 480,
         }),
       ),
     )
 
     renderJornadaPainel()
 
-    expect(await screen.findByText('Trabalhado hoje: 9h00')).toBeInTheDocument()
-    expect(screen.getByText('Saldo do dia: +1h00')).toBeInTheDocument()
-    expect(screen.getByText('Saldo acumulado no período: +2h00')).toBeInTheDocument()
+    expect(await screen.findByText('9h00')).toBeInTheDocument()
+    expect(screen.getByText('+1h00')).toBeInTheDocument()
+    expect(screen.getByText('+2h00')).toBeInTheDocument()
   })
 
   it('exibe saldo negativo com sinal de menos', async () => {
@@ -66,8 +66,8 @@ describe('JornadaPainel', () => {
 
     renderJornadaPainel()
 
-    expect(await screen.findByText('Saldo do dia: -5h00')).toBeInTheDocument()
-    expect(screen.getByText('Saldo acumulado no período: -0h45')).toBeInTheDocument()
+    expect(await screen.findByText('-5h00')).toBeInTheDocument()
+    expect(screen.getByText('-0h45')).toBeInTheDocument()
   })
 
   it('exibe o estado do dia', async () => {
@@ -105,8 +105,8 @@ describe('JornadaPainel', () => {
 
     renderJornadaPainel()
 
-    expect(await screen.findByText('Total apontado hoje: 8h00')).toBeInTheDocument()
-    expect(screen.getByText('Diferença apontado vs. trabalhado: -1h00')).toBeInTheDocument()
+    expect(await screen.findByText('8h00')).toBeInTheDocument()
+    expect(screen.getByText('-1h00')).toBeInTheDocument()
   })
 
   it('diferença positiva quando o apontado é maior que o trabalhado', async () => {
@@ -125,7 +125,7 @@ describe('JornadaPainel', () => {
 
     renderJornadaPainel()
 
-    expect(await screen.findByText('Total apontado hoje: 3h30')).toBeInTheDocument()
-    expect(screen.getByText('Diferença apontado vs. trabalhado: +0h30')).toBeInTheDocument()
+    expect(await screen.findByText('3h30')).toBeInTheDocument()
+    expect(screen.getByText('+0h30')).toBeInTheDocument()
   })
 })

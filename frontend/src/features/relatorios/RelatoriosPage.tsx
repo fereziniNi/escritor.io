@@ -51,86 +51,110 @@ export function RelatoriosPage() {
   })
 
   return (
-    <main>
-      <h1>Relatórios</h1>
+    <main className="pagina">
+      <div className="pagina-cabecalho">
+        <h1>📊 Relatórios</h1>
+      </div>
 
-      <form>
-        <label htmlFor="usuario-id-relatorio">Usuário (id, em branco = eu mesmo)</label>
-        <input
-          id="usuario-id-relatorio"
-          value={usuarioIdTexto}
-          onChange={(evento) => setUsuarioIdTexto(evento.target.value)}
-        />
+      <form className="secao cartao">
+        <div className="formulario">
+          <div className="campo">
+            <label htmlFor="usuario-id-relatorio">Usuário (id, em branco = eu mesmo)</label>
+            <input
+              id="usuario-id-relatorio"
+              value={usuarioIdTexto}
+              onChange={(evento) => setUsuarioIdTexto(evento.target.value)}
+            />
+          </div>
 
-        <label htmlFor="inicio-relatorio">Início</label>
-        <input
-          id="inicio-relatorio"
-          type="date"
-          value={inicio}
-          onChange={(evento) => setInicio(evento.target.value)}
-        />
+          <div className="campo">
+            <label htmlFor="inicio-relatorio">Início</label>
+            <input
+              id="inicio-relatorio"
+              type="date"
+              value={inicio}
+              onChange={(evento) => setInicio(evento.target.value)}
+            />
+          </div>
 
-        <label htmlFor="fim-relatorio">Fim</label>
-        <input id="fim-relatorio" type="date" value={fim} onChange={(evento) => setFim(evento.target.value)} />
+          <div className="campo">
+            <label htmlFor="fim-relatorio">Fim</label>
+            <input id="fim-relatorio" type="date" value={fim} onChange={(evento) => setFim(evento.target.value)} />
+          </div>
 
-        <label htmlFor="projeto-relatorio">Projeto</label>
-        <select
-          id="projeto-relatorio"
-          value={projetoId}
-          onChange={(evento) => {
-            setProjetoId(evento.target.value)
-            setEquipeId('')
-          }}
-        >
-          <option value="">Nenhum</option>
-          {projetosQuery.data?.map((projeto) => (
-            <option key={projeto.id} value={projeto.id}>
-              {projeto.nome}
-            </option>
-          ))}
-        </select>
+          <div className="campo">
+            <label htmlFor="projeto-relatorio">Projeto</label>
+            <select
+              id="projeto-relatorio"
+              value={projetoId}
+              onChange={(evento) => {
+                setProjetoId(evento.target.value)
+                setEquipeId('')
+              }}
+            >
+              <option value="">Nenhum</option>
+              {projetosQuery.data?.map((projeto) => (
+                <option key={projeto.id} value={projeto.id}>
+                  {projeto.nome}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <label htmlFor="equipe-relatorio">Equipe</label>
-        <select
-          id="equipe-relatorio"
-          value={equipeId}
-          onChange={(evento) => {
-            setEquipeId(evento.target.value)
-            setProjetoId('')
-          }}
-        >
-          <option value="">Nenhuma</option>
-          {equipesQuery.data?.map((equipe) => (
-            <option key={equipe.id} value={equipe.id}>
-              {equipe.nome}
-            </option>
-          ))}
-        </select>
+          <div className="campo">
+            <label htmlFor="equipe-relatorio">Equipe</label>
+            <select
+              id="equipe-relatorio"
+              value={equipeId}
+              onChange={(evento) => {
+                setEquipeId(evento.target.value)
+                setProjetoId('')
+              }}
+            >
+              <option value="">Nenhuma</option>
+              {equipesQuery.data?.map((equipe) => (
+                <option key={equipe.id} value={equipe.id}>
+                  {equipe.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
       </form>
 
-      <section>
-        <h2>Saldo</h2>
-        {espelhoQuery.isPending && <p>Carregando…</p>}
-        {espelhoQuery.isError && <p>Não foi possível carregar o saldo.</p>}
+      <section className="secao cartao">
+        <h2 className="secao-titulo">💰 Saldo</h2>
+        {espelhoQuery.isPending && <p className="mensagem-carregando">Carregando…</p>}
+        {espelhoQuery.isError && <p className="mensagem-erro">Não foi possível carregar o saldo.</p>}
         {espelhoQuery.data && <p>Saldo acumulado: {formatarSaldo(espelhoQuery.data.saldoAcumuladoNoPeriodo)}</p>}
       </section>
 
-      <section>
-        <h2>Dias inconsistentes no período</h2>
-        {!periodoCompleto && <p>Informe início e fim pra ver os dias inconsistentes.</p>}
-        {diasInconsistentesQuery.isError && <p>Não foi possível carregar os dias inconsistentes.</p>}
-        {diasInconsistentesQuery.data?.length === 0 && <p>Nenhum dia inconsistente no período.</p>}
-        <ul>{diasInconsistentesQuery.data?.map((data) => <li key={data}>{data}</li>)}</ul>
+      <section className="secao cartao">
+        <h2 className="secao-titulo">⚠️ Dias inconsistentes no período</h2>
+        {!periodoCompleto && <p className="mensagem-vazia">Informe início e fim pra ver os dias inconsistentes.</p>}
+        {diasInconsistentesQuery.isError && <p className="mensagem-erro">Não foi possível carregar os dias inconsistentes.</p>}
+        {diasInconsistentesQuery.data?.length === 0 && <p className="mensagem-vazia">Nenhum dia inconsistente no período.</p>}
+        {diasInconsistentesQuery.data && diasInconsistentesQuery.data.length > 0 && (
+          <ul className="linha-botoes" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {diasInconsistentesQuery.data.map((data) => (
+              <li key={data} className="badge badge-perigo">
+                {data}
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
-      <section>
-        <h2>Total apontado</h2>
-        {periodoCompleto && projetoId === '' && equipeId === '' && <p>Selecione um projeto ou uma equipe.</p>}
-        {totalApontadoQuery.isError && <p>Não foi possível carregar o total apontado.</p>}
+      <section className="secao cartao">
+        <h2 className="secao-titulo">🧮 Total apontado</h2>
+        {periodoCompleto && projetoId === '' && equipeId === '' && <p className="mensagem-vazia">Selecione um projeto ou uma equipe.</p>}
+        {totalApontadoQuery.isError && <p className="mensagem-erro">Não foi possível carregar o total apontado.</p>}
         {totalApontadoQuery.data && <p>Total apontado: {formatarMinutos(totalApontadoQuery.data.totalMinutos)}</p>}
       </section>
 
-      <FilaAjustesPainel />
+      <div className="secao">
+        <FilaAjustesPainel />
+      </div>
     </main>
   )
 }

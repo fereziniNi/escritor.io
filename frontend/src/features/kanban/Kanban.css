@@ -1,0 +1,194 @@
+/**
+ * Board do Kanban redesenhado (pedido "todos os menus/funções... elegante, bonito, versátil e
+ * fácil de utilizar") - antes era só `<main>`/`<section>`/`<ul>` sem nenhuma classe própria.
+ * Nenhum texto tocado aqui: só layout/cor. Alguns rótulos de botão são testados com matcher exato
+ * ancorado (ex. `/^editar$/i`, `/^salvar$/i`, `/^lançar$/i`, `/^aplicar$/i`, `/^comentar$/i`) e o
+ * <h1> do quadro/`<h2>` "Backlog" de coluna são testados via nome acessível exato - por isso esses
+ * textos ficam sem ícone/decoração, só a classe muda a aparência.
+ */
+
+.kanban-quadro-cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+}
+
+.kanban-quadro-icone {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.kanban-quadro-cabecalho h1 {
+  margin: 0;
+}
+
+.kanban-board {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.75rem;
+}
+
+.kanban-coluna {
+  flex: 0 0 300px;
+  background: var(--cor-primaria-clara);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  padding: 0.9rem 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.kanban-coluna-titulo {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  margin: 0;
+  color: var(--cor-primaria-escura);
+}
+
+.kanban-coluna-titulo .badge {
+  margin-left: auto;
+}
+
+.kanban-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-height: 8px;
+}
+
+.kanban-card {
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: 10px;
+  padding: 0.7rem 0.8rem;
+  box-shadow: 0 1px 0 var(--cor-borda);
+}
+
+.kanban-card-titulo {
+  font-weight: 800;
+  cursor: grab;
+  display: block;
+}
+
+.kanban-card-titulo:active {
+  cursor: grabbing;
+}
+
+.kanban-etiquetas {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.kanban-etiqueta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #fff;
+  padding: 0.15em 0.55em;
+  border-radius: 999px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+}
+
+.kanban-etiqueta button {
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  padding: 0 0.15em;
+  font-size: 0.85em;
+  line-height: 1;
+}
+
+.kanban-etiqueta button:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+  opacity: 0.7;
+}
+
+.kanban-aplicar-etiqueta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.kanban-card-form {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+}
+
+.kanban-card-form input {
+  flex: 1;
+  min-width: 0;
+}
+
+.kanban-card-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.55rem;
+}
+
+.kanban-subsecao {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--cor-borda);
+}
+
+.kanban-subsecao-corpo {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.kanban-subsecao-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.kanban-subsecao-item {
+  background: var(--cor-primaria-clara);
+  border-radius: 8px;
+  padding: 0.4em 0.6em;
+  font-size: 0.85rem;
+}
+
+.kanban-timer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.kanban-timer-cronometro {
+  font-family: var(--fonte-jogo);
+  font-size: 0.78rem;
+  color: var(--cor-acento-escuro);
+}
+
+.kanban-etiqueta-form {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}

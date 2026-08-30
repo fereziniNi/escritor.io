@@ -23,21 +23,24 @@ export function PontoWidget() {
   })
 
   if (estadoQuery.isPending) {
-    return <p>Carregando…</p>
+    return <p className="mensagem-carregando">Carregando…</p>
   }
 
   if (estadoQuery.isError) {
-    return <p>Não foi possível carregar o estado da marcação.</p>
+    return <p className="mensagem-erro">Não foi possível carregar o estado da marcação.</p>
   }
 
   return (
-    <section>
-      {estadoQuery.data.proximasOpcoes.map((tipo) => (
-        <button key={tipo} type="button" disabled={marcarMutation.isPending} onClick={() => marcarMutation.mutate(tipo)}>
-          {RÓTULOS[tipo]}
-        </button>
-      ))}
-      {marcarMutation.isError && <p>Não foi possível registrar a marcação.</p>}
+    <section className="cartao">
+      <h3 className="secao-titulo">⏱️ Marcar ponto</h3>
+      <div className="linha-botoes">
+        {estadoQuery.data.proximasOpcoes.map((tipo) => (
+          <button key={tipo} type="button" disabled={marcarMutation.isPending} onClick={() => marcarMutation.mutate(tipo)}>
+            {RÓTULOS[tipo]}
+          </button>
+        ))}
+      </div>
+      {marcarMutation.isError && <p className="mensagem-erro">Não foi possível registrar a marcação.</p>}
     </section>
   )
 }

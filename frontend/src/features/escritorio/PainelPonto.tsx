@@ -11,7 +11,7 @@ export function PainelPonto() {
   const papel = useAuthStore((estado) => estado.papel)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <div className="pagina">
       <PontoWidget />
       <JornadaPainel />
       <EspelhoMesPainel />

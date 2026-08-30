@@ -1,0 +1,91 @@
+/**
+ * Tela de login redesenhada (pedido "todos os menus/funções... elegante, bonito"): antes era um
+ * <form> sem nenhum estilo próprio, plantado no topo da página. Agora ocupa a janela inteira,
+ * centralizado, com a mesma identidade visual quente/game-adjacent do resto do app (fonte
+ * Press Start 2P só na marca, Nunito no corpo) - primeira coisa que qualquer usuário vê, então é
+ * onde a "cara" do produto mais aparece.
+ */
+.login-pagina {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.25rem;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(79, 143, 111, 0.12), transparent 40%),
+    radial-gradient(circle at 85% 80%, rgba(242, 165, 65, 0.14), transparent 45%),
+    var(--cor-fundo);
+}
+
+.login-marca {
+  text-align: center;
+  margin-bottom: 1.75rem;
+}
+
+.login-marca-icone {
+  font-size: 2.4rem;
+  line-height: 1;
+  margin-bottom: 0.5rem;
+}
+
+.login-marca h1 {
+  font-family: var(--fonte-jogo);
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--cor-primaria-escura);
+  margin: 0;
+}
+
+.login-cartao {
+  width: min(380px, 100%);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  box-shadow: var(--sombra-cartao);
+  padding: 1.75rem 1.75rem 2rem;
+}
+
+.login-cartao h2 {
+  margin-bottom: 0.35rem;
+}
+
+.login-subtitulo {
+  color: var(--cor-texto-suave);
+  font-size: 0.9rem;
+  margin: 0 0 1.25rem;
+}
+
+.login-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1.25rem;
+}
+
+.login-campo label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--cor-texto-suave);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.login-campo input {
+  font-size: 1.05rem;
+  padding: 0.65em 0.8em;
+}
+
+.login-acoes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.login-acoes button {
+  width: 100%;
+}
+
+.login-rodape {
+  margin-top: 1.25rem;
+  text-align: center;
+}

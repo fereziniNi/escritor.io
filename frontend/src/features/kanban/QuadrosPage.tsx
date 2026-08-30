@@ -36,44 +36,57 @@ export function QuadrosPage({ aoSelecionarQuadro }: { aoSelecionarQuadro?: (id: 
   })
 
   return (
-    <main>
-      <h1>Quadros</h1>
+    <main className="pagina">
+      <div className="pagina-cabecalho">
+        <h1>📋 Quadros</h1>
+      </div>
 
       {podeCriar && (
         <form
+          className="secao cartao"
           onSubmit={(evento) => {
             evento.preventDefault()
             criarMutation.mutate()
           }}
         >
-          <label htmlFor="nome-quadro">Nome</label>
-          <input id="nome-quadro" value={nome} onChange={(evento) => setNome(evento.target.value)} required />
+          <div className="formulario">
+            <div className="campo">
+              <label htmlFor="nome-quadro">Nome</label>
+              <input id="nome-quadro" value={nome} onChange={(evento) => setNome(evento.target.value)} required />
+            </div>
 
-          <label htmlFor="projeto-quadro">Projeto (id)</label>
-          <input
-            id="projeto-quadro"
-            value={projetoId}
-            onChange={(evento) => setProjetoId(evento.target.value)}
-          />
+            <div className="campo">
+              <label htmlFor="projeto-quadro">Projeto (id)</label>
+              <input
+                id="projeto-quadro"
+                value={projetoId}
+                onChange={(evento) => setProjetoId(evento.target.value)}
+              />
+            </div>
 
-          <label htmlFor="equipe-quadro">Equipe (id)</label>
-          <input id="equipe-quadro" value={equipeId} onChange={(evento) => setEquipeId(evento.target.value)} />
+            <div className="campo">
+              <label htmlFor="equipe-quadro">Equipe (id)</label>
+              <input id="equipe-quadro" value={equipeId} onChange={(evento) => setEquipeId(evento.target.value)} />
+            </div>
 
-          <button type="submit" disabled={criarMutation.isPending}>
-            Criar quadro
-          </button>
-          {criarMutation.isError && <p>Não foi possível criar o quadro.</p>}
+            <div className="campo-acoes">
+              <button type="submit" disabled={criarMutation.isPending}>
+                ➕ Criar quadro
+              </button>
+              {criarMutation.isError && <p className="mensagem-erro">Não foi possível criar o quadro.</p>}
+            </div>
+          </div>
         </form>
       )}
 
-      {quadrosQuery.isPending && <p>Carregando…</p>}
-      {quadrosQuery.isError && <p>Não foi possível carregar os quadros.</p>}
-      {quadrosQuery.data?.length === 0 && <p>Nenhum quadro visível ainda.</p>}
-      <ul>
+      {quadrosQuery.isPending && <p className="mensagem-carregando">Carregando…</p>}
+      {quadrosQuery.isError && <p className="mensagem-erro">Não foi possível carregar os quadros.</p>}
+      {quadrosQuery.data?.length === 0 && <p className="mensagem-vazia">Nenhum quadro visível ainda.</p>}
+      <ul className="lista-cartoes">
         {quadrosQuery.data?.map((quadro) => (
-          <li key={quadro.id}>
+          <li key={quadro.id} className="cartao-item">
             {aoSelecionarQuadro ? (
-              <button type="button" onClick={() => aoSelecionarQuadro(quadro.id)}>
+              <button type="button" className="botao-secundario" style={{ width: '100%', textAlign: 'left' }} onClick={() => aoSelecionarQuadro(quadro.id)}>
                 {quadro.nome}
               </button>
             ) : (

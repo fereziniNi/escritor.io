@@ -19,36 +19,50 @@ export function EquipesPage() {
   })
 
   return (
-    <main>
-      <h1>Equipes</h1>
+    <main className="pagina">
+      <div className="pagina-cabecalho">
+        <h1>👥 Equipes</h1>
+      </div>
 
       <form
+        className="secao cartao"
         onSubmit={(evento) => {
           evento.preventDefault()
           criarMutation.mutate()
         }}
       >
-        <label htmlFor="nome-equipe">Nome</label>
-        <input id="nome-equipe" value={nome} onChange={(evento) => setNome(evento.target.value)} required />
+        <div className="formulario">
+          <div className="campo">
+            <label htmlFor="nome-equipe">Nome</label>
+            <input id="nome-equipe" value={nome} onChange={(evento) => setNome(evento.target.value)} required />
+          </div>
 
-        <label htmlFor="descricao-equipe">Descrição</label>
-        <input
-          id="descricao-equipe"
-          value={descricao}
-          onChange={(evento) => setDescricao(evento.target.value)}
-        />
+          <div className="campo">
+            <label htmlFor="descricao-equipe">Descrição</label>
+            <input
+              id="descricao-equipe"
+              value={descricao}
+              onChange={(evento) => setDescricao(evento.target.value)}
+            />
+          </div>
 
-        <button type="submit" disabled={criarMutation.isPending}>
-          Criar equipe
-        </button>
-        {criarMutation.isError && <p>Não foi possível criar a equipe.</p>}
+          <div className="campo-acoes">
+            <button type="submit" disabled={criarMutation.isPending}>
+              ➕ Criar equipe
+            </button>
+            {criarMutation.isError && <p className="mensagem-erro">Não foi possível criar a equipe.</p>}
+          </div>
+        </div>
       </form>
 
-      {equipesQuery.isPending && <p>Carregando…</p>}
-      {equipesQuery.isError && <p>Não foi possível carregar as equipes.</p>}
-      <ul>
+      {equipesQuery.isPending && <p className="mensagem-carregando">Carregando…</p>}
+      {equipesQuery.isError && <p className="mensagem-erro">Não foi possível carregar as equipes.</p>}
+      {equipesQuery.data?.length === 0 && <p className="mensagem-vazia">Nenhuma equipe cadastrada ainda.</p>}
+      <ul className="lista-cartoes">
         {equipesQuery.data?.map((equipe) => (
-          <li key={equipe.id}>{equipe.nome}</li>
+          <li key={equipe.id} className="cartao-item cartao-item-titulo">
+            {equipe.nome}
+          </li>
         ))}
       </ul>
     </main>

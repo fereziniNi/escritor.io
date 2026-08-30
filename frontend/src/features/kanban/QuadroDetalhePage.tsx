@@ -38,6 +38,7 @@ import { resolverMovimento } from './resolverMovimento'
 import { rotuloEvento } from './rotuloEvento'
 import type { Apontamento, Card, ColunaComCards, Etiqueta, QuadroDetalhe } from './types'
 import { useQuadroWebSocket } from './useQuadroWebSocket'
+import './Kanban.css'
 
 function ComentariosDoCard({ cardId }: { cardId: number }) {
   const queryClient = useQueryClient()
@@ -61,36 +62,44 @@ function ComentariosDoCard({ cardId }: { cardId: number }) {
   })
 
   return (
-    <div>
-      <button type="button" onClick={() => setAberto((atual) => !atual)}>
-        Comentários
+    <div className="kanban-subsecao">
+      <button type="button" className="botao-secundario botao-pequeno" onClick={() => setAberto((atual) => !atual)}>
+        💬 Comentários
       </button>
       {aberto && (
-        <div>
-          {comentariosQuery.isError && <p>Não foi possível carregar os comentários.</p>}
-          <ul>
-            {comentariosQuery.data?.map((comentario) => (
-              <li key={comentario.id}>{comentario.texto}</li>
-            ))}
-          </ul>
+        <div className="kanban-subsecao-corpo">
+          {comentariosQuery.isError && <p className="mensagem-erro">Não foi possível carregar os comentários.</p>}
+          {comentariosQuery.data && comentariosQuery.data.length > 0 && (
+            <ul className="kanban-subsecao-lista">
+              {comentariosQuery.data.map((comentario) => (
+                <li key={comentario.id} className="kanban-subsecao-item">
+                  {comentario.texto}
+                </li>
+              ))}
+            </ul>
+          )}
           <form
+            className="kanban-card-form"
             onSubmit={(evento) => {
               evento.preventDefault()
               criarComentarioMutation.mutate({ cardId, texto })
             }}
           >
-            <label htmlFor={`novo-comentario-${cardId}`}>Novo comentário</label>
+            <label htmlFor={`novo-comentario-${cardId}`} className="sr-only">
+              Novo comentário
+            </label>
             <textarea
               id={`novo-comentario-${cardId}`}
               value={texto}
               onChange={(evento) => setTexto(evento.target.value)}
+              placeholder="Novo comentário"
               required
             />
-            <button type="submit" disabled={criarComentarioMutation.isPending}>
+            <button type="submit" className="botao-pequeno" disabled={criarComentarioMutation.isPending}>
               Comentar
             </button>
-            {criarComentarioMutation.isError && <p>Não foi possível comentar.</p>}
           </form>
+          {criarComentarioMutation.isError && <p className="mensagem-erro">Não foi possível comentar.</p>}
         </div>
       )}
     </div>
@@ -108,16 +117,18 @@ function HistoricoDoCard({ cardId }: { cardId: number }) {
   })
 
   return (
-    <div>
-      <button type="button" onClick={() => setAberto((atual) => !atual)}>
-        Histórico
+    <div className="kanban-subsecao">
+      <button type="button" className="botao-secundario botao-pequeno" onClick={() => setAberto((atual) => !atual)}>
+        🕘 Histórico
       </button>
       {aberto && (
-        <div>
-          {eventosQuery.isError && <p>Não foi possível carregar o histórico.</p>}
-          <ul aria-label="Histórico do card">
+        <div className="kanban-subsecao-corpo">
+          {eventosQuery.isError && <p className="mensagem-erro">Não foi possível carregar o histórico.</p>}
+          <ul aria-label="Histórico do card" className="kanban-subsecao-lista">
             {eventosQuery.data?.map((evento) => (
-              <li key={evento.id}>{rotuloEvento(evento)}</li>
+              <li key={evento.id} className="kanban-subsecao-item">
+                {rotuloEvento(evento)}
+              </li>
             ))}
           </ul>
         </div>
@@ -159,14 +170,14 @@ function TimerDoCard({ cardId }: { cardId: number }) {
 
   if (!apontamentoAtivo) {
     return (
-      <div>
-        <button type="button" onClick={() => iniciarMutation.mutate()} disabled={iniciarMutation.isPending}>
-          Iniciar timer
+      <div className="kanban-timer">
+        <button type="button" className="botao-pequeno" onClick={() => iniciarMutation.mutate()} disabled={iniciarMutation.isPending}>
+          ▶️ Iniciar timer
         </button>
-        {iniciarMutation.isError && <p>Não foi possível iniciar o timer.</p>}
+        {iniciarMutation.isError && <p className="mensagem-erro">Não foi possível iniciar o timer.</p>}
         {/* pararMutation também pode ter errado sem apontamentoAtivo: onError já zerou o
         estado antes desta renderização, e a mensagem precisa sobreviver a essa troca de branch. */}
-        {pararMutation.isError && <p>Não foi possível parar o timer.</p>}
+        {pararMutation.isError && <p className="mensagem-erro">Não foi possível parar o timer.</p>}
       </div>
     )
   }
@@ -174,10 +185,10 @@ function TimerDoCard({ cardId }: { cardId: number }) {
   const segundosDecorridos = (agora - new Date(apontamentoAtivo.inicio).getTime()) / 1000
 
   return (
-    <div>
-      <span>{formatarDuracao(segundosDecorridos)}</span>
-      <button type="button" onClick={() => pararMutation.mutate()} disabled={pararMutation.isPending}>
-        Parar timer
+    <div className="kanban-timer">
+      <span className="kanban-timer-cronometro">⏱️ {formatarDuracao(segundosDecorridos)}</span>
+      <button type="button" className="botao-perigo botao-pequeno" onClick={() => pararMutation.mutate()} disabled={pararMutation.isPending}>
+        ⏹️ Parar timer
       </button>
     </div>
   )
@@ -205,8 +216,9 @@ function LinhaApontamento({
 
   if (emEdicao) {
     return (
-      <li>
+      <li className="kanban-subsecao-item">
         <form
+          className="formulario"
           onSubmit={(evento) => {
             evento.preventDefault()
             onSalvarEdicao(minutos, descricao)
@@ -217,7 +229,7 @@ function LinhaApontamento({
           inicio original + minutos novos, mantendo o inicio intocado. Timer ainda aberto (fim nulo)
           não tem duração pra editar ainda, só descrição. */}
           {apontamento.fim !== null && (
-            <>
+            <div className="campo">
               <label htmlFor={`minutos-edicao-${apontamento.id}`}>Minutos</label>
               <input
                 id={`minutos-edicao-${apontamento.id}`}
@@ -226,31 +238,37 @@ function LinhaApontamento({
                 onChange={(evento) => setMinutos(evento.target.value)}
                 required
               />
-            </>
+            </div>
           )}
-          <label htmlFor={`descricao-edicao-${apontamento.id}`}>Descrição</label>
-          <input id={`descricao-edicao-${apontamento.id}`} value={descricao} onChange={(evento) => setDescricao(evento.target.value)} />
-          <button type="submit" disabled={salvandoEdicao}>
-            Salvar
-          </button>
-          <button type="button" onClick={onCancelarEdicao}>
-            Cancelar
-          </button>
+          <div className="campo">
+            <label htmlFor={`descricao-edicao-${apontamento.id}`}>Descrição</label>
+            <input id={`descricao-edicao-${apontamento.id}`} value={descricao} onChange={(evento) => setDescricao(evento.target.value)} />
+          </div>
+          <div className="campo-acoes">
+            <button type="submit" className="botao-pequeno" disabled={salvandoEdicao}>
+              Salvar
+            </button>
+            <button type="button" className="botao-secundario botao-pequeno" onClick={onCancelarEdicao}>
+              Cancelar
+            </button>
+          </div>
         </form>
       </li>
     )
   }
 
   return (
-    <li>
+    <li className="kanban-subsecao-item">
       <span>{apontamento.minutos !== null ? `${apontamento.minutos} min` : 'em andamento'}</span>
       {apontamento.descricao && <span> — {apontamento.descricao}</span>}
-      <button type="button" onClick={onIniciarEdicao}>
-        Editar
-      </button>
-      <button type="button" aria-label={`Excluir apontamento ${apontamento.id}`} onClick={onExcluir}>
-        Excluir
-      </button>
+      <div className="linha-botoes" style={{ marginTop: '0.35rem' }}>
+        <button type="button" className="botao-secundario botao-pequeno" onClick={onIniciarEdicao}>
+          Editar
+        </button>
+        <button type="button" className="botao-perigo botao-pequeno" aria-label={`Excluir apontamento ${apontamento.id}`} onClick={onExcluir}>
+          🗑️
+        </button>
+      </div>
     </li>
   )
 }
@@ -294,14 +312,14 @@ function ApontamentosDoCard({ cardId }: { cardId: number }) {
   })
 
   return (
-    <div>
-      <button type="button" onClick={() => setAberto((atual) => !atual)}>
-        Apontamentos
+    <div className="kanban-subsecao">
+      <button type="button" className="botao-secundario botao-pequeno" onClick={() => setAberto((atual) => !atual)}>
+        🧾 Apontamentos
       </button>
       {aberto && (
-        <div>
-          {apontamentosQuery.isError && <p>Não foi possível carregar os apontamentos.</p>}
-          <ul aria-label="Apontamentos do card">
+        <div className="kanban-subsecao-corpo">
+          {apontamentosQuery.isError && <p className="mensagem-erro">Não foi possível carregar os apontamentos.</p>}
+          <ul aria-label="Apontamentos do card" className="kanban-subsecao-lista">
             {apontamentosQuery.data?.map((apontamento) => (
               <LinhaApontamento
                 key={apontamento.id}
@@ -322,10 +340,11 @@ function ApontamentosDoCard({ cardId }: { cardId: number }) {
               />
             ))}
           </ul>
-          {editarMutation.isError && <p>Não foi possível editar o apontamento.</p>}
-          {excluirMutation.isError && <p>Não foi possível excluir o apontamento.</p>}
+          {editarMutation.isError && <p className="mensagem-erro">Não foi possível editar o apontamento.</p>}
+          {excluirMutation.isError && <p className="mensagem-erro">Não foi possível excluir o apontamento.</p>}
 
           <form
+            className="formulario"
             onSubmit={(evento) => {
               evento.preventDefault()
               criarManualMutation.mutate({
@@ -337,20 +356,26 @@ function ApontamentosDoCard({ cardId }: { cardId: number }) {
               })
             }}
           >
-            <label htmlFor={`minutos-manual-${cardId}`}>Minutos trabalhados</label>
-            <input
-              id={`minutos-manual-${cardId}`}
-              type="number"
-              value={minutosManual}
-              onChange={(evento) => setMinutosManual(evento.target.value)}
-              required
-            />
-            <label htmlFor={`descricao-manual-${cardId}`}>Descrição</label>
-            <input id={`descricao-manual-${cardId}`} value={descricaoManual} onChange={(evento) => setDescricaoManual(evento.target.value)} />
-            <button type="submit" disabled={criarManualMutation.isPending}>
-              Lançar
-            </button>
-            {criarManualMutation.isError && <p>Não foi possível lançar o apontamento.</p>}
+            <div className="campo">
+              <label htmlFor={`minutos-manual-${cardId}`}>Minutos trabalhados</label>
+              <input
+                id={`minutos-manual-${cardId}`}
+                type="number"
+                value={minutosManual}
+                onChange={(evento) => setMinutosManual(evento.target.value)}
+                required
+              />
+            </div>
+            <div className="campo">
+              <label htmlFor={`descricao-manual-${cardId}`}>Descrição</label>
+              <input id={`descricao-manual-${cardId}`} value={descricaoManual} onChange={(evento) => setDescricaoManual(evento.target.value)} />
+            </div>
+            <div className="campo-acoes">
+              <button type="submit" className="botao-pequeno" disabled={criarManualMutation.isPending}>
+                Lançar
+              </button>
+              {criarManualMutation.isError && <p className="mensagem-erro">Não foi possível lançar o apontamento.</p>}
+            </div>
           </form>
         </div>
       )}
@@ -388,28 +413,32 @@ function CardArrastavel({
   const etiquetasParaAplicar = etiquetasDisponiveis.filter((etiqueta) => !idsJaAplicados.has(etiqueta.id))
 
   return (
-    <li ref={setNodeRef} style={style}>
+    <li ref={setNodeRef} style={style} className="kanban-card">
       {/* Handle de arrastar isolado num elemento próprio: {...attributes} inclui role="button" do
       dnd-kit, e colocar isso no <li> inteiro (que também contém o select/botões de etiqueta)
       aninharia elementos interativos dentro de um role="button" - ARIA inválido que faz o nome
       acessível do card "engolir" o aria-label dos botões filhos (confirmado num browser real,
       não pego pelo jsdom dos testes de componente). */}
-      <span {...attributes} {...listeners}>
+      <span className="kanban-card-titulo" {...attributes} {...listeners}>
         {card.titulo}
       </span>
-      <ul>
-        {card.etiquetas.map((etiqueta) => (
-          <li key={etiqueta.id} style={{ backgroundColor: etiqueta.cor, display: 'inline-block' }}>
-            {etiqueta.nome}
-            <button type="button" aria-label={`Remover ${etiqueta.nome}`} onClick={() => onRemoverEtiqueta(etiqueta.id)}>
-              ×
-            </button>
-          </li>
-        ))}
-      </ul>
+      {card.etiquetas.length > 0 && (
+        <ul className="kanban-etiquetas">
+          {card.etiquetas.map((etiqueta) => (
+            <li key={etiqueta.id} className="kanban-etiqueta" style={{ backgroundColor: etiqueta.cor }}>
+              {etiqueta.nome}
+              <button type="button" aria-label={`Remover ${etiqueta.nome}`} onClick={() => onRemoverEtiqueta(etiqueta.id)}>
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       {etiquetasParaAplicar.length > 0 && (
-        <div>
-          <label htmlFor={`aplicar-etiqueta-${card.id}`}>Aplicar etiqueta</label>
+        <div className="kanban-aplicar-etiqueta">
+          <label htmlFor={`aplicar-etiqueta-${card.id}`} className="sr-only">
+            Aplicar etiqueta
+          </label>
           <select
             id={`aplicar-etiqueta-${card.id}`}
             value={etiquetaSelecionada}
@@ -422,7 +451,7 @@ function CardArrastavel({
               </option>
             ))}
           </select>
-          <button type="button" disabled={etiquetaSelecionada === ''} onClick={onAplicarEtiqueta}>
+          <button type="button" className="botao-pequeno" disabled={etiquetaSelecionada === ''} onClick={onAplicarEtiqueta}>
             Aplicar
           </button>
         </div>
@@ -461,18 +490,18 @@ function ColunaComDrop({
   const { setNodeRef } = useDroppable({ id: `coluna-${coluna.id}`, data: { type: 'coluna', colunaId: coluna.id } })
 
   return (
-    <section ref={setNodeRef}>
-      <h2>
+    <section ref={setNodeRef} className="kanban-coluna">
+      <h2 className="kanban-coluna-titulo">
         {coluna.nome}
         {coluna.limiteWip !== null && (
-          <span>
+          <span className="badge">
             {' '}
             {coluna.cards.length}/{coluna.limiteWip}
           </span>
         )}
       </h2>
       <SortableContext items={coluna.cards.map((card) => card.id)} strategy={verticalListSortingStrategy}>
-        <ul>
+        <ul className="kanban-cards">
           {coluna.cards.map((card) => (
             <CardArrastavel
               key={card.id}
@@ -488,19 +517,23 @@ function ColunaComDrop({
       </SortableContext>
 
       <form
+        className="kanban-card-form"
         onSubmit={(evento) => {
           evento.preventDefault()
           onCriarCard()
         }}
       >
-        <label htmlFor={`titulo-card-${coluna.id}`}>Novo card</label>
+        <label htmlFor={`titulo-card-${coluna.id}`} className="sr-only">
+          Novo card
+        </label>
         <input
           id={`titulo-card-${coluna.id}`}
           value={tituloNovoCard}
           onChange={(evento) => onTituloChange(evento.target.value)}
+          placeholder="+ Novo card"
           required
         />
-        <button type="submit" disabled={criandoCard}>
+        <button type="submit" className="botao-pequeno" disabled={criandoCard}>
           Adicionar card
         </button>
       </form>
@@ -621,47 +654,60 @@ export function QuadroDetalhePage({ quadroIdProp }: { quadroIdProp?: number } = 
   }
 
   if (quadroQuery.isPending) {
-    return <p>Carregando…</p>
+    return <p className="mensagem-carregando">Carregando…</p>
   }
 
   if (quadroQuery.isError) {
-    return <p>Não foi possível carregar o quadro.</p>
+    return <p className="mensagem-erro">Não foi possível carregar o quadro.</p>
   }
 
   const quadro = quadroQuery.data
   const etiquetasDisponiveis = etiquetasQuery.data ?? []
 
   return (
-    <main>
-      <h1>{quadro.nome}</h1>
+    <main className="pagina" style={{ maxWidth: 'none' }}>
+      <div className="kanban-quadro-cabecalho">
+        <span className="kanban-quadro-icone" aria-hidden="true">
+          📋
+        </span>
+        <h1>{quadro.nome}</h1>
+      </div>
 
       {podeCriarEtiqueta && (
         <form
+          className="secao cartao kanban-etiqueta-form"
           onSubmit={(evento) => {
             evento.preventDefault()
             criarEtiquetaMutation.mutate({ quadroId, nome: nomeEtiqueta, cor: corEtiqueta })
           }}
         >
-          <label htmlFor="nome-etiqueta">Nome da etiqueta</label>
-          <input id="nome-etiqueta" value={nomeEtiqueta} onChange={(evento) => setNomeEtiqueta(evento.target.value)} required />
+          <div className="campo">
+            <label htmlFor="nome-etiqueta">Nome da etiqueta</label>
+            <input id="nome-etiqueta" value={nomeEtiqueta} onChange={(evento) => setNomeEtiqueta(evento.target.value)} required />
+          </div>
 
-          <label htmlFor="cor-etiqueta">Cor da etiqueta</label>
-          <input id="cor-etiqueta" value={corEtiqueta} onChange={(evento) => setCorEtiqueta(evento.target.value)} required />
+          <div className="campo">
+            <label htmlFor="cor-etiqueta">Cor da etiqueta</label>
+            <input id="cor-etiqueta" value={corEtiqueta} onChange={(evento) => setCorEtiqueta(evento.target.value)} required />
+          </div>
 
-          <button type="submit" disabled={criarEtiquetaMutation.isPending}>
-            Criar etiqueta
-          </button>
-          {criarEtiquetaMutation.isError && <p>Não foi possível criar a etiqueta.</p>}
+          <div className="campo-acoes" style={{ gridColumn: 'unset' }}>
+            <button type="submit" disabled={criarEtiquetaMutation.isPending}>
+              🏷️ Criar etiqueta
+            </button>
+          </div>
+          {criarEtiquetaMutation.isError && <p className="mensagem-erro">Não foi possível criar a etiqueta.</p>}
         </form>
       )}
 
-      {quadro.colunas.length === 0 && <p>Nenhuma coluna neste quadro ainda.</p>}
+      {quadro.colunas.length === 0 && <p className="mensagem-vazia">Nenhuma coluna neste quadro ainda.</p>}
 
-      {moverCardMutation.isError && <p>Não foi possível mover o card.</p>}
-      {aplicarEtiquetaMutation.isError && <p>Não foi possível aplicar a etiqueta.</p>}
-      {removerEtiquetaMutation.isError && <p>Não foi possível remover a etiqueta.</p>}
+      {moverCardMutation.isError && <p className="mensagem-erro">Não foi possível mover o card.</p>}
+      {aplicarEtiquetaMutation.isError && <p className="mensagem-erro">Não foi possível aplicar a etiqueta.</p>}
+      {removerEtiquetaMutation.isError && <p className="mensagem-erro">Não foi possível remover a etiqueta.</p>}
 
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+        <div className="kanban-board">
         {quadro.colunas.map((coluna) => (
           <ColunaComDrop
             key={coluna.id}
@@ -686,6 +732,7 @@ export function QuadroDetalhePage({ quadroIdProp }: { quadroIdProp?: number } = 
             criandoCard={criarCardMutation.isPending}
           />
         ))}
+        </div>
       </DndContext>
     </main>
   )

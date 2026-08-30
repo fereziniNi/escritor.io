@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import { queryClient } from './app/queryClient.ts'
 import './index.css'
+import './styles/paineis.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

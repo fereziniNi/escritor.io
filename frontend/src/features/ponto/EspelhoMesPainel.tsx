@@ -25,36 +25,50 @@ export function EspelhoMesPainel() {
   })
 
   if (espelhoQuery.isPending) {
-    return <p>Carregando…</p>
+    return <p className="mensagem-carregando">Carregando…</p>
   }
 
   if (espelhoQuery.isError) {
-    return <p>Não foi possível carregar o espelho do mês.</p>
+    return <p className="mensagem-erro">Não foi possível carregar o espelho do mês.</p>
   }
 
   const espelho = espelhoQuery.data
 
   return (
-    <section>
-      <h2>Espelho do mês</h2>
-      {espelho.dias.length === 0 && <p>Nenhuma marcação neste mês.</p>}
-      <table>
-        <tbody>
-          {espelho.dias.map((dia) => (
-            <tr key={dia.data}>
-              <td>{dia.data}</td>
-              <td>{formatarEstado(dia.estado)}</td>
-              <td>{formatarMinutos(dia.minutosTrabalhados)}</td>
-              <td>{formatarSaldo(dia.saldoDia)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <section className="secao cartao">
+      <h2 className="secao-titulo">🗓️ Espelho do mês</h2>
+      {espelho.dias.length === 0 && <p className="mensagem-vazia">Nenhuma marcação neste mês.</p>}
+      {espelho.dias.length > 0 && (
+        <div style={{ overflowX: 'auto' }}>
+          <table className="tabela-elegante">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Estado</th>
+                <th>Trabalhado</th>
+                <th>Saldo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {espelho.dias.map((dia) => (
+                <tr key={dia.data}>
+                  <td>{dia.data}</td>
+                  <td>{formatarEstado(dia.estado)}</td>
+                  <td>{formatarMinutos(dia.minutosTrabalhados)}</td>
+                  <td>{formatarSaldo(dia.saldoDia)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       <p>Saldo acumulado no período: {formatarSaldo(espelho.saldoAcumuladoNoPeriodo)}</p>
-      <button type="button" onClick={() => exportarCsvMutation.mutate()} disabled={exportarCsvMutation.isPending}>
-        Exportar CSV
-      </button>
-      {exportarCsvMutation.isError && <p>Não foi possível exportar o espelho do mês.</p>}
+      <div className="linha-botoes">
+        <button type="button" onClick={() => exportarCsvMutation.mutate()} disabled={exportarCsvMutation.isPending}>
+          ⬇️ Exportar CSV
+        </button>
+      </div>
+      {exportarCsvMutation.isError && <p className="mensagem-erro">Não foi possível exportar o espelho do mês.</p>}
     </section>
   )
 }

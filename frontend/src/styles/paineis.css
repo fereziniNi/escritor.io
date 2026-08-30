@@ -1,0 +1,318 @@
+/**
+ * Camada de utilitários compartilhada por todos os painéis funcionais (Ponto, Ajustes, Quadros,
+ * Relatórios, Equipes, Projetos) - pedido do usuário: "todos os menus/funções... mais elegante,
+ * bonito, versátil e fácil de utilizar", mantendo a identidade visual já estabelecida (paleta
+ * quente, Nunito/Press Start 2P, botões 3D) em vez de trocar de estética. Antes desta camada esses
+ * componentes não tinham nenhuma classe própria - só herdavam o reset global de index.css. Nenhum
+ * texto, rótulo, `id`/`htmlFor`, `aria-label` ou tipo de elemento muda aqui: só classNames novos e
+ * agrupamento visual, pra não quebrar nenhuma asserção de teste existente (getByRole/getByLabelText
+ * continuam resolvendo os mesmos elementos).
+ */
+
+/* ---------- estrutura de página/painel ---------- */
+
+/* Sem padding próprio de propósito: hoje todo `.pagina` é renderizado dentro do corpo de um
+`PainelFlutuante` (dock do Escritório), que já tem seu próprio padding - duplicar aqui só
+deixaria a margem interna exagerada. */
+.pagina {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.pagina-cabecalho {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.pagina-cabecalho h1 {
+  margin: 0;
+}
+
+.secao {
+  margin-bottom: 1.75rem;
+}
+
+.secao-titulo {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+/* ---------- formulários ---------- */
+
+.formulario {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.9rem 1rem;
+  align-items: end;
+}
+
+.formulario-largo {
+  grid-template-columns: 1fr;
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.campo label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--cor-texto-suave);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.campo input,
+.campo select,
+.campo textarea {
+  width: 100%;
+}
+
+.campo-acoes {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  grid-column: 1 / -1;
+}
+
+/* ---------- botões ---------- */
+
+.botao-secundario {
+  background: var(--cor-superficie);
+  color: var(--cor-primaria-escura);
+  box-shadow: 0 3px 0 var(--cor-borda);
+  border: 2px solid var(--cor-borda);
+}
+
+.botao-secundario:hover:not(:disabled) {
+  box-shadow: 0 4px 0 var(--cor-borda);
+  background: var(--cor-primaria-clara);
+}
+
+.botao-secundario:active:not(:disabled) {
+  box-shadow: 0 1px 0 var(--cor-borda);
+}
+
+.botao-perigo {
+  background: var(--cor-perigo);
+  box-shadow: 0 3px 0 #9a3b28;
+}
+
+.botao-perigo:hover:not(:disabled) {
+  box-shadow: 0 4px 0 #9a3b28;
+}
+
+.botao-perigo:active:not(:disabled) {
+  box-shadow: 0 1px 0 #9a3b28;
+}
+
+.botao-pequeno {
+  font-size: 0.78rem;
+  padding: 0.4em 0.9em;
+  box-shadow: 0 2px 0 var(--cor-primaria-escura);
+}
+
+.botao-secundario.botao-pequeno {
+  box-shadow: 0 2px 0 var(--cor-borda);
+}
+
+.linha-botoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ---------- mensagens de estado ---------- */
+
+.mensagem-carregando,
+.mensagem-erro,
+.mensagem-vazia {
+  margin: 0.5rem 0;
+  padding: 0.6em 0.9em;
+  border-radius: var(--raio-borda);
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+.mensagem-carregando {
+  color: var(--cor-texto-suave);
+}
+
+.mensagem-erro {
+  color: var(--cor-perigo);
+  background: #fdece7;
+}
+
+.mensagem-vazia {
+  color: var(--cor-texto-suave);
+  background: var(--cor-primaria-clara);
+}
+
+.mensagem-sucesso {
+  margin: 0.5rem 0;
+  padding: 0.6em 0.9em;
+  border-radius: var(--raio-borda);
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--cor-primaria-escura);
+  background: var(--cor-primaria-clara);
+}
+
+/* ---------- listas viram cartões ---------- */
+
+.lista-cartoes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.cartao-item {
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  padding: 0.85rem 1rem;
+  box-shadow: 0 1px 0 var(--cor-borda);
+  transition: box-shadow 120ms ease-out, transform 120ms ease-out;
+}
+
+.lista-cartoes > .cartao-item:hover {
+  box-shadow: var(--sombra-cartao);
+  transform: translateY(-1px);
+}
+
+.cartao-item-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.cartao-item-titulo {
+  font-weight: 800;
+  color: var(--cor-texto);
+}
+
+.cartao-item-meta {
+  font-size: 0.82rem;
+  color: var(--cor-texto-suave);
+}
+
+.cartao-item-corpo {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+/* ---------- grade de estatísticas ---------- */
+
+.grade-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.stat-cartao {
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  padding: 0.85rem 1rem;
+  box-shadow: 0 1px 0 var(--cor-borda);
+}
+
+.stat-cartao-rotulo {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--cor-texto-suave);
+  margin-bottom: 0.25rem;
+}
+
+.stat-cartao-valor {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--cor-primaria-escura);
+}
+
+.stat-cartao-valor.stat-positivo {
+  color: var(--cor-primaria-escura);
+}
+
+.stat-cartao-valor.stat-negativo {
+  color: var(--cor-perigo);
+}
+
+/* ---------- badges/pílulas ---------- */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.2em 0.65em;
+  border-radius: 999px;
+  background: var(--cor-primaria-clara);
+  color: var(--cor-primaria-escura);
+  white-space: nowrap;
+}
+
+.badge-neutro {
+  background: #eceae0;
+  color: var(--cor-texto-suave);
+}
+
+.badge-perigo {
+  background: #fdece7;
+  color: var(--cor-perigo);
+}
+
+/* ---------- tabela ---------- */
+
+.tabela-elegante {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.9rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  overflow: hidden;
+}
+
+.tabela-elegante th,
+.tabela-elegante td {
+  text-align: left;
+  padding: 0.55em 0.8em;
+}
+
+.tabela-elegante thead th {
+  background: var(--cor-primaria-clara);
+  color: var(--cor-primaria-escura);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.tabela-elegante tbody tr:nth-child(even) {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.tabela-elegante tbody tr:hover {
+  background: var(--cor-primaria-clara);
+}

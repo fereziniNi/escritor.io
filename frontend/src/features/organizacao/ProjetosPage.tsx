@@ -29,62 +29,83 @@ export function ProjetosPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projetos'] }),
   })
 
+  const RÓTULO_STATUS: Record<StatusProjeto, string> = { ATIVO: 'Ativo', PAUSADO: 'Pausado', CONCLUIDO: 'Concluído' }
+
   return (
-    <main>
-      <h1>Projetos</h1>
+    <main className="pagina">
+      <div className="pagina-cabecalho">
+        <h1>📁 Projetos</h1>
+      </div>
 
       <form
+        className="secao cartao"
         onSubmit={(evento) => {
           evento.preventDefault()
           criarMutation.mutate()
         }}
       >
-        <label htmlFor="nome-projeto">Nome</label>
-        <input id="nome-projeto" value={nome} onChange={(evento) => setNome(evento.target.value)} required />
+        <div className="formulario">
+          <div className="campo">
+            <label htmlFor="nome-projeto">Nome</label>
+            <input id="nome-projeto" value={nome} onChange={(evento) => setNome(evento.target.value)} required />
+          </div>
 
-        <label htmlFor="cliente-projeto">Cliente</label>
-        <input
-          id="cliente-projeto"
-          value={cliente}
-          onChange={(evento) => setCliente(evento.target.value)}
-          required
-        />
+          <div className="campo">
+            <label htmlFor="cliente-projeto">Cliente</label>
+            <input
+              id="cliente-projeto"
+              value={cliente}
+              onChange={(evento) => setCliente(evento.target.value)}
+              required
+            />
+          </div>
 
-        <label htmlFor="status-projeto">Status</label>
-        <select
-          id="status-projeto"
-          value={status}
-          onChange={(evento) => setStatus(evento.target.value as StatusProjeto)}
-        >
-          <option value="ATIVO">Ativo</option>
-          <option value="PAUSADO">Pausado</option>
-          <option value="CONCLUIDO">Concluído</option>
-        </select>
+          <div className="campo">
+            <label htmlFor="status-projeto">Status</label>
+            <select
+              id="status-projeto"
+              value={status}
+              onChange={(evento) => setStatus(evento.target.value as StatusProjeto)}
+            >
+              <option value="ATIVO">Ativo</option>
+              <option value="PAUSADO">Pausado</option>
+              <option value="CONCLUIDO">Concluído</option>
+            </select>
+          </div>
 
-        <label htmlFor="inicio-projeto">Início</label>
-        <input
-          id="inicio-projeto"
-          type="date"
-          value={inicio}
-          onChange={(evento) => setInicio(evento.target.value)}
-          required
-        />
+          <div className="campo">
+            <label htmlFor="inicio-projeto">Início</label>
+            <input
+              id="inicio-projeto"
+              type="date"
+              value={inicio}
+              onChange={(evento) => setInicio(evento.target.value)}
+              required
+            />
+          </div>
 
-        <button type="submit" disabled={criarMutation.isPending}>
-          Criar projeto
-        </button>
-        {criarMutation.isError && <p>Não foi possível criar o projeto.</p>}
+          <div className="campo-acoes">
+            <button type="submit" disabled={criarMutation.isPending}>
+              ➕ Criar projeto
+            </button>
+            {criarMutation.isError && <p className="mensagem-erro">Não foi possível criar o projeto.</p>}
+          </div>
+        </div>
       </form>
 
-      {projetosQuery.isPending && <p>Carregando…</p>}
-      {projetosQuery.isError && <p>Não foi possível carregar os projetos.</p>}
-      <ul>
+      {projetosQuery.isPending && <p className="mensagem-carregando">Carregando…</p>}
+      {projetosQuery.isError && <p className="mensagem-erro">Não foi possível carregar os projetos.</p>}
+      {projetosQuery.data?.length === 0 && <p className="mensagem-vazia">Nenhum projeto cadastrado ainda.</p>}
+      <ul className="lista-cartoes">
         {projetosQuery.data?.map((projeto) => (
-          <li key={projeto.id}>
-            {projeto.nome} — {projeto.cliente}
+          <li key={projeto.id} className="cartao-item">
+            <div className="cartao-item-cabecalho">
+              <span className="cartao-item-titulo">{projeto.nome}</span>
+              <span className="badge">{RÓTULO_STATUS[projeto.status]}</span>
+            </div>
+            <p className="cartao-item-meta">{projeto.cliente}</p>
             {equipesQuery.data && equipesQuery.data.length > 0 && (
-              <>
-                {' '}
+              <div className="campo" style={{ marginTop: '0.5rem' }}>
                 <select
                   aria-label={`Vincular equipe ao projeto ${projeto.nome}`}
                   defaultValue=""
@@ -104,7 +125,7 @@ export function ProjetosPage() {
                     </option>
                   ))}
                 </select>
-              </>
+              </div>
             )}
           </li>
         ))}

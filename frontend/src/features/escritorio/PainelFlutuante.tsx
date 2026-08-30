@@ -7,7 +7,19 @@ import type { ReactNode } from 'react'
  * URL: "uma tela só, tudo integrado nela", pedido do usuário depois do roadmap completo. Fecha no
  * X, clicando fora, ou Esc - três jeitos óbvios de sair, nenhum deles surpreendente.
  */
-export function PainelFlutuante({ titulo, aoFechar, children }: { titulo: string; aoFechar: () => void; children: ReactNode }) {
+export function PainelFlutuante({
+  titulo,
+  aoFechar,
+  children,
+  largo = false,
+}: {
+  titulo: string
+  aoFechar: () => void
+  children: ReactNode
+  /** Quadros do Kanban podem ter várias colunas lado a lado - o painel padrão (760px) forçaria
+   * rolagem horizontal cedo demais, então esse painel específico pede mais largura. */
+  largo?: boolean
+}) {
   useEffect(() => {
     function aoPressionarTecla(evento: KeyboardEvent) {
       if (evento.key === 'Escape') {
@@ -20,7 +32,13 @@ export function PainelFlutuante({ titulo, aoFechar, children }: { titulo: string
 
   return (
     <div className="escritorio-painel-fundo" onClick={aoFechar}>
-      <div className="escritorio-painel" role="dialog" aria-modal="true" aria-label={titulo} onClick={(evento) => evento.stopPropagation()}>
+      <div
+        className={`escritorio-painel${largo ? ' escritorio-painel-largo' : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={titulo}
+        onClick={(evento) => evento.stopPropagation()}
+      >
         <div className="escritorio-painel-cabecalho">
           <h3>{titulo}</h3>
           <button type="button" aria-label="Fechar" onClick={aoFechar}>

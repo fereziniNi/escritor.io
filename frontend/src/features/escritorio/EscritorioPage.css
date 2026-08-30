@@ -348,6 +348,10 @@
   overflow: hidden;
 }
 
+.escritorio-painel-largo {
+  width: min(1180px, 96vw);
+}
+
 .escritorio-painel-cabecalho {
   display: flex;
   align-items: center;

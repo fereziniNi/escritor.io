@@ -25,44 +25,55 @@ export function SolicitarAjusteForm() {
 
   return (
     <form
+      className="secao cartao"
       onSubmit={(evento) => {
         evento.preventDefault()
         mutation.mutate()
       }}
     >
-      <h2>Solicitar ajuste de ponto</h2>
+      <h2 className="secao-titulo">✍️ Solicitar ajuste de ponto</h2>
 
-      <label htmlFor="tipo-ajuste">Tipo</label>
-      <select id="tipo-ajuste" value={tipo} onChange={(evento) => setTipo(evento.target.value as TipoRegistroPonto)}>
-        {OPCOES_TIPO.map((opcao) => (
-          <option key={opcao.valor} value={opcao.valor}>
-            {opcao.rotulo}
-          </option>
-        ))}
-      </select>
+      <div className="formulario">
+        <div className="campo">
+          <label htmlFor="tipo-ajuste">Tipo</label>
+          <select id="tipo-ajuste" value={tipo} onChange={(evento) => setTipo(evento.target.value as TipoRegistroPonto)}>
+            {OPCOES_TIPO.map((opcao) => (
+              <option key={opcao.valor} value={opcao.valor}>
+                {opcao.rotulo}
+              </option>
+            ))}
+          </select>
+        </div>
 
-      <label htmlFor="momento-ajuste">Data e hora</label>
-      <input
-        id="momento-ajuste"
-        type="datetime-local"
-        value={momento}
-        onChange={(evento) => setMomento(evento.target.value)}
-        required
-      />
+        <div className="campo">
+          <label htmlFor="momento-ajuste">Data e hora</label>
+          <input
+            id="momento-ajuste"
+            type="datetime-local"
+            value={momento}
+            onChange={(evento) => setMomento(evento.target.value)}
+            required
+          />
+        </div>
 
-      <label htmlFor="justificativa-ajuste">Justificativa</label>
-      <textarea
-        id="justificativa-ajuste"
-        value={justificativa}
-        onChange={(evento) => setJustificativa(evento.target.value)}
-        required
-      />
+        <div className="campo formulario-largo" style={{ gridColumn: '1 / -1' }}>
+          <label htmlFor="justificativa-ajuste">Justificativa</label>
+          <textarea
+            id="justificativa-ajuste"
+            value={justificativa}
+            onChange={(evento) => setJustificativa(evento.target.value)}
+            required
+          />
+        </div>
 
-      <button type="submit" disabled={mutation.isPending}>
-        Enviar solicitação
-      </button>
-      {mutation.isError && <p>Não foi possível enviar a solicitação.</p>}
-      {mutation.isSuccess && <p>Solicitação enviada.</p>}
+        <div className="campo-acoes">
+          <button type="submit" disabled={mutation.isPending}>
+            📨 Enviar solicitação
+          </button>
+          {mutation.isError && <p className="mensagem-erro">Não foi possível enviar a solicitação.</p>}
+          {mutation.isSuccess && <p className="mensagem-sucesso">Solicitação enviada.</p>}
+        </div>
+      </div>
     </form>
   )
 }
