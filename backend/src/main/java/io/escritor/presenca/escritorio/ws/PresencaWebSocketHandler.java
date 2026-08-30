@@ -7,14 +7,19 @@ import io.escritor.presenca.escritorio.service.LocalizadorZona;
 import io.escritor.presenca.escritorio.service.ValidadorPosicaoMapa;
 import tools.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.UnaryOperator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -39,23 +44,37 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
  * tenha trocado de status manualmente enquanto estava dentro - {@link #rastreioPorUsuario} guarda
  * esse "status pra restaurar" por usuário, e fica {@code null} assim que uma troca manual
  * acontece dentro da zona, o que faz {@link #tratarPosicao} não restaurar mais nada na saída.
+ *
+ * <p>S6.8 (PRD: {@code AUSENTE} é automático após 5 minutos sem input): {@link
+ * #verificarInatividade(Instant)} varre {@link #ultimaAtividadePorUsuario} - atualizada em
+ * qualquer mensagem recebida e na conexão - e força {@code AUSENTE} em quem passou do limiar,
+ * marcando em {@link #ausenteAutomaticoUsuarios} que foi o timeout (não uma escolha manual) que
+ * fez isso. Qualquer mensagem nova desse usuário (posição ou status) tira ele do {@code AUSENTE}
+ * automático de volta pra {@code DISPONIVEL} antes de processar o resto da mensagem - ver {@link
+ * #sairDeAusenciaAutomaticaSeNecessario}.
  */
 @Component
 public class PresencaWebSocketHandler extends TextWebSocketHandler {
 
     private static final Logger log = LoggerFactory.getLogger(PresencaWebSocketHandler.class);
+    private static final Duration LIMIAR_INATIVIDADE = Duration.ofMinutes(5);
 
     private final Map<Long, WebSocketSession> sessoesPorUsuario = new ConcurrentHashMap<>();
     private final Map<Long, EstadoPresencaUsuario> estadoPorUsuario = new ConcurrentHashMap<>();
     private final Map<Long, RastreioZona> rastreioPorUsuario = new ConcurrentHashMap<>();
+    private final Map<Long, Instant> ultimaAtividadePorUsuario = new ConcurrentHashMap<>();
+    private final Set<Long> ausenteAutomaticoUsuarios = ConcurrentHashMap.newKeySet();
     private final ObjectMapper objectMapper;
     private final ValidadorPosicaoMapa validadorPosicaoMapa;
     private final LocalizadorZona localizadorZona;
+    private final Clock clock;
 
-    public PresencaWebSocketHandler(ObjectMapper objectMapper, ValidadorPosicaoMapa validadorPosicaoMapa, LocalizadorZona localizadorZona) {
+    public PresencaWebSocketHandler(
+            ObjectMapper objectMapper, ValidadorPosicaoMapa validadorPosicaoMapa, LocalizadorZona localizadorZona, Clock clock) {
         this.objectMapper = objectMapper;
         this.validadorPosicaoMapa = validadorPosicaoMapa;
         this.localizadorZona = localizadorZona;
+        this.clock = clock;
     }
 
     @Override
@@ -65,6 +84,7 @@ public class PresencaWebSocketHandler extends TextWebSocketHandler {
 
         estadoPorUsuario.put(usuarioId, new EstadoPresencaUsuario(usuarioId, nome, 0, 0, StatusAvatar.DISPONIVEL));
         sessoesPorUsuario.put(usuarioId, session);
+        ultimaAtividadePorUsuario.put(usuarioId, Instant.now(clock));
 
         enviar(session, new PresencaEventoWs("SNAPSHOT", List.copyOf(estadoPorUsuario.values())));
     }
@@ -75,6 +95,40 @@ public class PresencaWebSocketHandler extends TextWebSocketHandler {
         estadoPorUsuario.remove(usuarioId);
         sessoesPorUsuario.remove(usuarioId);
         rastreioPorUsuario.remove(usuarioId);
+        ultimaAtividadePorUsuario.remove(usuarioId);
+        ausenteAutomaticoUsuarios.remove(usuarioId);
+    }
+
+    /**
+     * Dispara a cada 30s de tempo real (intervalo de checagem, não o limiar em si - esse é
+     * {@link #LIMIAR_INATIVIDADE}) via {@code @Scheduled}; a versão com parâmetro existe separada
+     * pra ser testável sem depender de tempo de parede de verdade (mesmo espírito de {@code
+     * EstadoDia.calcular} receber {@code agora} em vez de chamar {@code Instant.now()} sozinho).
+     */
+    @Scheduled(fixedRate = 30_000)
+    public void verificarInatividade() {
+        verificarInatividade(Instant.now(clock));
+    }
+
+    public void verificarInatividade(Instant agora) {
+        estadoPorUsuario.forEach((usuarioId, estadoAtual) -> {
+            if (estadoAtual.status() == StatusAvatar.AUSENTE) {
+                return;
+            }
+            Instant ultimaAtividade = ultimaAtividadePorUsuario.get(usuarioId);
+            if (ultimaAtividade == null || Duration.between(ultimaAtividade, agora).compareTo(LIMIAR_INATIVIDADE) < 0) {
+                return;
+            }
+
+            EstadoPresencaUsuario atualizado =
+                    new EstadoPresencaUsuario(estadoAtual.usuarioId(), estadoAtual.nome(), estadoAtual.x(), estadoAtual.y(), StatusAvatar.AUSENTE);
+            estadoPorUsuario.put(usuarioId, atualizado);
+            ausenteAutomaticoUsuarios.add(usuarioId);
+            // zera o rastreio de zona: se a pessoa acordar sem sair do lugar, precisa ser tratado
+            // como uma "entrada" nova na zona pra recalcular o status certo, não como "nada mudou"
+            rastreioPorUsuario.remove(usuarioId);
+            broadcast(new PresencaEventoWs("STATUS", List.of(atualizado)));
+        });
     }
 
     /**
@@ -95,11 +149,33 @@ public class PresencaWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
+        Long usuarioId = usuarioId(session);
+        ultimaAtividadePorUsuario.put(usuarioId, Instant.now(clock));
+        sairDeAusenciaAutomaticaSeNecessario(usuarioId);
+
         if ("POSICAO".equals(comando.tipo())) {
             tratarPosicao(session, comando);
         } else if ("STATUS".equals(comando.tipo())) {
             tratarStatus(session, comando);
         }
+    }
+
+    /**
+     * Qualquer mensagem (mesmo uma posição inválida ou um status desconhecido, que
+     * {@link #tratarPosicao}/{@link #tratarStatus} vão rejeitar em seguida) já conta como "voltou"
+     * - é atividade de verdade vinda do cliente, independente do conteúdo ser aceito depois.
+     */
+    private void sairDeAusenciaAutomaticaSeNecessario(Long usuarioId) {
+        if (!ausenteAutomaticoUsuarios.remove(usuarioId)) {
+            return;
+        }
+        EstadoPresencaUsuario atual = estadoPorUsuario.get(usuarioId);
+        if (atual == null || atual.status() != StatusAvatar.AUSENTE) {
+            return;
+        }
+        EstadoPresencaUsuario atualizado = new EstadoPresencaUsuario(atual.usuarioId(), atual.nome(), atual.x(), atual.y(), StatusAvatar.DISPONIVEL);
+        estadoPorUsuario.put(usuarioId, atualizado);
+        broadcast(new PresencaEventoWs("STATUS", List.of(atualizado)));
     }
 
     private void tratarPosicao(WebSocketSession session, ComandoWs comando) {

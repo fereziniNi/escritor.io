@@ -4,6 +4,8 @@ import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.seguranca.JwtService;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -47,6 +49,9 @@ class PresencaWebSocketIT {
 
     @Autowired
     private UsuarioRepository usuarioRepository;
+
+    @Autowired
+    private PresencaWebSocketHandler presencaWebSocketHandler;
 
     @Test
     void conectarRegistraOUsuarioERecebeUmSnapshotDeSiMesmo() throws Exception {
@@ -318,6 +323,70 @@ class PresencaWebSocketIT {
 
             String recebido = mensagensAna.poll(5, TimeUnit.SECONDS);
             assertThat(recebido).isNotNull().contains("\"status\":\"DISPONIVEL\"");
+        } finally {
+            sessaoAna.close();
+        }
+    }
+
+    @Test
+    void usuarioInativoPorCincoMinutosRecebeStatusAusenteDeVerdade() throws Exception {
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s68a@escritor.io", Papel.COLABORADOR, 480));
+        String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
+        BlockingQueue<String> mensagensAna = new LinkedBlockingQueue<>();
+
+        WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
+        try {
+            mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
+
+            // chama a varredura direto, sem esperar 5 minutos de verdade nem o @Scheduled real -
+            // "agora" simulado já passou do limiar de inatividade (PRD)
+            presencaWebSocketHandler.verificarInatividade(Instant.now().plus(Duration.ofMinutes(6)));
+
+            String recebido = mensagensAna.poll(5, TimeUnit.SECONDS);
+            assertThat(recebido).isNotNull().contains("\"tipo\":\"STATUS\"").contains("\"status\":\"AUSENTE\"");
+        } finally {
+            sessaoAna.close();
+        }
+    }
+
+    @Test
+    void usuarioAindaAtivoNaoRecebeStatusAusente() throws Exception {
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s68b@escritor.io", Papel.COLABORADOR, 480));
+        String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
+        BlockingQueue<String> mensagensAna = new LinkedBlockingQueue<>();
+
+        WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
+        try {
+            mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
+
+            // "agora" simulado é só um instante depois de conectar - bem abaixo do limiar de 5 min
+            presencaWebSocketHandler.verificarInatividade(Instant.now());
+
+            String recebido = mensagensAna.poll(2, TimeUnit.SECONDS);
+            assertThat(recebido).isNull();
+        } finally {
+            sessaoAna.close();
+        }
+    }
+
+    @Test
+    void qualquerMensagemNovaTiraOUsuarioDoAusenteAutomatico() throws Exception {
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s68c@escritor.io", Papel.COLABORADOR, 480));
+        String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
+        BlockingQueue<String> mensagensAna = new LinkedBlockingQueue<>();
+
+        WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
+        try {
+            mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
+            presencaWebSocketHandler.verificarInatividade(Instant.now().plus(Duration.ofMinutes(6)));
+            String ausente = mensagensAna.poll(5, TimeUnit.SECONDS);
+            assertThat(ausente).isNotNull().contains("\"status\":\"AUSENTE\"");
+
+            // (8,8) não cai em nenhuma zona seedada - qualquer mensagem nova já tira do AUSENTE
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":8,\"y\":8}"));
+
+            String recuperado = mensagensAna.poll(5, TimeUnit.SECONDS);
+            assertThat(recuperado).isNotNull().contains("\"status\":\"DISPONIVEL\"").doesNotContain("\"status\":\"AUSENTE\"");
         } finally {
             sessaoAna.close();
         }
