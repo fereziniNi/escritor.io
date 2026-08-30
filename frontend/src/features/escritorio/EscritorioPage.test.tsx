@@ -157,6 +157,36 @@ describe('EscritorioPage', () => {
     })
   })
 
+  it('a lista de presença reflete entrar/sair de zona e troca de status sem reload', async () => {
+    server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)))
+    renderPagina()
+    await screen.findByText('Escritório')
+
+    act(() => {
+      WebSocketFalso.instancias[0].disparaMensagem({
+        tipo: 'SNAPSHOT',
+        usuarios: [{ usuarioId: 1, nome: 'Ana', x: 8, y: 8, status: 'DISPONIVEL' }],
+      })
+    })
+    await waitFor(() => {
+      expect(screen.getByTestId('presenca-zona-aberto')).toHaveTextContent('Ana')
+    })
+    expect(screen.getByTestId('presenca-zona-10')).not.toHaveTextContent('Ana')
+
+    act(() => {
+      WebSocketFalso.instancias[0].disparaMensagem({
+        tipo: 'POSICAO',
+        usuarios: [{ usuarioId: 1, nome: 'Ana', x: 1, y: 1, status: 'FOCO' }],
+      })
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('presenca-zona-10')).toHaveTextContent('Ana')
+      expect(screen.getByTestId('presenca-zona-10')).toHaveTextContent('Foco')
+    })
+    expect(screen.getByTestId('presenca-zona-aberto')).not.toHaveTextContent('Ana')
+  })
+
   it('mostra erro quando não há mapa ativo', async () => {
     server.use(http.get('/mapas/ativo', () => new HttpResponse(null, { status: 404 })))
 

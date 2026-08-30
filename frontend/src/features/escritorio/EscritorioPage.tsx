@@ -1,20 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { buscarMapaAtivo } from './api'
+import { ListaPresenca } from './ListaPresenca'
+import { OPCOES_STATUS, ROTULO_STATUS } from './statusAvatar'
 import { usePresencaWebSocket } from './usePresencaWebSocket'
 import type { StatusAvatar, TipoZona } from './types'
 
 const TAMANHO_TILE_PX = 32
-
-const OPCOES_STATUS: StatusAvatar[] = ['DISPONIVEL', 'FOCO', 'REUNIAO', 'ALMOCO', 'AUSENTE']
-
-const ROTULO_STATUS: Record<StatusAvatar, string> = {
-  DISPONIVEL: 'Disponível',
-  FOCO: 'Foco',
-  REUNIAO: 'Reunião',
-  ALMOCO: 'Almoço',
-  AUSENTE: 'Ausente',
-}
 
 const TECLA_PARA_DELTA: Record<string, readonly [number, number]> = {
   ArrowUp: [0, -1],
@@ -148,6 +140,7 @@ export function EscritorioPage() {
           </div>
         ))}
       </div>
+      <ListaPresenca zonas={mapa.zonas} usuarios={Object.values(usuarios)} meuUsuarioId={meuUsuarioId} />
     </section>
   )
 }
