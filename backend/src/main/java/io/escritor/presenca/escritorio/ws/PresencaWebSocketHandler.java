@@ -6,7 +6,9 @@ import tools.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.UnaryOperator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -21,10 +23,9 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
  * pra todo mundo autenticado. Estado vivo (posição, status) fica só neste mapa em memória, nunca
  * no banco (PRD). Conectar registra o usuário com posição inicial (0,0) e status
  * {@code DISPONIVEL}, e devolve pra ele mesmo um snapshot de todo mundo presente (incluindo
- * ele); desconectar remove o usuário do estado. Mensagem recebida do cliente é só
- * {@code {"x":.,"y":.}} - sem envelope com "tipo" pro lado de entrada, porque movimento é o único
- * tipo de mensagem que o cliente manda até aqui (S6.4); se um segundo tipo aparecer (S6.6, status
- * manual) é quando um discriminador de entrada passa a valer a pena, não antes.
+ * ele); desconectar remove o usuário do estado. Mensagem recebida do cliente agora tem um
+ * discriminador {@code tipo} ({@code POSICAO} ou {@code STATUS}, S6.6) - só passou a valer a pena
+ * a partir de um segundo tipo de mensagem de entrada; até S6.4 movimento era o único.
  */
 @Component
 public class PresencaWebSocketHandler extends TextWebSocketHandler {
@@ -60,32 +61,60 @@ public class PresencaWebSocketHandler extends TextWebSocketHandler {
     }
 
     /**
-     * Payload malformado ou posição fora dos limites do mapa é silenciosamente ignorado - o
-     * cliente nunca é fonte de verdade sobre posição (PRD), e uma sessão instável/maliciosa
-     * mandando lixo não derruba a conexão nem afeta os demais.
+     * Payload malformado, tipo desconhecido, posição fora dos limites do mapa ou status
+     * desconhecido é silenciosamente ignorado - o cliente nunca é fonte de verdade sobre posição
+     * (PRD), e uma sessão instável/maliciosa mandando lixo não derruba a conexão nem afeta os
+     * demais. Não existe (nem pode existir, {@link ComandoWs} não tem esse campo) jeito do cliente
+     * dizer *de quem* é o status/posição sendo alterado - é sempre a própria sessão autenticada no
+     * handshake, então "usuário altera status de outro" não é uma checagem que precisa ser feita,
+     * é uma ação que a mensagem não sabe nem expressar.
      */
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
-        ComandoPosicaoWs comando;
+        ComandoWs comando;
         try {
-            comando = objectMapper.readValue(message.getPayload(), ComandoPosicaoWs.class);
+            comando = objectMapper.readValue(message.getPayload(), ComandoWs.class);
         } catch (Exception e) {
             return;
         }
 
-        if (!validadorPosicaoMapa.dentroDosLimites(comando.x(), comando.y())) {
+        if ("POSICAO".equals(comando.tipo())) {
+            tratarPosicao(session, comando);
+        } else if ("STATUS".equals(comando.tipo())) {
+            tratarStatus(session, comando);
+        }
+    }
+
+    private void tratarPosicao(WebSocketSession session, ComandoWs comando) {
+        if (comando.x() == null || comando.y() == null || !validadorPosicaoMapa.dentroDosLimites(comando.x(), comando.y())) {
             return;
         }
 
+        atualizarEstado(session, atual -> new EstadoPresencaUsuario(atual.usuarioId(), atual.nome(), comando.x(), comando.y(), atual.status()))
+                .ifPresent(atualizado -> broadcast(new PresencaEventoWs("POSICAO", List.of(atualizado))));
+    }
+
+    private void tratarStatus(WebSocketSession session, ComandoWs comando) {
+        StatusAvatar novoStatus;
+        try {
+            novoStatus = StatusAvatar.valueOf(comando.status());
+        } catch (Exception e) {
+            return;
+        }
+
+        atualizarEstado(session, atual -> new EstadoPresencaUsuario(atual.usuarioId(), atual.nome(), atual.x(), atual.y(), novoStatus))
+                .ifPresent(atualizado -> broadcast(new PresencaEventoWs("STATUS", List.of(atualizado))));
+    }
+
+    private Optional<EstadoPresencaUsuario> atualizarEstado(WebSocketSession session, UnaryOperator<EstadoPresencaUsuario> atualizar) {
         Long usuarioId = usuarioId(session);
         EstadoPresencaUsuario atual = estadoPorUsuario.get(usuarioId);
         if (atual == null) {
-            return;
+            return Optional.empty();
         }
-
-        EstadoPresencaUsuario atualizado = new EstadoPresencaUsuario(atual.usuarioId(), atual.nome(), comando.x(), comando.y(), atual.status());
+        EstadoPresencaUsuario atualizado = atualizar.apply(atual);
         estadoPorUsuario.put(usuarioId, atualizado);
-        broadcast(new PresencaEventoWs("POSICAO", List.of(atualizado)));
+        return Optional.of(atualizado);
     }
 
     private void enviar(WebSocketSession sessao, PresencaEventoWs evento) {
@@ -117,6 +146,6 @@ public class PresencaWebSocketHandler extends TextWebSocketHandler {
     private record PresencaEventoWs(String tipo, List<EstadoPresencaUsuario> usuarios) {
     }
 
-    private record ComandoPosicaoWs(int x, int y) {
+    private record ComandoWs(String tipo, Integer x, Integer y, String status) {
     }
 }

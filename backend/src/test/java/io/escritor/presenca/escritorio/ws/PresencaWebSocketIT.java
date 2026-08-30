@@ -107,7 +107,7 @@ class PresencaWebSocketIT {
             try {
                 mensagensBeto.poll(5, TimeUnit.SECONDS); // snapshot inicial de quando Beto conectou, descartado
 
-                sessaoAna.sendMessage(new TextMessage("{\"x\":5,\"y\":5}"));
+                sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":5,\"y\":5}"));
 
                 String recebido = mensagensBeto.poll(5, TimeUnit.SECONDS);
                 assertThat(recebido)
@@ -132,7 +132,7 @@ class PresencaWebSocketIT {
         WebSocketSession sessaoAna = conectar(tokenAna, new LinkedBlockingQueue<>());
         try {
             // mapa seedado por V20__create_mapa.sql tem largura_tiles=20 - x=25 está fora
-            sessaoAna.sendMessage(new TextMessage("{\"x\":25,\"y\":5}"));
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":25,\"y\":5}"));
             Thread.sleep(500); // dá tempo do servidor processar (e rejeitar) a mensagem
 
             Usuario beto = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s64c@escritor.io", Papel.COLABORADOR, 480));
@@ -143,6 +143,91 @@ class PresencaWebSocketIT {
                 String snapshot = mensagensBeto.poll(5, TimeUnit.SECONDS);
 
                 assertThat(snapshot).isNotNull().doesNotContain("\"x\":25");
+            } finally {
+                sessaoBeto.close();
+            }
+        } finally {
+            sessaoAna.close();
+        }
+    }
+
+    @Test
+    void trocarOProprioStatusEAceitoERebroadcastParaOsDemaisConectados() throws Exception {
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s66a@escritor.io", Papel.COLABORADOR, 480));
+        Usuario beto = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s66a@escritor.io", Papel.COLABORADOR, 480));
+        String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
+        String tokenBeto = jwtService.gerarAccessToken(beto.getId(), Papel.COLABORADOR);
+
+        WebSocketSession sessaoAna = conectar(tokenAna, new LinkedBlockingQueue<>());
+        try {
+            BlockingQueue<String> mensagensBeto = new LinkedBlockingQueue<>();
+            WebSocketSession sessaoBeto = conectar(tokenBeto, mensagensBeto);
+            try {
+                mensagensBeto.poll(5, TimeUnit.SECONDS); // snapshot inicial de quando Beto conectou, descartado
+
+                sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"STATUS\",\"status\":\"FOCO\"}"));
+
+                String recebido = mensagensBeto.poll(5, TimeUnit.SECONDS);
+                assertThat(recebido)
+                        .isNotNull()
+                        .contains("\"tipo\":\"STATUS\"")
+                        .contains("\"usuarioId\":" + ana.getId())
+                        .contains("\"status\":\"FOCO\"");
+            } finally {
+                sessaoBeto.close();
+            }
+        } finally {
+            sessaoAna.close();
+        }
+    }
+
+    @Test
+    void naoExisteJeitoDoClienteAlterarOStatusDeOutroUsuario() throws Exception {
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s66b@escritor.io", Papel.COLABORADOR, 480));
+        Usuario beto = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s66b@escritor.io", Papel.COLABORADOR, 480));
+        String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
+        String tokenBeto = jwtService.gerarAccessToken(beto.getId(), Papel.COLABORADOR);
+
+        WebSocketSession sessaoAna = conectar(tokenAna, new LinkedBlockingQueue<>());
+        try {
+            BlockingQueue<String> mensagensBeto = new LinkedBlockingQueue<>();
+            WebSocketSession sessaoBeto = conectar(tokenBeto, mensagensBeto);
+            try {
+                mensagensBeto.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
+
+                // "usuarioId" extra no payload é ignorado - ComandoWs nem tem esse campo, a
+                // identidade de quem manda vem sempre da sessão autenticada no handshake
+                sessaoAna.sendMessage(
+                        new TextMessage("{\"tipo\":\"STATUS\",\"status\":\"FOCO\",\"usuarioId\":" + beto.getId() + "}"));
+
+                String recebido = mensagensBeto.poll(5, TimeUnit.SECONDS);
+                assertThat(recebido).isNotNull().contains("\"usuarioId\":" + ana.getId()).doesNotContain("\"usuarioId\":" + beto.getId());
+            } finally {
+                sessaoBeto.close();
+            }
+        } finally {
+            sessaoAna.close();
+        }
+    }
+
+    @Test
+    void statusDesconhecidoERejeitadoENaoPropagado() throws Exception {
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s66c@escritor.io", Papel.COLABORADOR, 480));
+        String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
+
+        WebSocketSession sessaoAna = conectar(tokenAna, new LinkedBlockingQueue<>());
+        try {
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"STATUS\",\"status\":\"NAO_EXISTE\"}"));
+            Thread.sleep(500); // dá tempo do servidor processar (e rejeitar) a mensagem
+
+            Usuario beto = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s66c@escritor.io", Papel.COLABORADOR, 480));
+            String tokenBeto = jwtService.gerarAccessToken(beto.getId(), Papel.COLABORADOR);
+            BlockingQueue<String> mensagensBeto = new LinkedBlockingQueue<>();
+            WebSocketSession sessaoBeto = conectar(tokenBeto, mensagensBeto);
+            try {
+                String snapshot = mensagensBeto.poll(5, TimeUnit.SECONDS);
+
+                assertThat(snapshot).isNotNull().doesNotContain("\"status\":\"NAO_EXISTE\"").contains("\"status\":\"DISPONIVEL\"");
             } finally {
                 sessaoBeto.close();
             }

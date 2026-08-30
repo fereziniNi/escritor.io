@@ -112,7 +112,28 @@ describe('EscritorioPage', () => {
       expect(screen.getByTestId('avatar-1')).toHaveStyle({ left: '192px', top: '160px' }); // (6*32, 5*32)
     })
     // nenhuma resposta do servidor foi simulada - a posição já mudou só com a predição local
-    expect(WebSocketFalso.instancias[0].mensagensEnviadas).toContain(JSON.stringify({ x: 6, y: 5 }))
+    expect(WebSocketFalso.instancias[0].mensagensEnviadas).toContain(JSON.stringify({ tipo: 'POSICAO', x: 6, y: 5 }))
+  })
+
+  it('trocar o status no seletor atualiza o próprio avatar e manda a mudança pro servidor', async () => {
+    server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)))
+    renderPagina()
+    await screen.findByText('Escritório')
+
+    act(() => {
+      WebSocketFalso.instancias[0].disparaMensagem({
+        tipo: 'SNAPSHOT',
+        usuarios: [{ usuarioId: 1, nome: 'Ana', x: 5, y: 5, status: 'DISPONIVEL' }],
+      })
+    })
+    await waitFor(() => expect(screen.getByTestId('avatar-1')).toBeInTheDocument())
+
+    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'FOCO' } })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('avatar-1')).toHaveAttribute('title', 'Ana - Foco')
+    })
+    expect(WebSocketFalso.instancias[0].mensagensEnviadas).toContain(JSON.stringify({ tipo: 'STATUS', status: 'FOCO' }))
   })
 
   it('não deixa o avatar sair dos limites do mapa ao mover na borda', async () => {

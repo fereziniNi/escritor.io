@@ -154,7 +154,50 @@ describe('usePresencaWebSocket', () => {
       result.current.mover(1, 0)
     })
 
-    expect(WebSocketFalso.instancias[0].mensagensEnviadas).toContain(JSON.stringify({ x: 1, y: 0 }))
+    expect(WebSocketFalso.instancias[0].mensagensEnviadas).toContain(JSON.stringify({ tipo: 'POSICAO', x: 1, y: 0 }))
+  })
+
+  it('definirStatus atualiza o próprio status localmente de imediato e manda pro servidor', async () => {
+    const { result } = renderHook(() => usePresencaWebSocket())
+    act(() => {
+      WebSocketFalso.instancias[0].disparaMensagem({
+        tipo: 'SNAPSHOT',
+        usuarios: [{ usuarioId: 1, nome: 'Ana', x: 0, y: 0, status: 'DISPONIVEL' }],
+      })
+    })
+    await waitFor(() => expect(result.current.usuarios[1]).toBeDefined())
+
+    act(() => {
+      result.current.definirStatus('FOCO')
+    })
+
+    expect(result.current.usuarios[1]?.status).toBe('FOCO')
+    expect(WebSocketFalso.instancias[0].mensagensEnviadas).toContain(JSON.stringify({ tipo: 'STATUS', status: 'FOCO' }))
+  })
+
+  it('um evento STATUS de outro usuário atualiza só o status dele, sem mexer no meu', async () => {
+    const { result } = renderHook(() => usePresencaWebSocket())
+    act(() => {
+      WebSocketFalso.instancias[0].disparaMensagem({
+        tipo: 'SNAPSHOT',
+        usuarios: [
+          { usuarioId: 1, nome: 'Ana', x: 0, y: 0, status: 'DISPONIVEL' },
+          { usuarioId: 2, nome: 'Beto', x: 3, y: 4, status: 'DISPONIVEL' },
+        ],
+      })
+    })
+
+    act(() => {
+      WebSocketFalso.instancias[0].disparaMensagem({
+        tipo: 'STATUS',
+        usuarios: [{ usuarioId: 2, nome: 'Beto', x: 3, y: 4, status: 'REUNIAO' }],
+      })
+    })
+
+    await waitFor(() => {
+      expect(result.current.usuarios[2]?.status).toBe('REUNIAO')
+      expect(result.current.usuarios[1]?.status).toBe('DISPONIVEL')
+    })
   })
 
   it('reconecta se a conexão cair sem ter sido fechada pelo próprio componente', async () => {

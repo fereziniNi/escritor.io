@@ -2,9 +2,19 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { buscarMapaAtivo } from './api'
 import { usePresencaWebSocket } from './usePresencaWebSocket'
-import type { TipoZona } from './types'
+import type { StatusAvatar, TipoZona } from './types'
 
 const TAMANHO_TILE_PX = 32
+
+const OPCOES_STATUS: StatusAvatar[] = ['DISPONIVEL', 'FOCO', 'REUNIAO', 'ALMOCO', 'AUSENTE']
+
+const ROTULO_STATUS: Record<StatusAvatar, string> = {
+  DISPONIVEL: 'Disponível',
+  FOCO: 'Foco',
+  REUNIAO: 'Reunião',
+  ALMOCO: 'Almoço',
+  AUSENTE: 'Ausente',
+}
 
 const TECLA_PARA_DELTA: Record<string, readonly [number, number]> = {
   ArrowUp: [0, -1],
@@ -38,7 +48,7 @@ const COR_POR_TIPO_ZONA: Record<TipoZona, string> = {
  */
 export function EscritorioPage() {
   const mapaQuery = useQuery({ queryKey: ['mapas', 'ativo'], queryFn: buscarMapaAtivo })
-  const { usuarios, meuUsuarioId, mover } = usePresencaWebSocket()
+  const { usuarios, meuUsuarioId, mover, definirStatus } = usePresencaWebSocket()
 
   useEffect(() => {
     const mapa = mapaQuery.data
@@ -71,10 +81,24 @@ export function EscritorioPage() {
   }
 
   const mapa = mapaQuery.data
+  const meuStatus = meuUsuarioId !== null ? usuarios[meuUsuarioId]?.status : undefined
 
   return (
     <section>
       <h2>{mapa.nome}</h2>
+      <label>
+        Status
+        <select
+          value={meuStatus ?? 'DISPONIVEL'}
+          onChange={(evento) => definirStatus(evento.target.value as StatusAvatar)}
+        >
+          {OPCOES_STATUS.map((status) => (
+            <option key={status} value={status}>
+              {ROTULO_STATUS[status]}
+            </option>
+          ))}
+        </select>
+      </label>
       <div
         data-testid="mapa"
         style={{
@@ -106,7 +130,7 @@ export function EscritorioPage() {
           <div
             key={usuario.usuarioId}
             data-testid={`avatar-${usuario.usuarioId}`}
-            title={usuario.nome}
+            title={`${usuario.nome} - ${ROTULO_STATUS[usuario.status]}`}
             style={{
               position: 'absolute',
               left: usuario.x * TAMANHO_TILE_PX,
