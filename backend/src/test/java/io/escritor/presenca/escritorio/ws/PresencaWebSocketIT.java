@@ -1,11 +1,14 @@
 package io.escritor.presenca.escritorio.ws;
 
+import io.escritor.presenca.escritorio.domain.EventoPresenca;
+import io.escritor.presenca.escritorio.repository.EventoPresencaRepository;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.seguranca.JwtService;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -52,6 +55,9 @@ class PresencaWebSocketIT {
 
     @Autowired
     private PresencaWebSocketHandler presencaWebSocketHandler;
+
+    @Autowired
+    private EventoPresencaRepository eventoPresencaRepository;
 
     @Test
     void conectarRegistraOUsuarioERecebeUmSnapshotDeSiMesmo() throws Exception {
@@ -390,6 +396,108 @@ class PresencaWebSocketIT {
         } finally {
             sessaoAna.close();
         }
+    }
+
+    @Test
+    void entrarNumaZonaGravaUmEventoDePresencaAberto() throws Exception {
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s612a@escritor.io", Papel.COLABORADOR, 480));
+        String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
+        BlockingQueue<String> mensagensAna = new LinkedBlockingQueue<>();
+
+        WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
+        try {
+            mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
+
+            // zona "Sala de foco" seedada por V21__create_zona.sql cobre x em [0,4) e y em [0,4)
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":1,\"y\":1}"));
+            String recebido = mensagensAna.poll(5, TimeUnit.SECONDS);
+            assertThat(recebido).isNotNull(); // o broadcast já saiu antes da escrita do evento (PRD, S6.12)
+            // receber o broadcast no cliente não prova que a escrita seguinte no servidor (mesma
+            // thread, mas depois do send) já terminou - entrega de rede e o resto do método do
+            // servidor correm em paralelo, então ainda precisa de uma margem aqui
+            Thread.sleep(300);
+
+            List<EventoPresenca> eventos = eventoPresencaRepository.findByUsuarioId(ana.getId());
+            assertThat(eventos).hasSize(1);
+            assertThat(eventos.get(0).getUsuario().getId()).isEqualTo(ana.getId());
+            assertThat(eventos.get(0).getZona().getNome()).isEqualTo("Sala de foco");
+            assertThat(eventos.get(0).getEntrouEm()).isNotNull();
+            assertThat(eventos.get(0).getSaiuEm()).isNull();
+        } finally {
+            sessaoAna.close();
+        }
+    }
+
+    @Test
+    void sairDeUmaZonaEncerraOEventoDePresencaAberto() throws Exception {
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s612b@escritor.io", Papel.COLABORADOR, 480));
+        String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
+        BlockingQueue<String> mensagensAna = new LinkedBlockingQueue<>();
+
+        WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
+        try {
+            mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":1,\"y\":1}")); // entra na zona de foco
+            mensagensAna.poll(5, TimeUnit.SECONDS);
+
+            // (8,8) não cai em nenhuma zona seedada
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":8,\"y\":8}"));
+            mensagensAna.poll(5, TimeUnit.SECONDS);
+            Thread.sleep(300); // receber o broadcast não prova que a escrita seguinte já terminou
+
+            List<EventoPresenca> eventos = eventoPresencaRepository.findByUsuarioId(ana.getId());
+            assertThat(eventos).hasSize(1);
+            assertThat(eventos.get(0).getSaiuEm()).isNotNull();
+        } finally {
+            sessaoAna.close();
+        }
+    }
+
+    @Test
+    void andarDiretoDeUmaZonaPraOutraEncerraAAntigaEAbreANova() throws Exception {
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s612c@escritor.io", Papel.COLABORADOR, 480));
+        String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
+        BlockingQueue<String> mensagensAna = new LinkedBlockingQueue<>();
+
+        WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
+        try {
+            mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":1,\"y\":1}")); // entra na zona de foco
+            mensagensAna.poll(5, TimeUnit.SECONDS);
+
+            // zona "Sala de reunião" seedada cobre x em [5,10) e y em [0,5)
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":6,\"y\":1}"));
+            mensagensAna.poll(5, TimeUnit.SECONDS);
+            Thread.sleep(300); // receber o broadcast não prova que a escrita seguinte já terminou
+
+            List<EventoPresenca> eventos = eventoPresencaRepository.findByUsuarioId(ana.getId());
+            assertThat(eventos).hasSize(2);
+            EventoPresenca eventoFoco = eventos.stream().filter(e -> e.getZona().getNome().equals("Sala de foco")).findFirst().orElseThrow();
+            EventoPresenca eventoReuniao =
+                    eventos.stream().filter(e -> e.getZona().getNome().equals("Sala de reunião")).findFirst().orElseThrow();
+            assertThat(eventoFoco.getSaiuEm()).isNotNull();
+            assertThat(eventoReuniao.getSaiuEm()).isNull();
+        } finally {
+            sessaoAna.close();
+        }
+    }
+
+    @Test
+    void desconectarComZonaAbertaEncerraOEventoDePresenca() throws Exception {
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s612d@escritor.io", Papel.COLABORADOR, 480));
+        String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
+        BlockingQueue<String> mensagensAna = new LinkedBlockingQueue<>();
+
+        WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
+        sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":1,\"y\":1}")); // entra na zona de foco
+        mensagensAna.poll(5, TimeUnit.SECONDS);
+
+        sessaoAna.close();
+        Thread.sleep(500); // dá tempo do container processar o fechamento e afterConnectionClosed rodar
+
+        List<EventoPresenca> eventos = eventoPresencaRepository.findByUsuarioId(ana.getId());
+        assertThat(eventos).hasSize(1);
+        assertThat(eventos.get(0).getSaiuEm()).isNotNull();
     }
 
     @Test

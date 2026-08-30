@@ -4,6 +4,7 @@ import io.escritor.presenca.escritorio.domain.StatusAvatar;
 import io.escritor.presenca.escritorio.domain.TipoZona;
 import io.escritor.presenca.escritorio.domain.Zona;
 import io.escritor.presenca.escritorio.service.LocalizadorZona;
+import io.escritor.presenca.escritorio.service.RegistroEventoPresencaService;
 import io.escritor.presenca.escritorio.service.ValidadorPosicaoMapa;
 import tools.jackson.databind.ObjectMapper;
 import java.io.IOException;
@@ -52,6 +53,13 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
  * fez isso. Qualquer mensagem nova desse usuário (posição ou status) tira ele do {@code AUSENTE}
  * automático de volta pra {@code DISPONIVEL} antes de processar o resto da mensagem - ver {@link
  * #sairDeAusenciaAutomaticaSeNecessario}.
+ *
+ * <p>S6.12 (PRD §3.5, opcional): {@link #eventoZonaAtualPorUsuario} rastreia em qual zona (sem
+ * filtro de status - qualquer uma, diferente de {@link #rastreioPorUsuario}/S6.7) cada usuário
+ * está, só pra saber quando gravar um {@code EventoPresenca} via {@link
+ * RegistroEventoPresencaService}. Essa escrita sempre acontece *depois* do {@link
+ * #broadcast(PresencaEventoWs)} de posição/status - nunca antes - pra nunca atrasar a resposta em
+ * tempo real pros clientes conectados (PRD).
  */
 @Component
 public class PresencaWebSocketHandler extends TextWebSocketHandler {
@@ -64,16 +72,23 @@ public class PresencaWebSocketHandler extends TextWebSocketHandler {
     private final Map<Long, RastreioZona> rastreioPorUsuario = new ConcurrentHashMap<>();
     private final Map<Long, Instant> ultimaAtividadePorUsuario = new ConcurrentHashMap<>();
     private final Set<Long> ausenteAutomaticoUsuarios = ConcurrentHashMap.newKeySet();
+    private final Map<Long, Long> eventoZonaAtualPorUsuario = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper;
     private final ValidadorPosicaoMapa validadorPosicaoMapa;
     private final LocalizadorZona localizadorZona;
+    private final RegistroEventoPresencaService registroEventoPresencaService;
     private final Clock clock;
 
     public PresencaWebSocketHandler(
-            ObjectMapper objectMapper, ValidadorPosicaoMapa validadorPosicaoMapa, LocalizadorZona localizadorZona, Clock clock) {
+            ObjectMapper objectMapper,
+            ValidadorPosicaoMapa validadorPosicaoMapa,
+            LocalizadorZona localizadorZona,
+            RegistroEventoPresencaService registroEventoPresencaService,
+            Clock clock) {
         this.objectMapper = objectMapper;
         this.validadorPosicaoMapa = validadorPosicaoMapa;
         this.localizadorZona = localizadorZona;
+        this.registroEventoPresencaService = registroEventoPresencaService;
         this.clock = clock;
     }
 
@@ -97,6 +112,11 @@ public class PresencaWebSocketHandler extends TextWebSocketHandler {
         rastreioPorUsuario.remove(usuarioId);
         ultimaAtividadePorUsuario.remove(usuarioId);
         ausenteAutomaticoUsuarios.remove(usuarioId);
+
+        Long zonaAberta = eventoZonaAtualPorUsuario.remove(usuarioId);
+        if (zonaAberta != null) {
+            registroEventoPresencaService.registrarTransicaoDeZona(usuarioId, zonaAberta, null, Instant.now(clock));
+        }
     }
 
     /**
@@ -187,7 +207,27 @@ public class PresencaWebSocketHandler extends TextWebSocketHandler {
         atualizarEstado(session, atual -> {
             StatusAvatar novoStatus = resolverStatusAposMover(usuarioId, atual.status(), comando.x(), comando.y());
             return new EstadoPresencaUsuario(atual.usuarioId(), atual.nome(), comando.x(), comando.y(), novoStatus);
-        }).ifPresent(atualizado -> broadcast(new PresencaEventoWs("POSICAO", List.of(atualizado))));
+        }).ifPresent(atualizado -> {
+            broadcast(new PresencaEventoWs("POSICAO", List.of(atualizado)));
+            // sempre depois do broadcast acima - a resposta em tempo real pros clientes conectados
+            // já saiu antes dessa escrita começar (PRD, S6.12)
+            registrarEventoPresencaSeMudouDeZona(usuarioId, comando.x(), comando.y());
+        });
+    }
+
+    private void registrarEventoPresencaSeMudouDeZona(Long usuarioId, int x, int y) {
+        Long zonaAlvoId = localizadorZona.zonaContendo(x, y).map(Zona::getId).orElse(null);
+        Long zonaAnteriorId = eventoZonaAtualPorUsuario.get(usuarioId);
+        if (Objects.equals(zonaAnteriorId, zonaAlvoId)) {
+            return;
+        }
+
+        if (zonaAlvoId == null) {
+            eventoZonaAtualPorUsuario.remove(usuarioId);
+        } else {
+            eventoZonaAtualPorUsuario.put(usuarioId, zonaAlvoId);
+        }
+        registroEventoPresencaService.registrarTransicaoDeZona(usuarioId, zonaAnteriorId, zonaAlvoId, Instant.now(clock));
     }
 
     /**

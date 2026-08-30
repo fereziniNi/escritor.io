@@ -2,7 +2,7 @@
 
 Backlog ordenado de fatias verticais. Cada fatia é pequena o suficiente para caber num ciclo TDD completo (backend domínio → backend web/repo → frontend) e entrega algo demonstrável. Não pular fatias — cada uma assume que as anteriores estão testadas e verdes.
 
-Fases 1 a 4 (E0 + E1 + E2 + E3 + E4) estão completas e em uso. E5 (Escritório virtual, S6) é o próximo e último épico do roadmap sugerido do PRD (§5) — deixado por último de propósito (PRD §4, E5: "deixar por último"), por ser o mais especulativo dos cinco: depende de WebSocket com estado em memória (não banco) e renderização de mapa em canvas, as duas peças mais novas da stack até aqui.
+Fases 1 a 5 (E0 + E1 + E2 + E3 + E4 + E5) estão completas e em uso — o roadmap sugerido do PRD (§5) inteiro. E5 (Escritório virtual, S6) foi o último épico de propósito (PRD §4, E5: "deixar por último"), por ser o mais especulativo dos seis: dependia de WebSocket com estado em memória (não banco) e renderização de mapa, as duas peças mais novas da stack até então.
 
 ---
 
@@ -133,7 +133,7 @@ Decisão de sequenciamento: o mapa (S6.1-S6.2) e o canal de tempo real (S6.3-S6.
 | S6.9 ✅ | Frontend: lista de presença (quem está em cada zona + status), atualizada em tempo real | Componente: entrar/sair de zona e trocar de status reflete na lista sem reload |
 | S6.10 ✅ | Reconexão automática do WebSocket com backoff exponencial (PRD) | Componente: conexão perdida tenta reconectar com atraso crescente; ao reconectar, ressincroniza pelo snapshot do estado |
 | S6.11 ✅ | Ao entrar no mapa sem ponto aberto, exibir sugestão — nunca automação — de registrar entrada (PRD) | Componente: usuário sem `ENTRADA` aberta vê o aviso ao acessar o mapa; usuário com ponto aberto não vê nada |
-| S6.12 | `EventoPresenca` (opcional, PRD §3.5) — registra entrada/saída de zona pra relatório futuro, sem bloquear nem atrasar o fluxo em tempo real | Domínio: entrar/sair de uma zona grava `entrou_em`/`saiu_em`; a escrita não interfere na resposta em tempo real do WS |
+| S6.12 ✅ | `EventoPresenca` (opcional, PRD §3.5) — registra entrada/saída de zona pra relatório futuro, sem bloquear nem atrasar o fluxo em tempo real | Domínio: entrar/sair de uma zona grava `entrou_em`/`saiu_em`; a escrita não interfere na resposta em tempo real do WS |
 
 ## Definição de pronto (para toda fatia)
 
