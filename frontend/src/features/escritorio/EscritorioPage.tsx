@@ -30,11 +30,9 @@ const TITULO_PAINEL: Record<PainelId, string> = {
 }
 
 /** Usado como valor inicial/fallback (inclusive em teste, onde `ResizeObserver` não existe no
- * jsdom) - o tamanho real vem de `useTamanhoTileResponsivo` quando há um `ResizeObserver` de
+ * jsdom) - a dimensão real vem de `useDimensaoTileResponsiva` quando há um `ResizeObserver` de
  * verdade medindo o espaço disponível. */
 const TAMANHO_TILE_PADRAO_PX = 40
-const TAMANHO_TILE_MINIMO_PX = 24
-const TAMANHO_TILE_MAXIMO_PX = 72
 
 const TECLA_PARA_DELTA: Record<string, readonly [number, number]> = {
   ArrowUp: [0, -1],
@@ -74,7 +72,17 @@ function useAnimacaoPersonagem(x: number) {
   return { direcao, andando }
 }
 
-function AvatarNoMapa({ usuario, ehEu, tamanhoTile }: { usuario: EstadoPresencaUsuario; ehEu: boolean; tamanhoTile: number }) {
+function AvatarNoMapa({
+  usuario,
+  ehEu,
+  tamanhoTileX,
+  tamanhoTileY,
+}: {
+  usuario: EstadoPresencaUsuario
+  ehEu: boolean
+  tamanhoTileX: number
+  tamanhoTileY: number
+}) {
   const { direcao, andando } = useAnimacaoPersonagem(usuario.x)
 
   return (
@@ -83,9 +91,9 @@ function AvatarNoMapa({ usuario, ehEu, tamanhoTile }: { usuario: EstadoPresencaU
       data-testid={`avatar-${usuario.usuarioId}`}
       title={`${usuario.nome} - ${ROTULO_STATUS[usuario.status]}`}
       style={{
-        left: usuario.x * tamanhoTile,
-        top: usuario.y * tamanhoTile,
-        width: tamanhoTile,
+        left: usuario.x * tamanhoTileX,
+        top: usuario.y * tamanhoTileY,
+        width: tamanhoTileX,
       }}
     >
       <span className="escritorio-personagem-corpo">
@@ -98,16 +106,19 @@ function AvatarNoMapa({ usuario, ehEu, tamanhoTile }: { usuario: EstadoPresencaU
 }
 
 /**
- * Tamanho de tile responsivo: mede quanto espaço `.escritorio-coluna-mapa` tem disponível (o
- * dock/sidebar já ocupam o resto via flexbox) e escolhe o maior tile que ainda cabe o mapa
- * inteiro sem cortar, dentro de um mínimo/máximo razoável - assim o mapa realmente preenche a
- * janela em telas grandes, em vez de ficar um retângulo pequeno flutuando no meio de um espaço
- * vazio. Sem `ResizeObserver` (jsdom nos testes, ou um navegador muito antigo) fica no valor
- * padrão fixo - mesmo tamanho que a página sempre teve, então nenhuma asserção de pixel exato
- * nos testes muda.
+ * Dimensão de tile responsiva, X e Y independentes: mede quanto espaço `.escritorio-coluna-mapa`
+ * tem disponível (que agora é a tela inteira - o resto do HUD virou overlay por cima, não divide
+ * mais layout com o mapa) e estica cada eixo pra preencher exatamente essa largura/altura, sem
+ * preservar um tile quadrado uniforme. Pedido do usuário: "faça ele ser 100% da tela" - manter
+ * proporção quadrada deixaria sobra (letterbox) sempre que a proporção do mapa (larguraTiles ×
+ * alturaTiles) não bater com a da janela, que é o caso comum; esticar os dois eixos
+ * independentemente garante 100% preenchido, ao custo de tiles não serem mais quadrados perfeitos
+ * quando a proporção não bate - troca aceita de propósito pelo pedido. Sem `ResizeObserver`
+ * (jsdom nos testes) fica no valor padrão fixo nos dois eixos - mesmo tamanho que a página sempre
+ * teve, nenhuma asserção de pixel exato nos testes muda.
  */
-function useTamanhoTileResponsivo(containerRef: RefObject<HTMLDivElement | null>, larguraTiles: number, alturaTiles: number) {
-  const [tamanho, setTamanho] = useState(TAMANHO_TILE_PADRAO_PX)
+function useDimensaoTileResponsiva(containerRef: RefObject<HTMLDivElement | null>, larguraTiles: number, alturaTiles: number) {
+  const [dimensao, setDimensao] = useState({ x: TAMANHO_TILE_PADRAO_PX, y: TAMANHO_TILE_PADRAO_PX })
 
   useEffect(() => {
     const elemento = containerRef.current
@@ -124,14 +135,13 @@ function useTamanhoTileResponsivo(containerRef: RefObject<HTMLDivElement | null>
       if (width <= 0 || height <= 0) {
         return
       }
-      const calculado = Math.floor(Math.min(width / larguraTiles, height / alturaTiles))
-      setTamanho(Math.max(TAMANHO_TILE_MINIMO_PX, Math.min(TAMANHO_TILE_MAXIMO_PX, calculado)))
+      setDimensao({ x: width / larguraTiles, y: height / alturaTiles })
     })
     observer.observe(elemento)
     return () => observer.disconnect()
   }, [containerRef, larguraTiles, alturaTiles])
 
-  return tamanho
+  return dimensao
 }
 
 /**
@@ -155,7 +165,11 @@ export function EscritorioPage() {
   const papel = useAuthStore((estado) => estado.papel)
   const [painelAberto, setPainelAberto] = useState<PainelId | null>(null)
   const colunaMapaRef = useRef<HTMLDivElement>(null)
-  const tamanhoTile = useTamanhoTileResponsivo(colunaMapaRef, mapaQuery.data?.larguraTiles ?? 1, mapaQuery.data?.alturaTiles ?? 1)
+  const { x: tamanhoTileX, y: tamanhoTileY } = useDimensaoTileResponsiva(
+    colunaMapaRef,
+    mapaQuery.data?.larguraTiles ?? 1,
+    mapaQuery.data?.alturaTiles ?? 1,
+  )
 
   useEffect(() => {
     const mapa = mapaQuery.data
@@ -258,9 +272,8 @@ export function EscritorioPage() {
               data-testid="mapa"
               style={
                 {
-                  width: mapa.larguraTiles * tamanhoTile,
-                  height: mapa.alturaTiles * tamanhoTile,
-                  '--tamanho-tile': `${tamanhoTile}px`,
+                  '--tamanho-tile-x': `${tamanhoTileX}px`,
+                  '--tamanho-tile-y': `${tamanhoTileY}px`,
                 } as CSSProperties
               }
             >
@@ -271,10 +284,10 @@ export function EscritorioPage() {
                   title={zona.nome}
                   data-testid={`zona-${zona.id}`}
                   style={{
-                    left: zona.x * tamanhoTile,
-                    top: zona.y * tamanhoTile,
-                    width: zona.largura * tamanhoTile,
-                    height: zona.altura * tamanhoTile,
+                    left: zona.x * tamanhoTileX,
+                    top: zona.y * tamanhoTileY,
+                    width: zona.largura * tamanhoTileX,
+                    height: zona.altura * tamanhoTileY,
                     background: COR_POR_TIPO_ZONA[zona.tipo],
                   }}
                 >
@@ -291,7 +304,13 @@ export function EscritorioPage() {
               ))}
 
               {Object.values(usuarios).map((usuario) => (
-                <AvatarNoMapa key={usuario.usuarioId} usuario={usuario} ehEu={usuario.usuarioId === meuUsuarioId} tamanhoTile={tamanhoTile} />
+                <AvatarNoMapa
+                  key={usuario.usuarioId}
+                  usuario={usuario}
+                  ehEu={usuario.usuarioId === meuUsuarioId}
+                  tamanhoTileX={tamanhoTileX}
+                  tamanhoTileY={tamanhoTileY}
+                />
               ))}
             </div>
           </div>

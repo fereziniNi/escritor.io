@@ -50,9 +50,6 @@
 .escritorio-coluna-mapa {
   width: 100%;
   height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .escritorio-coluna-lista {
@@ -75,19 +72,22 @@
 /* ---------- moldura + piso ---------- */
 
 .escritorio-mapa-moldura {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
   padding: 10px;
   background: #4a3626;
   background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.04) 0 2px, transparent 2px 6px);
-  border-radius: 16px;
-  box-shadow: var(--sombra-cartao);
-  overflow: auto;
-  max-width: 100%;
-  max-height: 100%;
+  overflow: hidden;
 }
 
 .escritorio-mapa {
-  --tamanho-tile: 40px;
+  --tamanho-tile-x: 40px;
+  --tamanho-tile-y: 40px;
   position: relative;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
   background-color: #d9b98a;
   background-image:
     repeating-linear-gradient(
@@ -95,13 +95,21 @@
       rgba(0, 0, 0, 0.05) 0,
       rgba(0, 0, 0, 0.05) 2px,
       transparent 2px,
-      transparent calc(var(--tamanho-tile) * 2)
+      transparent calc(var(--tamanho-tile-x) * 2)
     ),
-    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.06) 0, rgba(0, 0, 0, 0.06) 1px, transparent 1px, transparent var(--tamanho-tile)),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0 var(--tamanho-tile), transparent var(--tamanho-tile) calc(var(--tamanho-tile) * 2));
+    repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.06) 0,
+      rgba(0, 0, 0, 0.06) 1px,
+      transparent 1px,
+      transparent var(--tamanho-tile-y)
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.12) 0 var(--tamanho-tile-x),
+      transparent var(--tamanho-tile-x) calc(var(--tamanho-tile-x) * 2)
+    );
   border: 3px solid #2b1f16;
-  border-radius: 8px;
-  flex: none;
 }
 
 /* ---------- salas ---------- */
