@@ -122,7 +122,7 @@ Decisão de sequenciamento: o mapa (S6.1-S6.2) e o canal de tempo real (S6.3-S6.
 
 | # | Fatia | Teste que vem primeiro |
 |---|---|---|
-| S6.1 | Entidades `Mapa` e `Zona` + migração Flyway, com um `layout_json` v1 versionado no repo (seed via migração) | Repositório: roundtrip de `Mapa`/`Zona`; domínio: zona fora dos limites do mapa (`x + largura > largura_tiles` etc.) é rejeitada |
+| S6.1 ✅ | Entidades `Mapa` e `Zona` + migração Flyway, com um `layout_json` v1 versionado no repo (seed via migração) | Repositório: roundtrip de `Mapa`/`Zona`; domínio: zona fora dos limites do mapa (`x + largura > largura_tiles` etc.) é rejeitada |
 | S6.2 | `GET /mapas/ativo` — retorna o mapa ativo com suas zonas, pro frontend renderizar | Web: 404 se não houver mapa ativo; serializa zonas com tipo/posição/dimensão |
 | S6.3 | `/ws/presenca` — handler WebSocket; conectar registra o usuário no estado em memória (posição inicial, status `DISPONIVEL`) | Integração: cliente conecta e recebe snapshot do estado atual de todos os presentes; desconectar remove o usuário do estado |
 | S6.4 | Cliente envia posição (`x,y`) — servidor valida contra os limites do mapa e colisões de zona, nunca confia na posição do cliente (PRD) | Integração: posição fora dos limites do mapa é rejeitada e não propagada; posição válida é aceita e re-broadcast pros demais conectados |
