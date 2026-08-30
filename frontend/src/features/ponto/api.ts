@@ -26,6 +26,19 @@ export async function buscarEspelhoDoMes(usuarioId?: number): Promise<EspelhoMes
   return response.json()
 }
 
+/**
+ * Retorna o `Blob` do CSV (não JSON) - o download em si é responsabilidade de quem chama, já que
+ * um link `<a href>` puro não carrega o header `Authorization` (S5.9).
+ */
+export async function baixarEspelhoDoMesCsv(usuarioId?: number): Promise<Blob> {
+  const query = usuarioId ? `&usuarioId=${usuarioId}` : ''
+  const response = await apiFetch(`/ponto/espelho-do-mes?formato=csv${query}`)
+  if (!response.ok) {
+    throw new Error('Não foi possível exportar o espelho do mês')
+  }
+  return response.blob()
+}
+
 export async function buscarDiasInconsistentes(dados: {
   usuarioId: number | null
   inicio: string

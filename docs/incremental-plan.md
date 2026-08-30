@@ -2,7 +2,7 @@
 
 Backlog ordenado de fatias verticais. Cada fatia é pequena o suficiente para caber num ciclo TDD completo (backend domínio → backend web/repo → frontend) e entrega algo demonstrável. Não pular fatias — cada uma assume que as anteriores estão testadas e verdes.
 
-Fases 1, 2 e 3 (E0 + E1 + E2 + E3) estão completas e em uso. Fase 4 (E4 Relatórios) está esboçada abaixo (S5), seguindo o mesmo formato — ainda não implementada. E5 (Escritório virtual) continua para depois, conforme o roadmap do PRD (§5) — deixado por último de propósito (PRD §4, E5: "deixar por último"), é o épico mais especulativo dos cinco.
+Fases 1 a 4 (E0 + E1 + E2 + E3 + E4) estão completas e em uso. E5 (Escritório virtual) continua para depois, conforme o roadmap do PRD (§5) — deixado por último de propósito (PRD §4, E5: "deixar por último"), é o épico mais especulativo dos cinco.
 
 ---
 
@@ -108,7 +108,7 @@ Como em E3, relatório é informativo — nenhuma fatia daqui bloqueia ação ne
 | S5.6 ✅ | `GET /ajustes/pendentes` (S2.12, hoje sem filtro) ganha visibilidade por equipe pro gestor, reusando o serviço de S5.1 — fecha uma lacuna que já existia antes de E4: hoje qualquer gestor vê/aprova ajuste de qualquer equipe | Serviço: gestor só vê solicitações de colaboradores de equipes que lidera; admin continua vendo todas |
 | S5.7 ✅ | "Dias inconsistentes" no período, por pessoa/equipe — reusa `EstadoDia.INCONSISTENTE` (S2.8) sobre o intervalo pedido, não só o dia de hoje | Serviço: período com dias `ABERTA`/`FECHADA`/`INCONSISTENTE` mistos retorna só os inconsistentes; gestor só vê da própria equipe |
 | S5.8 ✅ | Frontend: painel de relatórios do gestor (`RelatoriosPage` ou similar) — seletor de pessoa/equipe/período, saldo, total apontado por projeto, pendências (ajustes + dias inconsistentes) | Componente: só `GESTOR`/`ADMIN` acessam a rota; trocar o filtro atualiza os dados sem reload manual |
-| S5.9 | Frontend: botão de exportar espelho do mês em CSV na tela do colaborador | Componente: clique dispara o download do CSV retornado por S5.3 |
+| S5.9 ✅ | Frontend: botão de exportar espelho do mês em CSV na tela do colaborador | Componente: clique dispara o download do CSV retornado por S5.3 |
 
 ---
 
