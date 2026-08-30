@@ -3,7 +3,7 @@ import { buscarEspelhoDoMes } from './api'
 import { formatarEstado, formatarMinutos, formatarSaldo } from './formatarMinutos'
 
 export function EspelhoMesPainel() {
-  const espelhoQuery = useQuery({ queryKey: ['ponto', 'espelho-do-mes'], queryFn: buscarEspelhoDoMes })
+  const espelhoQuery = useQuery({ queryKey: ['ponto', 'espelho-do-mes'], queryFn: () => buscarEspelhoDoMes() })
 
   if (espelhoQuery.isPending) {
     return <p>Carregando…</p>

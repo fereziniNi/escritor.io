@@ -7,6 +7,7 @@ import { QuadroDetalhePage } from './features/kanban/QuadroDetalhePage'
 import { QuadrosPage } from './features/kanban/QuadrosPage'
 import { EquipesPage } from './features/organizacao/EquipesPage'
 import { ProjetosPage } from './features/organizacao/ProjetosPage'
+import { RelatoriosPage } from './features/relatorios/RelatoriosPage'
 
 function App() {
   return (
@@ -51,6 +52,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <QuadroDetalhePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/relatorios"
+            element={
+              <ProtectedRoute papeisPermitidos={['GESTOR', 'ADMIN']}>
+                <RelatoriosPage />
               </ProtectedRoute>
             }
           />

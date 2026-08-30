@@ -1,5 +1,5 @@
 import { apiFetch } from '../../shared/api/http'
-import type { Apontamento, Card, Comentario, Etiqueta, EventoCard, Quadro, QuadroDetalhe } from './types'
+import type { Apontamento, Card, Comentario, Etiqueta, EventoCard, Quadro, QuadroDetalhe, TotalApontado } from './types'
 
 export async function listarQuadros(): Promise<Quadro[]> {
   const response = await apiFetch('/quadros')
@@ -188,4 +188,20 @@ export async function excluirApontamento(apontamentoId: number): Promise<void> {
   if (!response.ok) {
     throw new Error('Não foi possível excluir o apontamento')
   }
+}
+
+export async function buscarTotalApontadoPorProjetoOuEquipe(dados: {
+  projetoId: number | null
+  equipeId: number | null
+  inicio: string
+  fim: string
+}): Promise<TotalApontado> {
+  const filtro = dados.projetoId ? `projetoId=${dados.projetoId}` : `equipeId=${dados.equipeId}`
+  const response = await apiFetch(
+    `/apontamentos/relatorio?${filtro}&inicio=${encodeURIComponent(dados.inicio)}&fim=${encodeURIComponent(dados.fim)}`,
+  )
+  if (!response.ok) {
+    throw new Error('Não foi possível carregar o total apontado')
+  }
+  return response.json()
 }

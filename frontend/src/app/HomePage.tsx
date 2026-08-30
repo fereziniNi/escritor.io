@@ -23,6 +23,12 @@ export function HomePage() {
 
       <nav>
         <Link to="/kanban">Quadros</Link>
+        {(papel === 'GESTOR' || papel === 'ADMIN') && (
+          <>
+            {' · '}
+            <Link to="/relatorios">Relatórios</Link>
+          </>
+        )}
         {papel === 'ADMIN' && (
           <>
             {' · '}

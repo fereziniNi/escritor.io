@@ -17,10 +17,26 @@ export async function buscarJornadaDoDia(): Promise<JornadaDoDia> {
   return response.json()
 }
 
-export async function buscarEspelhoDoMes(): Promise<EspelhoMes> {
-  const response = await apiFetch('/ponto/espelho-do-mes')
+export async function buscarEspelhoDoMes(usuarioId?: number): Promise<EspelhoMes> {
+  const query = usuarioId ? `?usuarioId=${usuarioId}` : ''
+  const response = await apiFetch(`/ponto/espelho-do-mes${query}`)
   if (!response.ok) {
     throw new Error('Não foi possível carregar o espelho do mês')
+  }
+  return response.json()
+}
+
+export async function buscarDiasInconsistentes(dados: {
+  usuarioId: number | null
+  inicio: string
+  fim: string
+}): Promise<string[]> {
+  const usuarioIdQuery = dados.usuarioId ? `usuarioId=${dados.usuarioId}&` : ''
+  const response = await apiFetch(
+    `/ponto/dias-inconsistentes?${usuarioIdQuery}inicio=${encodeURIComponent(dados.inicio)}&fim=${encodeURIComponent(dados.fim)}`,
+  )
+  if (!response.ok) {
+    throw new Error('Não foi possível carregar os dias inconsistentes')
   }
   return response.json()
 }

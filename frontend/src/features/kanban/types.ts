@@ -46,6 +46,10 @@ export interface Apontamento {
   editadoEm: string
 }
 
+export interface TotalApontado {
+  totalMinutos: number
+}
+
 export interface Card {
   id: number
   colunaId: number
