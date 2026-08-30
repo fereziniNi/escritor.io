@@ -94,6 +94,64 @@ class PresencaWebSocketIT {
     }
 
     @Test
+    void posicaoValidaEAceitaERebroadcastParaOsDemaisConectados() throws Exception {
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s64a@escritor.io", Papel.COLABORADOR, 480));
+        Usuario beto = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s64a@escritor.io", Papel.COLABORADOR, 480));
+        String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
+        String tokenBeto = jwtService.gerarAccessToken(beto.getId(), Papel.COLABORADOR);
+
+        WebSocketSession sessaoAna = conectar(tokenAna, new LinkedBlockingQueue<>());
+        try {
+            BlockingQueue<String> mensagensBeto = new LinkedBlockingQueue<>();
+            WebSocketSession sessaoBeto = conectar(tokenBeto, mensagensBeto);
+            try {
+                mensagensBeto.poll(5, TimeUnit.SECONDS); // snapshot inicial de quando Beto conectou, descartado
+
+                sessaoAna.sendMessage(new TextMessage("{\"x\":5,\"y\":5}"));
+
+                String recebido = mensagensBeto.poll(5, TimeUnit.SECONDS);
+                assertThat(recebido)
+                        .isNotNull()
+                        .contains("\"tipo\":\"POSICAO\"")
+                        .contains("\"usuarioId\":" + ana.getId())
+                        .contains("\"x\":5")
+                        .contains("\"y\":5");
+            } finally {
+                sessaoBeto.close();
+            }
+        } finally {
+            sessaoAna.close();
+        }
+    }
+
+    @Test
+    void posicaoForaDosLimitesDoMapaERejeitadaENaoPropagada() throws Exception {
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s64c@escritor.io", Papel.COLABORADOR, 480));
+        String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
+
+        WebSocketSession sessaoAna = conectar(tokenAna, new LinkedBlockingQueue<>());
+        try {
+            // mapa seedado por V20__create_mapa.sql tem largura_tiles=20 - x=25 está fora
+            sessaoAna.sendMessage(new TextMessage("{\"x\":25,\"y\":5}"));
+            Thread.sleep(500); // dá tempo do servidor processar (e rejeitar) a mensagem
+
+            Usuario beto = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s64c@escritor.io", Papel.COLABORADOR, 480));
+            String tokenBeto = jwtService.gerarAccessToken(beto.getId(), Papel.COLABORADOR);
+            BlockingQueue<String> mensagensBeto = new LinkedBlockingQueue<>();
+            WebSocketSession sessaoBeto = conectar(tokenBeto, mensagensBeto);
+            try {
+                String snapshot = mensagensBeto.poll(5, TimeUnit.SECONDS);
+
+                assertThat(snapshot).isNotNull().doesNotContain("\"x\":25");
+            } finally {
+                sessaoBeto.close();
+            }
+        } finally {
+            sessaoAna.close();
+        }
+    }
+
+    @Test
     void desconectarRemoveOUsuarioDoEstado() throws Exception {
         Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s63c@escritor.io", Papel.COLABORADOR, 480));
         Usuario beto = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s63c@escritor.io", Papel.COLABORADOR, 480));
