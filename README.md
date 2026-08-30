@@ -19,7 +19,7 @@ Ambiente único onde a equipe registra jornada (ponto), organiza tarefas (kanban
 
 ## Status
 
-Fase atual: **S5 — E4 Relatórios** (ver [docs/incremental-plan.md](docs/incremental-plan.md)). E0 (Fundação), E1 (Ponto), E2 (Kanban), E3 (Apontamento de horas) e E4 (Relatórios) estão completos. Próximo: E5 Escritório virtual (deixado por último de propósito, PRD §4).
+Fase atual: **S6 — E5 Escritório virtual** (ver [docs/incremental-plan.md](docs/incremental-plan.md)). E0 (Fundação), E1 (Ponto), E2 (Kanban), E3 (Apontamento de horas) e E4 (Relatórios) estão completos. Em andamento: E5 Escritório virtual, o último épico do roadmap sugerido do PRD (§5), deixado por último de propósito (PRD §4).
 
 - ✅ S0.1 — backend (`/backend`): Spring Boot 4.1.x + Maven Wrapper, Flyway configurado, `GET /health`, validado por teste de integração com Testcontainers.
 - ✅ S0.2 — frontend (`/frontend`): Vite + React + TS, TanStack Query, componente `HealthStatus` consumindo `/health` via proxy de dev, testado com Vitest + Testing Library + MSW. Verificado ponta a ponta num browser real contra o backend rodando de verdade.

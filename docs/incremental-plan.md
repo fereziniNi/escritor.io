@@ -1,8 +1,8 @@
-# Plano incremental — Fases 1 a 4 (E0 + E1 + E2 + E3 + E4)
+# Plano incremental — Fases 1 a 5 (E0 + E1 + E2 + E3 + E4 + E5)
 
 Backlog ordenado de fatias verticais. Cada fatia é pequena o suficiente para caber num ciclo TDD completo (backend domínio → backend web/repo → frontend) e entrega algo demonstrável. Não pular fatias — cada uma assume que as anteriores estão testadas e verdes.
 
-Fases 1 a 4 (E0 + E1 + E2 + E3 + E4) estão completas e em uso. E5 (Escritório virtual) continua para depois, conforme o roadmap do PRD (§5) — deixado por último de propósito (PRD §4, E5: "deixar por último"), é o épico mais especulativo dos cinco.
+Fases 1 a 4 (E0 + E1 + E2 + E3 + E4) estão completas e em uso. E5 (Escritório virtual, S6) é o próximo e último épico do roadmap sugerido do PRD (§5) — deixado por último de propósito (PRD §4, E5: "deixar por último"), por ser o mais especulativo dos cinco: depende de WebSocket com estado em memória (não banco) e renderização de mapa em canvas, as duas peças mais novas da stack até aqui.
 
 ---
 
@@ -111,6 +111,29 @@ Como em E3, relatório é informativo — nenhuma fatia daqui bloqueia ação ne
 | S5.9 ✅ | Frontend: botão de exportar espelho do mês em CSV na tela do colaborador | Componente: clique dispara o download do CSV retornado por S5.3 |
 
 ---
+
+## S6 — E5 Escritório virtual
+
+PRD §3.5: `Mapa (id, nome, largura_tiles, altura_tiles, layout_json, ativo)`, `Zona (id, mapa_id, nome, x, y, largura, altura, tipo: FOCO|REUNIAO|CAFE|ATENDIMENTO|LIVRE)`, `EventoPresenca` (opcional). Diferença fundamental em relação a tudo que veio antes: **o estado vivo (posição, status, última atividade) fica em memória no servidor, não no banco** — com 10 usuários isso é trivial e evita escrita constante em disco (PRD §3.5). O `layout_json` é versionado no repositório na v1, sem editor visual (PRD, fora de escopo).
+
+Princípio de design que atravessa o épico inteiro (PRD): **presença no mapa ≠ ponto batido**. Nenhuma fatia daqui registra ou encerra `RegistroPonto` automaticamente — o máximo permitido é uma *sugestão* (S6.11), nunca uma ação automática.
+
+Decisão de sequenciamento: o mapa (S6.1-S6.2) e o canal de tempo real (S6.3-S6.4) vêm antes de qualquer coisa visual, porque servidor validando posição/colisão (PRD: "o cliente nunca é fonte de verdade sobre posição") só faz sentido depois de existir um mapa com limites e zonas reais para validar contra. Status manual (S6.6) vem antes do status automático por zona (S6.7) pelo mesmo motivo de S2.3→S2.4: a máquina de estado mais simples primeiro, a automação por cima depois.
+
+| # | Fatia | Teste que vem primeiro |
+|---|---|---|
+| S6.1 | Entidades `Mapa` e `Zona` + migração Flyway, com um `layout_json` v1 versionado no repo (seed via migração) | Repositório: roundtrip de `Mapa`/`Zona`; domínio: zona fora dos limites do mapa (`x + largura > largura_tiles` etc.) é rejeitada |
+| S6.2 | `GET /mapas/ativo` — retorna o mapa ativo com suas zonas, pro frontend renderizar | Web: 404 se não houver mapa ativo; serializa zonas com tipo/posição/dimensão |
+| S6.3 | `/ws/presenca` — handler WebSocket; conectar registra o usuário no estado em memória (posição inicial, status `DISPONIVEL`) | Integração: cliente conecta e recebe snapshot do estado atual de todos os presentes; desconectar remove o usuário do estado |
+| S6.4 | Cliente envia posição (`x,y`) — servidor valida contra os limites do mapa e colisões de zona, nunca confia na posição do cliente (PRD) | Integração: posição fora dos limites do mapa é rejeitada e não propagada; posição válida é aceita e re-broadcast pros demais conectados |
+| S6.5 | Frontend: renderização do mapa (canvas) com zonas e avatares, movimento por setas do teclado com predição local + throttle de envio (máx. a cada 100ms, PRD) | Componente: seta pressionada move o avatar localmente de imediato, sem esperar resposta do servidor |
+| S6.6 | Status manual do avatar (`DISPONIVEL/FOCO/REUNIAO/ALMOCO/AUSENTE`) — mensagem WS pra trocar o próprio status, broadcast pros demais | Integração: trocar o próprio status é refletido nos demais clientes conectados; usuário não altera status de outro |
+| S6.7 | Entrar numa zona tipada (FOCO/REUNIAO/CAFE/ATENDIMENTO) atualiza o status automaticamente (PRD); sair da zona volta ao status anterior, a menos que tenha sido setado manualmente durante a estadia | Integração: mover avatar pra dentro de zona FOCO muda status pra FOCO sem ação explícita; status setado manualmente dentro da zona sobrevive à saída |
+| S6.8 | `AUSENTE` automático após 5 minutos sem input do usuário (nem movimento, nem troca manual de status) — PRD | Integração: usuário sem qualquer mensagem por 5 min tem o status forçado pra `AUSENTE` pelo servidor; qualquer input novo tira do `AUSENTE` |
+| S6.9 | Frontend: lista de presença (quem está em cada zona + status), atualizada em tempo real | Componente: entrar/sair de zona e trocar de status reflete na lista sem reload |
+| S6.10 | Reconexão automática do WebSocket com backoff exponencial (PRD) | Componente: conexão perdida tenta reconectar com atraso crescente; ao reconectar, ressincroniza pelo snapshot do estado |
+| S6.11 | Ao entrar no mapa sem ponto aberto, exibir sugestão — nunca automação — de registrar entrada (PRD) | Componente: usuário sem `ENTRADA` aberta vê o aviso ao acessar o mapa; usuário com ponto aberto não vê nada |
+| S6.12 | `EventoPresenca` (opcional, PRD §3.5) — registra entrada/saída de zona pra relatório futuro, sem bloquear nem atrasar o fluxo em tempo real | Domínio: entrar/sair de uma zona grava `entrou_em`/`saiu_em`; a escrita não interfere na resposta em tempo real do WS |
 
 ## Definição de pronto (para toda fatia)
 
