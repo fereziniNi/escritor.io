@@ -35,5 +35,14 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     pool: 'threads',
+    // react-reconciler é importado por @pixi/react (mundo do Escritório, redesign estilo Gather)
+    // sem extensão de arquivo (`react-reconciler/constants`) - resolve normal no build/dev do Vite,
+    // mas a resolução nativa de módulos do Vitest recusa o bare specifier sem extensão. Forçar esses
+    // pacotes a passar pelo pipeline de transform do Vite (em vez da resolução nativa do Node) resolve.
+    server: {
+      deps: {
+        inline: ['@pixi/react', 'pixi.js', 'react-reconciler'],
+      },
+    },
   },
 })
