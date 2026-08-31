@@ -184,6 +184,9 @@ describe('EscritorioPage', () => {
     renderPagina()
     await screen.findByText(/Escritório/)
 
+    // lista de presença agora é um drawer recolhível (Fase 4), fechado por padrão
+    fireEvent.click(screen.getByRole('button', { name: 'Participantes' }))
+
     act(() => {
       WebSocketFalso.instancias[0].disparaMensagem({
         tipo: 'SNAPSHOT',

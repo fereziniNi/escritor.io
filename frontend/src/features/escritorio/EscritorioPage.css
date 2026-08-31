@@ -52,92 +52,6 @@
   height: 100%;
 }
 
-.escritorio-coluna-lista {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  z-index: 10;
-  width: min(300px, calc(100vw - 2rem));
-  max-height: calc(100vh - 2rem);
-  display: flex;
-  flex-direction: column;
-}
-
-.escritorio-coluna-lista .escritorio-lista-presenca {
-  flex: 1;
-  overflow-y: auto;
-  background: rgba(255, 255, 255, 0.94);
-}
-
-/* ---------- HUD (dock de status) ---------- */
-
-.escritorio-dock {
-  position: absolute;
-  bottom: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.6rem;
-  background: #2b2b3a;
-  color: #fff;
-  border-radius: 20px;
-  padding: 0.5rem 0.9rem;
-  box-shadow: var(--sombra-cartao);
-  width: max-content;
-  max-width: calc(100vw - 2rem);
-}
-
-.escritorio-dock-rotulo {
-  font-weight: 800;
-  font-size: 0.75rem;
-  color: #c9c9da;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.escritorio-dock select {
-  background: #3c3c50;
-  color: #fff;
-  border: 2px solid #52526a;
-}
-
-.escritorio-dock-separador {
-  width: 1px;
-  align-self: stretch;
-  background: #4a4a60;
-  margin: 0 0.1rem;
-}
-
-.escritorio-dock-botao {
-  background: #3c3c50;
-  border: 2px solid #52526a;
-  box-shadow: none;
-  padding: 0.4em 0.85em;
-  font-size: 0.82rem;
-  border-radius: 999px;
-}
-
-.escritorio-dock-botao:hover:not(:disabled) {
-  background: #4a4a63;
-  transform: none;
-  box-shadow: none;
-}
-
-.escritorio-dock-botao:active:not(:disabled) {
-  background: var(--cor-acento);
-  border-color: var(--cor-acento-escuro);
-}
-
-.escritorio-dock-dica {
-  font-size: 0.75rem;
-  color: #a9a9bd;
-  white-space: nowrap;
-}
-
 /* ---------- painel flutuante (dock -> funções integradas) ---------- */
 
 .escritorio-painel-fundo {
@@ -283,9 +197,3 @@ contarem a mesma história de "quem está perto de quem agora". */
   margin: 0;
 }
 
-@media (max-width: 720px) {
-  .escritorio-coluna-lista {
-    width: calc(100vw - 2rem);
-    max-height: 40vh;
-  }
-}

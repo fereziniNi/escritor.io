@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { HealthStatus } from '../../app/HealthStatus'
 import { useAuthStore } from '../auth/authStore'
 import { EquipesPage } from '../organizacao/EquipesPage'
@@ -7,8 +7,7 @@ import { ProjetosPage } from '../organizacao/ProjetosPage'
 import { RelatoriosPage } from '../relatorios/RelatoriosPage'
 import { buscarMapaAtivo } from './api'
 import './EscritorioPage.css'
-import { ICONE_STATUS } from './icones'
-import { ListaPresenca } from './ListaPresenca'
+import './ui/hud.css'
 import { CamadaMundo } from './mundo/CamadaMundo'
 import { PROXIMIDADE_RAIO_TILES } from './mundo/constantes'
 import { construirGradeColisao } from './mundo/construirGradeColisao'
@@ -19,12 +18,13 @@ import { useMovimentoTeclado } from './mundo/useMovimentoTeclado'
 import { PainelFlutuante } from './PainelFlutuante'
 import { PainelKanban } from './PainelKanban'
 import { PainelPonto } from './PainelPonto'
-import { OPCOES_STATUS, ROTULO_STATUS } from './statusAvatar'
 import { SugestaoRegistrarEntrada } from './SugestaoRegistrarEntrada'
+import type { PainelId } from './ui/BarraFerramentas'
+import { BarraFerramentas } from './ui/BarraFerramentas'
+import { Notificacoes } from './ui/Notificacao'
+import { PainelLateral } from './ui/PainelLateral'
+import { useNotificacoes } from './ui/useNotificacoes'
 import { usePresencaWebSocket } from './usePresencaWebSocket'
-import type { StatusAvatar } from './types'
-
-type PainelId = 'ponto' | 'kanban' | 'relatorios' | 'equipes' | 'projetos'
 
 const TITULO_PAINEL: Record<PainelId, string> = {
   ponto: '⏱️ Ponto',
@@ -36,15 +36,18 @@ const TITULO_PAINEL: Record<PainelId, string> = {
 
 /**
  * O mundo (piso/paredes/móveis/avatares/câmera) é desenhado num canvas Pixi via `CamadaMundo`
- * (redesign estilo Gather, ver plano em `.claude/plans/splendid-percolating-mochi.md`) - substitui
- * a renderização anterior em `<div>`s posicionados por CSS. O HUD ao redor (título, dock, painéis,
- * lista de presença) continua em DOM/React normal, só o mundo em si migrou.
+ * (redesign estilo Gather, ver plano em `.claude/plans/splendid-percolating-mochi.md`). O HUD ao
+ * redor virou uma toolbar inferior (`BarraFerramentas`) + um drawer de participantes recolhível
+ * (`PainelLateral`) + uma pilha de notificações (`Notificacoes`) - mais perto da proporção e do
+ * comportamento do dock/painel do Gather do que a barra sempre-visível de antes.
  */
 export function EscritorioPage() {
   const mapaQuery = useQuery({ queryKey: ['mapas', 'ativo'], queryFn: buscarMapaAtivo })
   const { usuarios, meuUsuarioId, mover, definirStatus } = usePresencaWebSocket()
   const papel = useAuthStore((estado) => estado.papel)
   const [painelAberto, setPainelAberto] = useState<PainelId | null>(null)
+  const [participantesAberto, setParticipantesAberto] = useState(false)
+  const { itens: notificacoes, notificar } = useNotificacoes()
 
   const eu = meuUsuarioId !== null ? usuarios[meuUsuarioId] : undefined
 
@@ -65,13 +68,34 @@ export function EscritorioPage() {
   })
 
   // proximidade (Fase 3): calculada a partir da posição real em tile, não de posição de tela -
-  // usada tanto pro destaque na lista lateral (aqui) quanto pro brilho no mundo Pixi (dentro de
-  // CamadaMundo, que recalcula por conta própria a partir dos mesmos `usuarios`).
+  // usada pro destaque na lista lateral, pro brilho no mundo Pixi (dentro de CamadaMundo, que
+  // recalcula por conta própria a partir dos mesmos `usuarios`) e pro toast abaixo.
   const usuariosLista = useMemo(() => Object.values(usuarios), [usuarios])
-  const proximos = useMemo(
-    () => usuariosProximosDeAlguem(calcularParesProximos(usuariosLista, PROXIMIDADE_RAIO_TILES)),
-    [usuariosLista],
-  )
+  const pares = useMemo(() => calcularParesProximos(usuariosLista, PROXIMIDADE_RAIO_TILES), [usuariosLista])
+  const proximos = useMemo(() => usuariosProximosDeAlguem(pares), [pares])
+
+  // notifica só a *transição* de entrar em proximidade de alguém (não fica repetindo a cada
+  // render enquanto os dois continuam parados perto um do outro).
+  const paresNotificadosRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (meuUsuarioId === null) {
+      return
+    }
+    const chaves = new Set<string>()
+    for (const par of pares) {
+      const chave = `${par.usuarioIdA}-${par.usuarioIdB}`
+      chaves.add(chave)
+      const souEuNoPar = par.usuarioIdA === meuUsuarioId || par.usuarioIdB === meuUsuarioId
+      if (souEuNoPar && !paresNotificadosRef.current.has(chave)) {
+        const outroId = par.usuarioIdA === meuUsuarioId ? par.usuarioIdB : par.usuarioIdA
+        const outro = usuarios[outroId]
+        if (outro) {
+          notificar(`${outro.nome} está por perto`)
+        }
+      }
+    }
+    paresNotificadosRef.current = chaves
+  }, [pares, meuUsuarioId, usuarios, notificar])
 
   if (mapaQuery.isPending) {
     return <p>Carregando…</p>
@@ -82,53 +106,24 @@ export function EscritorioPage() {
   }
 
   const mapa = mapaQuery.data
-  const meuStatus = eu?.status
+  const meuStatus = eu?.status ?? 'DISPONIVEL'
 
   return (
     <section className="escritorio-pagina">
       <h2 className="escritorio-titulo fonte-jogo">🏢 {mapa.nome}</h2>
       <SugestaoRegistrarEntrada aoClicarRegistrar={() => setPainelAberto('ponto')} />
+      <Notificacoes itens={notificacoes} />
 
-      <div className="escritorio-dock">
-        <span className="escritorio-dock-rotulo">Meu status</span>
-        <select
-          aria-label="Status"
-          value={meuStatus ?? 'DISPONIVEL'}
-          onChange={(evento) => definirStatus(evento.target.value as StatusAvatar)}
-        >
-          {OPCOES_STATUS.map((status) => (
-            <option key={status} value={status}>
-              {ICONE_STATUS[status]} {ROTULO_STATUS[status]}
-            </option>
-          ))}
-        </select>
-
-        <span className="escritorio-dock-separador" />
-
-        <button type="button" className="escritorio-dock-botao" onClick={() => setPainelAberto('ponto')}>
-          ⏱️ Ponto
-        </button>
-        <button type="button" className="escritorio-dock-botao" onClick={() => setPainelAberto('kanban')}>
-          📋 Quadros
-        </button>
-        {(papel === 'GESTOR' || papel === 'ADMIN') && (
-          <button type="button" className="escritorio-dock-botao" onClick={() => setPainelAberto('relatorios')}>
-            📊 Relatórios
-          </button>
-        )}
-        {papel === 'ADMIN' && (
-          <>
-            <button type="button" className="escritorio-dock-botao" onClick={() => setPainelAberto('equipes')}>
-              👥 Equipes
-            </button>
-            <button type="button" className="escritorio-dock-botao" onClick={() => setPainelAberto('projetos')}>
-              📁 Projetos
-            </button>
-          </>
-        )}
-
-        <span className="escritorio-dock-dica">⬅️⬆️➡️⬇️ pra andar</span>
-      </div>
+      <BarraFerramentas
+        nome={eu?.nome ?? 'Você'}
+        meuStatus={meuStatus}
+        aoMudarStatus={definirStatus}
+        papel={papel}
+        painelAberto={painelAberto}
+        aoAbrirPainel={setPainelAberto}
+        participantesAberto={participantesAberto}
+        aoAlternarParticipantes={() => setParticipantesAberto((atual) => !atual)}
+      />
 
       {painelAberto && (
         <PainelFlutuante
@@ -155,9 +150,13 @@ export function EscritorioPage() {
           />
         </div>
 
-        <div className="escritorio-coluna-lista">
-          <ListaPresenca zonas={mapa.zonas} usuarios={usuariosLista} meuUsuarioId={meuUsuarioId} usuariosProximos={proximos} />
-        </div>
+        <PainelLateral
+          aberto={participantesAberto}
+          zonas={mapa.zonas}
+          usuarios={usuariosLista}
+          meuUsuarioId={meuUsuarioId}
+          usuariosProximos={proximos}
+        />
       </div>
 
       <div className="escritorio-rodape">

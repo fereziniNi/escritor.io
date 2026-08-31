@@ -1,0 +1,214 @@
+/**
+ * Fase 4 do redesign estilo Gather (toolbar/painéis) - toolbar inferior com botões quadrados só de
+ * ícone (proporção mais perto do dock de controles real do Gather que os botões texto+emoji de
+ * antes), menu de usuário com avatar, drawer de participantes recolhível, e uma pilha de toasts.
+ * Reaproveita os tokens de cor/sombra já estabelecidos (`--cor-acento`, `--sombra-cartao` etc, de
+ * `index.css`) - só a composição/proporção do HUD muda, não a identidade visual do produto.
+ */
+
+.escritorio-toolbar {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+  background: #2b2b3a;
+  color: #fff;
+  border-radius: 18px;
+  padding: 0.5rem;
+  box-shadow: var(--sombra-cartao);
+  width: max-content;
+  max-width: calc(100vw - 2rem);
+}
+
+.escritorio-toolbar-separador {
+  width: 1px;
+  align-self: stretch;
+  margin-block: 0.25rem;
+  background: #4a4a60;
+}
+
+.escritorio-toolbar-grupo {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.escritorio-toolbar-botao {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #3c3c50;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  font-size: 1.25rem;
+  line-height: 1;
+  border-radius: 12px;
+}
+
+.escritorio-toolbar-botao:hover:not(:disabled) {
+  background: #4a4a63;
+  transform: none;
+  box-shadow: none;
+}
+
+.escritorio-toolbar-botao:active:not(:disabled) {
+  transform: scale(0.94);
+  box-shadow: none;
+}
+
+.escritorio-toolbar-botao--ativo {
+  background: var(--cor-acento);
+}
+
+.escritorio-toolbar-botao[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.escritorio-toolbar-dica {
+  font-size: 0.72rem;
+  color: #a9a9bd;
+  white-space: nowrap;
+  padding: 0 0.5rem;
+}
+
+/* ---------- menu de usuário ---------- */
+
+.escritorio-menu-usuario {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0.4rem 0.2rem 0.2rem;
+}
+
+.escritorio-menu-usuario-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #3c3c50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex: none;
+}
+
+.escritorio-menu-usuario-avatar svg {
+  width: 26px;
+  height: auto;
+  transform: translateY(3px);
+}
+
+.escritorio-menu-usuario-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.escritorio-menu-usuario-nome {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.escritorio-menu-usuario-status {
+  background: #3c3c50;
+  color: #fff;
+  border: 1px solid #52526a;
+  font-size: 0.72rem;
+  padding: 0.15em 0.4em;
+  border-radius: 6px;
+}
+
+/* ---------- drawer de participantes ---------- */
+
+.escritorio-painel-lateral {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 10;
+  width: min(300px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  display: flex;
+  flex-direction: column;
+  animation: escritorio-painel-lateral-entrada 160ms ease-out;
+}
+
+.escritorio-painel-lateral .escritorio-lista-presenca {
+  flex: 1;
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+@keyframes escritorio-painel-lateral-entrada {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ---------- notificações ---------- */
+
+.escritorio-notificacoes {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  pointer-events: none;
+}
+
+.escritorio-notificacao {
+  background: #2b2b3a;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.5em 1em;
+  border-radius: 999px;
+  box-shadow: var(--sombra-cartao);
+  animation: escritorio-notificacao-entrada 200ms ease-out;
+}
+
+@keyframes escritorio-notificacao-entrada {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 720px) {
+  .escritorio-painel-lateral {
+    width: calc(100vw - 2rem);
+    max-height: 40vh;
+  }
+
+  .escritorio-toolbar-dica {
+    display: none;
+  }
+}
