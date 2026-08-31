@@ -25,6 +25,11 @@ const COR_TEXTO_NOME = 0xffffff
 const VELOCIDADE_PERNA = 0.02
 const AMPLITUDE_PERNA = 0.5
 
+/** Bob de espera (Fase 5, polish) - o corpo balança bem sutilmente mesmo parado, mesma sensação
+ * da animação `escritorio-bob` que existia em CSS no mapa em DOM (1.8s por ciclo, ±2px). */
+const VELOCIDADE_BOB = 0.0035
+const AMPLITUDE_BOB_PX = 1.6
+
 function hexParaNumero(cor: string): number {
   return Number(cor.replace('#', '0x'))
 }
@@ -60,11 +65,13 @@ export function AvatarPixi({
   const progressoRef = useRef(1)
   const tempoAnimadoRef = useRef(0)
   const tempoPulsoRef = useRef(0)
+  const tempoBobRef = useRef(0)
 
   const [posicaoRenderizada, setPosicaoRenderizada] = useState<PosicaoTile>({ x: tileX, y: tileY })
   const [direcao, setDirecao] = useState<'esquerda' | 'direita'>('direita')
   const [anguloPerna, setAnguloPerna] = useState(0)
   const [pulsoProximidade, setPulsoProximidade] = useState(0.5)
+  const [bobY, setBobY] = useState(0)
 
   useEffect(() => {
     if (alvoRef.current.x === tileX && alvoRef.current.y === tileY) {
@@ -99,6 +106,9 @@ export function AvatarPixi({
       tempoPulsoRef.current += ticker.deltaMS
       setPulsoProximidade(0.5 + Math.sin(tempoPulsoRef.current * 0.004) * 0.3)
     }
+
+    tempoBobRef.current += ticker.deltaMS
+    setBobY(Math.sin(tempoBobRef.current * VELOCIDADE_BOB) * AMPLITUDE_BOB_PX)
   })
 
   const worldX = posicaoRenderizada.x * TILE_PX + TILE_PX / 2
@@ -106,7 +116,11 @@ export function AvatarPixi({
 
   return (
     <pixiContainer x={worldX} y={worldY}>
-      <pixiContainer pivot={PIVO_BASE} scale={{ x: direcao === 'esquerda' ? -ESCALA_AVATAR : ESCALA_AVATAR, y: ESCALA_AVATAR }}>
+      <pixiContainer
+        pivot={PIVO_BASE}
+        y={bobY}
+        scale={{ x: direcao === 'esquerda' ? -ESCALA_AVATAR : ESCALA_AVATAR, y: ESCALA_AVATAR }}
+      >
         {destaque && <pixiGraphics draw={desenharAnelDestaque} />}
         {proximo && <pixiGraphics draw={desenharAnelProximidade} alpha={pulsoProximidade} />}
         <pixiGraphics
