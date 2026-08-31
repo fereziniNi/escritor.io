@@ -5,12 +5,13 @@ import type { EstadoPresencaUsuario, Zona } from '../types'
 import { AvatarPixi } from './AvatarPixi'
 import { calcularTransformCamera } from './camera'
 import type { TransformCamera } from './camera'
-import { TILE_PX, ZOOM_MAXIMO, ZOOM_MINIMO, ZOOM_PADRAO } from './constantes'
+import { PROXIMIDADE_RAIO_TILES, TILE_PX, ZOOM_MAXIMO, ZOOM_MINIMO, ZOOM_PADRAO } from './constantes'
 import { MOBILIA_MUNDO, PORTAS_OVERRIDE } from './dadosMundo'
 import { gerarParedesDeZona } from './gerarParedesDeZona'
 import { PixiMundo } from './PixiMundo'
+import { calcularParesProximos, usuariosProximosDeAlguem } from './proximidade'
 import { SeguidorCamera } from './SeguidorCamera'
-import { desenharMobilia, desenharParedes, desenharPiso } from './spriteFactory'
+import { desenharMobilia, desenharParedes, desenharPiso, desenharZonas } from './spriteFactory'
 
 /** Valor de fallback determinístico quando não há `ResizeObserver` de verdade disponível (mesmo
  * espírito do fallback que `useDimensaoTileResponsiva` usava no mapa em DOM). */
@@ -62,6 +63,10 @@ export function CamadaMundo({
   const hostRef = useRef<HTMLDivElement>(null)
   const viewport = useTamanhoViewport(hostRef)
   const paredes = useMemo(() => gerarParedesDeZona(zonas, PORTAS_OVERRIDE), [zonas])
+  const proximos = useMemo(
+    () => usuariosProximosDeAlguem(calcularParesProximos(usuarios, PROXIMIDADE_RAIO_TILES)),
+    [usuarios],
+  )
 
   const larguraMundoPx = larguraTiles * TILE_PX
   const alturaMundoPx = alturaTiles * TILE_PX
@@ -108,6 +113,7 @@ export function CamadaMundo({
         />
         <pixiContainer x={transform.x} y={transform.y} scale={transform.scale}>
           <pixiGraphics draw={(g) => desenharPiso(g, larguraTiles, alturaTiles)} />
+          <pixiGraphics draw={(g) => desenharZonas(g, zonas)} />
           <pixiGraphics draw={(g) => desenharMobilia(g, MOBILIA_MUNDO)} />
           <pixiGraphics draw={(g) => desenharParedes(g, paredes)} />
           {usuarios.map((usuario) => (
@@ -118,6 +124,7 @@ export function CamadaMundo({
               nome={usuario.nome}
               corCorpo={COR_STATUS[usuario.status]}
               destaque={usuario.usuarioId === meuUsuarioId}
+              proximo={proximos.has(usuario.usuarioId)}
             />
           ))}
         </pixiContainer>

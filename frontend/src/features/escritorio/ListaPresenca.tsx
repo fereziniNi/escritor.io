@@ -3,12 +3,13 @@ import { localizarZona } from './localizarZona'
 import { ROTULO_STATUS } from './statusAvatar'
 import type { EstadoPresencaUsuario, Zona } from './types'
 
-function ItemUsuario({ usuario, souEu }: { usuario: EstadoPresencaUsuario; souEu: boolean }) {
+function ItemUsuario({ usuario, souEu, proximo }: { usuario: EstadoPresencaUsuario; souEu: boolean; proximo: boolean }) {
   return (
-    <li>
+    <li className={proximo ? 'escritorio-lista-item--proximo' : undefined}>
       <span className="escritorio-lista-avatar-swatch" style={{ background: COR_STATUS[usuario.status] }} />
       {ICONE_STATUS[usuario.status]} {usuario.nome}
       {souEu ? ' (você)' : ''} - {ROTULO_STATUS[usuario.status]}
+      {proximo && <span className="escritorio-lista-item-proximidade" title="Perto de alguém agora"> 📍</span>}
     </li>
   )
 }
@@ -22,10 +23,14 @@ export function ListaPresenca({
   zonas,
   usuarios,
   meuUsuarioId,
+  usuariosProximos,
 }: {
   zonas: Zona[]
   usuarios: EstadoPresencaUsuario[]
   meuUsuarioId: number | null
+  /** Fase 3 - ids de quem está dentro do raio de proximidade de alguém (`proximidade.ts`),
+   * opcional pra não obrigar todo chamador a calcular isso. */
+  usuariosProximos?: Set<number>
 }) {
   const usuariosPorZonaId = new Map<number, EstadoPresencaUsuario[]>()
   const semZona: EstadoPresencaUsuario[] = []
@@ -55,7 +60,7 @@ export function ListaPresenca({
           ) : (
             <ul>
               {(usuariosPorZonaId.get(zona.id) ?? []).map((usuario) => (
-                <ItemUsuario key={usuario.usuarioId} usuario={usuario} souEu={usuario.usuarioId === meuUsuarioId} />
+                <ItemUsuario key={usuario.usuarioId} usuario={usuario} souEu={usuario.usuarioId === meuUsuarioId} proximo={usuariosProximos?.has(usuario.usuarioId) ?? false} />
               ))}
             </ul>
           )}
@@ -68,7 +73,7 @@ export function ListaPresenca({
         ) : (
           <ul>
             {semZona.map((usuario) => (
-              <ItemUsuario key={usuario.usuarioId} usuario={usuario} souEu={usuario.usuarioId === meuUsuarioId} />
+              <ItemUsuario key={usuario.usuarioId} usuario={usuario} souEu={usuario.usuarioId === meuUsuarioId} proximo={usuariosProximos?.has(usuario.usuarioId) ?? false} />
             ))}
           </ul>
         )}

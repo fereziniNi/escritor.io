@@ -1,4 +1,6 @@
 import type { Graphics as PixiGraphics } from 'pixi.js'
+import { COR_ZONA } from '../icones'
+import type { Zona } from '../types'
 import { TILE_PX } from './constantes'
 import type { ItemMobilia, SegmentoParede } from './tipos'
 
@@ -36,6 +38,21 @@ export function desenharPiso(g: PixiGraphics, larguraTiles: number, alturaTiles:
     g.lineTo(larguraTiles * TILE_PX, ty * TILE_PX)
   }
   g.stroke({ width: 1, color: COR_LINHA_PISO })
+}
+
+function hexParaNumero(cor: string): number {
+  return Number(cor.replace('#', '0x'))
+}
+
+/** Tinge o piso de cada zona com a cor do seu `TipoZona` (Fase 3 - "identidade espacial") -
+ * translúcido de propósito (alpha baixo) pra não esconder a grade/xadrez do piso por baixo,
+ * desenhado entre `desenharPiso` e `desenharMobilia`/`desenharParedes`. */
+export function desenharZonas(g: PixiGraphics, zonas: Zona[]): void {
+  g.clear()
+  for (const zona of zonas) {
+    g.rect(zona.x * TILE_PX, zona.y * TILE_PX, zona.largura * TILE_PX, zona.altura * TILE_PX)
+    g.fill({ color: hexParaNumero(COR_ZONA[zona.tipo]), alpha: 0.45 })
+  }
 }
 
 const ESPESSURA_PAREDE_PX = 6

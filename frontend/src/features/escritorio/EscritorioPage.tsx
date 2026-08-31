@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { HealthStatus } from '../../app/HealthStatus'
 import { useAuthStore } from '../auth/authStore'
 import { EquipesPage } from '../organizacao/EquipesPage'
@@ -10,6 +10,11 @@ import './EscritorioPage.css'
 import { ICONE_STATUS } from './icones'
 import { ListaPresenca } from './ListaPresenca'
 import { CamadaMundo } from './mundo/CamadaMundo'
+import { PROXIMIDADE_RAIO_TILES } from './mundo/constantes'
+import { construirGradeColisao } from './mundo/construirGradeColisao'
+import { PORTAS_OVERRIDE } from './mundo/dadosMundo'
+import { gerarParedesDeZona } from './mundo/gerarParedesDeZona'
+import { calcularParesProximos, usuariosProximosDeAlguem } from './mundo/proximidade'
 import { useMovimentoTeclado } from './mundo/useMovimentoTeclado'
 import { PainelFlutuante } from './PainelFlutuante'
 import { PainelKanban } from './PainelKanban'
@@ -43,13 +48,30 @@ export function EscritorioPage() {
 
   const eu = meuUsuarioId !== null ? usuarios[meuUsuarioId] : undefined
 
+  // colisão client-side (Fase 3): paredes derivadas das zonas, mesma fonte que CamadaMundo usa
+  // pra desenhar - o cliente se recusa a *iniciar* um movimento pra dentro de uma parede, mas o
+  // servidor (ValidadorPosicaoMapa) continua só validando o retângulo externo do mapa, não paredes
+  // - limitação real e documentada, não um substituto de validação de servidor.
+  const paredes = useMemo(() => gerarParedesDeZona(mapaQuery.data?.zonas ?? [], PORTAS_OVERRIDE), [mapaQuery.data?.zonas])
+  const transicaoBloqueada = useMemo(() => construirGradeColisao(paredes), [paredes])
+
   useMovimentoTeclado({
     // com um painel aberto (formulário, board etc.), as setas são do painel, não do personagem
     ativo: painelAberto === null,
     posicaoAtual: eu ? { x: eu.x, y: eu.y } : undefined,
     limites: { larguraTiles: mapaQuery.data?.larguraTiles ?? 1, alturaTiles: mapaQuery.data?.alturaTiles ?? 1 },
     mover,
+    transicaoBloqueada,
   })
+
+  // proximidade (Fase 3): calculada a partir da posição real em tile, não de posição de tela -
+  // usada tanto pro destaque na lista lateral (aqui) quanto pro brilho no mundo Pixi (dentro de
+  // CamadaMundo, que recalcula por conta própria a partir dos mesmos `usuarios`).
+  const usuariosLista = useMemo(() => Object.values(usuarios), [usuarios])
+  const proximos = useMemo(
+    () => usuariosProximosDeAlguem(calcularParesProximos(usuariosLista, PROXIMIDADE_RAIO_TILES)),
+    [usuariosLista],
+  )
 
   if (mapaQuery.isPending) {
     return <p>Carregando…</p>
@@ -128,13 +150,13 @@ export function EscritorioPage() {
             larguraTiles={mapa.larguraTiles}
             alturaTiles={mapa.alturaTiles}
             zonas={mapa.zonas}
-            usuarios={Object.values(usuarios)}
+            usuarios={usuariosLista}
             meuUsuarioId={meuUsuarioId}
           />
         </div>
 
         <div className="escritorio-coluna-lista">
-          <ListaPresenca zonas={mapa.zonas} usuarios={Object.values(usuarios)} meuUsuarioId={meuUsuarioId} />
+          <ListaPresenca zonas={mapa.zonas} usuarios={usuariosLista} meuUsuarioId={meuUsuarioId} usuariosProximos={proximos} />
         </div>
       </div>
 

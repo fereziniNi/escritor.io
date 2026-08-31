@@ -1,0 +1,51 @@
+import { describe, expect, it } from 'vitest'
+import { calcularParesProximos, usuariosProximosDeAlguem } from './proximidade'
+import type { EstadoPresencaUsuario } from '../types'
+
+function usuario(usuarioId: number, x: number, y: number): EstadoPresencaUsuario {
+  return { usuarioId, nome: `Usuário ${usuarioId}`, x, y, status: 'DISPONIVEL' }
+}
+
+describe('calcularParesProximos', () => {
+  it('encontra um par dentro do raio', () => {
+    const pares = calcularParesProximos([usuario(1, 5, 5), usuario(2, 6, 5)], 2)
+    expect(pares).toEqual([{ usuarioIdA: 1, usuarioIdB: 2, distanciaTiles: 1 }])
+  })
+
+  it('não inclui pares fora do raio', () => {
+    const pares = calcularParesProximos([usuario(1, 0, 0), usuario(2, 10, 10)], 2)
+    expect(pares).toEqual([])
+  })
+
+  it('usa distância euclidiana (inclui diagonal), não Manhattan', () => {
+    // (0,0) -> (2,2): distância euclidiana ≈ 2.83, Manhattan seria 4
+    const pares = calcularParesProximos([usuario(1, 0, 0), usuario(2, 2, 2)], 3)
+    expect(pares).toHaveLength(1)
+    expect(pares[0].distanciaTiles).toBeCloseTo(Math.sqrt(8), 5)
+  })
+
+  it('considera todos os pares quando há mais de 2 usuários', () => {
+    const usuarios = [usuario(1, 0, 0), usuario(2, 1, 0), usuario(3, 20, 20)]
+    const pares = calcularParesProximos(usuarios, 2)
+    expect(pares).toEqual([{ usuarioIdA: 1, usuarioIdB: 2, distanciaTiles: 1 }])
+  })
+
+  it('não quebra com 0 ou 1 usuário', () => {
+    expect(calcularParesProximos([], 2)).toEqual([])
+    expect(calcularParesProximos([usuario(1, 0, 0)], 2)).toEqual([])
+  })
+})
+
+describe('usuariosProximosDeAlguem', () => {
+  it('junta os ids dos dois lados de cada par, sem duplicar', () => {
+    const pares = [
+      { usuarioIdA: 1, usuarioIdB: 2, distanciaTiles: 1 },
+      { usuarioIdA: 2, usuarioIdB: 3, distanciaTiles: 1.5 },
+    ]
+    expect(usuariosProximosDeAlguem(pares)).toEqual(new Set([1, 2, 3]))
+  })
+
+  it('vazio quando não há pares', () => {
+    expect(usuariosProximosDeAlguem([])).toEqual(new Set())
+  })
+})

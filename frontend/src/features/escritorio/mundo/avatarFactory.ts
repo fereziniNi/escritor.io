@@ -13,6 +13,9 @@ const COR_PERNA = 0x3a3550
 const COR_PELE = 0xf2c9a0
 const COR_CABELO = 0x4a3728
 const COR_DESTAQUE = 0xf2a541
+/** Azul-ciano de propósito bem distante do laranja de "sou eu" (`COR_DESTAQUE`) - os dois anéis
+ * podem aparecer ao mesmo tempo (sou eu E estou perto de alguém) e precisam ser distinguíveis. */
+const COR_PROXIMIDADE = 0x4fc3f2
 
 /** Ponto (topo-centro) em torno do qual cada perna gira - usado tanto aqui (desenho local) quanto
  * em `AvatarPixi.tsx` (posicionamento do `Graphics` da perna dentro do container do avatar). */
@@ -62,4 +65,12 @@ export function desenharAnelDestaque(g: PixiGraphics): void {
   g.clear()
   g.circle(12, 16, 15)
   g.stroke({ width: 2, color: COR_DESTAQUE, alpha: 0.9 })
+}
+
+/** Anel maior que o de destaque (fica por fora dele quando os dois aparecem juntos) - a
+ * pulsação (alpha) é controlada por quem desenha via a prop `alpha` do `<pixiGraphics>`, não aqui. */
+export function desenharAnelProximidade(g: PixiGraphics): void {
+  g.clear()
+  g.circle(12, 16, 20)
+  g.stroke({ width: 2.5, color: COR_PROXIMIDADE })
 }

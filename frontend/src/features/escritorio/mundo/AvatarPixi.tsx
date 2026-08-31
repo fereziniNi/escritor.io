@@ -1,7 +1,7 @@
 import { extend, useTick } from '@pixi/react'
 import { Container, Graphics, Text } from 'pixi.js'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { desenharAnelDestaque, desenharCorpoAvatar, desenharPerna, PIVO_PERNA_DIREITA, PIVO_PERNA_ESQUERDA } from './avatarFactory'
+import { desenharAnelDestaque, desenharAnelProximidade, desenharCorpoAvatar, desenharPerna, PIVO_PERNA_DIREITA, PIVO_PERNA_ESQUERDA } from './avatarFactory'
 import { TILE_PX } from './constantes'
 import { DURACAO_GLIDE_MS, interpolarPosicao } from './glide'
 import type { PosicaoTile } from './movimento'
@@ -43,12 +43,15 @@ export function AvatarPixi({
   nome,
   corCorpo,
   destaque,
+  proximo = false,
 }: {
   tileX: number
   tileY: number
   nome: string
   corCorpo: string
   destaque: boolean
+  /** Fase 3 - alguém está dentro do raio de proximidade deste avatar (`proximidade.ts`). */
+  proximo?: boolean
 }) {
   const corCorpoNumero = useMemo(() => hexParaNumero(corCorpo), [corCorpo])
 
@@ -56,10 +59,12 @@ export function AvatarPixi({
   const inicioGlideRef = useRef<PosicaoTile>({ x: tileX, y: tileY })
   const progressoRef = useRef(1)
   const tempoAnimadoRef = useRef(0)
+  const tempoPulsoRef = useRef(0)
 
   const [posicaoRenderizada, setPosicaoRenderizada] = useState<PosicaoTile>({ x: tileX, y: tileY })
   const [direcao, setDirecao] = useState<'esquerda' | 'direita'>('direita')
   const [anguloPerna, setAnguloPerna] = useState(0)
+  const [pulsoProximidade, setPulsoProximidade] = useState(0.5)
 
   useEffect(() => {
     if (alvoRef.current.x === tileX && alvoRef.current.y === tileY) {
@@ -89,6 +94,11 @@ export function AvatarPixi({
     } else if (anguloPerna !== 0) {
       setAnguloPerna(0)
     }
+
+    if (proximo) {
+      tempoPulsoRef.current += ticker.deltaMS
+      setPulsoProximidade(0.5 + Math.sin(tempoPulsoRef.current * 0.004) * 0.3)
+    }
   })
 
   const worldX = posicaoRenderizada.x * TILE_PX + TILE_PX / 2
@@ -98,6 +108,7 @@ export function AvatarPixi({
     <pixiContainer x={worldX} y={worldY}>
       <pixiContainer pivot={PIVO_BASE} scale={{ x: direcao === 'esquerda' ? -ESCALA_AVATAR : ESCALA_AVATAR, y: ESCALA_AVATAR }}>
         {destaque && <pixiGraphics draw={desenharAnelDestaque} />}
+        {proximo && <pixiGraphics draw={desenharAnelProximidade} alpha={pulsoProximidade} />}
         <pixiGraphics
           draw={desenharPerna}
           x={PIVO_PERNA_ESQUERDA.x}

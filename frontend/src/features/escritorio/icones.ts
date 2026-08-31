@@ -24,3 +24,14 @@ export const COR_STATUS: Record<StatusAvatar, string> = {
   ALMOCO: '#e8a33d',
   AUSENTE: '#8b8b9a',
 }
+
+/** Tingimento do piso por tipo de zona (Fase 3 - "identidade espacial" de cada sala) - mesma
+ * paleta usada quando o mapa ainda era renderizado em DOM, agora aplicada como um tingimento
+ * translúcido sobre o piso do mundo Pixi em vez de background sólido de um `<div>`. */
+export const COR_ZONA: Record<TipoZona, string> = {
+  FOCO: '#bfe3c4',
+  REUNIAO: '#bfd6ec',
+  CAFE: '#eccfa8',
+  ATENDIMENTO: '#eac1c8',
+  LIVRE: '#dbe8d6',
+}
