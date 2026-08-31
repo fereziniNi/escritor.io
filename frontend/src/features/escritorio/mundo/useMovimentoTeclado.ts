@@ -13,21 +13,20 @@ const TECLA_PARA_DELTA: Record<string, readonly [number, number]> = {
  * Move o próprio jogador por seta do teclado - substitui o `window` keydown effect que ficava
  * inline em `EscritorioPage.tsx` (mesma lógica de clamp, agora em `calcularProximaPosicao`,
  * puro/testado). `ativo=false` (ex.: um painel do dock aberto) desliga as setas sem precisar
- * desmontar o listener toda hora. `transicaoBloqueada` (Fase 3) impede iniciar um passo que
- * cruzaria uma parede - opcional pra não quebrar quem ainda não tem colisão calculada.
+ * desmontar o listener toda hora. Sem colisão de propósito (pedido do usuário: "remover as
+ * paredes") - `calcularProximaPosicao` ainda aceita um `transicaoBloqueada` opcional pra quem
+ * quiser reintroduzir algum tipo de barreira no futuro, mas este hook não passa nenhum hoje.
  */
 export function useMovimentoTeclado({
   ativo,
   posicaoAtual,
   limites,
   mover,
-  transicaoBloqueada,
 }: {
   ativo: boolean
   posicaoAtual: PosicaoTile | undefined
   limites: { larguraTiles: number; alturaTiles: number }
   mover: (x: number, y: number) => void
-  transicaoBloqueada?: (de: PosicaoTile, para: PosicaoTile) => boolean
 }) {
   useEffect(() => {
     if (!ativo || !posicaoAtual) {
@@ -40,11 +39,11 @@ export function useMovimentoTeclado({
         return
       }
       evento.preventDefault()
-      const proxima = calcularProximaPosicao(posicaoAtual, delta, limites, transicaoBloqueada)
+      const proxima = calcularProximaPosicao(posicaoAtual, delta, limites)
       mover(proxima.x, proxima.y)
     }
 
     window.addEventListener('keydown', aoPressionarTecla)
     return () => window.removeEventListener('keydown', aoPressionarTecla)
-  }, [ativo, posicaoAtual, limites, mover, transicaoBloqueada])
+  }, [ativo, posicaoAtual, limites, mover])
 }

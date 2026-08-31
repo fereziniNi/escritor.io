@@ -10,9 +10,6 @@ import './EscritorioPage.css'
 import './ui/hud.css'
 import { CamadaMundo } from './mundo/CamadaMundo'
 import { PROXIMIDADE_RAIO_TILES } from './mundo/constantes'
-import { construirGradeColisao } from './mundo/construirGradeColisao'
-import { PORTAS_OVERRIDE } from './mundo/dadosMundo'
-import { gerarParedesDeZona } from './mundo/gerarParedesDeZona'
 import { calcularParesProximos, usuariosProximosDeAlguem } from './mundo/proximidade'
 import { useMovimentoTeclado } from './mundo/useMovimentoTeclado'
 import { PainelFlutuante } from './PainelFlutuante'
@@ -35,11 +32,13 @@ const TITULO_PAINEL: Record<PainelId, string> = {
 }
 
 /**
- * O mundo (piso/paredes/móveis/avatares/câmera) é desenhado num canvas Pixi via `CamadaMundo`
- * (redesign estilo Gather, ver plano em `.claude/plans/splendid-percolating-mochi.md`). O HUD ao
- * redor virou uma toolbar inferior (`BarraFerramentas`) + um drawer de participantes recolhível
- * (`PainelLateral`) + uma pilha de notificações (`Notificacoes`) - mais perto da proporção e do
- * comportamento do dock/painel do Gather do que a barra sempre-visível de antes.
+ * O mundo (piso/móveis/avatares/câmera) é desenhado num canvas Pixi via `CamadaMundo` (redesign
+ * estilo Gather, ver plano em `.claude/plans/splendid-percolating-mochi.md`). Sem paredes/colisão
+ * de propósito (pedido do usuário: "remover as paredes, deixar o mapa mais vivo") - o movimento
+ * só é limitado pelos cantos do mapa (`useMovimentoTeclado`). O HUD ao redor virou uma toolbar
+ * inferior (`BarraFerramentas`) + um drawer de participantes recolhível (`PainelLateral`) + uma
+ * pilha de notificações (`Notificacoes`) - mais perto da proporção e do comportamento do
+ * dock/painel do Gather do que a barra sempre-visível de antes.
  */
 export function EscritorioPage() {
   const mapaQuery = useQuery({ queryKey: ['mapas', 'ativo'], queryFn: buscarMapaAtivo })
@@ -51,20 +50,12 @@ export function EscritorioPage() {
 
   const eu = meuUsuarioId !== null ? usuarios[meuUsuarioId] : undefined
 
-  // colisão client-side (Fase 3): paredes derivadas das zonas, mesma fonte que CamadaMundo usa
-  // pra desenhar - o cliente se recusa a *iniciar* um movimento pra dentro de uma parede, mas o
-  // servidor (ValidadorPosicaoMapa) continua só validando o retângulo externo do mapa, não paredes
-  // - limitação real e documentada, não um substituto de validação de servidor.
-  const paredes = useMemo(() => gerarParedesDeZona(mapaQuery.data?.zonas ?? [], PORTAS_OVERRIDE), [mapaQuery.data?.zonas])
-  const transicaoBloqueada = useMemo(() => construirGradeColisao(paredes), [paredes])
-
   useMovimentoTeclado({
     // com um painel aberto (formulário, board etc.), as setas são do painel, não do personagem
     ativo: painelAberto === null,
     posicaoAtual: eu ? { x: eu.x, y: eu.y } : undefined,
     limites: { larguraTiles: mapaQuery.data?.larguraTiles ?? 1, alturaTiles: mapaQuery.data?.alturaTiles ?? 1 },
     mover,
-    transicaoBloqueada,
   })
 
   // proximidade (Fase 3): calculada a partir da posição real em tile, não de posição de tela -

@@ -1,21 +1,11 @@
-/** Segmento de parede em coordenadas de tile (não px) - `comprimento` é medido ao longo do eixo
- * da orientação (horizontal → eixo x, vertical → eixo y). */
-export interface SegmentoParede {
-  x: number
-  y: number
-  orientacao: 'horizontal' | 'vertical'
-  comprimento: number
-}
-
-export type BordaZona = 'norte' | 'sul' | 'leste' | 'oeste'
-
-/** Override manual de em qual borda de uma zona específica fica a porta (padrão: sul). */
-export interface PortaOverride {
-  zonaId: number
-  borda: BordaZona
-}
-
-export type TipoMovel = 'mesa' | 'cadeira' | 'planta' | 'estante' | 'balcao' | 'tapete' | 'sofa' | 'mesaJogos'
+/**
+ * Sem paredes/portas de propósito (pedido do usuário: "remover as paredes, deixar o mapa mais
+ * vivo") - salas continuam com identidade visual só pelo tingimento de piso (`desenharZonas`) e
+ * pela densidade de móveis, sem barreira física nem colisão. `SegmentoParede`/`PortaOverride`
+ * (gerarParedesDeZona/construirGradeColisao) existiam antes e foram removidos por completo, não
+ * só desativados.
+ */
+export type TipoMovel = 'mesa' | 'cadeira' | 'planta' | 'estante' | 'balcao' | 'tapete' | 'sofa' | 'mesaJogos' | 'aquario'
 
 export interface ItemMobilia {
   tipo: TipoMovel

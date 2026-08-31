@@ -6,12 +6,11 @@ import { AvatarPixi } from './AvatarPixi'
 import { calcularTransformCamera } from './camera'
 import type { TransformCamera } from './camera'
 import { PROXIMIDADE_RAIO_TILES, TILE_PX, ZOOM_MAXIMO, ZOOM_MINIMO, ZOOM_PADRAO } from './constantes'
-import { MOBILIA_MUNDO, PORTAS_OVERRIDE } from './dadosMundo'
-import { gerarParedesDeZona } from './gerarParedesDeZona'
+import { MOBILIA_MUNDO } from './dadosMundo'
 import { PixiMundo } from './PixiMundo'
 import { calcularParesProximos, usuariosProximosDeAlguem } from './proximidade'
 import { SeguidorCamera } from './SeguidorCamera'
-import { desenharMobilia, desenharParedes, desenharPiso, desenharZonas } from './spriteFactory'
+import { desenharMobilia, desenharPiso, desenharZonas } from './spriteFactory'
 
 /** Valor de fallback determinístico quando não há `ResizeObserver` de verdade disponível (mesmo
  * espírito do fallback que `useDimensaoTileResponsiva` usava no mapa em DOM). */
@@ -40,12 +39,11 @@ function useTamanhoViewport(containerRef: React.RefObject<HTMLDivElement | null>
 }
 
 /**
- * Compõe o mundo Pixi: piso + móveis + paredes + avatares, com uma câmera que segue o próprio
- * jogador (suavizada por `SeguidorCamera`) - roda do mouse ainda ajusta o zoom. Sem jogador
- * localizável ainda (antes do snapshot inicial do WebSocket chegar) a câmera fica centralizada no
- * mapa, mesmo comportamento estático da Fase 1. Ainda não é montado dentro do
- * `EscritorioPage.tsx` real (o mapa em DOM continua sendo o que os usuários veem) até o movimento
- * de teclado ter paridade (Fase 2.2) - ver plano.
+ * Compõe o mundo Pixi: piso + móveis + avatares, com uma câmera que segue o próprio jogador
+ * (suavizada por `SeguidorCamera`) - roda do mouse ainda ajusta o zoom. Sem paredes de propósito
+ * (pedido do usuário: "remover as paredes, deixar o mapa mais vivo") - as 4 salas continuam
+ * distinguíveis pelo tingimento de piso (`desenharZonas`) e pela densidade de móveis de cada uma,
+ * sem barreira física nem colisão entre elas.
  */
 export function CamadaMundo({
   larguraTiles,
@@ -62,7 +60,6 @@ export function CamadaMundo({
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewport = useTamanhoViewport(hostRef)
-  const paredes = useMemo(() => gerarParedesDeZona(zonas, PORTAS_OVERRIDE), [zonas])
   const proximos = useMemo(
     () => usuariosProximosDeAlguem(calcularParesProximos(usuarios, PROXIMIDADE_RAIO_TILES)),
     [usuarios],
@@ -115,7 +112,6 @@ export function CamadaMundo({
           <pixiGraphics draw={(g) => desenharPiso(g, larguraTiles, alturaTiles)} />
           <pixiGraphics draw={(g) => desenharZonas(g, zonas)} />
           <pixiGraphics draw={(g) => desenharMobilia(g, MOBILIA_MUNDO)} />
-          <pixiGraphics draw={(g) => desenharParedes(g, paredes)} />
           {usuarios.map((usuario) => (
             <AvatarPixi
               key={usuario.usuarioId}

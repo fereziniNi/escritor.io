@@ -2,7 +2,7 @@ import type { Graphics as PixiGraphics } from 'pixi.js'
 import { COR_ZONA } from '../icones'
 import type { Zona } from '../types'
 import { TILE_PX } from './constantes'
-import type { ItemMobilia, SegmentoParede } from './tipos'
+import type { ItemMobilia } from './tipos'
 
 /**
  * "Fábrica" de desenho procedural do mundo - continua o precedente já estabelecido no projeto
@@ -49,38 +49,15 @@ function hexParaNumero(cor: string): number {
 }
 
 /** Tinge o piso de cada zona com a cor do seu `TipoZona` (Fase 3 - "identidade espacial") -
- * translúcido de propósito (alpha baixo) pra não esconder a grade/xadrez do piso por baixo,
- * desenhado entre `desenharPiso` e `desenharMobilia`/`desenharParedes`. */
+ * translúcido de propósito (alpha baixo) pra não esconder a grade/xadrez do piso por baixo.
+ * Pedido do usuário: "remover as paredes" - sem barreira física entre salas, o tingimento de piso
+ * (agora um pouco mais forte, 0.6 em vez de 0.55) é a única fronteira visual entre elas, reforçado
+ * pela densidade de móveis de cada uma. */
 export function desenharZonas(g: PixiGraphics, zonas: Zona[]): void {
   g.clear()
   for (const zona of zonas) {
     g.rect(zona.x * TILE_PX, zona.y * TILE_PX, zona.largura * TILE_PX, zona.altura * TILE_PX)
-    g.fill({ color: hexParaNumero(COR_ZONA[zona.tipo]), alpha: 0.55 })
-  }
-}
-
-const ESPESSURA_PAREDE_PX = 6
-/** Parede clara e fria (divisória de escritório de verdade) - antes era madeira escura tipo
- * "cabana", que não combinava com o pedido de tema claro/azulado. */
-const COR_PAREDE = 0xb7c2cd
-const COR_PAREDE_BORDA = 0x8793a1
-
-/** Desenha todas as paredes num único `Graphics` - cada segmento vira um retângulo fino sobre a
- * linha de grade correspondente, esticado meia espessura além das pontas nominais pra as quinas
- * entre segmentos perpendiculares fecharem sem buraco visual. */
-export function desenharParedes(g: PixiGraphics, paredes: SegmentoParede[]): void {
-  g.clear()
-  for (const parede of paredes) {
-    const meia = ESPESSURA_PAREDE_PX / 2
-    if (parede.orientacao === 'horizontal') {
-      const largura = parede.comprimento * TILE_PX + ESPESSURA_PAREDE_PX
-      g.rect(parede.x * TILE_PX - meia, parede.y * TILE_PX - meia, largura, ESPESSURA_PAREDE_PX)
-    } else {
-      const altura = parede.comprimento * TILE_PX + ESPESSURA_PAREDE_PX
-      g.rect(parede.x * TILE_PX - meia, parede.y * TILE_PX - meia, ESPESSURA_PAREDE_PX, altura)
-    }
-    g.fill({ color: COR_PAREDE })
-    g.stroke({ width: 1, color: COR_PAREDE_BORDA })
+    g.fill({ color: hexParaNumero(COR_ZONA[zona.tipo]), alpha: 0.6 })
   }
 }
 
@@ -176,6 +153,17 @@ function desenharMesaJogos(g: PixiGraphics, cx: number, cy: number, rotacao: num
   g.stroke({ width: 1.5, color: 0xffffff, alpha: 0.85 })
 }
 
+/** Aquário decorativo - tanque de vidro (retângulo azul translúcido com borda) + 2 "peixes"
+ * (pontinhos laranja), pra dar mais variedade de detalhe além de móvel de mesa/sala. */
+function desenharAquario(g: PixiGraphics, cx: number, cy: number): void {
+  g.roundRect(cx - TILE_PX * 0.42, cy - TILE_PX * 0.3, TILE_PX * 0.84, TILE_PX * 0.6, 3)
+  g.fill({ color: 0x8fd0e8, alpha: 0.75 })
+  g.stroke({ width: 1.5, color: 0x3a5a68 })
+  g.circle(cx - TILE_PX * 0.15, cy, TILE_PX * 0.06)
+  g.circle(cx + TILE_PX * 0.12, cy - TILE_PX * 0.08, TILE_PX * 0.06)
+  g.fill({ color: 0xe8873a })
+}
+
 /** Desenha os móveis/decoração - tapetes primeiro (ficam por baixo dos demais itens), depois o
  * resto na ordem em que aparecem em `dadosMundo.MOBILIA_MUNDO`. */
 export function desenharMobilia(g: PixiGraphics, itens: ItemMobilia[]): void {
@@ -211,6 +199,9 @@ export function desenharMobilia(g: PixiGraphics, itens: ItemMobilia[]): void {
         break
       case 'mesaJogos':
         desenharMesaJogos(g, cx, cy, rotacao)
+        break
+      case 'aquario':
+        desenharAquario(g, cx, cy)
         break
     }
   }
