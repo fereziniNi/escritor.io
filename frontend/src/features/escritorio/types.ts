@@ -1,6 +1,8 @@
 export type TipoZona = 'FOCO' | 'REUNIAO' | 'CAFE' | 'ATENDIMENTO' | 'LIVRE'
 
-export type StatusAvatar = 'DISPONIVEL' | 'FOCO' | 'REUNIAO' | 'ALMOCO' | 'AUSENTE'
+/** OFFLINE é automático (backend marca quem desconecta, nunca escolhido manualmente - não aparece
+ * em `OPCOES_STATUS`) - o avatar fica estacionado em "Fora do trabalho" até a pessoa reconectar. */
+export type StatusAvatar = 'DISPONIVEL' | 'FOCO' | 'REUNIAO' | 'ALMOCO' | 'AUSENTE' | 'OFFLINE'
 
 export interface Zona {
   id: number

@@ -33,7 +33,10 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
  * pra todo mundo autenticado. Estado vivo (posição, status) fica só neste mapa em memória, nunca
  * no banco (PRD). Conectar registra o usuário com posição inicial (0,0) e status
  * {@code DISPONIVEL}, e devolve pra ele mesmo um snapshot de todo mundo presente (incluindo
- * ele); desconectar remove o usuário do estado. Mensagem recebida do cliente agora tem um
+ * ele); desconectar NÃO remove o usuário do estado - marca {@code OFFLINE} e move a posição pro
+ * centro da zona "Fora do trabalho" ({@link TipoZona#LIVRE}), pra o avatar continuar visível
+ * (estacionado, parado) pros demais até a pessoa reconectar, em vez de sumir sem explicação (ver
+ * {@link #afterConnectionClosed}). Mensagem recebida do cliente agora tem um
  * discriminador {@code tipo} ({@code POSICAO} ou {@code STATUS}, S6.6) - só passou a valer a pena
  * a partir de um segundo tipo de mensagem de entrada; até S6.4 movimento era o único.
  *
@@ -107,16 +110,39 @@ public class PresencaWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         Long usuarioId = usuarioId(session);
-        estadoPorUsuario.remove(usuarioId);
         sessoesPorUsuario.remove(usuarioId);
         rastreioPorUsuario.remove(usuarioId);
         ultimaAtividadePorUsuario.remove(usuarioId);
         ausenteAutomaticoUsuarios.remove(usuarioId);
 
+        estacionarComoOffline(usuarioId);
+
         Long zonaAberta = eventoZonaAtualPorUsuario.remove(usuarioId);
         if (zonaAberta != null) {
             registroEventoPresencaService.registrarTransicaoDeZona(usuarioId, zonaAberta, null, Instant.now(clock));
         }
+    }
+
+    /**
+     * Move quem acabou de desconectar pro centro de "Fora do trabalho" com status {@code OFFLINE},
+     * em vez de remover do estado - o avatar continua visível pros demais (parado, "estacionado")
+     * até a pessoa reconectar, quando {@link #afterConnectionEstablished} sobrescreve essa entrada
+     * de novo com posição (0,0) e {@code DISPONIVEL}. Sem zona "Fora do trabalho" seedada (não
+     * deveria acontecer em produção), mantém a última posição conhecida - só troca o status.
+     * Não abre um novo {@code EventoPresenca} pra essa posição sintética: é só um "estacionamento"
+     * visual, não uma visita de verdade à sala.
+     */
+    private void estacionarComoOffline(Long usuarioId) {
+        EstadoPresencaUsuario atual = estadoPorUsuario.get(usuarioId);
+        if (atual == null) {
+            return;
+        }
+        Optional<Zona> zonaForaDoTrabalho = localizadorZona.zonaPorTipo(TipoZona.LIVRE);
+        int x = zonaForaDoTrabalho.map(zona -> zona.getX() + zona.getLargura() / 2).orElse(atual.x());
+        int y = zonaForaDoTrabalho.map(zona -> zona.getY() + zona.getAltura() / 2).orElse(atual.y());
+        EstadoPresencaUsuario offline = new EstadoPresencaUsuario(atual.usuarioId(), atual.nome(), x, y, StatusAvatar.OFFLINE);
+        estadoPorUsuario.put(usuarioId, offline);
+        broadcast(new PresencaEventoWs("STATUS", List.of(offline)));
     }
 
     /**
@@ -132,7 +158,11 @@ public class PresencaWebSocketHandler extends TextWebSocketHandler {
 
     public void verificarInatividade(Instant agora) {
         estadoPorUsuario.forEach((usuarioId, estadoAtual) -> {
-            if (estadoAtual.status() == StatusAvatar.AUSENTE) {
+            // OFFLINE nunca é revertido por inatividade - só volta a algo quando a pessoa reconecta
+            // de verdade (afterConnectionEstablished); sem sessão aberta pra esse usuarioId,
+            // ultimaAtividadePorUsuario também já está vazio, então isso é defensivo, não o único
+            // motivo de pular.
+            if (estadoAtual.status() == StatusAvatar.AUSENTE || estadoAtual.status() == StatusAvatar.OFFLINE) {
                 return;
             }
             Instant ultimaAtividade = ultimaAtividadePorUsuario.get(usuarioId);
@@ -306,13 +336,22 @@ public class PresencaWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
+    /**
+     * {@code isOpen()} não é garantia contra uma corrida - a sessão pode fechar entre essa
+     * checagem e o {@code sendMessage} de verdade (mais provável agora que {@link
+     * #estacionarComoOffline} passou a fazer {@link #broadcast} bem no meio de outra sessão
+     * fechando, S6.x). O Tomcat sinaliza isso com {@link IllegalStateException}, não {@link
+     * IOException} - sem esse catch aqui, uma sessão flakada no meio de {@link
+     * #sessoesPorUsuario}{@code .values()} abortava o loop de {@link #broadcast} inteiro e ninguém
+     * depois dela recebia o evento.
+     */
     private void enviarMensagem(WebSocketSession sessao, TextMessage mensagem) {
         if (!sessao.isOpen()) {
             return;
         }
         try {
             sessao.sendMessage(mensagem);
-        } catch (IOException e) {
+        } catch (IOException | IllegalStateException e) {
             log.warn("Falha ao enviar evento de presença pra sessão {}", sessao.getId(), e);
         }
     }

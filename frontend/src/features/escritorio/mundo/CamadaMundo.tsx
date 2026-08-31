@@ -125,6 +125,7 @@ export function CamadaMundo({
               corCorpo={COR_STATUS[usuario.status]}
               destaque={usuario.usuarioId === meuUsuarioId}
               proximo={proximos.has(usuario.usuarioId)}
+              offline={usuario.status === 'OFFLINE'}
             />
           ))}
         </pixiContainer>

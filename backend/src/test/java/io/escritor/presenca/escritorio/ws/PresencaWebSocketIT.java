@@ -32,9 +32,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * IT de ponta a ponta (S6.3): prova que conectar em {@code /ws/presenca} registra o usuário no
- * estado em memória e devolve um snapshot de verdade, e que desconectar remove o registro - não
- * um mock do handler, a stack WebSocket real (mesmo padrão de {@code
- * QuadroWebSocketBroadcastIT}, kanban S3.11).
+ * estado em memória e devolve um snapshot de verdade, e que desconectar estaciona o avatar como
+ * {@code OFFLINE} em "Fora do trabalho" em vez de removê-lo do registro (pedido do usuário: "o
+ * personagem fica em Fora do trabalho") - não um mock do handler, a stack WebSocket real (mesmo
+ * padrão de {@code QuadroWebSocketBroadcastIT}, kanban S3.11).
  */
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -505,7 +506,7 @@ class PresencaWebSocketIT {
     }
 
     @Test
-    void desconectarRemoveOUsuarioDoEstado() throws Exception {
+    void desconectarEstacionaOUsuarioComoOfflineEmForaDoTrabalhoEmVezDeRemover() throws Exception {
         Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s63c@escritor.io", Papel.COLABORADOR, 480));
         Usuario beto = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s63c@escritor.io", Papel.COLABORADOR, 480));
         Usuario caio = usuarioRepository.saveAndFlush(new Usuario("Caio Reis", "caio-s63c@escritor.io", Papel.COLABORADOR, 480));
@@ -524,11 +525,16 @@ class PresencaWebSocketIT {
         try {
             String recebidoCaio = mensagensCaio.poll(5, TimeUnit.SECONDS);
 
+            // Ana continua no snapshot (não some) - só que agora OFFLINE e estacionada no centro
+            // de "Fora do trabalho" (V24: x=16,y=10,largura=10,altura=8 -> centro 21,14)
             assertThat(recebidoCaio)
                     .isNotNull()
                     .contains("\"usuarioId\":" + beto.getId())
                     .contains("\"usuarioId\":" + caio.getId())
-                    .doesNotContain("\"usuarioId\":" + ana.getId());
+                    .contains("\"usuarioId\":" + ana.getId())
+                    .contains("\"status\":\"OFFLINE\"")
+                    .contains("\"x\":21")
+                    .contains("\"y\":14");
         } finally {
             sessaoBeto.close();
             sessaoCaio.close();

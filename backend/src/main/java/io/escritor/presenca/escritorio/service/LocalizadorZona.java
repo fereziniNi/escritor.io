@@ -1,6 +1,7 @@
 package io.escritor.presenca.escritorio.service;
 
 import io.escritor.presenca.escritorio.domain.Mapa;
+import io.escritor.presenca.escritorio.domain.TipoZona;
 import io.escritor.presenca.escritorio.domain.Zona;
 import io.escritor.presenca.escritorio.repository.MapaRepository;
 import io.escritor.presenca.escritorio.repository.ZonaRepository;
@@ -33,6 +34,13 @@ public class LocalizadorZona {
         return zonas().stream()
                 .filter(zona -> x >= zona.getX() && x < zona.getX() + zona.getLargura() && y >= zona.getY() && y < zona.getY() + zona.getAltura())
                 .findFirst();
+    }
+
+    /** Usado por {@code PresencaWebSocketHandler} pra "estacionar" quem desconecta na zona do tipo
+     * pedido (hoje só {@link TipoZona#LIVRE}, "Fora do trabalho") - o caminho inverso de
+     * {@link #zonaContendo}, que vai de posição pra zona. */
+    public Optional<Zona> zonaPorTipo(TipoZona tipo) {
+        return zonas().stream().filter(zona -> zona.getTipo() == tipo).findFirst();
     }
 
     private List<Zona> zonas() {

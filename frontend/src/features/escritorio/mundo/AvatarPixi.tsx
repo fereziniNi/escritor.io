@@ -20,6 +20,10 @@ const PIVO_BASE = { x: 12, y: 27 }
 
 const COR_TEXTO_NOME = 0xffffff
 
+/** Avatar de quem está OFFLINE (estacionado em "Fora do trabalho" pelo backend) renderiza bem
+ * apagado - dá pra ver que "tem alguém ali" sem parecer alguém realmente presente/ativo. */
+const ALPHA_OFFLINE = 0.45
+
 /** Velocidade (rad/ms) e amplitude (rad) do balanço de perna enquanto anda - valores escolhidos
  * pra completar um ciclo perceptível dentro da duração de um glide (`DURACAO_GLIDE_MS`). */
 const VELOCIDADE_PERNA = 0.02
@@ -49,6 +53,7 @@ export function AvatarPixi({
   corCorpo,
   destaque,
   proximo = false,
+  offline = false,
 }: {
   tileX: number
   tileY: number
@@ -57,6 +62,9 @@ export function AvatarPixi({
   destaque: boolean
   /** Fase 3 - alguém está dentro do raio de proximidade deste avatar (`proximidade.ts`). */
   proximo?: boolean
+  /** Backend marcou esse usuário como OFFLINE (desconectou, estacionado em "Fora do trabalho") -
+   * avatar renderiza apagado + nome com sufixo, pra não parecer alguém realmente presente. */
+  offline?: boolean
 }) {
   const corCorpoNumero = useMemo(() => hexParaNumero(corCorpo), [corCorpo])
 
@@ -115,7 +123,7 @@ export function AvatarPixi({
   const worldY = posicaoRenderizada.y * TILE_PX + TILE_PX
 
   return (
-    <pixiContainer x={worldX} y={worldY}>
+    <pixiContainer x={worldX} y={worldY} alpha={offline ? ALPHA_OFFLINE : 1}>
       <pixiContainer
         pivot={PIVO_BASE}
         y={bobY}
@@ -139,7 +147,7 @@ export function AvatarPixi({
       </pixiContainer>
 
       <pixiText
-        text={nome}
+        text={offline ? `${nome} (offline)` : nome}
         anchor={{ x: 0.5, y: 1 }}
         y={-PIVO_BASE.y * ESCALA_AVATAR - 6}
         style={{ fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: '800', fill: COR_TEXTO_NOME, stroke: { color: 0x2b2b3a, width: 3 } }}

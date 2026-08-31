@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { calcularParesProximos, usuariosProximosDeAlguem } from './proximidade'
-import type { EstadoPresencaUsuario } from '../types'
+import type { EstadoPresencaUsuario, StatusAvatar } from '../types'
 
-function usuario(usuarioId: number, x: number, y: number): EstadoPresencaUsuario {
-  return { usuarioId, nome: `Usuário ${usuarioId}`, x, y, status: 'DISPONIVEL' }
+function usuario(usuarioId: number, x: number, y: number, status: StatusAvatar = 'DISPONIVEL'): EstadoPresencaUsuario {
+  return { usuarioId, nome: `Usuário ${usuarioId}`, x, y, status }
 }
 
 describe('calcularParesProximos', () => {
@@ -33,6 +33,11 @@ describe('calcularParesProximos', () => {
   it('não quebra com 0 ou 1 usuário', () => {
     expect(calcularParesProximos([], 2)).toEqual([])
     expect(calcularParesProximos([usuario(1, 0, 0)], 2)).toEqual([])
+  })
+
+  it('ignora quem está OFFLINE - avatar estacionado em Fora do trabalho não conta como "perto"', () => {
+    const pares = calcularParesProximos([usuario(1, 5, 5), usuario(2, 6, 5, 'OFFLINE')], 2)
+    expect(pares).toEqual([])
   })
 })
 

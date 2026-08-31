@@ -11,15 +11,19 @@ export interface ParProximo {
  * Encontra todos os pares de usuários dentro do raio de proximidade, usando a posição real em
  * tile (x,y) que já vem do servidor - nunca posição de tela/DOM (o mundo pode estar em qualquer
  * zoom/pan, isso não deve mudar quem está "perto"). Distância euclidiana, não Manhattan - "perto"
- * inclui a diagonal, como esperado de proximidade espacial de verdade.
+ * inclui a diagonal, como esperado de proximidade espacial de verdade. Ignora quem está OFFLINE -
+ * são avatares estacionados em "Fora do trabalho" pelo backend (desconectaram), não tem ninguém
+ * de verdade ali pra estar "perto" - sem isso, um avatar fantasma dispararia notificação de
+ * proximidade pra quem só está passando pela sala.
  */
 export function calcularParesProximos(usuarios: EstadoPresencaUsuario[], raioTiles: number): ParProximo[] {
+  const online = usuarios.filter((usuario) => usuario.status !== 'OFFLINE')
   const pares: ParProximo[] = []
 
-  for (let i = 0; i < usuarios.length; i++) {
-    for (let j = i + 1; j < usuarios.length; j++) {
-      const a = usuarios[i]
-      const b = usuarios[j]
+  for (let i = 0; i < online.length; i++) {
+    for (let j = i + 1; j < online.length; j++) {
+      const a = online[i]
+      const b = online[j]
       const distanciaTiles = Math.hypot(a.x - b.x, a.y - b.y)
       if (distanciaTiles <= raioTiles) {
         pares.push({ usuarioIdA: a.usuarioId, usuarioIdB: b.usuarioId, distanciaTiles })
