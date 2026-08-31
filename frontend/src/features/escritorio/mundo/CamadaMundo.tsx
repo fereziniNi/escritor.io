@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react'
 import type { Zona } from '../types'
 import { calcularTransformCamera } from './camera'
-import { TILE_PX } from './constantes'
+import { TILE_PX, ZOOM_MAXIMO, ZOOM_MINIMO, ZOOM_PADRAO } from './constantes'
 import { MOBILIA_MUNDO, PORTAS_OVERRIDE } from './dadosMundo'
 import { gerarParedesDeZona } from './gerarParedesDeZona'
 import { PixiMundo } from './PixiMundo'
@@ -34,11 +35,11 @@ function useTamanhoViewport(containerRef: React.RefObject<HTMLDivElement | null>
 }
 
 /**
- * Compõe o mundo Pixi: por enquanto (Fase 1.1 do redesign Gather) só o piso, com uma câmera
- * estática centralizada no meio do mapa - paredes/móveis/avatares/follow entram nas próximas
- * etapas. Ainda não é montado dentro do `EscritorioPage.tsx` real (o mapa em DOM continua sendo o
- * que os usuários veem) até a Fase 2 ter paridade de funcionalidade (movimento incluso) - ver
- * plano.
+ * Compõe o mundo Pixi: piso + móveis + paredes, com uma câmera navegável (roda do mouse pra zoom,
+ * arrastar pra fazer pan) centralizada por padrão no meio do mapa - o "seguir o avatar" entra na
+ * Fase 2 junto com o movimento de verdade (`useCameraFollow`, ainda não escrito). Ainda não é
+ * montado dentro do `EscritorioPage.tsx` real (o mapa em DOM continua sendo o que os usuários
+ * veem) até a Fase 2 ter paridade de funcionalidade - ver plano.
  */
 export function CamadaMundo({
   larguraTiles,
@@ -56,18 +57,51 @@ export function CamadaMundo({
   const larguraMundoPx = larguraTiles * TILE_PX
   const alturaMundoPx = alturaTiles * TILE_PX
 
+  const [zoom, setZoom] = useState(ZOOM_PADRAO)
+  const [centro, setCentro] = useState(() => ({ x: larguraMundoPx / 2, y: alturaMundoPx / 2 }))
+  const arrastoRef = useRef<{ x: number; y: number } | null>(null)
+
+  function aoRodarRoda(evento: ReactWheelEvent<HTMLDivElement>) {
+    setZoom((atual) => Math.min(ZOOM_MAXIMO, Math.max(ZOOM_MINIMO, atual - evento.deltaY * 0.001)))
+  }
+
+  function aoPressionarPonteiro(evento: ReactPointerEvent<HTMLDivElement>) {
+    arrastoRef.current = { x: evento.clientX, y: evento.clientY }
+  }
+
+  function aoMoverPonteiro(evento: ReactPointerEvent<HTMLDivElement>) {
+    if (!arrastoRef.current) return
+    const dx = evento.clientX - arrastoRef.current.x
+    const dy = evento.clientY - arrastoRef.current.y
+    arrastoRef.current = { x: evento.clientX, y: evento.clientY }
+    setCentro((atual) => ({ x: atual.x - dx / zoom, y: atual.y - dy / zoom }))
+  }
+
+  function aoSoltarPonteiro() {
+    arrastoRef.current = null
+  }
+
   const transform = calcularTransformCamera({
-    jogadorX: larguraMundoPx / 2,
-    jogadorY: alturaMundoPx / 2,
+    jogadorX: centro.x,
+    jogadorY: centro.y,
     larguraMundoPx,
     alturaMundoPx,
     larguraViewportPx: viewport.largura,
     alturaViewportPx: viewport.altura,
-    zoom: 1,
+    zoom,
   })
 
   return (
-    <div ref={hostRef} data-testid="mundo-viewport" style={{ width: '100%', height: '100%' }}>
+    <div
+      ref={hostRef}
+      data-testid="mundo-viewport"
+      style={{ width: '100%', height: '100%', cursor: arrastoRef.current ? 'grabbing' : 'grab', touchAction: 'none' }}
+      onWheel={aoRodarRoda}
+      onPointerDown={aoPressionarPonteiro}
+      onPointerMove={aoMoverPonteiro}
+      onPointerUp={aoSoltarPonteiro}
+      onPointerLeave={aoSoltarPonteiro}
+    >
       <PixiMundo>
         <pixiContainer x={transform.x} y={transform.y} scale={transform.scale}>
           <pixiGraphics draw={(g) => desenharPiso(g, larguraTiles, alturaTiles)} />

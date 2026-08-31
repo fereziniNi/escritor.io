@@ -8,3 +8,7 @@ export const TILE_PX = 32
 /** Raio de proximidade em tiles (distância euclidiana) - usado pelo destaque visual de "perto um do
  * outro", não uma constante mágica espalhada pelo código. */
 export const PROXIMIDADE_RAIO_TILES = 2
+
+export const ZOOM_MINIMO = 0.6
+export const ZOOM_MAXIMO = 2.0
+export const ZOOM_PADRAO = 1.0
