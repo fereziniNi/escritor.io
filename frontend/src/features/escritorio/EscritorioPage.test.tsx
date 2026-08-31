@@ -115,14 +115,13 @@ describe('EscritorioPage', () => {
 
     renderPagina()
 
-    expect(await screen.findByText(/Escritório/)).toBeInTheDocument()
-    expect(screen.getByTestId('mundo-canvas-host')).toBeInTheDocument()
+    expect(await screen.findByTestId('mundo-canvas-host')).toBeInTheDocument()
   })
 
   it('seta pressionada manda a posição do próprio jogador pro servidor, sem esperar resposta', async () => {
     server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto(), handlerHealthOk())
     renderPagina()
-    await screen.findByText(/Escritório/)
+    await screen.findByTestId('mundo-canvas-host')
 
     act(() => {
       WebSocketFalso.instancias[0].disparaMensagem({
@@ -143,7 +142,7 @@ describe('EscritorioPage', () => {
   it('trocar o status no seletor manda a mudança pro servidor', async () => {
     server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto(), handlerHealthOk())
     renderPagina()
-    await screen.findByText(/Escritório/)
+    await screen.findByTestId('mundo-canvas-host')
 
     act(() => {
       WebSocketFalso.instancias[0].disparaMensagem({
@@ -162,7 +161,7 @@ describe('EscritorioPage', () => {
   it('não manda o jogador pra fora dos limites do mapa ao mover na borda', async () => {
     server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto(), handlerHealthOk())
     renderPagina()
-    await screen.findByText(/Escritório/)
+    await screen.findByTestId('mundo-canvas-host')
 
     act(() => {
       WebSocketFalso.instancias[0].disparaMensagem({
@@ -182,7 +181,7 @@ describe('EscritorioPage', () => {
   it('a lista de presença reflete entrar/sair de zona e troca de status sem reload', async () => {
     server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto(), handlerHealthOk())
     renderPagina()
-    await screen.findByText(/Escritório/)
+    await screen.findByTestId('mundo-canvas-host')
 
     // lista de presença agora é um drawer recolhível (Fase 4), fechado por padrão
     fireEvent.click(screen.getByRole('button', { name: 'Participantes' }))
@@ -223,7 +222,7 @@ describe('EscritorioPage', () => {
       http.get('/ponto/espelho-do-mes', () => HttpResponse.json({ dias: [], saldoAcumuladoNoPeriodo: 0 })),
     )
     renderPagina()
-    await screen.findByText(/Escritório/)
+    await screen.findByTestId('mundo-canvas-host')
 
     fireEvent.click(screen.getByRole('button', { name: /Ponto/ }))
 
@@ -243,7 +242,7 @@ describe('EscritorioPage', () => {
       http.get('/ponto/espelho-do-mes', () => HttpResponse.json({ dias: [], saldoAcumuladoNoPeriodo: 0 })),
     )
     renderPagina()
-    await screen.findByText(/Escritório/)
+    await screen.findByTestId('mundo-canvas-host')
 
     fireEvent.click(screen.getByRole('button', { name: /Ponto/ }))
     await screen.findByRole('dialog', { name: /Ponto/ })
@@ -264,7 +263,7 @@ describe('EscritorioPage', () => {
       http.get('/ponto/espelho-do-mes', () => HttpResponse.json({ dias: [], saldoAcumuladoNoPeriodo: 0 })),
     )
     renderPagina()
-    await screen.findByText(/Escritório/)
+    await screen.findByTestId('mundo-canvas-host')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Ir pra tela de ponto' }))
 

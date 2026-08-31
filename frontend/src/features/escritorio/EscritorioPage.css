@@ -1,9 +1,11 @@
 /**
  * Pedido do usuário: "só a escritorio-coluna-mapa deve estar na tela, o resto sobrescrito" - o
  * mapa passa a ser a única coisa que realmente ocupa espaço de layout (`position: relative`,
- * 100vw/100vh, sem padding roubando área dele); título, aviso, dock e lista de presença viram
- * overlays `position: absolute` flutuando por cima (mesmo espírito do HUD de um jogo de verdade -
- * o "tabuleiro" enche a tela, os controles ficam desenhados por cima dele, não ao lado).
+ * 100vw/100vh, sem padding roubando área dele); aviso, dock e lista de presença viram overlays
+ * `position: absolute` flutuando por cima (mesmo espírito do HUD de um jogo de verdade - o
+ * "tabuleiro" enche a tela, os controles ficam desenhados por cima dele, não ao lado). Sem título
+ * de página no canto (pedido do usuário: "remova a palavra Escritório no canto superior
+ * esquerdo") - o rótulo de sala já cumpre esse papel de "onde eu estou" direto no mapa.
  */
 .escritorio-pagina {
   position: relative;
@@ -12,25 +14,9 @@
   overflow: hidden;
 }
 
-.escritorio-titulo {
-  position: absolute;
-  top: 0.9rem;
-  left: 1rem;
-  z-index: 10;
-  font-family: var(--fonte-jogo);
-  font-size: 0.9rem;
-  line-height: 1.6;
-  color: var(--cor-primaria-escura);
-  margin: 0;
-  background: rgba(244, 241, 230, 0.88);
-  padding: 0.4rem 0.7rem;
-  border-radius: 10px;
-  box-shadow: var(--sombra-cartao);
-}
-
 .escritorio-aviso {
   position: absolute;
-  top: 3.6rem;
+  top: 0.9rem;
   left: 1rem;
   z-index: 10;
   max-width: min(320px, calc(100vw - 2rem));

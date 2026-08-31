@@ -114,7 +114,6 @@ export function EscritorioPage() {
 
   return (
     <section className="escritorio-pagina">
-      <h2 className="escritorio-titulo fonte-jogo">🏢 {mapa.nome}</h2>
       <SugestaoRegistrarEntrada aoClicarRegistrar={() => setPainelAberto('ponto')} />
       <Notificacoes itens={notificacoes} />
 
