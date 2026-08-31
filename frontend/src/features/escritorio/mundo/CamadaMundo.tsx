@@ -2,10 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Zona } from '../types'
 import { calcularTransformCamera } from './camera'
 import { TILE_PX } from './constantes'
-import { PORTAS_OVERRIDE } from './dadosMundo'
+import { MOBILIA_MUNDO, PORTAS_OVERRIDE } from './dadosMundo'
 import { gerarParedesDeZona } from './gerarParedesDeZona'
 import { PixiMundo } from './PixiMundo'
-import { desenharParedes, desenharPiso } from './spriteFactory'
+import { desenharMobilia, desenharParedes, desenharPiso } from './spriteFactory'
 
 /** Valor de fallback determinístico quando não há `ResizeObserver` de verdade disponível (mesmo
  * espírito do fallback que `useDimensaoTileResponsiva` usava no mapa em DOM). */
@@ -71,6 +71,7 @@ export function CamadaMundo({
       <PixiMundo>
         <pixiContainer x={transform.x} y={transform.y} scale={transform.scale}>
           <pixiGraphics draw={(g) => desenharPiso(g, larguraTiles, alturaTiles)} />
+          <pixiGraphics draw={(g) => desenharMobilia(g, MOBILIA_MUNDO)} />
           <pixiGraphics draw={(g) => desenharParedes(g, paredes)} />
         </pixiContainer>
       </PixiMundo>
