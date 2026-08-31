@@ -22,7 +22,10 @@ export function PixiMundo({ children }: { children: ReactNode }) {
 
   return (
     <div ref={hostRef} data-testid="mundo-canvas-host" style={{ width: '100%', height: '100%' }}>
-      <Application resizeTo={hostRef} backgroundAlpha={0} antialias={false}>
+      {/* Fundo azul-claro sólido (em vez de transparente pro creme da página) - dá uma
+      ambientação de "escritório" coesa mesmo na margem fora do tabuleiro de tiles, quando o
+      mundo não preenche 100% da viewport num zoom/proporção específico. */}
+      <Application resizeTo={hostRef} background="#dbe6ef" antialias={false}>
         {children}
       </Application>
     </div>

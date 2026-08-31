@@ -25,12 +25,13 @@ export const COR_STATUS: Record<StatusAvatar, string> = {
   AUSENTE: '#8b8b9a',
 }
 
-/** Tingimento do piso por tipo de zona (Fase 3 - "identidade espacial" de cada sala) - mesma
- * paleta usada quando o mapa ainda era renderizado em DOM, agora aplicada como um tingimento
- * translúcido sobre o piso do mundo Pixi em vez de background sólido de um `<div>`. */
+/** Tingimento do piso por tipo de zona (Fase 3 - "identidade espacial" de cada sala), translúcido
+ * sobre o piso do mundo Pixi. REUNIAO ficou um pouco mais saturada que a paleta original (mapa em
+ * DOM) porque o piso agora tem um tom azulado por baixo (tema claro pedido pelo usuário) - um azul
+ * pastel igualmente claro somia contra o piso; um pouco mais forte volta a se distinguir. */
 export const COR_ZONA: Record<TipoZona, string> = {
   FOCO: '#bfe3c4',
-  REUNIAO: '#bfd6ec',
+  REUNIAO: '#a6cdf0',
   CAFE: '#eccfa8',
   ATENDIMENTO: '#eac1c8',
   LIVRE: '#dbe8d6',

@@ -12,9 +12,13 @@ import type { ItemMobilia, SegmentoParede } from './tipos'
  * simples com contorno, na mesma linguagem "pixel art via primitivas".
  */
 
-const COR_PISO_CLARO = 0xd9b98a
-const COR_PISO_ESCURO = 0xc9a877
-const COR_LINHA_PISO = 0x00000014 // preto quase transparente, só pra marcar a grade
+/** Piso claro com leve tom azulado (pedido do usuário: "tema mais claro, com fundo um pouco
+ * azul... parecendo um escritório de verdade") - troca o piso de tábuas de madeira (tom
+ * quente/rústico) por um azulejo/carpete claro, mais perto de um escritório moderno de verdade. */
+const COR_PISO_CLARO = 0xeef2f6
+const COR_PISO_ESCURO = 0xdfe6ec
+const COR_LINHA_PISO = 0x2a3a4a
+const ALPHA_LINHA_PISO = 0.08
 
 /** Desenha o piso do mundo inteiro (tabuleiro xadrez sutil, uma cor a cada 2 tiles, como o piso
  * de tábuas de madeira que existia em CSS) num único `Graphics`, mais barato que um sprite por
@@ -37,7 +41,7 @@ export function desenharPiso(g: PixiGraphics, larguraTiles: number, alturaTiles:
     g.moveTo(0, ty * TILE_PX)
     g.lineTo(larguraTiles * TILE_PX, ty * TILE_PX)
   }
-  g.stroke({ width: 1, color: COR_LINHA_PISO })
+  g.stroke({ width: 1, color: COR_LINHA_PISO, alpha: ALPHA_LINHA_PISO })
 }
 
 function hexParaNumero(cor: string): number {
@@ -51,13 +55,15 @@ export function desenharZonas(g: PixiGraphics, zonas: Zona[]): void {
   g.clear()
   for (const zona of zonas) {
     g.rect(zona.x * TILE_PX, zona.y * TILE_PX, zona.largura * TILE_PX, zona.altura * TILE_PX)
-    g.fill({ color: hexParaNumero(COR_ZONA[zona.tipo]), alpha: 0.45 })
+    g.fill({ color: hexParaNumero(COR_ZONA[zona.tipo]), alpha: 0.55 })
   }
 }
 
 const ESPESSURA_PAREDE_PX = 6
-const COR_PAREDE = 0x2b1f16
-const COR_PAREDE_BORDA = 0x1a120c
+/** Parede clara e fria (divisória de escritório de verdade) - antes era madeira escura tipo
+ * "cabana", que não combinava com o pedido de tema claro/azulado. */
+const COR_PAREDE = 0xb7c2cd
+const COR_PAREDE_BORDA = 0x8793a1
 
 /** Desenha todas as paredes num único `Graphics` - cada segmento vira um retângulo fino sobre a
  * linha de grade correspondente, esticado meia espessura além das pontas nominais pra as quinas
