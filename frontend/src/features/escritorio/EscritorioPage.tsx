@@ -11,11 +11,13 @@ import './ui/hud.css'
 import { CamadaMundo } from './mundo/CamadaMundo'
 import { PROXIMIDADE_RAIO_TILES } from './mundo/constantes'
 import { calcularParesProximos, usuariosProximosDeAlguem } from './mundo/proximidade'
+import { calcularDestinoParaStatus } from './mundo/statusParaZona'
 import { useMovimentoTeclado } from './mundo/useMovimentoTeclado'
 import { PainelFlutuante } from './PainelFlutuante'
 import { PainelKanban } from './PainelKanban'
 import { PainelPonto } from './PainelPonto'
 import { SugestaoRegistrarEntrada } from './SugestaoRegistrarEntrada'
+import type { StatusAvatar } from './types'
 import type { PainelId } from './ui/BarraFerramentas'
 import { BarraFerramentas } from './ui/BarraFerramentas'
 import { Notificacoes } from './ui/Notificacao'
@@ -99,6 +101,17 @@ export function EscritorioPage() {
   const mapa = mapaQuery.data
   const meuStatus = eu?.status ?? 'DISPONIVEL'
 
+  // pedido do usuário: escolher um status redireciona o personagem pro lugar que o representa
+  // (Área de trabalho/Sala de reunião/Café/Fora do trabalho) - `calcularDestinoParaStatus` decide
+  // se existe destino (DISPONIVEL não tem, de propósito).
+  function aoMudarStatus(status: StatusAvatar) {
+    definirStatus(status)
+    const destino = calcularDestinoParaStatus(mapa.zonas, status)
+    if (destino) {
+      mover(destino.x, destino.y)
+    }
+  }
+
   return (
     <section className="escritorio-pagina">
       <h2 className="escritorio-titulo fonte-jogo">🏢 {mapa.nome}</h2>
@@ -108,7 +121,7 @@ export function EscritorioPage() {
       <BarraFerramentas
         nome={eu?.nome ?? 'Você'}
         meuStatus={meuStatus}
-        aoMudarStatus={definirStatus}
+        aoMudarStatus={aoMudarStatus}
         papel={papel}
         painelAberto={painelAberto}
         aoAbrirPainel={setPainelAberto}

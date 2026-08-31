@@ -103,7 +103,7 @@ export function BarraFerramentas({
 
       <ControlesAudioVideo />
 
-      <span className="escritorio-toolbar-dica">⬅️⬆️➡️⬇️ pra andar</span>
+      <span className="escritorio-toolbar-dica">⬅️⬆️➡️⬇️ ou WASD pra andar</span>
     </div>
   )
 }

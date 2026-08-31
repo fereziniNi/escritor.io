@@ -7,10 +7,18 @@ const TECLA_PARA_DELTA: Record<string, readonly [number, number]> = {
   ArrowDown: [0, 1],
   ArrowLeft: [-1, 0],
   ArrowRight: [1, 0],
+  w: [0, -1],
+  W: [0, -1],
+  s: [0, 1],
+  S: [0, 1],
+  a: [-1, 0],
+  A: [-1, 0],
+  d: [1, 0],
+  D: [1, 0],
 }
 
 /**
- * Move o próprio jogador por seta do teclado - substitui o `window` keydown effect que ficava
+ * Move o próprio jogador por seta ou WASD do teclado - substitui o `window` keydown effect que ficava
  * inline em `EscritorioPage.tsx` (mesma lógica de clamp, agora em `calcularProximaPosicao`,
  * puro/testado). `ativo=false` (ex.: um painel do dock aberto) desliga as setas sem precisar
  * desmontar o listener toda hora. Sem colisão de propósito (pedido do usuário: "remover as

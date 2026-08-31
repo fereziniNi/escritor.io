@@ -9,6 +9,7 @@ import { PROXIMIDADE_RAIO_TILES, TILE_PX, ZOOM_MAXIMO, ZOOM_MINIMO, ZOOM_PADRAO 
 import { MOBILIA_MUNDO } from './dadosMundo'
 import { PixiMundo } from './PixiMundo'
 import { calcularParesProximos, usuariosProximosDeAlguem } from './proximidade'
+import { RotuloZona } from './RotuloZona'
 import { SeguidorCamera } from './SeguidorCamera'
 import { desenharMobilia, desenharPiso, desenharZonas } from './spriteFactory'
 
@@ -112,6 +113,9 @@ export function CamadaMundo({
           <pixiGraphics draw={(g) => desenharPiso(g, larguraTiles, alturaTiles)} />
           <pixiGraphics draw={(g) => desenharZonas(g, zonas)} />
           <pixiGraphics draw={(g) => desenharMobilia(g, MOBILIA_MUNDO)} />
+          {zonas.map((zona) => (
+            <RotuloZona key={zona.id} zona={zona} />
+          ))}
           {usuarios.map((usuario) => (
             <AvatarPixi
               key={usuario.usuarioId}
