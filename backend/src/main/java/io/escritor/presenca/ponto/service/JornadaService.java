@@ -94,6 +94,21 @@ public class JornadaService {
     }
 
     /**
+     * Pro cronômetro ao vivo do frontend (`CronometroTrabalho`, canto superior direito) - só o
+     * segmento de hoje, diferente de {@link #jornadaDoDia(Usuario)}, que também calcula estado/
+     * saldo/apontamento. Sem checagem de visibilidade porque só é chamado pelo próprio usuário
+     * autenticado sobre si mesmo (via `PontoService.estadoAtual`), nunca com um `usuarioId` de
+     * outra pessoa.
+     */
+    public long segundosTrabalhadosAteAgora(Usuario usuario) {
+        Instant agora = Instant.now(clock);
+        LocalDate hoje = agora.atZone(ZoneOffset.UTC).toLocalDate();
+        Map<LocalDate, List<Marcacao>> marcacoesPorDia = marcacoesPorDiaNoMesCorrente(usuario, hoje);
+        List<Marcacao> marcacoesDeHoje = marcacoesPorDia.getOrDefault(hoje, List.of());
+        return JornadaDiaria.segundosTrabalhadosAteAgora(marcacoesDeHoje, agora);
+    }
+
+    /**
      * Só lista dias com pelo menos uma marcação - um dia sem nenhum registro não aparece (mesma
      * regra que {@link io.escritor.presenca.ponto.domain.SaldoAcumulado} já segue pro acumulado).
      */

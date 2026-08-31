@@ -20,14 +20,31 @@ vi.mock('./mundo/CamadaMundo', () => ({
   CamadaMundo: () => <div data-testid="mundo-canvas-host" />,
 }))
 
-/** Ponto aberto de propósito, pra `SugestaoRegistrarEntrada` (S6.11) não interferir nestes testes. */
+/** Ponto aberto de propósito, pra `SugestaoRegistrarEntrada` (S6.11) não interferir nestes testes.
+ * `CronometroTrabalho` (canto superior direito) também bate em `/ponto/estado-atual` em toda
+ * renderização da página, não só quando o painel de Ponto está aberto - por isso esse handler entra
+ * em praticamente todo teste, mesmo os que não mexem com ponto. */
 function handlerPontoAberto() {
-  return http.get('/ponto/estado-atual', () => HttpResponse.json({ ultimoTipo: 'ENTRADA', proximasOpcoes: ['PAUSA_INICIO', 'SAIDA'] }))
+  return http.get('/ponto/estado-atual', () =>
+    HttpResponse.json({
+      ultimoTipo: 'ENTRADA',
+      ultimoMomento: '2026-08-30T08:00:00Z',
+      segundosTrabalhadosAteAgora: 1800,
+      proximasOpcoes: ['PAUSA_INICIO', 'SAIDA'],
+    }),
+  )
 }
 
 /** `HealthStatus` (S6, reskin "uma tela só") agora mora dentro de `EscritorioPage`. */
 function handlerHealthOk() {
   return http.get('/health', () => HttpResponse.json({ status: 'UP' }))
+}
+
+/** Só `JornadaPainel` (dentro do painel de Ponto aberto) usa isso - `CronometroTrabalho` não. */
+function handlerJornadaVazia() {
+  return http.get('/ponto/jornada-do-dia', () =>
+    HttpResponse.json({ data: '2026-08-30', estado: 'ABERTA', minutosTrabalhados: 0, saldoDia: 0, saldoAcumuladoNoPeriodo: 0, totalApontadoMinutos: 0 }),
+  )
 }
 
 function base64UrlEncode(json: object): string {
@@ -216,9 +233,7 @@ describe('EscritorioPage', () => {
       http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)),
       handlerPontoAberto(),
       handlerHealthOk(),
-      http.get('/ponto/jornada-do-dia', () =>
-        HttpResponse.json({ data: '2026-08-30', estado: 'ABERTA', minutosTrabalhados: 0, saldoDia: 0, saldoAcumuladoNoPeriodo: 0, totalApontadoMinutos: 0 }),
-      ),
+      handlerJornadaVazia(),
       http.get('/ponto/espelho-do-mes', () => HttpResponse.json({ dias: [], saldoAcumuladoNoPeriodo: 0 })),
     )
     renderPagina()
@@ -227,9 +242,9 @@ describe('EscritorioPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Ponto/ }))
 
     expect(await screen.findByRole('dialog', { name: /Ponto/ })).toBeInTheDocument()
-    // ponto aberto (ENTRADA) - PontoWidget só oferece "Iniciar trabalho", nunca pausa/saída
-    // (pedido do usuário) - com jornada já aberta, o card mostra a confirmação, sem botão
-    expect(await screen.findByText('✅ Trabalho já iniciado hoje.')).toBeInTheDocument()
+    // ponto aberto (ENTRADA) - PontoWidget oferece Pausar e Encerrar trabalho
+    expect(await screen.findByRole('button', { name: 'Pausar' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Encerrar trabalho' })).toBeInTheDocument()
   })
 
   it('fecha o painel ao clicar em Fechar', async () => {
@@ -237,9 +252,7 @@ describe('EscritorioPage', () => {
       http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)),
       handlerPontoAberto(),
       handlerHealthOk(),
-      http.get('/ponto/jornada-do-dia', () =>
-        HttpResponse.json({ data: '2026-08-30', estado: 'ABERTA', minutosTrabalhados: 0, saldoDia: 0, saldoAcumuladoNoPeriodo: 0, totalApontadoMinutos: 0 }),
-      ),
+      handlerJornadaVazia(),
       http.get('/ponto/espelho-do-mes', () => HttpResponse.json({ dias: [], saldoAcumuladoNoPeriodo: 0 })),
     )
     renderPagina()
@@ -256,11 +269,11 @@ describe('EscritorioPage', () => {
   it('clicar no aviso de registrar entrada abre o painel de ponto', async () => {
     server.use(
       http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)),
-      http.get('/ponto/estado-atual', () => HttpResponse.json({ ultimoTipo: null, proximasOpcoes: ['ENTRADA'] })),
-      handlerHealthOk(),
-      http.get('/ponto/jornada-do-dia', () =>
-        HttpResponse.json({ data: '2026-08-30', estado: 'ABERTA', minutosTrabalhados: 0, saldoDia: 0, saldoAcumuladoNoPeriodo: 0, totalApontadoMinutos: 0 }),
+      http.get('/ponto/estado-atual', () =>
+        HttpResponse.json({ ultimoTipo: null, ultimoMomento: null, segundosTrabalhadosAteAgora: 0, proximasOpcoes: ['ENTRADA'] }),
       ),
+      handlerHealthOk(),
+      handlerJornadaVazia(),
       http.get('/ponto/espelho-do-mes', () => HttpResponse.json({ dias: [], saldoAcumuladoNoPeriodo: 0 })),
     )
     renderPagina()

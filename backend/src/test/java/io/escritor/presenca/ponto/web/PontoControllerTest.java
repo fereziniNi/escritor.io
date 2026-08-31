@@ -118,16 +118,21 @@ class PontoControllerTest {
 
     @Test
     @WithMockUser
-    void estadoAtualDeQuemEstaEmPausaSoOfereceRetomar() throws Exception {
+    void estadoAtualDeQuemEstaEmPausaOfereceRetomarOuEncerrar() throws Exception {
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
         when(pontoService.estadoAtual(any()))
                 .thenReturn(new EstadoAtualPontoResponse(
-                        TipoRegistroPonto.PAUSA_INICIO, java.util.Set.of(TipoRegistroPonto.PAUSA_FIM)));
+                        TipoRegistroPonto.PAUSA_INICIO,
+                        Instant.parse("2026-01-15T12:00:00Z"),
+                        1800L,
+                        java.util.Set.of(TipoRegistroPonto.PAUSA_FIM, TipoRegistroPonto.SAIDA)));
 
         mockMvc.perform(get("/ponto/estado-atual"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ultimoTipo").value("PAUSA_INICIO"))
-                .andExpect(jsonPath("$.proximasOpcoes", org.hamcrest.Matchers.contains("PAUSA_FIM")));
+                .andExpect(jsonPath("$.ultimoMomento").value("2026-01-15T12:00:00Z"))
+                .andExpect(jsonPath("$.segundosTrabalhadosAteAgora").value(1800))
+                .andExpect(jsonPath("$.proximasOpcoes", org.hamcrest.Matchers.containsInAnyOrder("PAUSA_FIM", "SAIDA")));
     }
 
     @Test

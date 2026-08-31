@@ -2,6 +2,12 @@ export type TipoRegistroPonto = 'ENTRADA' | 'PAUSA_INICIO' | 'PAUSA_FIM' | 'SAID
 
 export interface EstadoAtualPonto {
   ultimoTipo: TipoRegistroPonto | null
+  /** Horário da última marcação (ISO). */
+  ultimoMomento: string | null
+  /** Segundos trabalhados hoje até o momento em que o backend calculou esta resposta - já inclui
+   * o segmento em andamento (diferente de `minutosTrabalhados` de `/ponto/jornada-do-dia`, que só
+   * soma intervalos fechados). Base do cronômetro ao vivo (`CronometroTrabalho`). */
+  segundosTrabalhadosAteAgora: number
   proximasOpcoes: TipoRegistroPonto[]
 }
 

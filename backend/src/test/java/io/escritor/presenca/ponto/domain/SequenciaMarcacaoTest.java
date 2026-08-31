@@ -27,7 +27,7 @@ class SequenciaMarcacaoTest {
         "SAIDA, PAUSA_INICIO, false",
         "SAIDA, PAUSA_FIM, false",
         "PAUSA_INICIO, ENTRADA, false",
-        "PAUSA_INICIO, SAIDA, false",
+        "PAUSA_INICIO, SAIDA, true",
         "PAUSA_INICIO, PAUSA_INICIO, false",
         "PAUSA_INICIO, PAUSA_FIM, true",
         "PAUSA_FIM, ENTRADA, false",
@@ -40,9 +40,9 @@ class SequenciaMarcacaoTest {
     }
 
     @Test
-    void quemEstaEmPausaSoTemRetomarComoOpcao() {
+    void quemEstaEmPausaPodeRetomarOuEncerrarDireto() {
         assertThat(SequenciaMarcacao.tiposValidosApos(TipoRegistroPonto.PAUSA_INICIO))
-                .containsExactly(TipoRegistroPonto.PAUSA_FIM);
+                .containsExactlyInAnyOrder(TipoRegistroPonto.PAUSA_FIM, TipoRegistroPonto.SAIDA);
     }
 
     @Test

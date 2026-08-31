@@ -16,10 +16,12 @@ import org.springframework.stereotype.Service;
 public class PontoService {
 
     private final RegistroPontoRepository registroPontoRepository;
+    private final JornadaService jornadaService;
     private final Clock clock;
 
-    public PontoService(RegistroPontoRepository registroPontoRepository, Clock clock) {
+    public PontoService(RegistroPontoRepository registroPontoRepository, JornadaService jornadaService, Clock clock) {
         this.registroPontoRepository = registroPontoRepository;
+        this.jornadaService = jornadaService;
         this.clock = clock;
     }
 
@@ -47,7 +49,10 @@ public class PontoService {
         RegistroPonto ultimo =
                 registroPontoRepository.findFirstByUsuarioOrderByCriadoEmDesc(usuario).orElse(null);
         TipoRegistroPonto ultimoTipo = ultimo == null ? null : ultimo.getTipo();
+        Instant ultimoMomento = ultimo == null ? null : ultimo.getMomento();
+        long segundosTrabalhadosAteAgora = jornadaService.segundosTrabalhadosAteAgora(usuario);
 
-        return new EstadoAtualPontoResponse(ultimoTipo, SequenciaMarcacao.tiposValidosApos(ultimoTipo));
+        return new EstadoAtualPontoResponse(
+                ultimoTipo, ultimoMomento, segundosTrabalhadosAteAgora, SequenciaMarcacao.tiposValidosApos(ultimoTipo));
     }
 }

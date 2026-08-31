@@ -30,6 +30,9 @@ class PontoServiceTest {
     @Mock
     private RegistroPontoRepository registroPontoRepository;
 
+    @Mock
+    private JornadaService jornadaService;
+
     private final Usuario usuario = usuarioComId(1L);
     private final Instant agora = Instant.parse("2026-01-15T12:00:00Z");
     private final Clock clock = Clock.fixed(agora, ZoneOffset.UTC);
@@ -38,7 +41,7 @@ class PontoServiceTest {
 
     @BeforeEach
     void setUp() {
-        pontoService = new PontoService(registroPontoRepository, clock);
+        pontoService = new PontoService(registroPontoRepository, jornadaService, clock);
     }
 
     private static Usuario usuarioComId(Long id) {
@@ -104,46 +107,60 @@ class PontoServiceTest {
     }
 
     @Test
-    void quemEstaEmPausaNaoConsegueSair() {
+    void quemEstaEmPausaConsegueEncerrarDiretoSemVoltarPrimeiro() {
         RegistroPonto emPausa = new RegistroPonto(
                 usuario, TipoRegistroPonto.PAUSA_INICIO, agora.minusSeconds(600), OrigemRegistroPonto.WEB, "127.0.0.1", "junit", null);
         when(registroPontoRepository.findFirstByUsuarioOrderByCriadoEmDesc(usuario)).thenReturn(Optional.of(emPausa));
+        when(registroPontoRepository.save(any(RegistroPonto.class))).thenAnswer(chamada -> chamada.getArgument(0));
 
-        assertThatThrownBy(() -> pontoService.marcar(usuario, TipoRegistroPonto.SAIDA, "127.0.0.1", "junit"))
-                .isInstanceOf(SequenciaInvalidaException.class);
+        var resposta = pontoService.marcar(usuario, TipoRegistroPonto.SAIDA, "127.0.0.1", "junit");
+
+        assertThat(resposta.tipo()).isEqualTo(TipoRegistroPonto.SAIDA);
     }
 
     @Test
     void estadoAtualDeQuemNuncaMarcouSoOfereceEntrada() {
         when(registroPontoRepository.findFirstByUsuarioOrderByCriadoEmDesc(usuario)).thenReturn(Optional.empty());
+        when(jornadaService.segundosTrabalhadosAteAgora(usuario)).thenReturn(0L);
 
         var estado = pontoService.estadoAtual(usuario);
 
         assertThat(estado.ultimoTipo()).isNull();
+        assertThat(estado.ultimoMomento()).isNull();
+        assertThat(estado.segundosTrabalhadosAteAgora()).isZero();
         assertThat(estado.proximasOpcoes()).containsExactly(TipoRegistroPonto.ENTRADA);
     }
 
     @Test
-    void estadoAtualDeQuemEstaEmPausaSoOfereceRetomar() {
+    void estadoAtualDeQuemEstaEmPausaOfereceRetomarOuEncerrar() {
+        Instant momentoDaPausa = agora.minusSeconds(600);
         RegistroPonto emPausa = new RegistroPonto(
-                usuario, TipoRegistroPonto.PAUSA_INICIO, agora.minusSeconds(600), OrigemRegistroPonto.WEB, "127.0.0.1", "junit", null);
+                usuario, TipoRegistroPonto.PAUSA_INICIO, momentoDaPausa, OrigemRegistroPonto.WEB, "127.0.0.1", "junit", null);
         when(registroPontoRepository.findFirstByUsuarioOrderByCriadoEmDesc(usuario)).thenReturn(Optional.of(emPausa));
+        when(jornadaService.segundosTrabalhadosAteAgora(usuario)).thenReturn(1800L);
 
         var estado = pontoService.estadoAtual(usuario);
 
         assertThat(estado.ultimoTipo()).isEqualTo(TipoRegistroPonto.PAUSA_INICIO);
-        assertThat(estado.proximasOpcoes()).containsExactly(TipoRegistroPonto.PAUSA_FIM);
+        assertThat(estado.ultimoMomento()).isEqualTo(momentoDaPausa);
+        assertThat(estado.segundosTrabalhadosAteAgora()).isEqualTo(1800L);
+        assertThat(estado.proximasOpcoes())
+                .containsExactlyInAnyOrder(TipoRegistroPonto.PAUSA_FIM, TipoRegistroPonto.SAIDA);
     }
 
     @Test
     void estadoAtualDeQuemEstaTrabalhandoOferecePausaESaida() {
+        Instant momentoDaEntrada = agora.minusSeconds(600);
         RegistroPonto entrada = new RegistroPonto(
-                usuario, TipoRegistroPonto.ENTRADA, agora.minusSeconds(600), OrigemRegistroPonto.WEB, "127.0.0.1", "junit", null);
+                usuario, TipoRegistroPonto.ENTRADA, momentoDaEntrada, OrigemRegistroPonto.WEB, "127.0.0.1", "junit", null);
         when(registroPontoRepository.findFirstByUsuarioOrderByCriadoEmDesc(usuario)).thenReturn(Optional.of(entrada));
+        when(jornadaService.segundosTrabalhadosAteAgora(usuario)).thenReturn(600L);
 
         var estado = pontoService.estadoAtual(usuario);
 
         assertThat(estado.ultimoTipo()).isEqualTo(TipoRegistroPonto.ENTRADA);
+        assertThat(estado.ultimoMomento()).isEqualTo(momentoDaEntrada);
+        assertThat(estado.segundosTrabalhadosAteAgora()).isEqualTo(600L);
         assertThat(estado.proximasOpcoes())
                 .containsExactlyInAnyOrder(TipoRegistroPonto.PAUSA_INICIO, TipoRegistroPonto.SAIDA);
     }

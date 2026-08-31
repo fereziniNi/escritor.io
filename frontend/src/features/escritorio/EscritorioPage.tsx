@@ -8,6 +8,7 @@ import { RelatoriosPage } from '../relatorios/RelatoriosPage'
 import { buscarMapaAtivo } from './api'
 import './EscritorioPage.css'
 import './ui/hud.css'
+import { CronometroTrabalho } from './CronometroTrabalho'
 import { CamadaMundo } from './mundo/CamadaMundo'
 import { PROXIMIDADE_RAIO_TILES } from './mundo/constantes'
 import { calcularParesProximos, usuariosProximosDeAlguem } from './mundo/proximidade'
@@ -115,6 +116,7 @@ export function EscritorioPage() {
   return (
     <section className="escritorio-pagina">
       <SugestaoRegistrarEntrada aoClicarRegistrar={() => setPainelAberto('ponto')} />
+      <CronometroTrabalho />
       <Notificacoes itens={notificacoes} />
 
       <BarraFerramentas

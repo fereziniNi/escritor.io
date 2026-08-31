@@ -132,6 +132,15 @@ class JornadaServiceTest {
     }
 
     @Test
+    void segundosTrabalhadosAteAgoraContaOSegmentoEmAndamento() {
+        // clock fixo do setUp: 2026-01-13T20:00:00Z - entrada foi às 09:00, então 11h de trabalho
+        when(registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualOrderByMomentoAsc(any(), any()))
+                .thenReturn(List.of(registro(TipoRegistroPonto.ENTRADA, "2026-01-13T09:00:00Z")));
+
+        assertThat(jornadaService.segundosTrabalhadosAteAgora(usuario)).isEqualTo(11 * 3600);
+    }
+
+    @Test
     void saldoAcumuladoSomaOsDiasUteisAnterioresEIgnoraFimDeSemana() {
         when(registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualOrderByMomentoAsc(any(), any()))
                 .thenReturn(List.of(
