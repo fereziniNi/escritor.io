@@ -37,12 +37,12 @@ describe('SugestaoRegistrarEntrada', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Você ainda não registrou entrada hoje.')
   })
 
-  it('mostra o aviso quando o último registro foi SAIDA (jornada já encerrada)', async () => {
+  it('mostra o aviso com texto diferente quando o último registro foi SAIDA (já trabalhou e encerrou, não "nunca registrou")', async () => {
     server.use(http.get('/ponto/estado-atual', () => HttpResponse.json({ ultimoTipo: 'SAIDA', proximasOpcoes: ['ENTRADA'] })))
 
     renderComponente()
 
-    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent('Você já encerrou o trabalho por hoje.')
   })
 
   it('clicar no botão do aviso chama aoClicarRegistrar, pra abrir o painel de ponto', async () => {

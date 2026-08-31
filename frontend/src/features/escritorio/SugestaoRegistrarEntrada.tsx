@@ -9,6 +9,11 @@ import { buscarEstadoAtual } from '../ponto/api'
  * (já encerrou) - qualquer outro valor (`ENTRADA`/`PAUSA_INICIO`/`PAUSA_FIM`) significa jornada em
  * andamento, sem aviso. `aoClicarRegistrar` abre o painel de Ponto (S6, reskin "uma tela só") - já
  * não existe mais uma rota separada pra navegar até lá.
+ *
+ * <p>As duas situações sem ponto aberto têm textos diferentes de propósito - usuário relatou
+ * confusão com "não registrou entrada" aparecendo mesmo depois de já ter trabalhado e encerrado
+ * (SAIDA): a frase original era literalmente falsa nesse caso (a pessoa registrou entrada sim, só
+ * que também já saiu), então cada estado agora fala a verdade específica dele.
  */
 export function SugestaoRegistrarEntrada({ aoClicarRegistrar }: { aoClicarRegistrar: () => void }) {
   const estadoQuery = useQuery({ queryKey: ['ponto', 'estado-atual'], queryFn: buscarEstadoAtual })
@@ -17,14 +22,17 @@ export function SugestaoRegistrarEntrada({ aoClicarRegistrar }: { aoClicarRegist
     return null
   }
 
-  const pontoAberto = estadoQuery.data.ultimoTipo !== null && estadoQuery.data.ultimoTipo !== 'SAIDA'
+  const { ultimoTipo } = estadoQuery.data
+  const pontoAberto = ultimoTipo !== null && ultimoTipo !== 'SAIDA'
   if (pontoAberto) {
     return null
   }
 
+  const mensagem = ultimoTipo === 'SAIDA' ? 'Você já encerrou o trabalho por hoje.' : 'Você ainda não registrou entrada hoje.'
+
   return (
     <p role="alert" className="escritorio-aviso">
-      Você ainda não registrou entrada hoje.{' '}
+      {mensagem}{' '}
       <button type="button" onClick={aoClicarRegistrar}>
         Ir pra tela de ponto
       </button>
