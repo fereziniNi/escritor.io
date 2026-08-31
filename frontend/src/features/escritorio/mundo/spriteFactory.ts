@@ -1,5 +1,6 @@
 import type { Graphics as PixiGraphics } from 'pixi.js'
 import { TILE_PX } from './constantes'
+import type { SegmentoParede } from './tipos'
 
 /**
  * "Fábrica" de desenho procedural do mundo - continua o precedente já estabelecido no projeto
@@ -35,4 +36,27 @@ export function desenharPiso(g: PixiGraphics, larguraTiles: number, alturaTiles:
     g.lineTo(larguraTiles * TILE_PX, ty * TILE_PX)
   }
   g.stroke({ width: 1, color: COR_LINHA_PISO })
+}
+
+const ESPESSURA_PAREDE_PX = 6
+const COR_PAREDE = 0x2b1f16
+const COR_PAREDE_BORDA = 0x1a120c
+
+/** Desenha todas as paredes num único `Graphics` - cada segmento vira um retângulo fino sobre a
+ * linha de grade correspondente, esticado meia espessura além das pontas nominais pra as quinas
+ * entre segmentos perpendiculares fecharem sem buraco visual. */
+export function desenharParedes(g: PixiGraphics, paredes: SegmentoParede[]): void {
+  g.clear()
+  for (const parede of paredes) {
+    const meia = ESPESSURA_PAREDE_PX / 2
+    if (parede.orientacao === 'horizontal') {
+      const largura = parede.comprimento * TILE_PX + ESPESSURA_PAREDE_PX
+      g.rect(parede.x * TILE_PX - meia, parede.y * TILE_PX - meia, largura, ESPESSURA_PAREDE_PX)
+    } else {
+      const altura = parede.comprimento * TILE_PX + ESPESSURA_PAREDE_PX
+      g.rect(parede.x * TILE_PX - meia, parede.y * TILE_PX - meia, ESPESSURA_PAREDE_PX, altura)
+    }
+    g.fill({ color: COR_PAREDE })
+    g.stroke({ width: 1, color: COR_PAREDE_BORDA })
+  }
 }
