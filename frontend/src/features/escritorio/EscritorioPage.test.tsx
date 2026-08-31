@@ -207,7 +207,7 @@ describe('EscritorioPage', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('presenca-zona-10')).toHaveTextContent('Ana')
-      expect(screen.getByTestId('presenca-zona-10')).toHaveTextContent('Foco')
+      expect(screen.getByTestId('presenca-zona-10')).toHaveTextContent('Trabalhando')
     })
     expect(screen.getByTestId('presenca-zona-aberto')).not.toHaveTextContent('Ana')
   })

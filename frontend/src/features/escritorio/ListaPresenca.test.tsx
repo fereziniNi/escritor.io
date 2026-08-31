@@ -15,7 +15,7 @@ describe('ListaPresenca', () => {
     render(<ListaPresenca zonas={ZONAS} usuarios={[ANA, BETO]} meuUsuarioId={null} />)
 
     expect(within(screen.getByTestId('presenca-zona-1')).getByText(/Ana/)).toBeInTheDocument();
-    expect(within(screen.getByTestId('presenca-zona-1')).getByText(/Foco/)).toBeInTheDocument();
+    expect(within(screen.getByTestId('presenca-zona-1')).getByText(/Trabalhando/)).toBeInTheDocument();
     expect(within(screen.getByTestId('presenca-zona-aberto')).getByText(/Beto/)).toBeInTheDocument();
   })
 
