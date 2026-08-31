@@ -257,7 +257,7 @@ class PresencaWebSocketIT {
         try {
             mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
 
-            // zona "Sala de foco" seedada por V21__create_zona.sql cobre x em [0,4) e y em [0,4)
+            // zona "Sala de foco" seedada por V23__reorganiza_zonas_do_mapa.sql cobre x em [1,5) e y em [1,5)
             sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":1,\"y\":1}"));
 
             String recebido = mensagensAna.poll(5, TimeUnit.SECONDS);
@@ -280,7 +280,8 @@ class PresencaWebSocketIT {
             String dentro = mensagensAna.poll(5, TimeUnit.SECONDS);
             assertThat(dentro).isNotNull().contains("\"status\":\"FOCO\"");
 
-            // (8,8) não cai em nenhuma zona seedada (foco/reunião/café ficam todas em y < 5)
+            // (8,8) não cai em nenhuma zona seedada (V23: foco/recepção/café ficam em y 1-4/1-3,
+            // reunião em y 9-13, x 1-6 - (8,8) fica no corredor aberto entre elas)
             sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":8,\"y\":8}"));
 
             String fora = mensagensAna.poll(5, TimeUnit.SECONDS);
@@ -324,8 +325,8 @@ class PresencaWebSocketIT {
         try {
             mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
 
-            // zona "Café" seedada por V21__create_zona.sql cobre x em [11,15) e y em [0,4) - sem StatusAvatar.CAFE
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":12,\"y\":1}"));
+            // zona "Café" seedada por V23__reorganiza_zonas_do_mapa.sql cobre x em [14,18) e y em [1,5) - sem StatusAvatar.CAFE
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":15,\"y\":2}"));
 
             String recebido = mensagensAna.poll(5, TimeUnit.SECONDS);
             assertThat(recebido).isNotNull().contains("\"status\":\"DISPONIVEL\"");
@@ -408,7 +409,7 @@ class PresencaWebSocketIT {
         try {
             mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
 
-            // zona "Sala de foco" seedada por V21__create_zona.sql cobre x em [0,4) e y em [0,4)
+            // zona "Sala de foco" seedada por V23__reorganiza_zonas_do_mapa.sql cobre x em [1,5) e y em [1,5)
             sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":1,\"y\":1}"));
             String recebido = mensagensAna.poll(5, TimeUnit.SECONDS);
             assertThat(recebido).isNotNull(); // o broadcast já saiu antes da escrita do evento (PRD, S6.12)
@@ -465,8 +466,11 @@ class PresencaWebSocketIT {
             sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":1,\"y\":1}")); // entra na zona de foco
             mensagensAna.poll(5, TimeUnit.SECONDS);
 
-            // zona "Sala de reunião" seedada cobre x em [5,10) e y em [0,5)
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":6,\"y\":1}"));
+            // zona "Sala de reunião" seedada por V23__reorganiza_zonas_do_mapa.sql cobre x em [1,6) e y em [9,14) -
+            // não é fisicamente adjacente à Sala de foco no layout novo, mas não há checagem de velocidade/teleporte
+            // no servidor (ValidadorPosicaoMapa só valida limites do mapa), então uma única mensagem POSICAO
+            // "pulando" direto pra dentro da outra zona ainda é o cenário válido que este teste quer cobrir.
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":2,\"y\":10}"));
             mensagensAna.poll(5, TimeUnit.SECONDS);
             Thread.sleep(300); // receber o broadcast não prova que a escrita seguinte já terminou
 

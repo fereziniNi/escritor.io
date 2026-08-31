@@ -62,7 +62,9 @@ class MapaControllerIT {
                 .jsonPath("$.nome").isEqualTo("Escritório")
                 .jsonPath("$.larguraTiles").isEqualTo(20)
                 .jsonPath("$.alturaTiles").isEqualTo(15)
-                .jsonPath("$.zonas.length()").isEqualTo(3);
+                // 4 zonas desde V23 (layout reorganizado: salas espalhadas pelos cantos do mapa
+                // em vez de uma fileira só no topo, + Recepção nova)
+                .jsonPath("$.zonas.length()").isEqualTo(4);
     }
 
     @Test

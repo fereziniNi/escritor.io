@@ -42,11 +42,12 @@ class ZonaRepositoryIT {
     }
 
     @Test
-    void zonasSeedadasPelaMigracaoV21PertencemAoMapaAtivo() {
+    void zonasSeedadasPelaMigracaoPertencemAoMapaAtivo() {
         Mapa mapaAtivo = mapaRepository.findAll().stream().filter(Mapa::isAtivo).findFirst().orElseThrow();
 
+        // 4 zonas desde V23__reorganiza_zonas_do_mapa.sql (3 originais da V21 reposicionadas + Recepção nova)
         assertThat(zonaRepository.findAll())
-                .hasSize(3)
+                .hasSize(4)
                 .allSatisfy(zona -> assertThat(zona.getMapa().getId()).isEqualTo(mapaAtivo.getId()));
     }
 }
