@@ -15,7 +15,7 @@ export interface PortaOverride {
   borda: BordaZona
 }
 
-export type TipoMovel = 'mesa' | 'cadeira' | 'planta' | 'estante' | 'balcao' | 'tapete'
+export type TipoMovel = 'mesa' | 'cadeira' | 'planta' | 'estante' | 'balcao' | 'tapete' | 'sofa' | 'mesaJogos'
 
 export interface ItemMobilia {
   tipo: TipoMovel

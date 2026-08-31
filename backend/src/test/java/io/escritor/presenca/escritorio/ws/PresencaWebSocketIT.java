@@ -142,8 +142,8 @@ class PresencaWebSocketIT {
 
         WebSocketSession sessaoAna = conectar(tokenAna, new LinkedBlockingQueue<>());
         try {
-            // mapa seedado por V20__create_mapa.sql tem largura_tiles=20 - x=25 está fora
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":25,\"y\":5}"));
+            // mapa seedado por V24__redesenha_salas_por_funcao.sql tem largura_tiles=28 - x=30 está fora
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":30,\"y\":5}"));
             Thread.sleep(500); // dá tempo do servidor processar (e rejeitar) a mensagem
 
             Usuario beto = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s64c@escritor.io", Papel.COLABORADOR, 480));
@@ -153,7 +153,7 @@ class PresencaWebSocketIT {
             try {
                 String snapshot = mensagensBeto.poll(5, TimeUnit.SECONDS);
 
-                assertThat(snapshot).isNotNull().doesNotContain("\"x\":25");
+                assertThat(snapshot).isNotNull().doesNotContain("\"x\":30");
             } finally {
                 sessaoBeto.close();
             }
@@ -257,8 +257,8 @@ class PresencaWebSocketIT {
         try {
             mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
 
-            // zona "Sala de foco" seedada por V23__reorganiza_zonas_do_mapa.sql cobre x em [1,5) e y em [1,5)
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":1,\"y\":1}"));
+            // zona "Área de trabalho" (tipo FOCO) seedada por V24__redesenha_salas_por_funcao.sql cobre x em [1,13) e y em [10,18)
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":2,\"y\":11}"));
 
             String recebido = mensagensAna.poll(5, TimeUnit.SECONDS);
             assertThat(recebido).isNotNull().contains("\"status\":\"FOCO\"");
@@ -276,12 +276,12 @@ class PresencaWebSocketIT {
         WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
         try {
             mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":1,\"y\":1}")); // entra na zona de foco
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":2,\"y\":11}")); // entra na Área de trabalho (FOCO)
             String dentro = mensagensAna.poll(5, TimeUnit.SECONDS);
             assertThat(dentro).isNotNull().contains("\"status\":\"FOCO\"");
 
-            // (8,8) não cai em nenhuma zona seedada (V23: foco/recepção/café ficam em y 1-4/1-3,
-            // reunião em y 9-13, x 1-6 - (8,8) fica no corredor aberto entre elas)
+            // (8,8) não cai em nenhuma zona seedada (V24: reuniões/café ficam em y 1-6, área de
+            // trabalho/fora do trabalho em y 10-17 - (8,8) fica no corredor aberto entre elas)
             sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":8,\"y\":8}"));
 
             String fora = mensagensAna.poll(5, TimeUnit.SECONDS);
@@ -300,7 +300,7 @@ class PresencaWebSocketIT {
         WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
         try {
             mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":1,\"y\":1}")); // entra na zona de foco
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":2,\"y\":11}")); // entra na Área de trabalho (FOCO)
             mensagensAna.poll(5, TimeUnit.SECONDS);
 
             sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"STATUS\",\"status\":\"ALMOCO\"}")); // troca manual, ainda dentro da zona
@@ -325,7 +325,7 @@ class PresencaWebSocketIT {
         try {
             mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
 
-            // zona "Café" seedada por V23__reorganiza_zonas_do_mapa.sql cobre x em [14,18) e y em [1,5) - sem StatusAvatar.CAFE
+            // zona "Café" seedada por V24__redesenha_salas_por_funcao.sql cobre x em [13,19) e y em [1,7) - sem StatusAvatar.CAFE
             sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":15,\"y\":2}"));
 
             String recebido = mensagensAna.poll(5, TimeUnit.SECONDS);
@@ -409,8 +409,8 @@ class PresencaWebSocketIT {
         try {
             mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
 
-            // zona "Sala de foco" seedada por V23__reorganiza_zonas_do_mapa.sql cobre x em [1,5) e y em [1,5)
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":1,\"y\":1}"));
+            // zona "Área de trabalho" (tipo FOCO) seedada por V24__redesenha_salas_por_funcao.sql cobre x em [1,13) e y em [10,18)
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":2,\"y\":11}"));
             String recebido = mensagensAna.poll(5, TimeUnit.SECONDS);
             assertThat(recebido).isNotNull(); // o broadcast já saiu antes da escrita do evento (PRD, S6.12)
             // receber o broadcast no cliente não prova que a escrita seguinte no servidor (mesma
@@ -421,7 +421,7 @@ class PresencaWebSocketIT {
             List<EventoPresenca> eventos = eventoPresencaRepository.findByUsuarioId(ana.getId());
             assertThat(eventos).hasSize(1);
             assertThat(eventos.get(0).getUsuario().getId()).isEqualTo(ana.getId());
-            assertThat(eventos.get(0).getZona().getNome()).isEqualTo("Sala de foco");
+            assertThat(eventos.get(0).getZona().getNome()).isEqualTo("Área de trabalho");
             assertThat(eventos.get(0).getEntrouEm()).isNotNull();
             assertThat(eventos.get(0).getSaiuEm()).isNull();
         } finally {
@@ -438,7 +438,7 @@ class PresencaWebSocketIT {
         WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
         try {
             mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":1,\"y\":1}")); // entra na zona de foco
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":2,\"y\":11}")); // entra na Área de trabalho (FOCO)
             mensagensAna.poll(5, TimeUnit.SECONDS);
 
             // (8,8) não cai em nenhuma zona seedada
@@ -463,20 +463,20 @@ class PresencaWebSocketIT {
         WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
         try {
             mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":1,\"y\":1}")); // entra na zona de foco
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":2,\"y\":11}")); // entra na Área de trabalho (FOCO)
             mensagensAna.poll(5, TimeUnit.SECONDS);
 
-            // zona "Sala de reunião" seedada por V23__reorganiza_zonas_do_mapa.sql cobre x em [1,6) e y em [9,14) -
-            // não é fisicamente adjacente à Sala de foco no layout novo, mas não há checagem de velocidade/teleporte
-            // no servidor (ValidadorPosicaoMapa só valida limites do mapa), então uma única mensagem POSICAO
-            // "pulando" direto pra dentro da outra zona ainda é o cenário válido que este teste quer cobrir.
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":2,\"y\":10}"));
+            // zona "Sala de reunião" seedada por V24__redesenha_salas_por_funcao.sql cobre x em [1,8) e y em [1,7) -
+            // não é fisicamente adjacente à Área de trabalho no layout novo, mas não há checagem de velocidade/
+            // teleporte no servidor (ValidadorPosicaoMapa só valida limites do mapa), então uma única mensagem
+            // POSICAO "pulando" direto pra dentro da outra zona ainda é o cenário válido que este teste quer cobrir.
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":2,\"y\":2}"));
             mensagensAna.poll(5, TimeUnit.SECONDS);
             Thread.sleep(300); // receber o broadcast não prova que a escrita seguinte já terminou
 
             List<EventoPresenca> eventos = eventoPresencaRepository.findByUsuarioId(ana.getId());
             assertThat(eventos).hasSize(2);
-            EventoPresenca eventoFoco = eventos.stream().filter(e -> e.getZona().getNome().equals("Sala de foco")).findFirst().orElseThrow();
+            EventoPresenca eventoFoco = eventos.stream().filter(e -> e.getZona().getNome().equals("Área de trabalho")).findFirst().orElseThrow();
             EventoPresenca eventoReuniao =
                     eventos.stream().filter(e -> e.getZona().getNome().equals("Sala de reunião")).findFirst().orElseThrow();
             assertThat(eventoFoco.getSaiuEm()).isNotNull();
@@ -493,7 +493,7 @@ class PresencaWebSocketIT {
         BlockingQueue<String> mensagensAna = new LinkedBlockingQueue<>();
 
         WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
-        sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":1,\"y\":1}")); // entra na zona de foco
+        sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":2,\"y\":11}")); // entra na Área de trabalho (FOCO)
         mensagensAna.poll(5, TimeUnit.SECONDS);
 
         sessaoAna.close();

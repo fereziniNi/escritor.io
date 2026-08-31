@@ -1,63 +1,84 @@
 import type { ItemMobilia, PortaOverride } from './tipos'
 
-/** Override de borda de porta por id de zona - vazio por enquanto (as 4 zonas do layout novo,
- * V23__reorganiza_zonas_do_mapa.sql, usam todas o padrão de porta na borda sul, que já abre pro
- * corredor/área aberta em qualquer uma delas). */
+/** Override de borda de porta por id de zona - vazio (as 4 salas do layout novo,
+ * V24__redesenha_salas_por_funcao.sql, usam todas o padrão de porta na borda sul, abrindo pro
+ * corredor central). */
 export const PORTAS_OVERRIDE: PortaOverride[] = []
 
 /**
- * Móveis/decoração do mundo - conteúdo só de frontend, layout redesenhado (usuário não gostou da
- * organização original: as 3 salas ficavam todas espremidas numa fileira só no topo, com o resto
- * do mapa vazio). Agora as 4 zonas do backend (`V23__reorganiza_zonas_do_mapa.sql`: Sala de foco
- * 1,1,4×4 / Recepção 8,1,4×3 / Café 14,1,4×4 / Sala de reunião 1,9,5×5, mapa 20×15) ficam
- * espalhadas pelos cantos, com um corredor central de verdade entre elas - e a área aberta ganhou
- * dois grupos de baias + um canto de estar em vez de mesas soltas aleatórias. Coordenadas em
- * tiles, mesma origem/eixos das zonas.
+ * Móveis/decoração do mundo - conteúdo só de frontend, redesenhado a partir de uma referência
+ * visual de escritório virtual (usuário pediu 4 salas por função: Reuniões, Pausa/Café,
+ * Trabalhando, Fora do trabalho). Reaproveita os 4 tipos de zona do backend
+ * (`V24__redesenha_salas_por_funcao.sql`, mapa 28×20): Sala de reunião (REUNIAO) 1,1,7×6 / Café
+ * (CAFE) 13,1,6×6 / Área de trabalho (FOCO) 1,10,12×8 / Fora do trabalho (LIVRE) 16,10,10×8.
+ * Móveis desenhados via `PIXI.Graphics` (sem asset de imagem, mesmo princípio do resto do mundo) -
+ * a referência foi usada como inspiração de composição/densidade, não copiada literalmente.
  */
 export const MOBILIA_MUNDO: ItemMobilia[] = [
-  // Sala de foco (1,1,4×4)
-  { tipo: 'mesa', x: 2, y: 2 },
-  { tipo: 'cadeira', x: 2, y: 3 },
-  { tipo: 'planta', x: 4, y: 4 },
+  // ---------- Comodo 1 — Sala de reunião (1,1,7×6) ----------
+  { tipo: 'mesa', x: 4, y: 3, rotacao: 90 },
+  { tipo: 'mesa', x: 4, y: 4, rotacao: 90 },
+  { tipo: 'cadeira', x: 3, y: 3 },
+  { tipo: 'cadeira', x: 3, y: 4 },
+  { tipo: 'cadeira', x: 5, y: 3 },
+  { tipo: 'cadeira', x: 5, y: 4 },
+  { tipo: 'cadeira', x: 4, y: 2 },
+  { tipo: 'cadeira', x: 4, y: 5 },
+  { tipo: 'estante', x: 2, y: 2 },
+  { tipo: 'planta', x: 6, y: 5 },
 
-  // Recepção (8,1,4×3) - balcão de entrada
-  { tipo: 'balcao', x: 9, y: 2 },
-  { tipo: 'balcao', x: 10, y: 2 },
-  { tipo: 'planta', x: 11, y: 3 },
-
-  // Café (14,1,4×4)
+  // ---------- Comodo 2 — Café / Pausa (13,1,6×6) ----------
+  { tipo: 'balcao', x: 14, y: 2 },
   { tipo: 'balcao', x: 15, y: 2 },
-  { tipo: 'balcao', x: 16, y: 2 },
-  { tipo: 'planta', x: 17, y: 4 },
+  { tipo: 'mesa', x: 15, y: 4 },
+  { tipo: 'cadeira', x: 14, y: 4 },
+  { tipo: 'cadeira', x: 16, y: 4 },
+  { tipo: 'planta', x: 17, y: 2 },
+  { tipo: 'planta', x: 13, y: 5 },
 
-  // Sala de reunião (1,9,5×5) - mesa grande ao centro, cadeiras dos dois lados
-  { tipo: 'mesa', x: 3, y: 10, rotacao: 90 },
-  { tipo: 'mesa', x: 3, y: 11, rotacao: 90 },
-  { tipo: 'cadeira', x: 2, y: 10 },
-  { tipo: 'cadeira', x: 2, y: 11 },
-  { tipo: 'cadeira', x: 4, y: 10 },
-  { tipo: 'cadeira', x: 4, y: 11 },
+  // ---------- Comodo 3 — Área de trabalho (1,10,12×8) ----------
+  // baia A (3 mesas)
+  { tipo: 'mesa', x: 2, y: 11 },
+  { tipo: 'cadeira', x: 2, y: 12 },
+  { tipo: 'mesa', x: 4, y: 11 },
+  { tipo: 'cadeira', x: 4, y: 12 },
+  { tipo: 'mesa', x: 6, y: 11 },
+  { tipo: 'cadeira', x: 6, y: 12 },
+  // baia B (2 mesas)
+  { tipo: 'mesa', x: 8, y: 11 },
+  { tipo: 'cadeira', x: 8, y: 12 },
+  { tipo: 'mesa', x: 10, y: 11 },
+  { tipo: 'cadeira', x: 10, y: 12 },
+  // baia C (5 mesas)
+  { tipo: 'mesa', x: 2, y: 15 },
+  { tipo: 'cadeira', x: 2, y: 16 },
+  { tipo: 'mesa', x: 4, y: 15 },
+  { tipo: 'cadeira', x: 4, y: 16 },
+  { tipo: 'mesa', x: 6, y: 15 },
+  { tipo: 'cadeira', x: 6, y: 16 },
+  { tipo: 'mesa', x: 8, y: 15 },
+  { tipo: 'cadeira', x: 8, y: 16 },
+  { tipo: 'mesa', x: 10, y: 15 },
+  { tipo: 'cadeira', x: 10, y: 16 },
+  { tipo: 'estante', x: 11, y: 17 },
+  { tipo: 'planta', x: 1, y: 17 },
+  { tipo: 'planta', x: 11, y: 10 },
 
-  // baias soltas no corredor central, logo abaixo da Recepção
-  { tipo: 'mesa', x: 9, y: 6 },
-  { tipo: 'cadeira', x: 9, y: 7 },
-  { tipo: 'mesa', x: 12, y: 6 },
-  { tipo: 'cadeira', x: 12, y: 7 },
+  // ---------- Comodo 4 — Fora do trabalho (16,10,10×8) ----------
+  { tipo: 'sofa', x: 17, y: 11 },
+  { tipo: 'sofa', x: 20, y: 11 },
+  { tipo: 'mesaJogos', x: 23, y: 12 },
+  { tipo: 'tapete', x: 19, y: 14 },
+  { tipo: 'estante', x: 25, y: 11 },
+  { tipo: 'planta', x: 17, y: 16 },
+  { tipo: 'planta', x: 24, y: 16 },
 
-  // segundo grupo de baias na área aberta à direita/embaixo
-  { tipo: 'mesa', x: 9, y: 10 },
-  { tipo: 'cadeira', x: 9, y: 11 },
-  { tipo: 'mesa', x: 13, y: 10 },
-  { tipo: 'cadeira', x: 13, y: 11 },
-  { tipo: 'mesa', x: 17, y: 10 },
-  { tipo: 'cadeira', x: 17, y: 11 },
-
-  // canto de estar informal
-  { tipo: 'tapete', x: 15, y: 7 },
-  { tipo: 'estante', x: 17, y: 6 },
+  // ---------- corredor central ----------
+  { tipo: 'planta', x: 9, y: 8 },
+  { tipo: 'planta', x: 20, y: 8 },
 
   // plantas decorativas nos cantos do mapa
-  { tipo: 'planta', x: 0, y: 14 },
-  { tipo: 'planta', x: 19, y: 14 },
-  { tipo: 'planta', x: 19, y: 0 },
+  { tipo: 'planta', x: 0, y: 19 },
+  { tipo: 'planta', x: 27, y: 19 },
+  { tipo: 'planta', x: 27, y: 0 },
 ]

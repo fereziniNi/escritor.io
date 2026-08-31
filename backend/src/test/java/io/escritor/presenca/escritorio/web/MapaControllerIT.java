@@ -60,10 +60,11 @@ class MapaControllerIT {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.nome").isEqualTo("Escritório")
-                .jsonPath("$.larguraTiles").isEqualTo(20)
-                .jsonPath("$.alturaTiles").isEqualTo(15)
-                // 4 zonas desde V23 (layout reorganizado: salas espalhadas pelos cantos do mapa
-                // em vez de uma fileira só no topo, + Recepção nova)
+                // 28x20 desde V24 (mapa cresceu pra caber 4 salas maiores, redesenhadas por função)
+                .jsonPath("$.larguraTiles").isEqualTo(28)
+                .jsonPath("$.alturaTiles").isEqualTo(20)
+                // 4 zonas desde V23/V24 (layout reorganizado: salas espalhadas em vez de uma
+                // fileira só no topo - Reuniões/Café/Área de trabalho/Fora do trabalho)
                 .jsonPath("$.zonas.length()").isEqualTo(4);
     }
 

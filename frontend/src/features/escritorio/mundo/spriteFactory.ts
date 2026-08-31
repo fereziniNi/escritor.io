@@ -139,6 +139,43 @@ function desenharTapete(g: PixiGraphics, cx: number, cy: number): void {
   g.fill({ color: 0xe0a94f, alpha: 0.55 })
 }
 
+/** Sofá de "sala fora do trabalho" - um retângulo comprido com um encosto (faixa mais escura de
+ * um dos lados) e "braços" nas pontas. */
+function desenharSofa(g: PixiGraphics, cx: number, cy: number, rotacao: number): void {
+  const girado = rotacao === 90 || rotacao === 270
+  const largura = girado ? TILE_PX * 0.55 : TILE_PX * 1.7
+  const altura = girado ? TILE_PX * 1.7 : TILE_PX * 0.55
+  g.roundRect(cx - largura / 2, cy - altura / 2, largura, altura, 6)
+  g.fill({ color: 0x6f8fa8 })
+  g.stroke({ width: 1.5, color: 0x3f5a6e })
+  // encosto - faixa mais escura de um dos lados compridos
+  if (girado) {
+    g.roundRect(cx - largura / 2, cy - altura / 2, largura * 0.4, altura, 4)
+  } else {
+    g.roundRect(cx - largura / 2, cy - altura / 2, largura, altura * 0.4, 4)
+  }
+  g.fill({ color: 0x5a7890 })
+}
+
+/** Mesa de jogos (estilo ping-pong) - retângulo verde com linha central branca, pro "canto de
+ * descanso" ter algo mais lúdico que só sofá/tapete. */
+function desenharMesaJogos(g: PixiGraphics, cx: number, cy: number, rotacao: number): void {
+  const girado = rotacao === 90 || rotacao === 270
+  const largura = girado ? TILE_PX * 0.9 : TILE_PX * 1.7
+  const altura = girado ? TILE_PX * 1.7 : TILE_PX * 0.9
+  g.roundRect(cx - largura / 2, cy - altura / 2, largura, altura, 3)
+  g.fill({ color: 0x3a8f5c })
+  g.stroke({ width: 1.5, color: 0x1c1a28 })
+  if (girado) {
+    g.moveTo(cx - largura / 2 + 3, cy)
+    g.lineTo(cx + largura / 2 - 3, cy)
+  } else {
+    g.moveTo(cx, cy - altura / 2 + 3)
+    g.lineTo(cx, cy + altura / 2 - 3)
+  }
+  g.stroke({ width: 1.5, color: 0xffffff, alpha: 0.85 })
+}
+
 /** Desenha os móveis/decoração - tapetes primeiro (ficam por baixo dos demais itens), depois o
  * resto na ordem em que aparecem em `dadosMundo.MOBILIA_MUNDO`. */
 export function desenharMobilia(g: PixiGraphics, itens: ItemMobilia[]): void {
@@ -168,6 +205,12 @@ export function desenharMobilia(g: PixiGraphics, itens: ItemMobilia[]): void {
         break
       case 'tapete':
         desenharTapete(g, cx, cy)
+        break
+      case 'sofa':
+        desenharSofa(g, cx, cy, rotacao)
+        break
+      case 'mesaJogos':
+        desenharMesaJogos(g, cx, cy, rotacao)
         break
     }
   }

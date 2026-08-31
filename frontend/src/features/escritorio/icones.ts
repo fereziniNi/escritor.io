@@ -1,11 +1,14 @@
 import type { StatusAvatar, TipoZona } from './types'
 
+/** Tipos de zona hoje mapeiam pras 4 salas por função do redesign (V24): FOCO = Área de trabalho,
+ * REUNIAO = Sala de reunião, CAFE = Café, LIVRE = Fora do trabalho (lounge) - ATENDIMENTO não é
+ * mais usado por nenhuma zona seedada, mas o mapeamento continua completo por tipo. */
 export const ICONE_ZONA: Record<TipoZona, string> = {
-  FOCO: '🎯',
+  FOCO: '💻',
   REUNIAO: '🗣️',
   CAFE: '☕',
   ATENDIMENTO: '🛎️',
-  LIVRE: '🌿',
+  LIVRE: '🛋️',
 }
 
 export const ICONE_STATUS: Record<StatusAvatar, string> = {
@@ -34,5 +37,7 @@ export const COR_ZONA: Record<TipoZona, string> = {
   REUNIAO: '#a6cdf0',
   CAFE: '#eccfa8',
   ATENDIMENTO: '#eac1c8',
-  LIVRE: '#dbe8d6',
+  // lavanda em vez do verde pastel original - LIVRE agora é "Fora do trabalho" (lounge), precisa
+  // se distinguir da Área de trabalho (FOCO), que também é esverdeada
+  LIVRE: '#d9c8ea',
 }
