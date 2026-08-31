@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react'
-import type { Zona } from '../types'
+import type { WheelEvent as ReactWheelEvent } from 'react'
+import { COR_STATUS } from '../icones'
+import type { EstadoPresencaUsuario, Zona } from '../types'
+import { AvatarPixi } from './AvatarPixi'
 import { calcularTransformCamera } from './camera'
+import type { TransformCamera } from './camera'
 import { TILE_PX, ZOOM_MAXIMO, ZOOM_MINIMO, ZOOM_PADRAO } from './constantes'
 import { MOBILIA_MUNDO, PORTAS_OVERRIDE } from './dadosMundo'
 import { gerarParedesDeZona } from './gerarParedesDeZona'
 import { PixiMundo } from './PixiMundo'
+import { SeguidorCamera } from './SeguidorCamera'
 import { desenharMobilia, desenharParedes, desenharPiso } from './spriteFactory'
 
 /** Valor de fallback determinístico quando não há `ResizeObserver` de verdade disponível (mesmo
@@ -35,20 +39,25 @@ function useTamanhoViewport(containerRef: React.RefObject<HTMLDivElement | null>
 }
 
 /**
- * Compõe o mundo Pixi: piso + móveis + paredes, com uma câmera navegável (roda do mouse pra zoom,
- * arrastar pra fazer pan) centralizada por padrão no meio do mapa - o "seguir o avatar" entra na
- * Fase 2 junto com o movimento de verdade (`useCameraFollow`, ainda não escrito). Ainda não é
- * montado dentro do `EscritorioPage.tsx` real (o mapa em DOM continua sendo o que os usuários
- * veem) até a Fase 2 ter paridade de funcionalidade - ver plano.
+ * Compõe o mundo Pixi: piso + móveis + paredes + avatares, com uma câmera que segue o próprio
+ * jogador (suavizada por `SeguidorCamera`) - roda do mouse ainda ajusta o zoom. Sem jogador
+ * localizável ainda (antes do snapshot inicial do WebSocket chegar) a câmera fica centralizada no
+ * mapa, mesmo comportamento estático da Fase 1. Ainda não é montado dentro do
+ * `EscritorioPage.tsx` real (o mapa em DOM continua sendo o que os usuários veem) até o movimento
+ * de teclado ter paridade (Fase 2.2) - ver plano.
  */
 export function CamadaMundo({
   larguraTiles,
   alturaTiles,
   zonas,
+  usuarios,
+  meuUsuarioId,
 }: {
   larguraTiles: number
   alturaTiles: number
   zonas: Zona[]
+  usuarios: EstadoPresencaUsuario[]
+  meuUsuarioId: number | null
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewport = useTamanhoViewport(hostRef)
@@ -58,55 +67,60 @@ export function CamadaMundo({
   const alturaMundoPx = alturaTiles * TILE_PX
 
   const [zoom, setZoom] = useState(ZOOM_PADRAO)
-  const [centro, setCentro] = useState(() => ({ x: larguraMundoPx / 2, y: alturaMundoPx / 2 }))
-  const arrastoRef = useRef<{ x: number; y: number } | null>(null)
+  const [transform, setTransform] = useState<TransformCamera>(() =>
+    calcularTransformCamera({
+      jogadorX: larguraMundoPx / 2,
+      jogadorY: alturaMundoPx / 2,
+      larguraMundoPx,
+      alturaMundoPx,
+      larguraViewportPx: VIEWPORT_PADRAO_PX.largura,
+      alturaViewportPx: VIEWPORT_PADRAO_PX.altura,
+      zoom: ZOOM_PADRAO,
+    }),
+  )
 
   function aoRodarRoda(evento: ReactWheelEvent<HTMLDivElement>) {
     setZoom((atual) => Math.min(ZOOM_MAXIMO, Math.max(ZOOM_MINIMO, atual - evento.deltaY * 0.001)))
   }
 
-  function aoPressionarPonteiro(evento: ReactPointerEvent<HTMLDivElement>) {
-    arrastoRef.current = { x: evento.clientX, y: evento.clientY }
-  }
-
-  function aoMoverPonteiro(evento: ReactPointerEvent<HTMLDivElement>) {
-    if (!arrastoRef.current) return
-    const dx = evento.clientX - arrastoRef.current.x
-    const dy = evento.clientY - arrastoRef.current.y
-    arrastoRef.current = { x: evento.clientX, y: evento.clientY }
-    setCentro((atual) => ({ x: atual.x - dx / zoom, y: atual.y - dy / zoom }))
-  }
-
-  function aoSoltarPonteiro() {
-    arrastoRef.current = null
-  }
-
-  const transform = calcularTransformCamera({
-    jogadorX: centro.x,
-    jogadorY: centro.y,
-    larguraMundoPx,
-    alturaMundoPx,
-    larguraViewportPx: viewport.largura,
-    alturaViewportPx: viewport.altura,
-    zoom,
-  })
+  const eu = meuUsuarioId !== null ? usuarios.find((u) => u.usuarioId === meuUsuarioId) : undefined
+  const alvoX = eu ? eu.x * TILE_PX + TILE_PX / 2 : larguraMundoPx / 2
+  const alvoY = eu ? eu.y * TILE_PX + TILE_PX / 2 : alturaMundoPx / 2
 
   return (
     <div
       ref={hostRef}
       data-testid="mundo-viewport"
-      style={{ width: '100%', height: '100%', cursor: arrastoRef.current ? 'grabbing' : 'grab', touchAction: 'none' }}
+      style={{ width: '100%', height: '100%' }}
       onWheel={aoRodarRoda}
-      onPointerDown={aoPressionarPonteiro}
-      onPointerMove={aoMoverPonteiro}
-      onPointerUp={aoSoltarPonteiro}
-      onPointerLeave={aoSoltarPonteiro}
     >
       <PixiMundo>
+        <SeguidorCamera
+          alvoX={alvoX}
+          alvoY={alvoY}
+          larguraMundoPx={larguraMundoPx}
+          alturaMundoPx={alturaMundoPx}
+          larguraViewportPx={viewport.largura}
+          alturaViewportPx={viewport.altura}
+          zoom={zoom}
+          transformAtual={transform}
+          aoAtualizar={setTransform}
+        />
         <pixiContainer x={transform.x} y={transform.y} scale={transform.scale}>
           <pixiGraphics draw={(g) => desenharPiso(g, larguraTiles, alturaTiles)} />
           <pixiGraphics draw={(g) => desenharMobilia(g, MOBILIA_MUNDO)} />
           <pixiGraphics draw={(g) => desenharParedes(g, paredes)} />
+          {usuarios.map((usuario) => (
+            <AvatarPixi
+              key={usuario.usuarioId}
+              tileX={usuario.x}
+              tileY={usuario.y}
+              nome={usuario.nome}
+              corCorpo={COR_STATUS[usuario.status]}
+              direcao="direita"
+              destaque={usuario.usuarioId === meuUsuarioId}
+            />
+          ))}
         </pixiContainer>
       </PixiMundo>
     </div>
