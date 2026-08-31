@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { HealthStatus } from '../../app/HealthStatus'
 import { useAuthStore } from '../auth/authStore'
+import { ColaboradoresPage } from '../organizacao/ColaboradoresPage'
 import { EquipesPage } from '../organizacao/EquipesPage'
 import { ProjetosPage } from '../organizacao/ProjetosPage'
 import { RelatoriosPage } from '../relatorios/RelatoriosPage'
@@ -32,6 +33,7 @@ const TITULO_PAINEL: Record<PainelId, string> = {
   relatorios: '📊 Relatórios',
   equipes: '👥 Equipes',
   projetos: '📁 Projetos',
+  colaboradores: '🧑‍💼 Colaboradores',
 }
 
 /**
@@ -141,6 +143,7 @@ export function EscritorioPage() {
           {painelAberto === 'relatorios' && <RelatoriosPage />}
           {painelAberto === 'equipes' && <EquipesPage />}
           {painelAberto === 'projetos' && <ProjetosPage />}
+          {painelAberto === 'colaboradores' && <ColaboradoresPage />}
         </PainelFlutuante>
       )}
 

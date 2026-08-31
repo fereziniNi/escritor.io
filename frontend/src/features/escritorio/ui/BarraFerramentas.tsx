@@ -2,7 +2,7 @@ import { ControlesAudioVideo } from './ControlesAudioVideo'
 import { MenuUsuario } from './MenuUsuario'
 import type { StatusAvatar } from '../types'
 
-export type PainelId = 'ponto' | 'kanban' | 'relatorios' | 'equipes' | 'projetos'
+export type PainelId = 'ponto' | 'kanban' | 'relatorios' | 'equipes' | 'projetos' | 'colaboradores'
 
 /**
  * Toolbar inferior - substitui o `.escritorio-dock` antigo (botões com texto+emoji lado a lado)
@@ -94,6 +94,15 @@ export function BarraFerramentas({
               onClick={() => aoAbrirPainel('projetos')}
             >
               📁
+            </button>
+            <button
+              type="button"
+              className={`escritorio-toolbar-botao${painelAberto === 'colaboradores' ? ' escritorio-toolbar-botao--ativo' : ''}`}
+              aria-label="Colaboradores"
+              title="Colaboradores"
+              onClick={() => aoAbrirPainel('colaboradores')}
+            >
+              🧑‍💼
             </button>
           </>
         )}

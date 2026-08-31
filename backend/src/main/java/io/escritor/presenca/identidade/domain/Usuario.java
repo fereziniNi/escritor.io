@@ -70,6 +70,14 @@ public class Usuario {
         return cargaDiariaMinutos;
     }
 
+    /** Pedido do usuário: "o admin deve definir [a carga diária] para os outros funcionários, não
+     * deve ser padrão" - antes só dava pra escolher na criação, sem jeito nenhum de mudar depois.
+     * Validação de positivo fica só na camada web ({@code @Positive} em
+     * {@code AtualizarCargaDiariaRequest}), mesmo padrão já usado no construtor deste tipo. */
+    public void alterarCargaDiaria(Integer novaCargaDiariaMinutos) {
+        this.cargaDiariaMinutos = novaCargaDiariaMinutos;
+    }
+
     public boolean isAtivo() {
         return ativo;
     }

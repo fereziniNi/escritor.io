@@ -1,5 +1,6 @@
 import { apiFetch } from '../../shared/api/http'
-import type { Equipe, Projeto, StatusProjeto } from './types'
+import type { Papel } from '../auth/types'
+import type { Colaborador, Equipe, Projeto, StatusProjeto } from './types'
 
 export async function listarEquipes(): Promise<Equipe[]> {
   const response = await apiFetch('/equipes')
@@ -55,4 +56,44 @@ export async function vincularEquipeAoProjeto(projetoId: number, equipeId: numbe
   if (!response.ok) {
     throw new Error('Não foi possível vincular a equipe ao projeto')
   }
+}
+
+export async function listarColaboradores(): Promise<Colaborador[]> {
+  const response = await apiFetch('/usuarios')
+  if (!response.ok) {
+    throw new Error('Não foi possível carregar os colaboradores')
+  }
+  return response.json()
+}
+
+export async function criarColaborador(dados: {
+  nome: string
+  email: string
+  papel: Papel
+  cargaDiariaMinutos: number
+}): Promise<Colaborador> {
+  const response = await apiFetch('/usuarios', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(dados),
+  })
+  if (!response.ok) {
+    throw new Error('Não foi possível criar o colaborador')
+  }
+  return response.json()
+}
+
+/** Único campo editável hoje pra quem já existe (pedido do usuário: "o admin deve definir [a
+ * carga diária] pros outros funcionários, não deve ser padrão") - nome/email/papel não têm tela
+ * de edição ainda. */
+export async function atualizarCargaDiaria(colaboradorId: number, cargaDiariaMinutos: number): Promise<Colaborador> {
+  const response = await apiFetch(`/usuarios/${colaboradorId}/carga-diaria`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cargaDiariaMinutos }),
+  })
+  if (!response.ok) {
+    throw new Error('Não foi possível atualizar a carga diária')
+  }
+  return response.json()
 }
