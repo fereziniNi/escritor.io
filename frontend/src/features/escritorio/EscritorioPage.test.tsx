@@ -227,8 +227,9 @@ describe('EscritorioPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Ponto/ }))
 
     expect(await screen.findByRole('dialog', { name: /Ponto/ })).toBeInTheDocument()
-    // ponto aberto (ENTRADA) - PontoWidget deve oferecer pausa/saída, não "Entrada" de novo
-    expect(await screen.findByRole('button', { name: 'Saída' })).toBeInTheDocument()
+    // ponto aberto (ENTRADA) - PontoWidget só oferece "Iniciar trabalho", nunca pausa/saída
+    // (pedido do usuário) - com jornada já aberta, o card mostra a confirmação, sem botão
+    expect(await screen.findByText('✅ Trabalho já iniciado hoje.')).toBeInTheDocument()
   })
 
   it('fecha o painel ao clicar em Fechar', async () => {

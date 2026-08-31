@@ -30,7 +30,7 @@ function renderPontoWidget() {
 }
 
 describe('PontoWidget', () => {
-  it('quem nunca marcou vê só a opção de entrada', async () => {
+  it('quem nunca marcou vê só a opção de iniciar trabalho', async () => {
     server.use(
       http.get('/ponto/estado-atual', () =>
         HttpResponse.json({ ultimoTipo: null, proximasOpcoes: ['ENTRADA'] }),
@@ -39,11 +39,25 @@ describe('PontoWidget', () => {
 
     renderPontoWidget()
 
-    expect(await screen.findByRole('button', { name: 'Entrada' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Iniciar trabalho' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Saída' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Iniciar pausa' })).not.toBeInTheDocument()
   })
 
-  it('quem está em pausa vê só a opção de retomar', async () => {
+  it('quem já iniciou o trabalho não vê nenhum botão - saída e pausa saíram do card (pedido do usuário)', async () => {
+    server.use(
+      http.get('/ponto/estado-atual', () =>
+        HttpResponse.json({ ultimoTipo: 'ENTRADA', proximasOpcoes: ['PAUSA_INICIO', 'SAIDA'] }),
+      ),
+    )
+
+    renderPontoWidget()
+
+    expect(await screen.findByText('✅ Trabalho já iniciado hoje.')).toBeInTheDocument()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('quem está em pausa também não vê nenhum botão de retomar', async () => {
     server.use(
       http.get('/ponto/estado-atual', () =>
         HttpResponse.json({ ultimoTipo: 'PAUSA_INICIO', proximasOpcoes: ['PAUSA_FIM'] }),
@@ -52,11 +66,11 @@ describe('PontoWidget', () => {
 
     renderPontoWidget()
 
-    expect(await screen.findByRole('button', { name: 'Retomar' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Iniciar pausa' })).not.toBeInTheDocument()
+    expect(await screen.findByText('✅ Trabalho já iniciado hoje.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Retomar' })).not.toBeInTheDocument()
   })
 
-  it('clicar numa opção marca o ponto e atualiza o estado', async () => {
+  it('clicar em iniciar trabalho marca a entrada e o card vira só a confirmação', async () => {
     let ultimoTipo: string | null = null
     server.use(
       http.get('/ponto/estado-atual', () =>
@@ -77,8 +91,9 @@ describe('PontoWidget', () => {
     const user = userEvent.setup()
     renderPontoWidget()
 
-    await user.click(await screen.findByRole('button', { name: 'Entrada' }))
+    await user.click(await screen.findByRole('button', { name: 'Iniciar trabalho' }))
 
-    expect(await screen.findByRole('button', { name: 'Saída' })).toBeInTheDocument()
+    expect(await screen.findByText('✅ Trabalho já iniciado hoje.')).toBeInTheDocument()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 })
