@@ -117,7 +117,6 @@ export function CamadaMundo({
               tileY={usuario.y}
               nome={usuario.nome}
               corCorpo={COR_STATUS[usuario.status]}
-              direcao="direita"
               destaque={usuario.usuarioId === meuUsuarioId}
             />
           ))}

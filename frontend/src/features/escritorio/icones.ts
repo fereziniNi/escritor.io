@@ -24,12 +24,3 @@ export const COR_STATUS: Record<StatusAvatar, string> = {
   ALMOCO: '#e8a33d',
   AUSENTE: '#8b8b9a',
 }
-
-/** "Móveis" da sala - só decoração, posicionados por CSS dentro de cada zona. */
-export const PROPS_ZONA: Record<TipoZona, string[]> = {
-  FOCO: ['🖥️', '📚'],
-  REUNIAO: ['🪑', '🖼️'],
-  CAFE: ['🍪', '🫖'],
-  ATENDIMENTO: ['📋', '🔔'],
-  LIVRE: ['🪴'],
-}

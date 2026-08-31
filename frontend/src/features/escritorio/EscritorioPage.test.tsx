@@ -7,6 +7,19 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { useAuthStore } from '../auth/authStore'
 import { EscritorioPage } from './EscritorioPage'
 
+/**
+ * O mundo (piso/paredes/móveis/avatares) virou um canvas Pixi (`CamadaMundo`, redesign estilo
+ * Gather) - jsdom não tem um contexto 2D de canvas de verdade, então deixar o Pixi tentar
+ * inicializar de verdade aqui só gera ruído (rejeições assíncronas não tratadas) sem testar nada
+ * de útil. A fidelidade visual do mundo é verificada via Playwright num navegador real (mesmo
+ * método usado em toda a sessão), não aqui - estes testes continuam cobrindo o que sempre
+ * cobriram: o HUD ao redor (dock, painéis, lista de presença) e a integração de
+ * movimento/status via WebSocket (a lógica pura de posição está em `mundo/movimento.test.ts`).
+ */
+vi.mock('./mundo/CamadaMundo', () => ({
+  CamadaMundo: () => <div data-testid="mundo-canvas-host" />,
+}))
+
 /** Ponto aberto de propósito, pra `SugestaoRegistrarEntrada` (S6.11) não interferir nestes testes. */
 function handlerPontoAberto() {
   return http.get('/ponto/estado-atual', () => HttpResponse.json({ ultimoTipo: 'ENTRADA', proximasOpcoes: ['PAUSA_INICIO', 'SAIDA'] }))
@@ -97,16 +110,16 @@ function renderPagina() {
 }
 
 describe('EscritorioPage', () => {
-  it('renderiza o mapa e as zonas retornadas pela API', async () => {
+  it('renderiza o mapa (mundo Pixi) depois de carregar os dados da API', async () => {
     server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto(), handlerHealthOk())
 
     renderPagina()
 
     expect(await screen.findByText(/Escritório/)).toBeInTheDocument()
-    expect(screen.getByTestId('zona-10')).toHaveTextContent('Sala de foco')
+    expect(screen.getByTestId('mundo-canvas-host')).toBeInTheDocument()
   })
 
-  it('seta pressionada move o próprio avatar localmente de imediato, sem esperar resposta do servidor', async () => {
+  it('seta pressionada manda a posição do próprio jogador pro servidor, sem esperar resposta', async () => {
     server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto(), handlerHealthOk())
     renderPagina()
     await screen.findByText(/Escritório/)
@@ -117,18 +130,17 @@ describe('EscritorioPage', () => {
         usuarios: [{ usuarioId: 1, nome: 'Ana', x: 5, y: 5, status: 'DISPONIVEL' }],
       })
     })
-    await waitFor(() => expect(screen.getByTestId('avatar-1')).toBeInTheDocument())
 
     fireEvent.keyDown(window, { key: 'ArrowRight' })
 
+    // nenhuma resposta do servidor foi simulada - a mensagem já sai só com a predição local
+    // (a lógica de clamp/próxima posição em si é testada pura em mundo/movimento.test.ts)
     await waitFor(() => {
-      expect(screen.getByTestId('avatar-1')).toHaveStyle({ left: '240px', top: '200px' }); // (6*40, 5*40)
+      expect(WebSocketFalso.instancias[0].mensagensEnviadas).toContain(JSON.stringify({ tipo: 'POSICAO', x: 6, y: 5 }))
     })
-    // nenhuma resposta do servidor foi simulada - a posição já mudou só com a predição local
-    expect(WebSocketFalso.instancias[0].mensagensEnviadas).toContain(JSON.stringify({ tipo: 'POSICAO', x: 6, y: 5 }))
   })
 
-  it('trocar o status no seletor atualiza o próprio avatar e manda a mudança pro servidor', async () => {
+  it('trocar o status no seletor manda a mudança pro servidor', async () => {
     server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto(), handlerHealthOk())
     renderPagina()
     await screen.findByText(/Escritório/)
@@ -139,17 +151,15 @@ describe('EscritorioPage', () => {
         usuarios: [{ usuarioId: 1, nome: 'Ana', x: 5, y: 5, status: 'DISPONIVEL' }],
       })
     })
-    await waitFor(() => expect(screen.getByTestId('avatar-1')).toBeInTheDocument())
 
     fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'FOCO' } })
 
     await waitFor(() => {
-      expect(screen.getByTestId('avatar-1')).toHaveAttribute('title', 'Ana - Foco')
+      expect(WebSocketFalso.instancias[0].mensagensEnviadas).toContain(JSON.stringify({ tipo: 'STATUS', status: 'FOCO' }))
     })
-    expect(WebSocketFalso.instancias[0].mensagensEnviadas).toContain(JSON.stringify({ tipo: 'STATUS', status: 'FOCO' }))
   })
 
-  it('não deixa o avatar sair dos limites do mapa ao mover na borda', async () => {
+  it('não manda o jogador pra fora dos limites do mapa ao mover na borda', async () => {
     server.use(http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)), handlerPontoAberto(), handlerHealthOk())
     renderPagina()
     await screen.findByText(/Escritório/)
@@ -160,13 +170,12 @@ describe('EscritorioPage', () => {
         usuarios: [{ usuarioId: 1, nome: 'Ana', x: 0, y: 0, status: 'DISPONIVEL' }],
       })
     })
-    await waitFor(() => expect(screen.getByTestId('avatar-1')).toBeInTheDocument())
 
     fireEvent.keyDown(window, { key: 'ArrowLeft' })
     fireEvent.keyDown(window, { key: 'ArrowUp' })
 
     await waitFor(() => {
-      expect(screen.getByTestId('avatar-1')).toHaveStyle({ left: '0px', top: '0px' });
+      expect(WebSocketFalso.instancias[0].mensagensEnviadas).toContain(JSON.stringify({ tipo: 'POSICAO', x: 0, y: 0 }))
     })
   })
 
