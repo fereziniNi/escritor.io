@@ -29,7 +29,6 @@ function handlersPadrao() {
         { id: 11, nome: 'Projeto B', cliente: 'Acme', status: 'ATIVO', inicio: '2026-01-01', fimPrevisto: null },
       ]),
     ),
-    http.get('/ajustes/pendentes', () => HttpResponse.json([])),
     http.get('/ponto/espelho-do-mes', () => HttpResponse.json({ dias: [], saldoAcumuladoNoPeriodo: 60 })),
   ]
 }
@@ -64,8 +63,9 @@ describe('RelatoriosPage', () => {
     await user.type(screen.getByLabelText(/início/i), '2026-01-01')
     await user.type(screen.getByLabelText(/^fim$/i), '2026-02-01')
 
-    expect(await screen.findByText('2026-01-11')).toBeInTheDocument()
-    expect(screen.getByText('2026-01-12')).toBeInTheDocument()
+    // exibido em dd/mm/aaaa, não a data ISO crua que a API devolve (pedido do usuário)
+    expect(await screen.findByText('11/01/2026')).toBeInTheDocument()
+    expect(screen.getByText('12/01/2026')).toBeInTheDocument()
   })
 
   it('trocar o projeto selecionado atualiza o total apontado sem reload manual', async () => {
@@ -90,30 +90,5 @@ describe('RelatoriosPage', () => {
     await user.selectOptions(screen.getByLabelText(/projeto/i), '11')
 
     expect(await screen.findByText('Total apontado: 0h45')).toBeInTheDocument()
-  })
-
-  it('mostra as solicitações pendentes', async () => {
-    server.use(
-      http.get('/ajustes/pendentes', () =>
-        HttpResponse.json([
-          {
-            id: 1,
-            usuarioId: 2,
-            usuarioNome: 'Beto Lima',
-            tipoSolicitado: 'ENTRADA',
-            momentoSolicitado: '2026-01-15T09:00:00Z',
-            registroAlvoId: null,
-            justificativa: 'Esqueci',
-            status: 'PENDENTE',
-            criadoEm: '2026-01-15T10:00:00Z',
-          },
-        ]),
-      ),
-      ...handlersPadrao(),
-    )
-
-    renderPagina()
-
-    expect(await screen.findByText('Beto Lima')).toBeInTheDocument()
   })
 })

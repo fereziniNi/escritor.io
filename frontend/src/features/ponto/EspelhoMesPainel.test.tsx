@@ -45,8 +45,9 @@ describe('EspelhoMesPainel', () => {
 
     renderPainel()
 
-    expect(await screen.findByText('2026-01-12')).toBeInTheDocument()
-    expect(screen.getByText('2026-01-13')).toBeInTheDocument()
+    // exibido em dd/mm/aaaa, não a data ISO crua que a API devolve (pedido do usuário)
+    expect(await screen.findByText('12/01/2026')).toBeInTheDocument()
+    expect(screen.getByText('13/01/2026')).toBeInTheDocument()
     expect(screen.getByText('Saldo acumulado no período: +1h00')).toBeInTheDocument()
   })
 

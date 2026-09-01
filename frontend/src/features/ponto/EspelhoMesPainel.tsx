@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
+import { formatarDataBr } from '../../shared/formatarData'
 import { baixarEspelhoDoMesCsv, buscarEspelhoDoMes } from './api'
 import { formatarEstado, formatarMinutos, formatarSaldo } from './formatarMinutos'
 
@@ -52,7 +53,7 @@ export function EspelhoMesPainel() {
             <tbody>
               {espelho.dias.map((dia) => (
                 <tr key={dia.data}>
-                  <td>{dia.data}</td>
+                  <td>{formatarDataBr(dia.data)}</td>
                   <td>{formatarEstado(dia.estado)}</td>
                   <td>{formatarMinutos(dia.minutosTrabalhados)}</td>
                   <td>{formatarSaldo(dia.saldoDia)}</td>

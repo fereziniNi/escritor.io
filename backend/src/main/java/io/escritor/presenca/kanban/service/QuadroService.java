@@ -93,7 +93,8 @@ public class QuadroService {
 
     /**
      * 404 (não 403) quando o quadro existe mas não é visível pro usuário - mesma filosofia de
-     * "não revelar que o recurso existe" já usada em {@code SolicitacaoAjusteService}.
+     * "não revelar que o recurso existe" já usada em outros pontos do domínio de ponto (ex.:
+     * {@code PontoService#estadoAtual}).
      */
     public QuadroDetalheResponse buscarDetalhe(Long id, Usuario usuario) {
         Quadro quadro = buscarQuadro(id);

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { FilaAjustesPainel } from '../ajustes/FilaAjustesPainel'
+import { formatarDataBr } from '../../shared/formatarData'
 import { buscarTotalApontadoPorProjetoOuEquipe } from '../kanban/api'
 import { listarEquipes, listarProjetos } from '../organizacao/api'
 import { buscarDiasInconsistentes, buscarEspelhoDoMes } from '../ponto/api'
@@ -138,7 +138,7 @@ export function RelatoriosPage() {
           <ul className="linha-botoes" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             {diasInconsistentesQuery.data.map((data) => (
               <li key={data} className="badge badge-perigo">
-                {data}
+                {formatarDataBr(data)}
               </li>
             ))}
           </ul>
@@ -151,10 +151,6 @@ export function RelatoriosPage() {
         {totalApontadoQuery.isError && <p className="mensagem-erro">Não foi possível carregar o total apontado.</p>}
         {totalApontadoQuery.data && <p>Total apontado: {formatarMinutos(totalApontadoQuery.data.totalMinutos)}</p>}
       </section>
-
-      <div className="secao">
-        <FilaAjustesPainel />
-      </div>
     </main>
   )
 }
