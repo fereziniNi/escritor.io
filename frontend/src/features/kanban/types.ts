@@ -50,6 +50,15 @@ export interface TotalApontado {
   totalMinutos: number
 }
 
+/** Quanto tempo (fechado, apontamentos com `fim`) foi apontado num card específico num período -
+ * usado pela "Jornada de hoje" (ponto) pra listar quanto tempo a pessoa trabalhou em cada tarefa
+ * hoje, não só o agregado do dia. */
+export interface TotalPorCard {
+  cardId: number
+  cardTitulo: string
+  totalMinutos: number
+}
+
 export interface Card {
   id: number
   colunaId: number

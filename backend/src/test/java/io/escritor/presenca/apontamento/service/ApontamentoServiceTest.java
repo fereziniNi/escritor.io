@@ -82,9 +82,13 @@ class ApontamentoServiceTest {
     }
 
     private static Card cardComId(Long id) {
+        return cardComId(id, "Corrigir bug");
+    }
+
+    private static Card cardComId(Long id, String titulo) {
         Quadro quadro = new Quadro("Backlog", null, new Equipe("Backend", null));
         Coluna coluna = new Coluna(quadro, "A fazer", 0, null);
-        Card card = new Card(coluna, "Corrigir bug", null, 1024.0, null, null, null, usuarioComId(1L));
+        Card card = new Card(coluna, titulo, null, 1024.0, null, null, null, usuarioComId(1L));
         ReflectionTestUtils.setField(card, "id", id);
         return card;
     }
@@ -391,7 +395,7 @@ class ApontamentoServiceTest {
     @Test
     void listarTotalPorCardSomaOsMinutosDeCadaCardSeparadamente() {
         Instant inicio = agora.minus(1, ChronoUnit.DAYS);
-        Card outroCard = cardComId(6L);
+        Card outroCard = cardComId(6L, "Escrever testes");
         Apontamento primeiroDoCard5 = new Apontamento(
                 usuario, card, inicio.plus(1, ChronoUnit.HOURS), inicio.plus(2, ChronoUnit.HOURS), null, OrigemApontamento.MANUAL);
         Apontamento segundoDoCard5 = new Apontamento(
@@ -407,12 +411,12 @@ class ApontamentoServiceTest {
         assertThat(resposta).hasSize(2);
         assertThat(resposta)
                 .filteredOn(item -> item.cardId().equals(5L))
-                .extracting(TotalPorCardResponse::totalMinutos)
-                .containsExactly(90L);
+                .extracting(TotalPorCardResponse::cardTitulo, TotalPorCardResponse::totalMinutos)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("Corrigir bug", 90L));
         assertThat(resposta)
                 .filteredOn(item -> item.cardId().equals(6L))
-                .extracting(TotalPorCardResponse::totalMinutos)
-                .containsExactly(15L);
+                .extracting(TotalPorCardResponse::cardTitulo, TotalPorCardResponse::totalMinutos)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("Escrever testes", 15L));
     }
 
     @Test

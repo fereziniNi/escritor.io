@@ -372,7 +372,7 @@ class ApontamentoControllerTest {
     void listaOTotalApontadoPorCard() throws Exception {
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
         when(apontamentoService.listarTotalPorCard(isNull(), any(), any(), any()))
-                .thenReturn(List.of(new TotalPorCardResponse(5L, 90), new TotalPorCardResponse(6L, 15)));
+                .thenReturn(List.of(new TotalPorCardResponse(5L, "Corrigir bug", 90), new TotalPorCardResponse(6L, "Escrever testes", 15)));
 
         mockMvc.perform(get("/apontamentos")
                         .param("agrupar", "card")
@@ -380,8 +380,10 @@ class ApontamentoControllerTest {
                         .param("fim", "2026-02-01T00:00:00Z"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].cardId").value(5))
+                .andExpect(jsonPath("$[0].cardTitulo").value("Corrigir bug"))
                 .andExpect(jsonPath("$[0].totalMinutos").value(90))
                 .andExpect(jsonPath("$[1].cardId").value(6))
+                .andExpect(jsonPath("$[1].cardTitulo").value("Escrever testes"))
                 .andExpect(jsonPath("$[1].totalMinutos").value(15));
     }
 

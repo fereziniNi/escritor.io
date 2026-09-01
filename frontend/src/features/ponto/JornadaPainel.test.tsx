@@ -2,8 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { useAuthStore } from '../auth/authStore'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { JornadaPainel } from './JornadaPainel'
 
 const server = setupServer()
@@ -12,15 +11,21 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
-const ESTADO_INICIAL = useAuthStore.getState()
+const JORNADA_PADRAO = {
+  data: '2026-01-15',
+  estado: 'ABERTA',
+  minutosTrabalhados: 480,
+  saldoDia: 0,
+  saldoAcumuladoNoPeriodo: 0,
+  totalApontadoMinutos: 120,
+}
 
-beforeEach(() => {
-  useAuthStore.setState(ESTADO_INICIAL, true)
-  useAuthStore.getState().definirSessao('token-fake', 'COLABORADOR')
-})
+function handlerPorCard(itens: Array<{ cardId: number; cardTitulo: string; totalMinutos: number }>) {
+  return http.get('/apontamentos', () => HttpResponse.json(itens))
+}
 
 function renderJornadaPainel() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={queryClient}>
       <JornadaPainel />
@@ -29,103 +34,59 @@ function renderJornadaPainel() {
 }
 
 describe('JornadaPainel', () => {
-  it('exibe saldo positivo com sinal de mais', async () => {
+  it('mostra só "Trabalhado hoje" - sem estado do dia, saldo ou total apontado agregado (pedido do usuário)', async () => {
     server.use(
-      http.get('/ponto/jornada-do-dia', () =>
-        HttpResponse.json({
-          data: '2026-01-13',
-          estado: 'FECHADA',
-          minutosTrabalhados: 540,
-          saldoDia: 60,
-          saldoAcumuladoNoPeriodo: 120,
-          totalApontadoMinutos: 480,
-        }),
-      ),
-    )
-
-    renderJornadaPainel()
-
-    expect(await screen.findByText('9h00')).toBeInTheDocument()
-    expect(screen.getByText('+1h00')).toBeInTheDocument()
-    expect(screen.getByText('+2h00')).toBeInTheDocument()
-  })
-
-  it('exibe saldo negativo com sinal de menos', async () => {
-    server.use(
-      http.get('/ponto/jornada-do-dia', () =>
-        HttpResponse.json({
-          data: '2026-01-13',
-          estado: 'ABERTA',
-          minutosTrabalhados: 180,
-          saldoDia: -300,
-          saldoAcumuladoNoPeriodo: -45,
-          totalApontadoMinutos: 180,
-        }),
-      ),
-    )
-
-    renderJornadaPainel()
-
-    expect(await screen.findByText('-5h00')).toBeInTheDocument()
-    expect(screen.getByText('-0h45')).toBeInTheDocument()
-  })
-
-  it('exibe o estado do dia', async () => {
-    server.use(
-      http.get('/ponto/jornada-do-dia', () =>
-        HttpResponse.json({
-          data: '2026-01-13',
-          estado: 'INCONSISTENTE',
-          minutosTrabalhados: 0,
-          saldoDia: -480,
-          saldoAcumuladoNoPeriodo: -480,
-          totalApontadoMinutos: 0,
-        }),
-      ),
-    )
-
-    renderJornadaPainel()
-
-    expect(await screen.findByText(/inconsistente/i)).toBeInTheDocument()
-  })
-
-  it('mostra o total apontado hoje e a diferença em relação ao trabalhado', async () => {
-    server.use(
-      http.get('/ponto/jornada-do-dia', () =>
-        HttpResponse.json({
-          data: '2026-01-13',
-          estado: 'FECHADA',
-          minutosTrabalhados: 540,
-          saldoDia: 60,
-          saldoAcumuladoNoPeriodo: 120,
-          totalApontadoMinutos: 480,
-        }),
-      ),
+      http.get('/ponto/jornada-do-dia', () => HttpResponse.json(JORNADA_PADRAO)),
+      handlerPorCard([]),
     )
 
     renderJornadaPainel()
 
     expect(await screen.findByText('8h00')).toBeInTheDocument()
-    expect(screen.getByText('-1h00')).toBeInTheDocument()
+    expect(screen.getByText('Trabalhado hoje')).toBeInTheDocument()
+    expect(screen.queryByText('Estado do dia')).not.toBeInTheDocument()
+    expect(screen.queryByText('Saldo do dia')).not.toBeInTheDocument()
+    expect(screen.queryByText('Saldo acumulado no período')).not.toBeInTheDocument()
+    expect(screen.queryByText('Total apontado hoje')).not.toBeInTheDocument()
+    expect(screen.queryByText('Apontado vs. trabalhado')).not.toBeInTheDocument()
   })
 
-  it('diferença positiva quando o apontado é maior que o trabalhado', async () => {
+  it('lista quanto tempo foi apontado em cada tarefa hoje', async () => {
     server.use(
-      http.get('/ponto/jornada-do-dia', () =>
-        HttpResponse.json({
-          data: '2026-01-13',
-          estado: 'ABERTA',
-          minutosTrabalhados: 180,
-          saldoDia: -300,
-          saldoAcumuladoNoPeriodo: -45,
-          totalApontadoMinutos: 210,
-        }),
-      ),
+      http.get('/ponto/jornada-do-dia', () => HttpResponse.json(JORNADA_PADRAO)),
+      handlerPorCard([
+        { cardId: 1, cardTitulo: 'Corrigir bug de login', totalMinutos: 90 },
+        { cardId: 2, cardTitulo: 'Revisar PR', totalMinutos: 30 },
+      ]),
     )
 
     renderJornadaPainel()
 
-    expect(await screen.findByText('3h30')).toBeInTheDocument()
-    expect(screen.getByText('+0h30')).toBeInTheDocument()
+    expect(await screen.findByText('Corrigir bug de login')).toBeInTheDocument()
+    expect(screen.getByText('1h30')).toBeInTheDocument()
+    expect(screen.getByText('Revisar PR')).toBeInTheDocument()
+    expect(screen.getByText('0h30')).toBeInTheDocument()
+  })
+
+  it('mostra aviso quando nenhuma tarefa foi apontada hoje', async () => {
+    server.use(
+      http.get('/ponto/jornada-do-dia', () => HttpResponse.json(JORNADA_PADRAO)),
+      handlerPorCard([]),
+    )
+
+    renderJornadaPainel()
+
+    expect(await screen.findByText('Nenhuma tarefa apontada hoje.')).toBeInTheDocument()
+  })
+
+  it('mostra erro quando a jornada do dia falha ao carregar', async () => {
+    server.use(
+      http.get('/ponto/jornada-do-dia', () => new HttpResponse(null, { status: 500 })),
+      handlerPorCard([]),
+    )
+
+    renderJornadaPainel()
+
+    expect(await screen.findByText('Não foi possível carregar a jornada do dia.')).toBeInTheDocument()
   })
 })

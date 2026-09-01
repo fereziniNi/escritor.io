@@ -629,8 +629,10 @@ class ApontamentoControllerIT {
                 .expectBody()
                 .jsonPath("$.length()").isEqualTo(2)
                 .jsonPath("$[0].cardId").isEqualTo(cardA.getId())
+                .jsonPath("$[0].cardTitulo").isEqualTo("Card A")
                 .jsonPath("$[0].totalMinutos").isEqualTo(90)
                 .jsonPath("$[1].cardId").isEqualTo(cardB.getId())
+                .jsonPath("$[1].cardTitulo").isEqualTo("Card B")
                 .jsonPath("$[1].totalMinutos").isEqualTo(15);
     }
 

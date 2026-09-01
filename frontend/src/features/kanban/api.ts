@@ -1,5 +1,5 @@
 import { apiFetch } from '../../shared/api/http'
-import type { Apontamento, Card, Comentario, Etiqueta, EventoCard, Quadro, QuadroDetalhe, TotalApontado } from './types'
+import type { Apontamento, Card, Comentario, Etiqueta, EventoCard, Quadro, QuadroDetalhe, TotalApontado, TotalPorCard } from './types'
 
 export async function listarQuadros(): Promise<Quadro[]> {
   const response = await apiFetch('/quadros')
@@ -188,6 +188,18 @@ export async function excluirApontamento(apontamentoId: number): Promise<void> {
   if (!response.ok) {
     throw new Error('Não foi possível excluir o apontamento')
   }
+}
+
+/** Quanto tempo foi apontado em cada card, num período - usado pela "Jornada de hoje" (ponto)
+ * com `inicio`/`fim` do dia corrente. Sem `usuarioId`: o backend já assume "eu mesmo". */
+export async function listarTotalApontadoPorCard(dados: { inicio: string; fim: string }): Promise<TotalPorCard[]> {
+  const response = await apiFetch(
+    `/apontamentos?agrupar=card&inicio=${encodeURIComponent(dados.inicio)}&fim=${encodeURIComponent(dados.fim)}`,
+  )
+  if (!response.ok) {
+    throw new Error('Não foi possível carregar o tempo apontado por tarefa')
+  }
+  return response.json()
 }
 
 export async function buscarTotalApontadoPorProjetoOuEquipe(dados: {

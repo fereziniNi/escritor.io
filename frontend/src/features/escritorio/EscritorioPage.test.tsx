@@ -40,6 +40,12 @@ function handlerHealthOk() {
   return http.get('/health', () => HttpResponse.json({ status: 'UP' }))
 }
 
+/** `JornadaPainel` (dentro do painel de Ponto aberto) busca isso agora pra listar o tempo por
+ * tarefa hoje - só entra nos testes que abrem o painel. */
+function handlerSemApontamentoPorCard() {
+  return http.get('/apontamentos', () => HttpResponse.json([]))
+}
+
 /** Só `JornadaPainel` (dentro do painel de Ponto aberto) usa isso - `CronometroTrabalho` não. */
 function handlerJornadaVazia() {
   return http.get('/ponto/jornada-do-dia', () =>
@@ -234,6 +240,7 @@ describe('EscritorioPage', () => {
       handlerPontoAberto(),
       handlerHealthOk(),
       handlerJornadaVazia(),
+      handlerSemApontamentoPorCard(),
       http.get('/ponto/espelho-do-mes', () => HttpResponse.json({ dias: [], saldoAcumuladoNoPeriodo: 0 })),
     )
     renderPagina()
@@ -253,6 +260,7 @@ describe('EscritorioPage', () => {
       handlerPontoAberto(),
       handlerHealthOk(),
       handlerJornadaVazia(),
+      handlerSemApontamentoPorCard(),
       http.get('/ponto/espelho-do-mes', () => HttpResponse.json({ dias: [], saldoAcumuladoNoPeriodo: 0 })),
     )
     renderPagina()
@@ -274,6 +282,7 @@ describe('EscritorioPage', () => {
       ),
       handlerHealthOk(),
       handlerJornadaVazia(),
+      handlerSemApontamentoPorCard(),
       http.get('/ponto/espelho-do-mes', () => HttpResponse.json({ dias: [], saldoAcumuladoNoPeriodo: 0 })),
     )
     renderPagina()

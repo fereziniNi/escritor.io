@@ -1,9 +1,25 @@
 import { useQuery } from '@tanstack/react-query'
+import { listarTotalApontadoPorCard } from '../kanban/api'
 import { buscarJornadaDoDia } from './api'
-import { formatarEstado, formatarMinutos, formatarSaldo } from './formatarMinutos'
+import { formatarMinutos } from './formatarMinutos'
+import { calcularLimitesDoDiaUtc } from './limitesDoDiaUtc'
 
+/**
+ * Pedido do usuário: "remova o estado do dia... o total apontado... apontado vs trabalhando
+ * também. Deixe somente o trabalhado hoje e quanto tempo trabalhou em cada tarefa" - saiu todo o
+ * resto que existia aqui (estado do dia, saldo do dia, saldo acumulado no período, total apontado
+ * agregado, apontado vs. trabalhado). No lugar do agregado, agora lista o tempo apontado
+ * individualmente em cada card hoje (`listarTotalApontadoPorCard`, `agrupar=card` do backend) -
+ * mais concreto que só um número somado.
+ */
 export function JornadaPainel() {
   const jornadaQuery = useQuery({ queryKey: ['ponto', 'jornada-do-dia'], queryFn: buscarJornadaDoDia })
+
+  const limites = calcularLimitesDoDiaUtc(new Date())
+  const porTarefaQuery = useQuery({
+    queryKey: ['apontamentos', 'por-card', 'hoje'],
+    queryFn: () => listarTotalApontadoPorCard(limites),
+  })
 
   if (jornadaQuery.isPending) {
     return <p className="mensagem-carregando">Carregando…</p>
@@ -14,45 +30,33 @@ export function JornadaPainel() {
   }
 
   const jornada = jornadaQuery.data
-  const diferenca = jornada.totalApontadoMinutos - jornada.minutosTrabalhados
 
   return (
     <section className="secao">
       <h3 className="secao-titulo">📅 Jornada de hoje</h3>
       <div className="grade-stats">
         <div className="stat-cartao">
-          <div className="stat-cartao-rotulo">Estado do dia</div>
-          <div className="stat-cartao-valor">{formatarEstado(jornada.estado)}</div>
-        </div>
-        <div className="stat-cartao">
           <div className="stat-cartao-rotulo">Trabalhado hoje</div>
           <div className="stat-cartao-valor">{formatarMinutos(jornada.minutosTrabalhados)}</div>
         </div>
-        <div className="stat-cartao">
-          <div className="stat-cartao-rotulo">Saldo do dia</div>
-          <div className={`stat-cartao-valor ${jornada.saldoDia < 0 ? 'stat-negativo' : 'stat-positivo'}`}>
-            {formatarSaldo(jornada.saldoDia)}
-          </div>
-        </div>
-        <div className="stat-cartao">
-          <div className="stat-cartao-rotulo">Saldo acumulado no período</div>
-          <div className={`stat-cartao-valor ${jornada.saldoAcumuladoNoPeriodo < 0 ? 'stat-negativo' : 'stat-positivo'}`}>
-            {formatarSaldo(jornada.saldoAcumuladoNoPeriodo)}
-          </div>
-        </div>
-        <div className="stat-cartao">
-          <div className="stat-cartao-rotulo">Total apontado hoje</div>
-          <div className="stat-cartao-valor">{formatarMinutos(jornada.totalApontadoMinutos)}</div>
-        </div>
-        {/* Só informativo (S4.9) - marcar SAIDA (PontoWidget, componente separado) continua
-        liberado independente desse valor, ponto e apontamento são sistemas paralelos (PRD §3.4). */}
-        <div className="stat-cartao">
-          <div className="stat-cartao-rotulo">Apontado vs. trabalhado</div>
-          <div className={`stat-cartao-valor ${diferenca < 0 ? 'stat-negativo' : 'stat-positivo'}`}>
-            {formatarSaldo(diferenca)}
-          </div>
-        </div>
       </div>
+
+      <h4>📌 Tempo por tarefa hoje</h4>
+      {porTarefaQuery.isPending && <p className="mensagem-carregando">Carregando…</p>}
+      {porTarefaQuery.isError && <p className="mensagem-erro">Não foi possível carregar o tempo por tarefa.</p>}
+      {porTarefaQuery.data?.length === 0 && <p className="mensagem-vazia">Nenhuma tarefa apontada hoje.</p>}
+      {porTarefaQuery.data && porTarefaQuery.data.length > 0 && (
+        <ul className="lista-cartoes">
+          {porTarefaQuery.data.map((item) => (
+            <li key={item.cardId} className="cartao-item">
+              <div className="cartao-item-cabecalho">
+                <span className="cartao-item-titulo">{item.cardTitulo}</span>
+                <span className="badge">{formatarMinutos(item.totalMinutos)}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   )
 }

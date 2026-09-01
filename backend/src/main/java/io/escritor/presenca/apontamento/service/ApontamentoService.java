@@ -222,13 +222,18 @@ public class ApontamentoService {
         Usuario usuarioAlvo =
                 visibilidadeUsuarioService.resolverAlvo(usuarioIdFiltro, usuarioAutenticado, ApontamentoDeOutroUsuarioException::new);
 
-        Map<Long, Long> totalPorCardId = apontamentoRepository
-                .findByUsuarioAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(usuarioAlvo, inicio, fim)
-                .stream()
+        List<Apontamento> apontamentosDoPeriodo = apontamentoRepository
+                .findByUsuarioAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(usuarioAlvo, inicio, fim);
+
+        Map<Long, Long> totalPorCardId = apontamentosDoPeriodo.stream()
                 .collect(Collectors.groupingBy(a -> a.getCard().getId(), Collectors.summingLong(Apontamento::getMinutos)));
+        // um card só pode ter um título por vez - qualquer apontamento dele serve pra pegar o
+        // título atual, não precisa reduzir/escolher entre vários
+        Map<Long, String> tituloPorCardId = apontamentosDoPeriodo.stream()
+                .collect(Collectors.toMap(a -> a.getCard().getId(), a -> a.getCard().getTitulo(), (primeiro, segundo) -> primeiro));
 
         return totalPorCardId.entrySet().stream()
-                .map(entrada -> new TotalPorCardResponse(entrada.getKey(), entrada.getValue()))
+                .map(entrada -> new TotalPorCardResponse(entrada.getKey(), tituloPorCardId.get(entrada.getKey()), entrada.getValue()))
                 .sorted(Comparator.comparingLong(TotalPorCardResponse::totalMinutos).reversed())
                 .toList();
     }
