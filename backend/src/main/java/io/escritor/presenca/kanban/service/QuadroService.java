@@ -1,25 +1,25 @@
 package io.escritor.presenca.kanban.service;
 
-import io.escritor.presenca.identidade.domain.Equipe;
-import io.escritor.presenca.identidade.domain.MembroEquipe;
 import io.escritor.presenca.identidade.domain.Projeto;
 import io.escritor.presenca.identidade.domain.Usuario;
-import io.escritor.presenca.identidade.repository.EquipeRepository;
-import io.escritor.presenca.identidade.repository.MembroEquipeRepository;
-import io.escritor.presenca.identidade.repository.ProjetoEquipeRepository;
 import io.escritor.presenca.identidade.repository.ProjetoRepository;
+import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.Coluna;
+import io.escritor.presenca.kanban.domain.MembroQuadro;
 import io.escritor.presenca.kanban.domain.Quadro;
 import io.escritor.presenca.kanban.domain.RegraVisibilidadeQuadro;
 import io.escritor.presenca.kanban.repository.CardEtiquetaRepository;
 import io.escritor.presenca.kanban.repository.CardRepository;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
+import io.escritor.presenca.kanban.repository.MembroQuadroRepository;
 import io.escritor.presenca.kanban.repository.QuadroRepository;
+import io.escritor.presenca.kanban.web.AdicionarMembroQuadroRequest;
 import io.escritor.presenca.kanban.web.CardResponse;
 import io.escritor.presenca.kanban.web.ColunaComCardsResponse;
 import io.escritor.presenca.kanban.web.EtiquetaResponse;
+import io.escritor.presenca.kanban.web.MembroQuadroResponse;
 import io.escritor.presenca.kanban.web.QuadroDetalheResponse;
 import io.escritor.presenca.kanban.web.QuadroResponse;
 import java.util.List;
@@ -31,48 +31,51 @@ import org.springframework.stereotype.Service;
 public class QuadroService {
 
     private final QuadroRepository quadroRepository;
-    private final MembroEquipeRepository membroEquipeRepository;
-    private final ProjetoEquipeRepository projetoEquipeRepository;
+    private final MembroQuadroRepository membroQuadroRepository;
     private final ProjetoRepository projetoRepository;
-    private final EquipeRepository equipeRepository;
+    private final UsuarioRepository usuarioRepository;
     private final ColunaRepository colunaRepository;
     private final CardRepository cardRepository;
     private final CardEtiquetaRepository cardEtiquetaRepository;
 
     public QuadroService(
             QuadroRepository quadroRepository,
-            MembroEquipeRepository membroEquipeRepository,
-            ProjetoEquipeRepository projetoEquipeRepository,
+            MembroQuadroRepository membroQuadroRepository,
             ProjetoRepository projetoRepository,
-            EquipeRepository equipeRepository,
+            UsuarioRepository usuarioRepository,
             ColunaRepository colunaRepository,
             CardRepository cardRepository,
             CardEtiquetaRepository cardEtiquetaRepository) {
         this.quadroRepository = quadroRepository;
-        this.membroEquipeRepository = membroEquipeRepository;
-        this.projetoEquipeRepository = projetoEquipeRepository;
+        this.membroQuadroRepository = membroQuadroRepository;
         this.projetoRepository = projetoRepository;
-        this.equipeRepository = equipeRepository;
+        this.usuarioRepository = usuarioRepository;
         this.colunaRepository = colunaRepository;
         this.cardRepository = cardRepository;
         this.cardEtiquetaRepository = cardEtiquetaRepository;
     }
 
     public List<QuadroResponse> listarVisiveis(Usuario usuario) {
-        VisibilidadeUsuario visibilidade = calcularVisibilidade(usuario);
+        Set<Long> quadroIds = quadroIdsDoUsuario(usuario);
 
         return quadroRepository.findAll().stream()
-                .filter(quadro -> visivel(quadro, visibilidade))
+                .filter(quadro -> RegraVisibilidadeQuadro.visivel(quadro.getId(), quadroIds))
                 .map(QuadroResponse::de)
                 .toList();
     }
 
-    public QuadroResponse criar(String nome, Long projetoId, Long equipeId) {
+    /**
+     * Quem cria já entra como membro (pedido do cliente: atribuição individual é o que decide
+     * visibilidade agora, sem Equipe) - sem isso, quem acabou de criar o quadro não conseguiria
+     * mais vê-lo depois (visibilidade de quadro nunca teve bypass de ADMIN, só de {@link
+     * MembroQuadro}, e essa regra não muda aqui).
+     */
+    public QuadroResponse criar(String nome, Long projetoId, Usuario criador) {
         Projeto projeto = projetoId == null ? null : buscarProjeto(projetoId);
-        Equipe equipe = equipeId == null ? null : buscarEquipe(equipeId);
 
-        Quadro novo = new Quadro(nome, projeto, equipe);
+        Quadro novo = new Quadro(nome, projeto);
         Quadro salvo = quadroRepository.save(novo);
+        membroQuadroRepository.save(new MembroQuadro(salvo, criador));
 
         return QuadroResponse.de(salvo);
     }
@@ -85,10 +88,7 @@ public class QuadroService {
      * lança - quem decide o status HTTP é quem chama.
      */
     public boolean usuarioPodeVer(Long quadroId, Usuario usuario) {
-        return quadroRepository
-                .findById(quadroId)
-                .map(quadro -> visivel(quadro, calcularVisibilidade(usuario)))
-                .orElse(false);
+        return RegraVisibilidadeQuadro.visivel(quadroId, quadroIdsDoUsuario(usuario));
     }
 
     /**
@@ -98,17 +98,36 @@ public class QuadroService {
      */
     public QuadroDetalheResponse buscarDetalhe(Long id, Usuario usuario) {
         Quadro quadro = buscarQuadro(id);
-        if (!visivel(quadro, calcularVisibilidade(usuario))) {
+        if (!RegraVisibilidadeQuadro.visivel(quadro.getId(), quadroIdsDoUsuario(usuario))) {
             throw new RecursoNaoEncontradoException("Quadro não encontrado: " + id);
         }
 
         List<ColunaComCardsResponse> colunas = colunaRepository.findByQuadroOrderByOrdemAsc(quadro).stream()
                 .map(this::paraColunaComCards)
                 .toList();
+        List<MembroQuadroResponse> membros =
+                membroQuadroRepository.findByQuadro(quadro).stream().map(MembroQuadroResponse::de).toList();
 
         Long projetoId = quadro.getProjeto() == null ? null : quadro.getProjeto().getId();
-        Long equipeId = quadro.getEquipe() == null ? null : quadro.getEquipe().getId();
-        return new QuadroDetalheResponse(quadro.getId(), quadro.getNome(), projetoId, equipeId, quadro.isArquivado(), colunas);
+        return new QuadroDetalheResponse(quadro.getId(), quadro.getNome(), projetoId, quadro.isArquivado(), colunas, membros);
+    }
+
+    /**
+     * Pedido do cliente: pessoas atribuídas direto ao "sistema" (quadro), sem Equipe no meio -
+     * mesma idempotência de {@code EquipeService#adicionarMembro} que existia antes (adicionar
+     * quem já é membro não duplica nem lança erro).
+     */
+    public void adicionarMembro(Long quadroId, AdicionarMembroQuadroRequest request) {
+        Quadro quadro = buscarQuadro(quadroId);
+        Usuario usuario = usuarioRepository
+                .findById(request.usuarioId())
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
+
+        if (membroQuadroRepository.existsByQuadroAndUsuario(quadro, usuario)) {
+            return;
+        }
+
+        membroQuadroRepository.save(new MembroQuadro(quadro, usuario));
     }
 
     private ColunaComCardsResponse paraColunaComCards(Coluna coluna) {
@@ -129,22 +148,10 @@ public class QuadroService {
                 .toList();
     }
 
-    private VisibilidadeUsuario calcularVisibilidade(Usuario usuario) {
-        List<Equipe> equipesDoUsuario =
-                membroEquipeRepository.findByUsuario(usuario).stream().map(MembroEquipe::getEquipe).toList();
-        Set<Long> equipeIds = equipesDoUsuario.stream().map(Equipe::getId).collect(Collectors.toSet());
-
-        Set<Long> projetoIds = projetoEquipeRepository.findByEquipeIn(equipesDoUsuario).stream()
-                .map(vinculo -> vinculo.getProjeto().getId())
+    private Set<Long> quadroIdsDoUsuario(Usuario usuario) {
+        return membroQuadroRepository.findByUsuario(usuario).stream()
+                .map(membro -> membro.getQuadro().getId())
                 .collect(Collectors.toSet());
-
-        return new VisibilidadeUsuario(equipeIds, projetoIds);
-    }
-
-    private boolean visivel(Quadro quadro, VisibilidadeUsuario visibilidade) {
-        Long equipeId = quadro.getEquipe() == null ? null : quadro.getEquipe().getId();
-        Long projetoId = quadro.getProjeto() == null ? null : quadro.getProjeto().getId();
-        return RegraVisibilidadeQuadro.visivel(equipeId, projetoId, visibilidade.equipeIds(), visibilidade.projetoIds());
     }
 
     private Quadro buscarQuadro(Long id) {
@@ -153,12 +160,5 @@ public class QuadroService {
 
     private Projeto buscarProjeto(Long id) {
         return projetoRepository.findById(id).orElseThrow(() -> new RecursoNaoEncontradoException("Projeto não encontrado: " + id));
-    }
-
-    private Equipe buscarEquipe(Long id) {
-        return equipeRepository.findById(id).orElseThrow(() -> new RecursoNaoEncontradoException("Equipe não encontrada: " + id));
-    }
-
-    private record VisibilidadeUsuario(Set<Long> equipeIds, Set<Long> projetoIds) {
     }
 }

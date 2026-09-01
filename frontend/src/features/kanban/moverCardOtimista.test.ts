@@ -23,8 +23,8 @@ const QUADRO: QuadroDetalhe = {
   id: 1,
   nome: 'Backlog',
   projetoId: null,
-  equipeId: 10,
   arquivado: false,
+  membros: [],
   colunas: [
     { id: 100, nome: 'A fazer', ordem: 0, limiteWip: null, cards: [card(1, 100, 'Card 1'), card(2, 100, 'Card 2')] },
     { id: 200, nome: 'Em progresso', ordem: 1, limiteWip: null, cards: [card(3, 200, 'Card 3')] },

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { criarProjeto, listarEquipes, listarProjetos, vincularEquipeAoProjeto } from './api'
+import { criarProjeto, listarProjetos } from './api'
 import type { StatusProjeto } from './types'
 
 export function ProjetosPage() {
@@ -11,7 +11,6 @@ export function ProjetosPage() {
   const [inicio, setInicio] = useState('')
 
   const projetosQuery = useQuery({ queryKey: ['projetos'], queryFn: listarProjetos })
-  const equipesQuery = useQuery({ queryKey: ['equipes'], queryFn: listarEquipes })
 
   const criarMutation = useMutation({
     mutationFn: () => criarProjeto(nome, cliente, status, inicio),
@@ -21,12 +20,6 @@ export function ProjetosPage() {
       setInicio('')
       queryClient.invalidateQueries({ queryKey: ['projetos'] })
     },
-  })
-
-  const vincularMutation = useMutation({
-    mutationFn: ({ projetoId, equipeId }: { projetoId: number; equipeId: number }) =>
-      vincularEquipeAoProjeto(projetoId, equipeId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projetos'] }),
   })
 
   const RÓTULO_STATUS: Record<StatusProjeto, string> = { ATIVO: 'Ativo', PAUSADO: 'Pausado', CONCLUIDO: 'Concluído' }
@@ -104,29 +97,6 @@ export function ProjetosPage() {
               <span className="badge">{RÓTULO_STATUS[projeto.status]}</span>
             </div>
             <p className="cartao-item-meta">{projeto.cliente}</p>
-            {equipesQuery.data && equipesQuery.data.length > 0 && (
-              <div className="campo" style={{ marginTop: '0.5rem' }}>
-                <select
-                  aria-label={`Vincular equipe ao projeto ${projeto.nome}`}
-                  defaultValue=""
-                  onChange={(evento) => {
-                    const equipeId = Number(evento.target.value)
-                    if (equipeId) {
-                      vincularMutation.mutate({ projetoId: projeto.id, equipeId })
-                    }
-                  }}
-                >
-                  <option value="" disabled>
-                    Vincular equipe…
-                  </option>
-                  {equipesQuery.data.map((equipe) => (
-                    <option key={equipe.id} value={equipe.id}>
-                      {equipe.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
           </li>
         ))}
       </ul>

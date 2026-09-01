@@ -8,12 +8,10 @@ import io.escritor.presenca.apontamento.domain.LancamentoManualInvalidoException
 import io.escritor.presenca.apontamento.domain.OrigemApontamento;
 import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
 import io.escritor.presenca.apontamento.web.TotalPorCardResponse;
-import io.escritor.presenca.identidade.domain.Equipe;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Projeto;
 import io.escritor.presenca.identidade.domain.StatusProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
-import io.escritor.presenca.identidade.repository.EquipeRepository;
 import io.escritor.presenca.identidade.repository.ProjetoRepository;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.identidade.service.VisibilidadeUsuarioService;
@@ -60,9 +58,6 @@ class ApontamentoServiceTest {
     @Mock
     private ProjetoRepository projetoRepository;
 
-    @Mock
-    private EquipeRepository equipeRepository;
-
     private final Instant agora = Instant.parse("2026-01-15T12:00:00Z");
     private final Clock clock = Clock.fixed(agora, ZoneOffset.UTC);
 
@@ -86,7 +81,7 @@ class ApontamentoServiceTest {
     }
 
     private static Card cardComId(Long id, String titulo) {
-        Quadro quadro = new Quadro("Backlog", null, new Equipe("Backend", null));
+        Quadro quadro = new Quadro("Backlog", null);
         Coluna coluna = new Coluna(quadro, "A fazer", 0, null);
         Card card = new Card(coluna, titulo, null, 1024.0, null, null, null, usuarioComId(1L));
         ReflectionTestUtils.setField(card, "id", id);
@@ -95,8 +90,7 @@ class ApontamentoServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ApontamentoService(
-                apontamentoRepository, cardRepository, visibilidadeUsuarioService, projetoRepository, equipeRepository, clock);
+        service = new ApontamentoService(apontamentoRepository, cardRepository, visibilidadeUsuarioService, projetoRepository, clock);
     }
 
     @Test
@@ -348,7 +342,7 @@ class ApontamentoServiceTest {
         Instant instanteComMicrossegundos = Instant.parse("2026-01-15T12:00:00.123456Z");
         Clock clockComMicrossegundos = Clock.fixed(instanteComMicrossegundos, ZoneOffset.UTC);
         ApontamentoService servicoComMicrossegundos = new ApontamentoService(
-                apontamentoRepository, cardRepository, visibilidadeUsuarioService, projetoRepository, equipeRepository, clockComMicrossegundos);
+                apontamentoRepository, cardRepository, visibilidadeUsuarioService, projetoRepository, clockComMicrossegundos);
         when(cardRepository.findById(5L)).thenReturn(Optional.of(card));
         when(apontamentoRepository.findFirstByUsuarioAndFimIsNull(usuario)).thenReturn(Optional.empty());
         when(apontamentoRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
@@ -361,7 +355,7 @@ class ApontamentoServiceTest {
     /**
      * A partir de S5.2, resolução/autorização de `usuarioIdFiltro` é inteiramente responsabilidade
      * de {@link VisibilidadeUsuarioService#resolverAlvo} - o comportamento exaustivo por papel
-     * (colaborador/gestor/admin, equipe liderada etc.) já é coberto em `VisibilidadeUsuarioServiceTest`
+     * (colaborador/gestor/admin, quadros em comum etc.) já é coberto em `VisibilidadeUsuarioServiceTest`
      * e não precisa ser retestado aqui; estes dois testes só provam que `ApontamentoService` usa o
      * alvo resolvido pra consultar, e que uma exceção de `resolverAlvo` propaga sem tocar o
      * repositório de apontamentos.
@@ -436,12 +430,6 @@ class ApontamentoServiceTest {
         return projeto;
     }
 
-    private static Equipe equipeComId(Long id) {
-        Equipe equipe = new Equipe("Equipe X", null);
-        ReflectionTestUtils.setField(equipe, "id", id);
-        return equipe;
-    }
-
     @Test
     void totalApontadoPorProjetoSomaOsApontamentosFechadosDosCardsDosQuadrosVinculados() {
         Projeto projeto = projetoComId(20L);
@@ -455,57 +443,25 @@ class ApontamentoServiceTest {
                         projeto, inicio, agora))
                 .thenReturn(List.of(primeiro, segundo));
 
-        var resposta = service.totalApontadoPorProjetoOuEquipe(20L, null, inicio, agora);
+        var resposta = service.totalApontadoPorProjeto(20L, inicio, agora);
 
         assertThat(resposta.totalMinutos()).isEqualTo(90);
     }
 
     @Test
-    void totalApontadoPorEquipeSomaOsApontamentosFechadosDosCardsDosQuadrosVinculados() {
-        Equipe equipe = equipeComId(30L);
-        Instant inicio = agora.minus(1, ChronoUnit.DAYS);
-        Apontamento apontamento = new Apontamento(
-                usuario, card, inicio.plus(1, ChronoUnit.HOURS), inicio.plus(1, ChronoUnit.HOURS).plusSeconds(900), null, OrigemApontamento.MANUAL);
-        when(equipeRepository.findById(30L)).thenReturn(Optional.of(equipe));
-        when(apontamentoRepository.findByCard_Coluna_Quadro_EquipeAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(
-                        equipe, inicio, agora))
-                .thenReturn(List.of(apontamento));
-
-        var resposta = service.totalApontadoPorProjetoOuEquipe(null, 30L, inicio, agora);
-
-        assertThat(resposta.totalMinutos()).isEqualTo(15);
-    }
-
-    @Test
-    void totalApontadoSemProjetoIdNemEquipeIdLancaExcecao() {
-        assertThatThrownBy(() -> service.totalApontadoPorProjetoOuEquipe(null, null, agora.minus(1, ChronoUnit.DAYS), agora))
+    void totalApontadoSemProjetoIdLancaExcecao() {
+        assertThatThrownBy(() -> service.totalApontadoPorProjeto(null, agora.minus(1, ChronoUnit.DAYS), agora))
                 .isInstanceOf(FiltroRelatorioInvalidoException.class);
 
         verify(apontamentoRepository, never())
                 .findByCard_Coluna_Quadro_ProjetoAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(any(), any(), any());
-        verify(apontamentoRepository, never())
-                .findByCard_Coluna_Quadro_EquipeAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(any(), any(), any());
-    }
-
-    @Test
-    void totalApontadoComProjetoIdEEquipeIdJuntosLancaExcecao() {
-        assertThatThrownBy(() -> service.totalApontadoPorProjetoOuEquipe(20L, 30L, agora.minus(1, ChronoUnit.DAYS), agora))
-                .isInstanceOf(FiltroRelatorioInvalidoException.class);
     }
 
     @Test
     void totalApontadoPorProjetoInexistenteLancaRecursoNaoEncontrado() {
         when(projetoRepository.findById(999L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.totalApontadoPorProjetoOuEquipe(999L, null, agora.minus(1, ChronoUnit.DAYS), agora))
-                .isInstanceOf(RecursoNaoEncontradoException.class);
-    }
-
-    @Test
-    void totalApontadoPorEquipeInexistenteLancaRecursoNaoEncontrado() {
-        when(equipeRepository.findById(999L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.totalApontadoPorProjetoOuEquipe(null, 999L, agora.minus(1, ChronoUnit.DAYS), agora))
+        assertThatThrownBy(() -> service.totalApontadoPorProjeto(999L, agora.minus(1, ChronoUnit.DAYS), agora))
                 .isInstanceOf(RecursoNaoEncontradoException.class);
     }
 }

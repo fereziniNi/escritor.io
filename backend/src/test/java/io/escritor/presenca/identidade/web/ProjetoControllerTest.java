@@ -56,26 +56,4 @@ class ProjetoControllerTest {
 
         mockMvc.perform(get("/projetos")).andExpect(status().isOk());
     }
-
-    @Test
-    @WithMockUser(roles = "GESTOR")
-    void gestorNaoVinculaEquipe() throws Exception {
-        mockMvc.perform(post("/projetos/1/equipes")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"equipeId":2}
-                                """))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    void adminVinculaEquipe() throws Exception {
-        mockMvc.perform(post("/projetos/1/equipes")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"equipeId":2}
-                                """))
-                .andExpect(status().isNoContent());
-    }
 }

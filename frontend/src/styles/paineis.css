@@ -1,6 +1,6 @@
 /**
  * Camada de utilitários compartilhada por todos os painéis funcionais (Ponto, Quadros,
- * Relatórios, Equipes, Projetos, Colaboradores) - pedido do usuário: "todos os menus/funções... mais elegante,
+ * Relatórios, Projetos, Colaboradores) - pedido do usuário: "todos os menus/funções... mais elegante,
  * bonito, versátil e fácil de utilizar", mantendo a identidade visual já estabelecida (paleta
  * quente, Nunito/Press Start 2P, botões 3D) em vez de trocar de estética. Antes desta camada esses
  * componentes não tinham nenhuma classe própria - só herdavam o reset global de index.css. Nenhum

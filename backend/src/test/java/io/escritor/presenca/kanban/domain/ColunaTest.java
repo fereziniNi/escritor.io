@@ -1,6 +1,5 @@
 package io.escritor.presenca.kanban.domain;
 
-import io.escritor.presenca.identidade.domain.Equipe;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -8,7 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ColunaTest {
 
-    private final Quadro quadro = new Quadro("Backlog", null, new Equipe("Backend", null));
+    private final Quadro quadro = new Quadro("Backlog", null);
 
     @Test
     void colunaValidaSemLimiteWip() {

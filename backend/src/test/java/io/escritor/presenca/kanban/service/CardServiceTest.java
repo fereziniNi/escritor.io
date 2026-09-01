@@ -1,6 +1,5 @@
 package io.escritor.presenca.kanban.service;
 
-import io.escritor.presenca.identidade.domain.Equipe;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
@@ -65,7 +64,7 @@ class CardServiceTest {
     }
 
     private static Coluna colunaComId(Long id, Integer limiteWip) {
-        Quadro quadro = new Quadro("Backlog", null, new Equipe("Backend", null));
+        Quadro quadro = new Quadro("Backlog", null);
         Coluna coluna = new Coluna(quadro, "A fazer", 0, limiteWip);
         ReflectionTestUtils.setField(coluna, "id", id);
         return coluna;

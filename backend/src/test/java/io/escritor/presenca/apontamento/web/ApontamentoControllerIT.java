@@ -3,22 +3,19 @@ package io.escritor.presenca.apontamento.web;
 import io.escritor.presenca.apontamento.domain.Apontamento;
 import io.escritor.presenca.apontamento.domain.OrigemApontamento;
 import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
-import io.escritor.presenca.identidade.domain.Equipe;
-import io.escritor.presenca.identidade.domain.MembroEquipe;
 import io.escritor.presenca.identidade.domain.Papel;
-import io.escritor.presenca.identidade.domain.PapelNaEquipe;
 import io.escritor.presenca.identidade.domain.Projeto;
 import io.escritor.presenca.identidade.domain.StatusProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
-import io.escritor.presenca.identidade.repository.EquipeRepository;
-import io.escritor.presenca.identidade.repository.MembroEquipeRepository;
 import io.escritor.presenca.identidade.repository.ProjetoRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.Coluna;
+import io.escritor.presenca.kanban.domain.MembroQuadro;
 import io.escritor.presenca.kanban.domain.Quadro;
 import io.escritor.presenca.kanban.repository.CardRepository;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
+import io.escritor.presenca.kanban.repository.MembroQuadroRepository;
 import io.escritor.presenca.kanban.repository.QuadroRepository;
 import io.escritor.presenca.seguranca.JwtService;
 import java.time.Instant;
@@ -57,9 +54,6 @@ class ApontamentoControllerIT {
     private JwtService jwtService;
 
     @Autowired
-    private EquipeRepository equipeRepository;
-
-    @Autowired
     private UsuarioRepository usuarioRepository;
 
     @Autowired
@@ -75,7 +69,7 @@ class ApontamentoControllerIT {
     private ApontamentoRepository apontamentoRepository;
 
     @Autowired
-    private MembroEquipeRepository membroEquipeRepository;
+    private MembroQuadroRepository membroQuadroRepository;
 
     @Autowired
     private ProjetoRepository projetoRepository;
@@ -91,9 +85,8 @@ class ApontamentoControllerIT {
 
     @Test
     void iniciarUmSegundoTimerEncerraOPrimeiroDeVerdade() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-apt@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
         Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         var cardA = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         var cardB = cardRepository.saveAndFlush(new Card(coluna, "Card B", null, 2048.0, null, null, null, usuario));
@@ -129,9 +122,8 @@ class ApontamentoControllerIT {
 
     @Test
     void pararEncerraOTimerDeVerdadeEDepoisPermiteAbrirOutro() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-parar@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
         Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
@@ -168,10 +160,9 @@ class ApontamentoControllerIT {
 
     @Test
     void pararApontamentoDeOutroUsuarioRecebe403DeVerdade() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
         Usuario dono = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-dono@escritor.io", Papel.COLABORADOR, 480));
         Usuario outro = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-outro@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
         Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, dono));
         String tokenDono = jwtService.gerarAccessToken(dono.getId(), Papel.COLABORADOR);
@@ -198,9 +189,8 @@ class ApontamentoControllerIT {
 
     @Test
     void pararApontamentoJaEncerradoRecebe409DeVerdade() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-409@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
         Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
@@ -229,9 +219,8 @@ class ApontamentoControllerIT {
 
     @Test
     void criaLancamentoManualComMinutosDireto() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-manual@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
         Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
@@ -254,9 +243,8 @@ class ApontamentoControllerIT {
 
     @Test
     void criaLancamentoManualComIntervaloExplicito() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-manual2@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
         Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
@@ -277,9 +265,8 @@ class ApontamentoControllerIT {
 
     @Test
     void criarLancamentoManualComMinutosEIntervaloJuntosRecebe400DeVerdade() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-manual3@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
         Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
@@ -297,9 +284,8 @@ class ApontamentoControllerIT {
 
     @Test
     void editarRecalculaMinutosEPersisteDeVerdade() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-editar@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
         Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
@@ -339,10 +325,9 @@ class ApontamentoControllerIT {
 
     @Test
     void editarApontamentoDeOutroUsuarioRecebe403DeVerdadeENaoMudaNada() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
         Usuario dono = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-editar-dono@escritor.io", Papel.COLABORADOR, 480));
         Usuario outro = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-editar-outro@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
         Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, dono));
         String tokenDono = jwtService.gerarAccessToken(dono.getId(), Papel.COLABORADOR);
@@ -377,9 +362,8 @@ class ApontamentoControllerIT {
 
     @Test
     void excluirRemoveALinhaDeVerdade() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-excluir@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
         Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
@@ -409,10 +393,9 @@ class ApontamentoControllerIT {
 
     @Test
     void excluirApontamentoDeOutroUsuarioRecebe403DeVerdadeENaoApaga() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
         Usuario dono = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-excluir-dono@escritor.io", Papel.COLABORADOR, 480));
         Usuario outro = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-excluir-outro@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
         Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, dono));
         String tokenDono = jwtService.gerarAccessToken(dono.getId(), Papel.COLABORADOR);
@@ -443,9 +426,8 @@ class ApontamentoControllerIT {
 
     @Test
     void listaOsApontamentosDoCardMaisRecentePrimeiroDeVerdade() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-listar@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
         Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
@@ -495,9 +477,8 @@ class ApontamentoControllerIT {
 
     @Test
     void colaboradorVeOsProprosApontamentosNoPeriodoDeVerdade() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s410-self@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
         Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         Card card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         apontamentoRepository.saveAndFlush(new Apontamento(
@@ -527,13 +508,12 @@ class ApontamentoControllerIT {
     }
 
     @Test
-    void gestorVeApontamentosDeMembroDaEquipeQueLideraDeVerdade() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
+    void gestorVeApontamentosDeMembroDoMesmoQuadroDeVerdade() {
         Usuario gestor = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s410-gestor@escritor.io", Papel.GESTOR, 480));
         Usuario membro = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s410-membro@escritor.io", Papel.COLABORADOR, 480));
-        membroEquipeRepository.saveAndFlush(new MembroEquipe(equipe, gestor, PapelNaEquipe.LIDER));
-        membroEquipeRepository.saveAndFlush(new MembroEquipe(equipe, membro, PapelNaEquipe.MEMBRO));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
+        membroQuadroRepository.saveAndFlush(new MembroQuadro(quadro, gestor));
+        membroQuadroRepository.saveAndFlush(new MembroQuadro(quadro, membro));
         Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         Card card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, membro));
         apontamentoRepository.saveAndFlush(new Apontamento(
@@ -550,7 +530,7 @@ class ApontamentoControllerIT {
     }
 
     @Test
-    void gestorTentandoVerApontamentosDeUsuarioForaDaEquipeQueLideraRecebe403DeVerdade() {
+    void gestorTentandoVerApontamentosDeUsuarioForaDoQuadroRecebe403DeVerdade() {
         Usuario gestor = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s410-gestorfora@escritor.io", Papel.GESTOR, 480));
         Usuario forasteiro = usuarioRepository.saveAndFlush(new Usuario("Caio Reis", "caio-s410-forasteiro@escritor.io", Papel.COLABORADOR, 480));
         String tokenGestor = jwtService.gerarAccessToken(gestor.getId(), Papel.GESTOR);
@@ -568,10 +548,9 @@ class ApontamentoControllerIT {
 
     @Test
     void adminVeApontamentosDeQualquerUsuarioDeVerdade() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
         Usuario admin = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s410-admin@escritor.io", Papel.ADMIN, 480));
         Usuario qualquerUsuario = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s410-qualquer@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
         Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         Card card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, qualquerUsuario));
         apontamentoRepository.saveAndFlush(new Apontamento(
@@ -605,9 +584,8 @@ class ApontamentoControllerIT {
 
     @Test
     void listaOTotalApontadoPorCardDeVerdadeIgnorandoTimerAberto() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s54-porcard@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
         Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         Card cardA = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         Card cardB = cardRepository.saveAndFlush(new Card(coluna, "Card B", null, 2048.0, null, null, null, usuario));
@@ -640,7 +618,7 @@ class ApontamentoControllerIT {
     void gestorConsultaOTotalApontadoPorProjetoDeVerdade() {
         Usuario gestor = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s55-gestor@escritor.io", Papel.GESTOR, 480));
         Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Projeto S55", "Cliente", StatusProjeto.ATIVO, java.time.LocalDate.now(), null));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", projeto, null));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", projeto));
         Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         Card card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, gestor));
         apontamentoRepository.saveAndFlush(new Apontamento(
@@ -657,13 +635,13 @@ class ApontamentoControllerIT {
     }
 
     @Test
-    void colaboradorTentandoConsultarRelatorioPorEquipeRecebe403DeVerdade() {
+    void colaboradorTentandoConsultarRelatorioPorProjetoRecebe403DeVerdade() {
         Usuario colaborador = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s55-colaborador@escritor.io", Papel.COLABORADOR, 480));
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
+        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Projeto S55b", "Cliente", StatusProjeto.ATIVO, java.time.LocalDate.now(), null));
         String tokenColaborador = jwtService.gerarAccessToken(colaborador.getId(), Papel.COLABORADOR);
 
         client().get()
-                .uri("/apontamentos/relatorio?equipeId={equipeId}&inicio={inicio}&fim={fim}", equipe.getId(), "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z")
+                .uri("/apontamentos/relatorio?projetoId={projetoId}&inicio={inicio}&fim={fim}", projeto.getId(), "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z")
                 .header("Authorization", "Bearer " + tokenColaborador)
                 .exchange()
                 .expectStatus().isForbidden();

@@ -1,7 +1,5 @@
 package io.escritor.presenca.kanban.repository;
 
-import io.escritor.presenca.identidade.domain.Equipe;
-import io.escritor.presenca.identidade.repository.EquipeRepository;
 import io.escritor.presenca.kanban.domain.Etiqueta;
 import io.escritor.presenca.kanban.domain.Quadro;
 import org.junit.jupiter.api.Test;
@@ -25,9 +23,6 @@ class EtiquetaRepositoryIT {
     static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16").withInitScript("db-init/criar-papel-app.sql");
 
     @Autowired
-    private EquipeRepository equipeRepository;
-
-    @Autowired
     private QuadroRepository quadroRepository;
 
     @Autowired
@@ -35,8 +30,7 @@ class EtiquetaRepositoryIT {
 
     @Test
     void persisteERecuperaEtiqueta() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
 
         Etiqueta salva = etiquetaRepository.saveAndFlush(new Etiqueta(quadro, "Urgente", "#FF0000"));
 
@@ -48,9 +42,8 @@ class EtiquetaRepositoryIT {
 
     @Test
     void listaEtiquetasDeUmQuadroENaoDeOutro() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
-        Quadro quadroA = quadroRepository.saveAndFlush(new Quadro("Backlog A", null, equipe));
-        Quadro quadroB = quadroRepository.saveAndFlush(new Quadro("Backlog B", null, equipe));
+        Quadro quadroA = quadroRepository.saveAndFlush(new Quadro("Backlog A", null));
+        Quadro quadroB = quadroRepository.saveAndFlush(new Quadro("Backlog B", null));
         etiquetaRepository.saveAndFlush(new Etiqueta(quadroA, "Urgente", "#FF0000"));
         etiquetaRepository.saveAndFlush(new Etiqueta(quadroB, "Bug", "#00FF00"));
 

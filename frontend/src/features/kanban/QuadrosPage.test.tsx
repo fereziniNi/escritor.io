@@ -36,9 +36,7 @@ describe('QuadrosPage', () => {
 
     it('lista os quadros visíveis retornados pela API', async () => {
       server.use(
-        http.get('/quadros', () =>
-          HttpResponse.json([{ id: 1, nome: 'Backlog', projetoId: null, equipeId: 10, arquivado: false }]),
-        ),
+        http.get('/quadros', () => HttpResponse.json([{ id: 1, nome: 'Backlog', projetoId: null, arquivado: false }])),
       )
 
       renderQuadrosPage()
@@ -63,12 +61,12 @@ describe('QuadrosPage', () => {
     })
 
     it('cria um quadro e atualiza a lista', async () => {
-      let quadrosCriados: Array<{ id: number; nome: string; projetoId: number | null; equipeId: number | null; arquivado: boolean }> = []
+      let quadrosCriados: Array<{ id: number; nome: string; projetoId: number | null; arquivado: boolean }> = []
       server.use(
         http.get('/quadros', () => HttpResponse.json(quadrosCriados)),
         http.post('/quadros', async ({ request }) => {
-          const corpo = (await request.json()) as { nome: string; equipeId: number | null }
-          const novo = { id: 1, nome: corpo.nome, projetoId: null, equipeId: corpo.equipeId, arquivado: false }
+          const corpo = (await request.json()) as { nome: string; projetoId: number | null }
+          const novo = { id: 1, nome: corpo.nome, projetoId: corpo.projetoId, arquivado: false }
           quadrosCriados = [novo]
           return HttpResponse.json(novo, { status: 201 })
         }),
@@ -77,7 +75,6 @@ describe('QuadrosPage', () => {
       renderQuadrosPage()
 
       await user.type(screen.getByLabelText(/nome/i), 'Backlog')
-      await user.type(screen.getByLabelText(/equipe/i), '10')
       await user.click(screen.getByRole('button', { name: /criar quadro/i }))
 
       expect(await screen.findByText('Backlog')).toBeInTheDocument()

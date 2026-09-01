@@ -1,26 +1,6 @@
 import { apiFetch } from '../../shared/api/http'
 import type { Papel } from '../auth/types'
-import type { Colaborador, Equipe, Projeto, StatusProjeto } from './types'
-
-export async function listarEquipes(): Promise<Equipe[]> {
-  const response = await apiFetch('/equipes')
-  if (!response.ok) {
-    throw new Error('Não foi possível carregar as equipes')
-  }
-  return response.json()
-}
-
-export async function criarEquipe(nome: string, descricao: string): Promise<Equipe> {
-  const response = await apiFetch('/equipes', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nome, descricao: descricao || null }),
-  })
-  if (!response.ok) {
-    throw new Error('Não foi possível criar a equipe')
-  }
-  return response.json()
-}
+import type { Colaborador, Projeto, StatusProjeto } from './types'
 
 export async function listarProjetos(): Promise<Projeto[]> {
   const response = await apiFetch('/projetos')
@@ -45,17 +25,6 @@ export async function criarProjeto(
     throw new Error('Não foi possível criar o projeto')
   }
   return response.json()
-}
-
-export async function vincularEquipeAoProjeto(projetoId: number, equipeId: number): Promise<void> {
-  const response = await apiFetch(`/projetos/${projetoId}/equipes`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ equipeId }),
-  })
-  if (!response.ok) {
-    throw new Error('Não foi possível vincular a equipe ao projeto')
-  }
 }
 
 export async function listarColaboradores(): Promise<Colaborador[]> {

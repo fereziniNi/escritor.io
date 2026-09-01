@@ -1,16 +1,13 @@
 package io.escritor.presenca.kanban.web;
 
-import io.escritor.presenca.identidade.domain.Equipe;
-import io.escritor.presenca.identidade.domain.MembroEquipe;
 import io.escritor.presenca.identidade.domain.Papel;
-import io.escritor.presenca.identidade.domain.PapelNaEquipe;
 import io.escritor.presenca.identidade.domain.Usuario;
-import io.escritor.presenca.identidade.repository.EquipeRepository;
-import io.escritor.presenca.identidade.repository.MembroEquipeRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.kanban.domain.Coluna;
+import io.escritor.presenca.kanban.domain.MembroQuadro;
 import io.escritor.presenca.kanban.domain.Quadro;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
+import io.escritor.presenca.kanban.repository.MembroQuadroRepository;
 import io.escritor.presenca.kanban.repository.QuadroRepository;
 import io.escritor.presenca.seguranca.JwtService;
 import org.junit.jupiter.api.Test;
@@ -46,10 +43,7 @@ class CardEventoControllerIT {
     private JwtService jwtService;
 
     @Autowired
-    private EquipeRepository equipeRepository;
-
-    @Autowired
-    private MembroEquipeRepository membroEquipeRepository;
+    private MembroQuadroRepository membroQuadroRepository;
 
     @Autowired
     private UsuarioRepository usuarioRepository;
@@ -71,10 +65,9 @@ class CardEventoControllerIT {
 
     @Test
     void criarECardMoverGeramEventoSozinhosSemNenhumEndpointDeEventoSerChamado() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
         Usuario membro = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-evt@escritor.io", Papel.COLABORADOR, 480));
-        membroEquipeRepository.saveAndFlush(new MembroEquipe(equipe, membro, PapelNaEquipe.MEMBRO));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
+        membroQuadroRepository.saveAndFlush(new MembroQuadro(quadro, membro));
         Coluna colunaA = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         Coluna colunaB = colunaRepository.saveAndFlush(new Coluna(quadro, "Em progresso", 1, null));
         String token = jwtService.gerarAccessToken(membro.getId(), Papel.COLABORADOR);
@@ -151,10 +144,9 @@ class CardEventoControllerIT {
 
     @Test
     void usuarioSemAcessoAoQuadroRecebe403AoListarEventos() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
         Usuario dono = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-evt2@escritor.io", Papel.COLABORADOR, 480));
-        membroEquipeRepository.saveAndFlush(new MembroEquipe(equipe, dono, PapelNaEquipe.MEMBRO));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog Privado", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog Privado", null));
+        membroQuadroRepository.saveAndFlush(new MembroQuadro(quadro, dono));
         Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         String tokenDono = jwtService.gerarAccessToken(dono.getId(), Papel.COLABORADOR);
 

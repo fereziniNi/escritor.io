@@ -1,6 +1,5 @@
 package io.escritor.presenca.kanban.service;
 
-import io.escritor.presenca.identidade.domain.Equipe;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.NomeColunaObrigatorioException;
 import io.escritor.presenca.kanban.domain.OrdemColunaDuplicadaException;
@@ -36,7 +35,7 @@ class ColunaServiceTest {
     private ColunaService service;
 
     private static Quadro quadroComId(Long id) {
-        Quadro quadro = new Quadro("Backlog", null, new Equipe("Backend", null));
+        Quadro quadro = new Quadro("Backlog", null);
         ReflectionTestUtils.setField(quadro, "id", id);
         return quadro;
     }

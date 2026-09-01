@@ -1,7 +1,6 @@
 package io.escritor.presenca.apontamento.repository;
 
 import io.escritor.presenca.apontamento.domain.Apontamento;
-import io.escritor.presenca.identidade.domain.Equipe;
 import io.escritor.presenca.identidade.domain.Projeto;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.kanban.domain.Card;
@@ -33,16 +32,12 @@ public interface ApontamentoRepository extends JpaRepository<Apontamento, Long> 
             Usuario usuario, Instant inicio, Instant fim);
 
     /**
-     * Travessia `card.coluna.quadro.projeto` (S5.5) - agregação por projeto/equipe, diferente de
-     * S5.4 (por card): soma todos os apontamentos fechados de todos os cards de todos os quadros
-     * vinculados ao projeto, não só de um usuário. `Quadro.projeto` é opcional (PRD §3.3: projeto
-     * e/ou equipe), então esse é um `INNER JOIN` implícito do Spring Data - um card cujo quadro não
-     * tem projeto vinculado simplesmente não aparece, sem erro.
+     * Travessia `card.coluna.quadro.projeto` (S5.5) - agregação por projeto, diferente de S5.4
+     * (por card): soma todos os apontamentos fechados de todos os cards de todos os quadros
+     * vinculados ao projeto, não só de um usuário. `Quadro.projeto` é opcional, então esse é um
+     * `INNER JOIN` implícito do Spring Data - um card cujo quadro não tem projeto vinculado
+     * simplesmente não aparece, sem erro.
      */
     List<Apontamento> findByCard_Coluna_Quadro_ProjetoAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(
             Projeto projeto, Instant inicio, Instant fim);
-
-    /** Mesma ideia da query acima, pro outro lado do vínculo opcional de {@code Quadro} (equipe). */
-    List<Apontamento> findByCard_Coluna_Quadro_EquipeAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(
-            Equipe equipe, Instant inicio, Instant fim);
 }

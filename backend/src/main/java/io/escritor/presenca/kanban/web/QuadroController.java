@@ -50,7 +50,14 @@ public class QuadroController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('GESTOR', 'ADMIN')")
     public QuadroResponse criar(@Valid @RequestBody CriarQuadroRequest request) {
-        return quadroService.criar(request.nome(), request.projetoId(), request.equipeId());
+        return quadroService.criar(request.nome(), request.projetoId(), contextoUsuarioAutenticado.usuarioAtual());
+    }
+
+    @PostMapping("/{id}/membros")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('GESTOR', 'ADMIN')")
+    public void adicionarMembro(@PathVariable Long id, @Valid @RequestBody AdicionarMembroQuadroRequest request) {
+        quadroService.adicionarMembro(id, request);
     }
 
     @PostMapping("/{id}/colunas")

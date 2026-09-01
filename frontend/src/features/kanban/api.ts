@@ -9,11 +9,7 @@ export async function listarQuadros(): Promise<Quadro[]> {
   return response.json()
 }
 
-export async function criarQuadro(dados: {
-  nome: string
-  projetoId: number | null
-  equipeId: number | null
-}): Promise<Quadro> {
+export async function criarQuadro(dados: { nome: string; projetoId: number | null }): Promise<Quadro> {
   const response = await apiFetch('/quadros', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -31,6 +27,18 @@ export async function buscarQuadro(id: number): Promise<QuadroDetalhe> {
     throw new Error('Não foi possível carregar o quadro')
   }
   return response.json()
+}
+
+/** Pedido do cliente: atribuição individual de pessoa ao quadro ("sistema"), sem Equipe no meio. */
+export async function adicionarMembroAoQuadro(dados: { quadroId: number; usuarioId: number }): Promise<void> {
+  const response = await apiFetch(`/quadros/${dados.quadroId}/membros`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ usuarioId: dados.usuarioId }),
+  })
+  if (!response.ok) {
+    throw new Error('Não foi possível adicionar o membro ao quadro')
+  }
 }
 
 export async function criarCard(dados: { colunaId: number; titulo: string }): Promise<Card> {
@@ -202,15 +210,13 @@ export async function listarTotalApontadoPorCard(dados: { inicio: string; fim: s
   return response.json()
 }
 
-export async function buscarTotalApontadoPorProjetoOuEquipe(dados: {
-  projetoId: number | null
-  equipeId: number | null
+export async function buscarTotalApontadoPorProjeto(dados: {
+  projetoId: number
   inicio: string
   fim: string
 }): Promise<TotalApontado> {
-  const filtro = dados.projetoId ? `projetoId=${dados.projetoId}` : `equipeId=${dados.equipeId}`
   const response = await apiFetch(
-    `/apontamentos/relatorio?${filtro}&inicio=${encodeURIComponent(dados.inicio)}&fim=${encodeURIComponent(dados.fim)}`,
+    `/apontamentos/relatorio?projetoId=${dados.projetoId}&inicio=${encodeURIComponent(dados.inicio)}&fim=${encodeURIComponent(dados.fim)}`,
   )
   if (!response.ok) {
     throw new Error('Não foi possível carregar o total apontado')

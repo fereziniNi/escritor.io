@@ -1,13 +1,12 @@
 package io.escritor.presenca.ponto.web;
 
-import io.escritor.presenca.identidade.domain.Equipe;
-import io.escritor.presenca.identidade.domain.MembroEquipe;
 import io.escritor.presenca.identidade.domain.Papel;
-import io.escritor.presenca.identidade.domain.PapelNaEquipe;
 import io.escritor.presenca.identidade.domain.Usuario;
-import io.escritor.presenca.identidade.repository.EquipeRepository;
-import io.escritor.presenca.identidade.repository.MembroEquipeRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
+import io.escritor.presenca.kanban.domain.MembroQuadro;
+import io.escritor.presenca.kanban.domain.Quadro;
+import io.escritor.presenca.kanban.repository.MembroQuadroRepository;
+import io.escritor.presenca.kanban.repository.QuadroRepository;
 import io.escritor.presenca.ponto.domain.OrigemRegistroPonto;
 import io.escritor.presenca.ponto.domain.RegistroPonto;
 import io.escritor.presenca.ponto.domain.TipoRegistroPonto;
@@ -46,13 +45,13 @@ class PontoControllerIT {
     private JwtService jwtService;
 
     @Autowired
-    private EquipeRepository equipeRepository;
-
-    @Autowired
     private UsuarioRepository usuarioRepository;
 
     @Autowired
-    private MembroEquipeRepository membroEquipeRepository;
+    private QuadroRepository quadroRepository;
+
+    @Autowired
+    private MembroQuadroRepository membroQuadroRepository;
 
     @Autowired
     private RegistroPontoRepository registroPontoRepository;
@@ -67,12 +66,12 @@ class PontoControllerIT {
     }
 
     @Test
-    void gestorVeAJornadaDeUmMembroDaEquipeQueLideraDeVerdade() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
+    void gestorVeAJornadaDeUmMembroDoMesmoQuadroDeVerdade() {
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backend", null));
         Usuario gestor = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s52-gestor@escritor.io", Papel.GESTOR, 480));
         Usuario membro = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s52-membro@escritor.io", Papel.COLABORADOR, 480));
-        membroEquipeRepository.saveAndFlush(new MembroEquipe(equipe, gestor, PapelNaEquipe.LIDER));
-        membroEquipeRepository.saveAndFlush(new MembroEquipe(equipe, membro, PapelNaEquipe.MEMBRO));
+        membroQuadroRepository.saveAndFlush(new MembroQuadro(quadro, gestor));
+        membroQuadroRepository.saveAndFlush(new MembroQuadro(quadro, membro));
         registroPontoRepository.saveAndFlush(new RegistroPonto(
                 membro, TipoRegistroPonto.ENTRADA, Instant.now(), OrigemRegistroPonto.WEB, "127.0.0.1", "junit", null));
         String tokenGestor = jwtService.gerarAccessToken(gestor.getId(), Papel.GESTOR);
@@ -100,7 +99,7 @@ class PontoControllerIT {
     }
 
     @Test
-    void gestorTentandoVerJornadaDeUsuarioForaDaEquipeQueLideraRecebe403DeVerdade() {
+    void gestorTentandoVerJornadaDeUsuarioForaDoQuadroRecebe403DeVerdade() {
         Usuario gestor = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s52-gestorfora@escritor.io", Papel.GESTOR, 480));
         Usuario forasteiro =
                 usuarioRepository.saveAndFlush(new Usuario("Caio Reis", "caio-s52-forasteiro@escritor.io", Papel.COLABORADOR, 480));
@@ -149,7 +148,7 @@ class PontoControllerIT {
     }
 
     @Test
-    void gestorTentandoBaixarCsvDeUsuarioForaDaEquipeQueLideraRecebe403DeVerdade() {
+    void gestorTentandoBaixarCsvDeUsuarioForaDoQuadroRecebe403DeVerdade() {
         Usuario gestor = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s53-csvgestor@escritor.io", Papel.GESTOR, 480));
         Usuario forasteiro =
                 usuarioRepository.saveAndFlush(new Usuario("Caio Reis", "caio-s53-csvforasteiro@escritor.io", Papel.COLABORADOR, 480));
@@ -163,12 +162,12 @@ class PontoControllerIT {
     }
 
     @Test
-    void gestorConsultaOsDiasInconsistentesDeUmMembroDaEquipeQueLideraDeVerdade() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
+    void gestorConsultaOsDiasInconsistentesDeUmMembroDoMesmoQuadroDeVerdade() {
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backend", null));
         Usuario gestor = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s57-gestor@escritor.io", Papel.GESTOR, 480));
         Usuario membro = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s57-membro@escritor.io", Papel.COLABORADOR, 480));
-        membroEquipeRepository.saveAndFlush(new MembroEquipe(equipe, gestor, PapelNaEquipe.LIDER));
-        membroEquipeRepository.saveAndFlush(new MembroEquipe(equipe, membro, PapelNaEquipe.MEMBRO));
+        membroQuadroRepository.saveAndFlush(new MembroQuadro(quadro, gestor));
+        membroQuadroRepository.saveAndFlush(new MembroQuadro(quadro, membro));
         // só ENTRADA, dia bem no passado - com certeza já virou.
         registroPontoRepository.saveAndFlush(new RegistroPonto(
                 membro, TipoRegistroPonto.ENTRADA, Instant.parse("2026-01-11T09:00:00Z"), OrigemRegistroPonto.WEB, "127.0.0.1", "junit", null));
@@ -189,7 +188,7 @@ class PontoControllerIT {
     }
 
     @Test
-    void gestorTentandoVerDiasInconsistentesDeUsuarioForaDaEquipeQueLideraRecebe403DeVerdade() {
+    void gestorTentandoVerDiasInconsistentesDeUsuarioForaDoQuadroRecebe403DeVerdade() {
         Usuario gestor = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s57-gestorfora@escritor.io", Papel.GESTOR, 480));
         Usuario forasteiro =
                 usuarioRepository.saveAndFlush(new Usuario("Caio Reis", "caio-s57-forasteiro@escritor.io", Papel.COLABORADOR, 480));

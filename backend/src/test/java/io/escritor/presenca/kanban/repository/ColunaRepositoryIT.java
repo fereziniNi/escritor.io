@@ -1,7 +1,5 @@
 package io.escritor.presenca.kanban.repository;
 
-import io.escritor.presenca.identidade.domain.Equipe;
-import io.escritor.presenca.identidade.repository.EquipeRepository;
 import io.escritor.presenca.kanban.domain.Coluna;
 import io.escritor.presenca.kanban.domain.Quadro;
 import org.junit.jupiter.api.Test;
@@ -27,9 +25,6 @@ class ColunaRepositoryIT {
     static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16").withInitScript("db-init/criar-papel-app.sql");
 
     @Autowired
-    private EquipeRepository equipeRepository;
-
-    @Autowired
     private QuadroRepository quadroRepository;
 
     @Autowired
@@ -37,8 +32,7 @@ class ColunaRepositoryIT {
 
     @Test
     void persisteERecuperaColuna() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
 
         Coluna salva = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
 
@@ -51,8 +45,7 @@ class ColunaRepositoryIT {
 
     @Test
     void rejeitaOrdemDuplicadaNoMesmoQuadro() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
         colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
 
         Coluna duplicada = new Coluna(quadro, "Outra", 0, null);
@@ -63,9 +56,8 @@ class ColunaRepositoryIT {
 
     @Test
     void permiteAMesmaOrdemEmQuadrosDiferentes() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
-        Quadro quadroA = quadroRepository.saveAndFlush(new Quadro("Backlog A", null, equipe));
-        Quadro quadroB = quadroRepository.saveAndFlush(new Quadro("Backlog B", null, equipe));
+        Quadro quadroA = quadroRepository.saveAndFlush(new Quadro("Backlog A", null));
+        Quadro quadroB = quadroRepository.saveAndFlush(new Quadro("Backlog B", null));
         colunaRepository.saveAndFlush(new Coluna(quadroA, "A fazer", 0, null));
 
         Coluna colunaDeOutroQuadro = colunaRepository.saveAndFlush(new Coluna(quadroB, "A fazer", 0, null));

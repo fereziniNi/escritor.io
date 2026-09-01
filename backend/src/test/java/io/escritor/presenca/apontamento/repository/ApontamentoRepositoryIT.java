@@ -2,12 +2,10 @@ package io.escritor.presenca.apontamento.repository;
 
 import io.escritor.presenca.apontamento.domain.Apontamento;
 import io.escritor.presenca.apontamento.domain.OrigemApontamento;
-import io.escritor.presenca.identidade.domain.Equipe;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Projeto;
 import io.escritor.presenca.identidade.domain.StatusProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
-import io.escritor.presenca.identidade.repository.EquipeRepository;
 import io.escritor.presenca.identidade.repository.ProjetoRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.kanban.domain.Card;
@@ -43,9 +41,6 @@ class ApontamentoRepositoryIT {
     static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16").withInitScript("db-init/criar-papel-app.sql");
 
     @Autowired
-    private EquipeRepository equipeRepository;
-
-    @Autowired
     private ProjetoRepository projetoRepository;
 
     @Autowired
@@ -64,8 +59,7 @@ class ApontamentoRepositoryIT {
     private ApontamentoRepository apontamentoRepository;
 
     private Card criarCard(Usuario usuario) {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
         Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         return cardRepository.saveAndFlush(new Card(coluna, "Corrigir bug", null, 1024.0, null, null, null, usuario));
     }
@@ -182,8 +176,8 @@ class ApontamentoRepositoryIT {
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480));
         Projeto projetoA = projetoRepository.saveAndFlush(new Projeto("Projeto A", "Cliente", StatusProjeto.ATIVO, LocalDate.now(), null));
         Projeto projetoB = projetoRepository.saveAndFlush(new Projeto("Projeto B", "Cliente", StatusProjeto.ATIVO, LocalDate.now(), null));
-        Quadro quadroA = quadroRepository.saveAndFlush(new Quadro("Quadro A", projetoA, null));
-        Quadro quadroB = quadroRepository.saveAndFlush(new Quadro("Quadro B", projetoB, null));
+        Quadro quadroA = quadroRepository.saveAndFlush(new Quadro("Quadro A", projetoA));
+        Quadro quadroB = quadroRepository.saveAndFlush(new Quadro("Quadro B", projetoB));
         Coluna colunaA = colunaRepository.saveAndFlush(new Coluna(quadroA, "A fazer", 0, null));
         Coluna colunaB = colunaRepository.saveAndFlush(new Coluna(quadroB, "A fazer", 0, null));
         Card cardA = cardRepository.saveAndFlush(new Card(colunaA, "Card A", null, 1024.0, null, null, null, usuario));
@@ -197,28 +191,5 @@ class ApontamentoRepositoryIT {
                 projetoA, Instant.parse("2026-01-01T00:00:00Z"), Instant.parse("2026-02-01T00:00:00Z"));
 
         assertThat(encontrados).extracting(Apontamento::getId).containsExactly(doProjetoA.getId());
-    }
-
-    @Test
-    void encontraApontamentosFechadosDeTodosOsCardsDaEquipeIgnorandoQuadroSemEquipeVinculada() {
-        Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480));
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
-        Projeto projetoSemEquipe = projetoRepository.saveAndFlush(new Projeto("Projeto Solo", "Cliente", StatusProjeto.ATIVO, LocalDate.now(), null));
-        Quadro quadroDaEquipe = quadroRepository.saveAndFlush(new Quadro("Quadro Equipe", null, equipe));
-        // quadro vinculado só a projeto, sem equipe - não pode aparecer na busca por equipe.
-        Quadro quadroSoProjeto = quadroRepository.saveAndFlush(new Quadro("Quadro Projeto", projetoSemEquipe, null));
-        Coluna colunaDaEquipe = colunaRepository.saveAndFlush(new Coluna(quadroDaEquipe, "A fazer", 0, null));
-        Coluna colunaSoProjeto = colunaRepository.saveAndFlush(new Coluna(quadroSoProjeto, "A fazer", 0, null));
-        Card cardDaEquipe = cardRepository.saveAndFlush(new Card(colunaDaEquipe, "Card Equipe", null, 1024.0, null, null, null, usuario));
-        Card cardSoProjeto = cardRepository.saveAndFlush(new Card(colunaSoProjeto, "Card Projeto", null, 1024.0, null, null, null, usuario));
-        Apontamento daEquipe = apontamentoRepository.saveAndFlush(new Apontamento(
-                usuario, cardDaEquipe, Instant.parse("2026-01-15T09:00:00Z"), Instant.parse("2026-01-15T10:00:00Z"), null, OrigemApontamento.MANUAL));
-        apontamentoRepository.saveAndFlush(new Apontamento(
-                usuario, cardSoProjeto, Instant.parse("2026-01-15T09:00:00Z"), Instant.parse("2026-01-15T10:00:00Z"), null, OrigemApontamento.MANUAL));
-
-        var encontrados = apontamentoRepository.findByCard_Coluna_Quadro_EquipeAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(
-                equipe, Instant.parse("2026-01-01T00:00:00Z"), Instant.parse("2026-02-01T00:00:00Z"));
-
-        assertThat(encontrados).extracting(Apontamento::getId).containsExactly(daEquipe.getId());
     }
 }

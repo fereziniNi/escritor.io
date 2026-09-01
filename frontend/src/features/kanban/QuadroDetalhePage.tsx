@@ -15,6 +15,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { useAuthStore } from '../auth/authStore'
 import {
+  adicionarMembroAoQuadro,
   aplicarEtiqueta,
   buscarQuadro,
   criarApontamentoManual,
@@ -36,7 +37,7 @@ import { formatarDuracao } from './formatarDuracao'
 import { moverCardOtimista } from './moverCardOtimista'
 import { resolverMovimento } from './resolverMovimento'
 import { rotuloEvento } from './rotuloEvento'
-import type { Apontamento, Card, ColunaComCards, Etiqueta, QuadroDetalhe } from './types'
+import type { Apontamento, Card, ColunaComCards, Etiqueta, MembroQuadro, QuadroDetalhe } from './types'
 import { useQuadroWebSocket } from './useQuadroWebSocket'
 import './Kanban.css'
 
@@ -542,6 +543,73 @@ function ColunaComDrop({
 }
 
 /**
+ * Pedido do cliente: sem Equipe - pessoas são atribuídas direto ao quadro ("sistema"). Adicionar
+ * é por id de usuário (mesma disciplina de não montar dropdown pra uma API de listagem que não
+ * existe, ver comentário em `RelatoriosPage`); a lista de membros já traz o nome de quem foi
+ * adicionado.
+ */
+function MembrosDoQuadro({
+  quadroId,
+  membros,
+  podeGerenciar,
+}: {
+  quadroId: number
+  membros: MembroQuadro[]
+  podeGerenciar: boolean
+}) {
+  const queryClient = useQueryClient()
+  const [usuarioId, setUsuarioId] = useState('')
+
+  const adicionarMutation = useMutation({
+    mutationFn: () => adicionarMembroAoQuadro({ quadroId, usuarioId: Number(usuarioId) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quadros', quadroId] })
+      setUsuarioId('')
+    },
+  })
+
+  return (
+    <section className="secao cartao kanban-membros">
+      <h2 className="secao-titulo">👥 Membros do quadro</h2>
+      {membros.length === 0 && <p className="mensagem-vazia">Nenhum membro ainda.</p>}
+      {membros.length > 0 && (
+        <ul className="lista-cartoes">
+          {membros.map((membro) => (
+            <li key={membro.usuarioId} className="cartao-item">
+              {membro.usuarioNome}
+            </li>
+          ))}
+        </ul>
+      )}
+      {podeGerenciar && (
+        <form
+          className="kanban-card-form"
+          onSubmit={(evento) => {
+            evento.preventDefault()
+            adicionarMutation.mutate()
+          }}
+        >
+          <label htmlFor="usuario-id-membro" className="sr-only">
+            Adicionar membro (id do usuário)
+          </label>
+          <input
+            id="usuario-id-membro"
+            value={usuarioId}
+            onChange={(evento) => setUsuarioId(evento.target.value)}
+            placeholder="Id do usuário"
+            required
+          />
+          <button type="submit" className="botao-pequeno" disabled={adicionarMutation.isPending}>
+            ➕ Adicionar membro
+          </button>
+        </form>
+      )}
+      {adicionarMutation.isError && <p className="mensagem-erro">Não foi possível adicionar o membro.</p>}
+    </section>
+  )
+}
+
+/**
  * `quadroIdProp` é opcional - só existe pro `PainelKanban` (dock do Escritório, "uma tela só")
  * poder passar o id direto, sem precisar de uma rota `/kanban/:id` de verdade. `useParams()`
  * continua sendo chamado incondicionalmente (regra dos hooks), só o resultado é ignorado quando
@@ -672,6 +740,8 @@ export function QuadroDetalhePage({ quadroIdProp }: { quadroIdProp?: number } = 
         </span>
         <h1>{quadro.nome}</h1>
       </div>
+
+      <MembrosDoQuadro quadroId={quadroId} membros={quadro.membros} podeGerenciar={podeCriarEtiqueta} />
 
       {podeCriarEtiqueta && (
         <form

@@ -16,7 +16,6 @@ export function QuadrosPage({ aoSelecionarQuadro }: { aoSelecionarQuadro?: (id: 
 
   const [nome, setNome] = useState('')
   const [projetoId, setProjetoId] = useState('')
-  const [equipeId, setEquipeId] = useState('')
 
   const quadrosQuery = useQuery({ queryKey: ['quadros'], queryFn: listarQuadros })
 
@@ -25,12 +24,10 @@ export function QuadrosPage({ aoSelecionarQuadro }: { aoSelecionarQuadro?: (id: 
       criarQuadro({
         nome,
         projetoId: projetoId === '' ? null : Number(projetoId),
-        equipeId: equipeId === '' ? null : Number(equipeId),
       }),
     onSuccess: () => {
       setNome('')
       setProjetoId('')
-      setEquipeId('')
       queryClient.invalidateQueries({ queryKey: ['quadros'] })
     },
   })
@@ -62,11 +59,6 @@ export function QuadrosPage({ aoSelecionarQuadro }: { aoSelecionarQuadro?: (id: 
                 value={projetoId}
                 onChange={(evento) => setProjetoId(evento.target.value)}
               />
-            </div>
-
-            <div className="campo">
-              <label htmlFor="equipe-quadro">Equipe (id)</label>
-              <input id="equipe-quadro" value={equipeId} onChange={(evento) => setEquipeId(evento.target.value)} />
             </div>
 
             <div className="campo-acoes">

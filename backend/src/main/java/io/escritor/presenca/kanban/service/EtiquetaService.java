@@ -52,8 +52,8 @@ public class EtiquetaService {
     }
 
     /**
-     * Idempotente, mesmo padrão de {@code EquipeService.adicionarMembro} (E0): aplicar uma
-     * etiqueta que o card já tem não duplica a linha, só devolve o vínculo existente.
+     * Idempotente, mesmo padrão de {@code QuadroService.adicionarMembro}: aplicar uma etiqueta
+     * que o card já tem não duplica a linha, só devolve o vínculo existente.
      */
     public EtiquetaResponse aplicar(Long cardId, Long etiquetaId) {
         Card card = buscarCard(cardId);

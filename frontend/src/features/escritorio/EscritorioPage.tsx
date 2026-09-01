@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { HealthStatus } from '../../app/HealthStatus'
 import { useAuthStore } from '../auth/authStore'
 import { ColaboradoresPage } from '../organizacao/ColaboradoresPage'
-import { EquipesPage } from '../organizacao/EquipesPage'
 import { ProjetosPage } from '../organizacao/ProjetosPage'
 import { RelatoriosPage } from '../relatorios/RelatoriosPage'
 import { buscarMapaAtivo } from './api'
@@ -31,7 +30,6 @@ const TITULO_PAINEL: Record<PainelId, string> = {
   ponto: '⏱️ Ponto',
   kanban: '📋 Quadros',
   relatorios: '📊 Relatórios',
-  equipes: '👥 Equipes',
   projetos: '📁 Projetos',
   colaboradores: '🧑‍💼 Colaboradores',
 }
@@ -141,7 +139,6 @@ export function EscritorioPage() {
           {painelAberto === 'ponto' && <PainelPonto />}
           {painelAberto === 'kanban' && <PainelKanban />}
           {painelAberto === 'relatorios' && <RelatoriosPage />}
-          {painelAberto === 'equipes' && <EquipesPage />}
           {painelAberto === 'projetos' && <ProjetosPage />}
           {painelAberto === 'colaboradores' && <ColaboradoresPage />}
         </PainelFlutuante>

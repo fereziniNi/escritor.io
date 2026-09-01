@@ -16,7 +16,6 @@ import io.escritor.presenca.kanban.domain.NomeColunaObrigatorioException;
 import io.escritor.presenca.kanban.domain.NomeEtiquetaObrigatorioException;
 import io.escritor.presenca.kanban.domain.NomeQuadroObrigatorioException;
 import io.escritor.presenca.kanban.domain.OrdemColunaDuplicadaException;
-import io.escritor.presenca.kanban.domain.QuadroSemVinculoException;
 import io.escritor.presenca.kanban.domain.TextoComentarioObrigatorioException;
 import io.escritor.presenca.kanban.domain.TituloCardObrigatorioException;
 import io.escritor.presenca.ponto.domain.JornadaDeOutroUsuarioException;
@@ -37,11 +36,6 @@ public class TratamentoErroGlobal {
     @ExceptionHandler(SequenciaInvalidaException.class)
     ResponseEntity<Void> tratarSequenciaInvalida() {
         return ResponseEntity.status(HttpStatus.CONFLICT).build();
-    }
-
-    @ExceptionHandler(QuadroSemVinculoException.class)
-    ResponseEntity<Void> tratarQuadroSemVinculo() {
-        return ResponseEntity.badRequest().build();
     }
 
     @ExceptionHandler(NomeQuadroObrigatorioException.class)

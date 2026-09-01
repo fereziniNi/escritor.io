@@ -1,9 +1,7 @@
 package io.escritor.presenca.kanban.web;
 
-import io.escritor.presenca.identidade.domain.Equipe;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Usuario;
-import io.escritor.presenca.identidade.repository.EquipeRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.CardEtiqueta;
@@ -52,9 +50,6 @@ class EtiquetaControllerIT {
     private JwtService jwtService;
 
     @Autowired
-    private EquipeRepository equipeRepository;
-
-    @Autowired
     private UsuarioRepository usuarioRepository;
 
     @Autowired
@@ -83,9 +78,8 @@ class EtiquetaControllerIT {
 
     @Test
     void removerEtiquetaDoCardPersisteDeVerdade() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-etq@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
         Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         Card card = cardRepository.saveAndFlush(new Card(coluna, "Corrigir bug", null, 1024.0, null, null, null, usuario));
         Etiqueta etiqueta = etiquetaRepository.saveAndFlush(new Etiqueta(quadro, "Urgente", "#FF0000"));

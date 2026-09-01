@@ -1,9 +1,7 @@
 package io.escritor.presenca.kanban.repository;
 
-import io.escritor.presenca.identidade.domain.Equipe;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Usuario;
-import io.escritor.presenca.identidade.repository.EquipeRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.Coluna;
@@ -29,9 +27,6 @@ class CardRepositoryIT {
     static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16").withInitScript("db-init/criar-papel-app.sql");
 
     @Autowired
-    private EquipeRepository equipeRepository;
-
-    @Autowired
     private QuadroRepository quadroRepository;
 
     @Autowired
@@ -45,8 +40,7 @@ class CardRepositoryIT {
 
     @Test
     void persisteERecuperaCard() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
         Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         Usuario autor = usuarioRepository.saveAndFlush(
                 new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480));
@@ -62,8 +56,7 @@ class CardRepositoryIT {
 
     @Test
     void encontraOCardDeMaiorPosicaoNaColuna() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
         Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         Usuario autor = usuarioRepository.saveAndFlush(
                 new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480));

@@ -85,18 +85,15 @@ public class ApontamentoController {
     }
 
     /**
-     * "Onde o esforço foi" por projeto/equipe (S5.5) - agregação de todo mundo que apontou tempo
-     * nos cards vinculados, não só de um usuário (diferente de {@link #listarTotalPorCard}), por
-     * isso restrito a gestor/admin aqui - `VisibilidadeUsuarioService` não se aplica, é sobre
-     * "ver dados de outro usuário", um eixo diferente de "ver dados de uma equipe/projeto".
+     * "Onde o esforço foi" por projeto (S5.5) - agregação de todo mundo que apontou tempo nos
+     * cards vinculados, não só de um usuário (diferente de {@link #listarTotalPorCard}), por isso
+     * restrito a gestor/admin aqui - `VisibilidadeUsuarioService` não se aplica, é sobre "ver
+     * dados de outro usuário", um eixo diferente de "ver dados de um projeto".
      */
     @GetMapping("/apontamentos/relatorio")
     @PreAuthorize("hasAnyRole('GESTOR', 'ADMIN')")
-    public TotalApontadoResponse totalApontadoPorProjetoOuEquipe(
-            @RequestParam(required = false) Long projetoId,
-            @RequestParam(required = false) Long equipeId,
-            @RequestParam Instant inicio,
-            @RequestParam Instant fim) {
-        return apontamentoService.totalApontadoPorProjetoOuEquipe(projetoId, equipeId, inicio, fim);
+    public TotalApontadoResponse totalApontadoPorProjeto(
+            @RequestParam Long projetoId, @RequestParam Instant inicio, @RequestParam Instant fim) {
+        return apontamentoService.totalApontadoPorProjeto(projetoId, inicio, fim);
     }
 }

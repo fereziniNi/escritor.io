@@ -1,9 +1,10 @@
 package io.escritor.presenca.kanban.web;
 
+import io.escritor.presenca.identidade.domain.Papel;
+import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.OrdemColunaDuplicadaException;
-import io.escritor.presenca.kanban.domain.QuadroSemVinculoException;
 import io.escritor.presenca.kanban.service.ColunaService;
 import io.escritor.presenca.kanban.service.EtiquetaService;
 import io.escritor.presenca.kanban.service.QuadroService;
@@ -17,6 +18,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -46,6 +48,12 @@ class QuadroControllerTest {
     @MockitoBean
     private ContextoUsuarioAutenticado contextoUsuarioAutenticado;
 
+    private static Usuario usuarioComId(Long id) {
+        Usuario usuario = new Usuario("Ana Souza", "ana@escritor.io", Papel.GESTOR, 480);
+        ReflectionTestUtils.setField(usuario, "id", id);
+        return usuario;
+    }
+
     @Test
     void semAutenticacaoRetorna401() throws Exception {
         mockMvc.perform(get("/quadros")).andExpect(status().isUnauthorized());
@@ -55,13 +63,11 @@ class QuadroControllerTest {
     @WithMockUser
     void listaOsQuadrosVisiveisAoUsuarioAutenticado() throws Exception {
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
-        when(quadroService.listarVisiveis(any()))
-                .thenReturn(List.of(new QuadroResponse(1L, "Backlog", null, 10L, false)));
+        when(quadroService.listarVisiveis(any())).thenReturn(List.of(new QuadroResponse(1L, "Backlog", null, false)));
 
         mockMvc.perform(get("/quadros"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].nome").value("Backlog"))
-                .andExpect(jsonPath("$[0].equipeId").value(10));
+                .andExpect(jsonPath("$[0].nome").value("Backlog"));
     }
 
     @Test
@@ -69,7 +75,7 @@ class QuadroControllerTest {
         mockMvc.perform(post("/quadros")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"nome":"Backlog","equipeId":10}
+                                {"nome":"Backlog"}
                                 """))
                 .andExpect(status().isUnauthorized());
     }
@@ -80,7 +86,7 @@ class QuadroControllerTest {
         mockMvc.perform(post("/quadros")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"nome":"Backlog","equipeId":10}
+                                {"nome":"Backlog"}
                                 """))
                 .andExpect(status().isForbidden());
     }
@@ -88,13 +94,14 @@ class QuadroControllerTest {
     @Test
     @WithMockUser(roles = "GESTOR")
     void criarComPapelGestorRetorna201() throws Exception {
-        when(quadroService.criar("Backlog", null, 10L))
-                .thenReturn(new QuadroResponse(1L, "Backlog", null, 10L, false));
+        Usuario criador = usuarioComId(10L);
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(criador);
+        when(quadroService.criar("Backlog", null, criador)).thenReturn(new QuadroResponse(1L, "Backlog", null, false));
 
         mockMvc.perform(post("/quadros")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"nome":"Backlog","equipeId":10}
+                                {"nome":"Backlog"}
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.nome").value("Backlog"));
@@ -103,13 +110,14 @@ class QuadroControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void criarComPapelAdminRetorna201() throws Exception {
-        when(quadroService.criar("Backlog", null, 10L))
-                .thenReturn(new QuadroResponse(1L, "Backlog", null, 10L, false));
+        Usuario criador = usuarioComId(10L);
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(criador);
+        when(quadroService.criar("Backlog", null, criador)).thenReturn(new QuadroResponse(1L, "Backlog", null, false));
 
         mockMvc.perform(post("/quadros")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"nome":"Backlog","equipeId":10}
+                                {"nome":"Backlog"}
                                 """))
                 .andExpect(status().isCreated());
     }
@@ -120,34 +128,68 @@ class QuadroControllerTest {
         mockMvc.perform(post("/quadros")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"equipeId":10}
+                                {}
                                 """))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     @WithMockUser(roles = "GESTOR")
-    void criarSemProjetoNemEquipeRetorna400() throws Exception {
-        when(quadroService.criar(eq("Órfão"), any(), any())).thenThrow(new QuadroSemVinculoException());
+    void criarComProjetoInexistenteRetorna404() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(usuarioComId(10L));
+        when(quadroService.criar(eq("Backlog"), eq(999L), any())).thenThrow(new RecursoNaoEncontradoException("não encontrado"));
 
         mockMvc.perform(post("/quadros")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"nome":"Órfão"}
+                                {"nome":"Backlog","projetoId":999}
                                 """))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void adicionarMembroSemAutenticacaoRetorna401() throws Exception {
+        mockMvc.perform(post("/quadros/1/membros")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"usuarioId":2}
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "COLABORADOR")
+    void adicionarMembroComPapelColaboradorRetorna403() throws Exception {
+        mockMvc.perform(post("/quadros/1/membros")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"usuarioId":2}
+                                """))
+                .andExpect(status().isForbidden());
     }
 
     @Test
     @WithMockUser(roles = "GESTOR")
-    void criarComEquipeInexistenteRetorna404() throws Exception {
-        when(quadroService.criar("Backlog", null, 999L))
-                .thenThrow(new RecursoNaoEncontradoException("não encontrada"));
-
-        mockMvc.perform(post("/quadros")
+    void adicionarMembroComPapelGestorRetorna204() throws Exception {
+        mockMvc.perform(post("/quadros/1/membros")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"nome":"Backlog","equipeId":999}
+                                {"usuarioId":2}
+                                """))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @WithMockUser(roles = "GESTOR")
+    void adicionarMembroDeUsuarioInexistenteRetorna404() throws Exception {
+        org.mockito.Mockito.doThrow(new RecursoNaoEncontradoException("não encontrado"))
+                .when(quadroService)
+                .adicionarMembro(eq(1L), any());
+
+        mockMvc.perform(post("/quadros/1/membros")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"usuarioId":999}
                                 """))
                 .andExpect(status().isNotFound());
     }
@@ -249,14 +291,13 @@ class QuadroControllerTest {
 
     @Test
     @WithMockUser
-    void buscarDetalheRetornaColunasECards() throws Exception {
+    void buscarDetalheRetornaColunasCardsEMembros() throws Exception {
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
         when(quadroService.buscarDetalhe(eq(1L), any()))
                 .thenReturn(new QuadroDetalheResponse(
                         1L,
                         "Backlog",
                         null,
-                        10L,
                         false,
                         List.of(new ColunaComCardsResponse(
                                 5L,
@@ -265,13 +306,15 @@ class QuadroControllerTest {
                                 null,
                                 List.of(new CardResponse(
                                         7L, 5L, "Corrigir bug", null, 1024.0, null, null, null, 1L,
-                                        java.time.Instant.parse("2026-01-15T09:00:00Z"), false, List.of()))))));
+                                        java.time.Instant.parse("2026-01-15T09:00:00Z"), false, List.of())))),
+                        List.of(new MembroQuadroResponse(1L, "Ana Souza"))));
 
         mockMvc.perform(get("/quadros/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nome").value("Backlog"))
                 .andExpect(jsonPath("$.colunas[0].nome").value("A fazer"))
-                .andExpect(jsonPath("$.colunas[0].cards[0].titulo").value("Corrigir bug"));
+                .andExpect(jsonPath("$.colunas[0].cards[0].titulo").value("Corrigir bug"))
+                .andExpect(jsonPath("$.membros[0].usuarioNome").value("Ana Souza"));
     }
 
     @Test

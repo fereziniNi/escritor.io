@@ -1,6 +1,5 @@
 package io.escritor.presenca.kanban.service;
 
-import io.escritor.presenca.identidade.domain.Equipe;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
@@ -47,7 +46,7 @@ class EtiquetaServiceTest {
     private EtiquetaService service;
 
     private static Quadro quadroComId(Long id) {
-        Quadro quadro = new Quadro("Backlog", null, new Equipe("Backend", null));
+        Quadro quadro = new Quadro("Backlog", null);
         ReflectionTestUtils.setField(quadro, "id", id);
         return quadro;
     }

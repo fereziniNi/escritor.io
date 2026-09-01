@@ -1,12 +1,11 @@
 package io.escritor.presenca.identidade.service;
 
-import io.escritor.presenca.identidade.domain.Equipe;
-import io.escritor.presenca.identidade.domain.MembroEquipe;
 import io.escritor.presenca.identidade.domain.Papel;
-import io.escritor.presenca.identidade.domain.PapelNaEquipe;
 import io.escritor.presenca.identidade.domain.Usuario;
-import io.escritor.presenca.identidade.repository.MembroEquipeRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
+import io.escritor.presenca.kanban.domain.MembroQuadro;
+import io.escritor.presenca.kanban.domain.Quadro;
+import io.escritor.presenca.kanban.repository.MembroQuadroRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,7 +31,7 @@ import static org.mockito.Mockito.when;
 class VisibilidadeUsuarioServiceTest {
 
     @Mock
-    private MembroEquipeRepository membroEquipeRepository;
+    private MembroQuadroRepository membroQuadroRepository;
 
     @Mock
     private UsuarioRepository usuarioRepository;
@@ -45,9 +44,15 @@ class VisibilidadeUsuarioServiceTest {
         return usuario;
     }
 
+    private static Quadro quadroComId(Long id) {
+        Quadro quadro = new Quadro("Sistema " + id, null);
+        ReflectionTestUtils.setField(quadro, "id", id);
+        return quadro;
+    }
+
     @BeforeEach
     void setUp() {
-        service = new VisibilidadeUsuarioService(membroEquipeRepository, usuarioRepository);
+        service = new VisibilidadeUsuarioService(membroQuadroRepository, usuarioRepository);
     }
 
     @Test
@@ -66,7 +71,7 @@ class VisibilidadeUsuarioServiceTest {
     }
 
     @Test
-    void adminVeQualquerUsuarioSemChecarEquipe() {
+    void adminVeQualquerUsuarioSemChecarQuadro() {
         Usuario admin = usuarioComId(9L, Papel.ADMIN);
         Usuario qualquerUsuario = usuarioComId(2L, Papel.COLABORADOR);
 
@@ -74,23 +79,22 @@ class VisibilidadeUsuarioServiceTest {
     }
 
     @Test
-    void gestorVeMembroDeEquipeQueLidera() {
+    void gestorVeMembroDoMesmoQuadro() {
         Usuario gestor = usuarioComId(2L, Papel.GESTOR);
         Usuario membro = usuarioComId(3L, Papel.COLABORADOR);
-        Equipe equipeLiderada = new Equipe("Backend", null);
-        ReflectionTestUtils.setField(equipeLiderada, "id", 10L);
-        MembroEquipe vinculoLideranca = new MembroEquipe(equipeLiderada, gestor, PapelNaEquipe.LIDER);
-        when(membroEquipeRepository.findByUsuarioAndPapelNaEquipe(gestor, PapelNaEquipe.LIDER)).thenReturn(List.of(vinculoLideranca));
-        when(membroEquipeRepository.existsByEquipeInAndUsuario(List.of(equipeLiderada), membro)).thenReturn(true);
+        Quadro quadroComum = quadroComId(10L);
+        when(membroQuadroRepository.findByUsuario(gestor)).thenReturn(List.of(new MembroQuadro(quadroComum, gestor)));
+        when(membroQuadroRepository.existsByQuadroInAndUsuario(List.of(quadroComum), membro)).thenReturn(true);
 
         assertThat(service.podeVer(gestor, membro)).isTrue();
     }
 
     @Test
-    void gestorNaoVeUsuarioForaDasEquipesQueLidera() {
+    void gestorNaoVeUsuarioForaDosQuadrosDosQuaisParticipa() {
         Usuario gestor = usuarioComId(2L, Papel.GESTOR);
         Usuario forasteiro = usuarioComId(4L, Papel.COLABORADOR);
-        when(membroEquipeRepository.findByUsuarioAndPapelNaEquipe(gestor, PapelNaEquipe.LIDER)).thenReturn(List.of());
+        when(membroQuadroRepository.findByUsuario(gestor)).thenReturn(List.of());
+        when(membroQuadroRepository.existsByQuadroInAndUsuario(List.of(), forasteiro)).thenReturn(false);
 
         assertThat(service.podeVer(gestor, forasteiro)).isFalse();
     }

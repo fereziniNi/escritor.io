@@ -1,15 +1,15 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { formatarDataBr } from '../../shared/formatarData'
-import { buscarTotalApontadoPorProjetoOuEquipe } from '../kanban/api'
-import { listarEquipes, listarProjetos } from '../organizacao/api'
+import { buscarTotalApontadoPorProjeto } from '../kanban/api'
+import { listarProjetos } from '../organizacao/api'
 import { buscarDiasInconsistentes, buscarEspelhoDoMes } from '../ponto/api'
 import { formatarMinutos, formatarSaldo } from '../ponto/formatarMinutos'
 
 /**
  * Seletor de pessoa é um id numérico digitado, não um dropdown de nomes de propósito (S5.8): não
- * existe ainda um `GET /usuarios` que um gestor possa chamar pra listar os membros da própria
- * equipe (só admin cadastra usuário, sem endpoint de listagem) - mesma disciplina de não construir
+ * existe ainda um `GET /usuarios` que um gestor possa chamar pra listar os membros dos próprios
+ * quadros (só admin cadastra usuário, sem endpoint de listagem) - mesma disciplina de não construir
  * UI pra uma API que não existe (S4.4).
  */
 export function RelatoriosPage() {
@@ -17,14 +17,12 @@ export function RelatoriosPage() {
   const [inicio, setInicio] = useState('')
   const [fim, setFim] = useState('')
   const [projetoId, setProjetoId] = useState('')
-  const [equipeId, setEquipeId] = useState('')
 
   const usuarioId = usuarioIdTexto === '' ? null : Number(usuarioIdTexto)
   const periodoCompleto = inicio !== '' && fim !== ''
   const inicioInstante = `${inicio}T00:00:00Z`
   const fimInstante = `${fim}T00:00:00Z`
 
-  const equipesQuery = useQuery({ queryKey: ['equipes'], queryFn: listarEquipes })
   const projetosQuery = useQuery({ queryKey: ['projetos'], queryFn: listarProjetos })
 
   const espelhoQuery = useQuery({
@@ -39,15 +37,14 @@ export function RelatoriosPage() {
   })
 
   const totalApontadoQuery = useQuery({
-    queryKey: ['apontamentos', 'relatorio', projetoId, equipeId, inicio, fim],
+    queryKey: ['apontamentos', 'relatorio', projetoId, inicio, fim],
     queryFn: () =>
-      buscarTotalApontadoPorProjetoOuEquipe({
-        projetoId: projetoId === '' ? null : Number(projetoId),
-        equipeId: equipeId === '' ? null : Number(equipeId),
+      buscarTotalApontadoPorProjeto({
+        projetoId: Number(projetoId),
         inicio: inicioInstante,
         fim: fimInstante,
       }),
-    enabled: periodoCompleto && (projetoId !== '' || equipeId !== ''),
+    enabled: periodoCompleto && projetoId !== '',
   })
 
   return (
@@ -87,34 +84,12 @@ export function RelatoriosPage() {
             <select
               id="projeto-relatorio"
               value={projetoId}
-              onChange={(evento) => {
-                setProjetoId(evento.target.value)
-                setEquipeId('')
-              }}
+              onChange={(evento) => setProjetoId(evento.target.value)}
             >
               <option value="">Nenhum</option>
               {projetosQuery.data?.map((projeto) => (
                 <option key={projeto.id} value={projeto.id}>
                   {projeto.nome}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="campo">
-            <label htmlFor="equipe-relatorio">Equipe</label>
-            <select
-              id="equipe-relatorio"
-              value={equipeId}
-              onChange={(evento) => {
-                setEquipeId(evento.target.value)
-                setProjetoId('')
-              }}
-            >
-              <option value="">Nenhuma</option>
-              {equipesQuery.data?.map((equipe) => (
-                <option key={equipe.id} value={equipe.id}>
-                  {equipe.nome}
                 </option>
               ))}
             </select>
@@ -147,7 +122,7 @@ export function RelatoriosPage() {
 
       <section className="secao cartao">
         <h2 className="secao-titulo">🧮 Total apontado</h2>
-        {periodoCompleto && projetoId === '' && equipeId === '' && <p className="mensagem-vazia">Selecione um projeto ou uma equipe.</p>}
+        {periodoCompleto && projetoId === '' && <p className="mensagem-vazia">Selecione um projeto.</p>}
         {totalApontadoQuery.isError && <p className="mensagem-erro">Não foi possível carregar o total apontado.</p>}
         {totalApontadoQuery.data && <p>Total apontado: {formatarMinutos(totalApontadoQuery.data.totalMinutos)}</p>}
       </section>

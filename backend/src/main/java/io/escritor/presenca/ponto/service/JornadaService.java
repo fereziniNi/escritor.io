@@ -50,7 +50,8 @@ public class JornadaService {
     }
 
     /**
-     * PRD §2: "gestor vê jornada e relatórios das suas equipes". Entrada pública usada pelo
+     * PRD §2: gestor vê jornada e relatórios de quem está atribuído aos mesmos quadros que ele
+     * (sem Equipe, ver {@link VisibilidadeUsuarioService}). Entrada pública usada pelo
      * controller (S5.2) - resolve/autoriza `usuarioId` via {@link VisibilidadeUsuarioService}
      * (S5.1) e delega pro cálculo de sempre ({@link #jornadaDoDia(Usuario)}), que continua sem
      * checar nada, só calculando pra quem for passado.

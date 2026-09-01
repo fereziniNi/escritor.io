@@ -1,18 +1,15 @@
 package io.escritor.presenca.kanban.ws;
 
-import io.escritor.presenca.identidade.domain.Equipe;
-import io.escritor.presenca.identidade.domain.MembroEquipe;
 import io.escritor.presenca.identidade.domain.Papel;
-import io.escritor.presenca.identidade.domain.PapelNaEquipe;
 import io.escritor.presenca.identidade.domain.Usuario;
-import io.escritor.presenca.identidade.repository.EquipeRepository;
-import io.escritor.presenca.identidade.repository.MembroEquipeRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.Coluna;
+import io.escritor.presenca.kanban.domain.MembroQuadro;
 import io.escritor.presenca.kanban.domain.Quadro;
 import io.escritor.presenca.kanban.repository.CardRepository;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
+import io.escritor.presenca.kanban.repository.MembroQuadroRepository;
 import io.escritor.presenca.kanban.repository.QuadroRepository;
 import io.escritor.presenca.seguranca.JwtService;
 import java.util.concurrent.BlockingQueue;
@@ -53,10 +50,7 @@ class QuadroWebSocketBroadcastIT {
     private JwtService jwtService;
 
     @Autowired
-    private EquipeRepository equipeRepository;
-
-    @Autowired
-    private MembroEquipeRepository membroEquipeRepository;
+    private MembroQuadroRepository membroQuadroRepository;
 
     @Autowired
     private UsuarioRepository usuarioRepository;
@@ -81,10 +75,9 @@ class QuadroWebSocketBroadcastIT {
 
     @Test
     void doisClientesConectadosAoMesmoQuadroRecebemOMovimentoDeCard() throws Exception {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-ws@escritor.io", Papel.COLABORADOR, 480));
-        membroEquipeRepository.saveAndFlush(new MembroEquipe(equipe, usuario, PapelNaEquipe.MEMBRO));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Board WS", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Board WS", null));
+        membroQuadroRepository.saveAndFlush(new MembroQuadro(quadro, usuario));
         Coluna origem = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
         Coluna destino = colunaRepository.saveAndFlush(new Coluna(quadro, "Em progresso", 1, null));
         Card card = cardRepository.saveAndFlush(new Card(origem, "Card WS", null, 1024.0, null, null, null, usuario));
@@ -120,9 +113,8 @@ class QuadroWebSocketBroadcastIT {
 
     @Test
     void handshakeERecusadoParaUsuarioSemAcessoAoQuadro() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Financeiro", null));
         Usuario semAcesso = usuarioRepository.saveAndFlush(new Usuario("Bia Rocha", "bia-ws@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Board Privado", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Board Privado", null));
         String token = jwtService.gerarAccessToken(semAcesso.getId(), Papel.COLABORADOR);
 
         assertThatThrownBy(() -> conectar(quadro.getId(), token, new LinkedBlockingQueue<>()))
@@ -131,8 +123,7 @@ class QuadroWebSocketBroadcastIT {
 
     @Test
     void handshakeERecusadoSemToken() {
-        Equipe equipe = equipeRepository.saveAndFlush(new Equipe("Backend", null));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Board Sem Token", null, equipe));
+        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Board Sem Token", null));
 
         assertThatThrownBy(() -> {
             StandardWebSocketClient wsClient = new StandardWebSocketClient();

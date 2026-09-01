@@ -9,10 +9,8 @@ import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
 import io.escritor.presenca.apontamento.web.ApontamentoResponse;
 import io.escritor.presenca.apontamento.web.TotalApontadoResponse;
 import io.escritor.presenca.apontamento.web.TotalPorCardResponse;
-import io.escritor.presenca.identidade.domain.Equipe;
 import io.escritor.presenca.identidade.domain.Projeto;
 import io.escritor.presenca.identidade.domain.Usuario;
-import io.escritor.presenca.identidade.repository.EquipeRepository;
 import io.escritor.presenca.identidade.repository.ProjetoRepository;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.identidade.service.VisibilidadeUsuarioService;
@@ -39,7 +37,6 @@ public class ApontamentoService {
     private final CardRepository cardRepository;
     private final VisibilidadeUsuarioService visibilidadeUsuarioService;
     private final ProjetoRepository projetoRepository;
-    private final EquipeRepository equipeRepository;
     private final Clock clock;
 
     public ApontamentoService(
@@ -47,13 +44,11 @@ public class ApontamentoService {
             CardRepository cardRepository,
             VisibilidadeUsuarioService visibilidadeUsuarioService,
             ProjetoRepository projetoRepository,
-            EquipeRepository equipeRepository,
             Clock clock) {
         this.apontamentoRepository = apontamentoRepository;
         this.cardRepository = cardRepository;
         this.visibilidadeUsuarioService = visibilidadeUsuarioService;
         this.projetoRepository = projetoRepository;
-        this.equipeRepository = equipeRepository;
         this.clock = clock;
     }
 
@@ -239,37 +234,26 @@ public class ApontamentoService {
     }
 
     /**
-     * "Onde o esforço foi" por projeto/equipe (S5.5) - a agregação que S4.10 deixou de fora de
-     * propósito. Diferente de {@link #listarTotalPorCard}, não é sobre um usuário: soma todos os
-     * apontamentos fechados de todos os cards de todos os quadros vinculados ao projeto/equipe,
-     * de qualquer pessoa que apontou tempo neles - por isso o endpoint é restrito a gestor/admin
-     * no controller (`@PreAuthorize`), não checado aqui via {@link VisibilidadeUsuarioService}
-     * (que é sobre "ver dados de outro usuário", um eixo diferente de "ver dados de uma equipe/
-     * projeto"). `Quadro.projeto`/`Quadro.equipe` são opcionais (PRD §3.3) - um card cujo quadro
-     * não tem o vínculo pedido simplesmente não entra na soma, via `INNER JOIN` implícito do
-     * Spring Data, sem precisar de tratamento especial.
+     * "Onde o esforço foi" por projeto (S5.5) - a agregação que S4.10 deixou de fora de propósito.
+     * Diferente de {@link #listarTotalPorCard}, não é sobre um usuário: soma todos os apontamentos
+     * fechados de todos os cards de todos os quadros vinculados ao projeto, de qualquer pessoa que
+     * apontou tempo neles - por isso o endpoint é restrito a gestor/admin no controller
+     * (`@PreAuthorize`), não checado aqui via {@link VisibilidadeUsuarioService} (que é sobre "ver
+     * dados de outro usuário", um eixo diferente de "ver dados de um projeto"). Pedido do cliente:
+     * sem Equipe - só "por projeto" agora, `equipeId` saiu (era a outra metade de um XOR que
+     * existia aqui). `Quadro.projeto` é opcional - um card cujo quadro não tem projeto vinculado
+     * simplesmente não entra na soma, via `INNER JOIN` implícito do Spring Data.
      */
-    public TotalApontadoResponse totalApontadoPorProjetoOuEquipe(Long projetoId, Long equipeId, Instant inicio, Instant fim) {
-        boolean temProjeto = projetoId != null;
-        boolean temEquipe = equipeId != null;
-        if (temProjeto == temEquipe) {
-            throw new FiltroRelatorioInvalidoException("Informe projetoId OU equipeId, não os dois nem nenhum");
+    public TotalApontadoResponse totalApontadoPorProjeto(Long projetoId, Instant inicio, Instant fim) {
+        if (projetoId == null) {
+            throw new FiltroRelatorioInvalidoException("Informe projetoId");
         }
 
-        List<Apontamento> apontamentos;
-        if (temProjeto) {
-            Projeto projeto = projetoRepository
-                    .findById(projetoId)
-                    .orElseThrow(() -> new RecursoNaoEncontradoException("Projeto não encontrado: " + projetoId));
-            apontamentos = apontamentoRepository.findByCard_Coluna_Quadro_ProjetoAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(
-                    projeto, inicio, fim);
-        } else {
-            Equipe equipe = equipeRepository
-                    .findById(equipeId)
-                    .orElseThrow(() -> new RecursoNaoEncontradoException("Equipe não encontrada: " + equipeId));
-            apontamentos = apontamentoRepository.findByCard_Coluna_Quadro_EquipeAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(
-                    equipe, inicio, fim);
-        }
+        Projeto projeto = projetoRepository
+                .findById(projetoId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Projeto não encontrado: " + projetoId));
+        List<Apontamento> apontamentos = apontamentoRepository
+                .findByCard_Coluna_Quadro_ProjetoAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(projeto, inicio, fim);
 
         long totalMinutos = apontamentos.stream().mapToLong(Apontamento::getMinutos).sum();
         return new TotalApontadoResponse(totalMinutos);

@@ -3,7 +3,6 @@ package io.escritor.presenca.ponto.service;
 import io.escritor.presenca.apontamento.domain.Apontamento;
 import io.escritor.presenca.apontamento.domain.OrigemApontamento;
 import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
-import io.escritor.presenca.identidade.domain.Equipe;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.service.VisibilidadeUsuarioService;
@@ -60,7 +59,7 @@ class JornadaServiceTest {
     }
 
     private static Card cardComId(Long id) {
-        Quadro quadro = new Quadro("Backlog", null, new Equipe("Backend", null));
+        Quadro quadro = new Quadro("Backlog", null);
         Coluna coluna = new Coluna(quadro, "A fazer", 0, null);
         Card card = new Card(coluna, "Corrigir bug", null, 1024.0, null, null, null, usuarioComId(1L, 480));
         ReflectionTestUtils.setField(card, "id", id);

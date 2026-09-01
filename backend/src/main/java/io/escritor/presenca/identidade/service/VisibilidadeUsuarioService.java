@@ -1,38 +1,37 @@
 package io.escritor.presenca.identidade.service;
 
-import io.escritor.presenca.identidade.domain.Equipe;
-import io.escritor.presenca.identidade.domain.MembroEquipe;
 import io.escritor.presenca.identidade.domain.Papel;
-import io.escritor.presenca.identidade.domain.PapelNaEquipe;
 import io.escritor.presenca.identidade.domain.Usuario;
-import io.escritor.presenca.identidade.repository.MembroEquipeRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
+import io.escritor.presenca.kanban.domain.MembroQuadro;
+import io.escritor.presenca.kanban.domain.Quadro;
+import io.escritor.presenca.kanban.repository.MembroQuadroRepository;
 import java.util.List;
 import java.util.function.Supplier;
 import org.springframework.stereotype.Service;
 
 /**
  * Extraída de {@code ApontamentoService} (S4.10) - até então a única lógica de "gestor vê equipe"
- * do sistema vivia direto dentro de um serviço de outro épico. PRD §2: "gestor vê jornada e
- * relatórios das suas equipes" - E4 (relatórios) precisa da mesma regra em vários lugares, daí a
- * extração antes de duplicar o par de queries em {@link MembroEquipeRepository} em cada serviço
- * novo.
+ * do sistema vivia direto dentro de um serviço de outro épico. Pedido do cliente (via usuário):
+ * sem Equipe - GESTOR passa a ver quem está atribuído aos mesmos quadros/"sistemas" que ele
+ * ({@link MembroQuadro}), no lugar de "membro de uma equipe que ele lidera".
  */
 @Service
 public class VisibilidadeUsuarioService {
 
-    private final MembroEquipeRepository membroEquipeRepository;
+    private final MembroQuadroRepository membroQuadroRepository;
     private final UsuarioRepository usuarioRepository;
 
-    public VisibilidadeUsuarioService(MembroEquipeRepository membroEquipeRepository, UsuarioRepository usuarioRepository) {
-        this.membroEquipeRepository = membroEquipeRepository;
+    public VisibilidadeUsuarioService(MembroQuadroRepository membroQuadroRepository, UsuarioRepository usuarioRepository) {
+        this.membroQuadroRepository = membroQuadroRepository;
         this.usuarioRepository = usuarioRepository;
     }
 
     /**
      * Colaborador só vê os próprios dados (checado aqui via id, então funciona mesmo pra quem não
-     * é ADMIN/GESTOR); gestor vê qualquer usuário membro de uma equipe que ele lidera
-     * (`PapelNaEquipe.LIDER`); admin vê todo mundo, sem checar equipe.
+     * é ADMIN/GESTOR); gestor vê qualquer usuário atribuído a um quadro do qual ele também é
+     * membro (sem distinção de "líder" - a atribuição em si já é a regra); admin vê todo mundo,
+     * sem checar quadro nenhum.
      */
     public boolean podeVer(Usuario requisitante, Usuario alvo) {
         if (requisitante.getId().equals(alvo.getId())) {
@@ -45,10 +44,10 @@ public class VisibilidadeUsuarioService {
             return false;
         }
 
-        List<Equipe> equipesLideradas = membroEquipeRepository.findByUsuarioAndPapelNaEquipe(requisitante, PapelNaEquipe.LIDER).stream()
-                .map(MembroEquipe::getEquipe)
+        List<Quadro> quadrosDoRequisitante = membroQuadroRepository.findByUsuario(requisitante).stream()
+                .map(MembroQuadro::getQuadro)
                 .toList();
-        return membroEquipeRepository.existsByEquipeInAndUsuario(equipesLideradas, alvo);
+        return membroQuadroRepository.existsByQuadroInAndUsuario(quadrosDoRequisitante, alvo);
     }
 
     /**

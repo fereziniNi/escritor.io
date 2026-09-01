@@ -1,6 +1,5 @@
 package io.escritor.presenca.apontamento.domain;
 
-import io.escritor.presenca.identidade.domain.Equipe;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.kanban.domain.Card;
@@ -15,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ApontamentoTest {
 
-    private final Quadro quadro = new Quadro("Backlog", null, new Equipe("Backend", null));
+    private final Quadro quadro = new Quadro("Backlog", null);
     private final Coluna coluna = new Coluna(quadro, "A fazer", 0, null);
     private final Usuario usuario = new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480);
     private final Card card = new Card(coluna, "Corrigir bug", null, 1024.0, null, null, null, usuario);

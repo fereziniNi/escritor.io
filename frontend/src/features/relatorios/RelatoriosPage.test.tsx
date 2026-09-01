@@ -22,7 +22,6 @@ beforeEach(() => {
 
 function handlersPadrao() {
   return [
-    http.get('/equipes', () => HttpResponse.json([{ id: 1, nome: 'Backend', descricao: null, ativa: true }])),
     http.get('/projetos', () =>
       HttpResponse.json([
         { id: 10, nome: 'Projeto A', cliente: 'Acme', status: 'ATIVO', inicio: '2026-01-01', fimPrevisto: null },

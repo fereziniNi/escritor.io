@@ -38,8 +38,8 @@ const QUADRO_DETALHE = {
   id: 1,
   nome: 'Backlog',
   projetoId: null,
-  equipeId: 10,
   arquivado: false,
+  membros: [{ usuarioId: 1, usuarioNome: 'Ana Souza' }],
   colunas: [
     {
       id: 5,
@@ -79,6 +79,45 @@ describe('QuadroDetalhePage', () => {
     expect(await screen.findByRole('heading', { name: 'Backlog' })).toBeInTheDocument()
     expect(screen.getByText('A fazer')).toBeInTheDocument()
     expect(screen.getByText('Corrigir bug')).toBeInTheDocument()
+  })
+
+  it('mostra os membros do quadro', async () => {
+    server.use(http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)), semEtiquetasDoQuadro())
+
+    renderPagina()
+
+    expect(await screen.findByText('Ana Souza')).toBeInTheDocument()
+  })
+
+  it('colaborador não vê o formulário de adicionar membro', async () => {
+    server.use(http.get('/quadros/1', () => HttpResponse.json(QUADRO_DETALHE)), semEtiquetasDoQuadro())
+
+    renderPagina()
+
+    await screen.findByText('Ana Souza')
+    expect(screen.queryByRole('button', { name: /adicionar membro/i })).not.toBeInTheDocument()
+  })
+
+  it('gestor adiciona um membro ao quadro e ele aparece na lista sem reload manual', async () => {
+    useAuthStore.getState().definirSessao('token-fake', 'GESTOR')
+    let membros = QUADRO_DETALHE.membros
+    server.use(
+      http.get('/quadros/1', () => HttpResponse.json({ ...QUADRO_DETALHE, membros })),
+      semEtiquetasDoQuadro(),
+      http.post('/quadros/1/membros', async ({ request }) => {
+        const corpo = (await request.json()) as { usuarioId: number }
+        membros = [...membros, { usuarioId: corpo.usuarioId, usuarioNome: 'Beto Lima' }]
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Ana Souza')
+    await user.type(screen.getByLabelText(/adicionar membro/i), '2')
+    await user.click(screen.getByRole('button', { name: /adicionar membro/i }))
+
+    expect(await screen.findByText('Beto Lima')).toBeInTheDocument()
   })
 
   it('cria um card na coluna certa e ele aparece sem reload manual', async () => {

@@ -37,7 +37,6 @@ describe('ProjetosPage', () => {
           { id: 1, nome: 'Portal', cliente: 'Acme', status: 'ATIVO', inicio: '2026-01-01', fimPrevisto: null },
         ]),
       ),
-      http.get('/equipes', () => HttpResponse.json([])),
     )
 
     renderProjetosPage()
@@ -57,7 +56,6 @@ describe('ProjetosPage', () => {
     }> = []
     server.use(
       http.get('/projetos', () => HttpResponse.json(projetosCriados)),
-      http.get('/equipes', () => HttpResponse.json([])),
       http.post('/projetos', async ({ request }) => {
         const corpo = (await request.json()) as { nome: string; cliente: string; status: string; inicio: string }
         const novo = { id: 1, ...corpo, fimPrevisto: null }
