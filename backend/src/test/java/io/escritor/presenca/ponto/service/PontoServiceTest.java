@@ -5,6 +5,7 @@ import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.ponto.domain.OrigemRegistroPonto;
 import io.escritor.presenca.ponto.domain.RegistroPonto;
 import io.escritor.presenca.ponto.domain.TipoRegistroPonto;
+import io.escritor.presenca.ponto.notificacao.NotificacaoPonto;
 import io.escritor.presenca.ponto.repository.RegistroPontoRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -33,6 +34,9 @@ class PontoServiceTest {
     @Mock
     private JornadaService jornadaService;
 
+    @Mock
+    private NotificacaoPonto notificacaoPonto;
+
     private final Usuario usuario = usuarioComId(1L);
     private final Instant agora = Instant.parse("2026-01-15T12:00:00Z");
     private final Clock clock = Clock.fixed(agora, ZoneOffset.UTC);
@@ -41,7 +45,7 @@ class PontoServiceTest {
 
     @BeforeEach
     void setUp() {
-        pontoService = new PontoService(registroPontoRepository, jornadaService, clock);
+        pontoService = new PontoService(registroPontoRepository, jornadaService, clock, notificacaoPonto);
     }
 
     private static Usuario usuarioComId(Long id) {
@@ -104,6 +108,21 @@ class PontoServiceTest {
                 .isInstanceOf(SequenciaInvalidaException.class);
 
         verify(registroPontoRepository, never()).save(any());
+        verify(notificacaoPonto, never()).avisarPonto(any(), any(), any());
+    }
+
+    @Test
+    void marcarPontoAvisaOChefe() {
+        // Pedido do cliente: "sempre que algum funcionario iniciasse o trabalho ou terminasse
+        // enviar uma mensagem para o chefe avisando" - `PontoService` só precisa chamar a porta
+        // (`NotificacaoPonto`); o "como" (Evolution API, WhatsApp) é detalhe da implementação,
+        // testado separadamente em `NotificacaoPontoWhatsAppTest`.
+        when(registroPontoRepository.findFirstByUsuarioOrderByCriadoEmDesc(usuario)).thenReturn(Optional.empty());
+        when(registroPontoRepository.save(any(RegistroPonto.class))).thenAnswer(chamada -> chamada.getArgument(0));
+
+        pontoService.marcar(usuario, TipoRegistroPonto.ENTRADA, "127.0.0.1", "junit");
+
+        verify(notificacaoPonto).avisarPonto(usuario, TipoRegistroPonto.ENTRADA, agora);
     }
 
     @Test

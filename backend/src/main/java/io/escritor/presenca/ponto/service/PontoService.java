@@ -5,6 +5,7 @@ import io.escritor.presenca.ponto.domain.OrigemRegistroPonto;
 import io.escritor.presenca.ponto.domain.RegistroPonto;
 import io.escritor.presenca.ponto.domain.SequenciaMarcacao;
 import io.escritor.presenca.ponto.domain.TipoRegistroPonto;
+import io.escritor.presenca.ponto.notificacao.NotificacaoPonto;
 import io.escritor.presenca.ponto.repository.RegistroPontoRepository;
 import io.escritor.presenca.ponto.web.EstadoAtualPontoResponse;
 import io.escritor.presenca.ponto.web.RegistroPontoResponse;
@@ -18,11 +19,17 @@ public class PontoService {
     private final RegistroPontoRepository registroPontoRepository;
     private final JornadaService jornadaService;
     private final Clock clock;
+    private final NotificacaoPonto notificacaoPonto;
 
-    public PontoService(RegistroPontoRepository registroPontoRepository, JornadaService jornadaService, Clock clock) {
+    public PontoService(
+            RegistroPontoRepository registroPontoRepository,
+            JornadaService jornadaService,
+            Clock clock,
+            NotificacaoPonto notificacaoPonto) {
         this.registroPontoRepository = registroPontoRepository;
         this.jornadaService = jornadaService;
         this.clock = clock;
+        this.notificacaoPonto = notificacaoPonto;
     }
 
     public RegistroPontoResponse marcar(Usuario usuario, TipoRegistroPonto tipo, String ip, String userAgent) {
@@ -41,6 +48,12 @@ public class PontoService {
                 usuario, tipo, momento, OrigemRegistroPonto.WEB, ip, userAgent, hashAnterior);
 
         RegistroPonto salvo = registroPontoRepository.save(novo);
+
+        // Pedido do cliente: "sempre que algum funcionario iniciasse o trabalho ou terminasse
+        // enviar uma mensagem para o chefe avisando" - best-effort, assíncrono (ver
+        // `NotificacaoPontoWhatsApp`), nunca pode fazer este método falhar: o ponto já foi salvo
+        // na linha acima, o aviso é só um efeito colateral.
+        notificacaoPonto.avisarPonto(usuario, tipo, momento);
 
         return RegistroPontoResponse.de(salvo);
     }

@@ -35,6 +35,14 @@ services:
       SPRING_FLYWAY_URL: jdbc:postgresql://postgres:5432/presenca
       SPRING_MAIL_HOST: mailpit
       SPRING_MAIL_PORT: 1025
+      # Integração com WhatsApp (pedido do cliente: avisar o chefe quando alguém bate ponto) -
+      # desligada por padrão (`APP_EVOLUTION_HABILITADO=false`), mesmo com o serviço `evolution-api`
+      # do perfil `whatsapp` no ar. Ver DEVELOPMENT.md "Integração com WhatsApp".
+      APP_EVOLUTION_BASE_URL: http://evolution-api:8080
+      APP_EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-troque-esta-chave}
+      APP_EVOLUTION_INSTANCIA: ${EVOLUTION_INSTANCIA:-escritorio}
+      APP_EVOLUTION_CHEFE_NUMERO: ${EVOLUTION_CHEFE_NUMERO:-}
+      APP_EVOLUTION_HABILITADO: ${EVOLUTION_HABILITADO:-false}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
 
@@ -69,5 +77,62 @@ services:
       psql -h postgres -U presenca -d presenca -f /seed.sql
       "
 
+  # Integração com WhatsApp (pedido do cliente: "integração com o evolution api para... enviar
+  # uma mensagem para o chefe avisando"). Fica atrás do perfil `whatsapp` de propósito - são mais
+  # 3 containers (Evolution API + o Postgres/Redis dele) que a maioria do trabalho do dia a dia
+  # não precisa; `docker compose up -d` (sem perfil) continua exatamente como antes. Subir com
+  # `docker compose --profile whatsapp up -d`. Ver DEVELOPMENT.md "Integração com WhatsApp" pro
+  # passo a passo completo (criar instância, parear via QR code, ligar o envio).
+  #
+  # Sem serviço de UI (`evolution-manager`) de propósito - testado nesta sessão e a imagem
+  # `evoapicloud/evolution-manager:latest` trava num bug de nginx conhecido e não corrigido
+  # (`invalid value "must-revalidate"`, EvolutionAPI/evolution-api#2093) - o pareamento via REST
+  # puro (ver DEVELOPMENT.md) funciona perfeitamente e não depende dela.
+  evolution-postgres:
+    image: postgres:16
+    profiles: ["whatsapp"]
+    environment:
+      POSTGRES_DB: evolution
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: evolution
+    volumes:
+      - evolution_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evolution"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  evolution-redis:
+    image: redis:7-alpine
+    profiles: ["whatsapp"]
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - evolution_redis_data:/data
+
+  evolution-api:
+    image: evoapicloud/evolution-api:latest
+    profiles: ["whatsapp"]
+    depends_on:
+      evolution-postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution:evolution@evolution-postgres:5432/evolution?schema=evolution_api
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://evolution-redis:6379/6
+      CACHE_LOCAL_ENABLED: "false"
+      # MESMA chave usada por `APP_EVOLUTION_API_KEY` acima (o backend chama isto aqui) - troque
+      # as duas juntas.
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-troque-esta-chave}
+    ports:
+      - "${EVOLUTION_API_PORT:-8085}:8080"
+    volumes:
+      - evolution_instances:/evolution/instances
+
 volumes:
   postgres_data:
+  evolution_postgres_data:
+  evolution_redis_data:
+  evolution_instances:

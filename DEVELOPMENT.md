@@ -61,6 +61,81 @@ Acesse `http://localhost:5173`. Login: e-mail `admin@escritor.io`, código chega
 
 `docker compose down` derruba tudo; `docker compose down -v` também apaga o volume do Postgres (perde os dados, inclusive o seed - a próxima subida recria do zero).
 
+## Integração com WhatsApp
+
+Pedido do cliente: avisar o chefe por WhatsApp sempre que alguém bate entrada ou saída do
+expediente (não pausa). A integração usa o [Evolution API](https://doc.evolution-api.com)
+(gateway self-hosted de WhatsApp) e fica **desligada por padrão** - ela exige um número de
+WhatsApp de verdade pareado via QR code antes de fazer sentido ligar.
+
+### 1. Suba o Evolution API
+
+Fica atrás do perfil `whatsapp` (não sobe com o `docker compose up -d` normal, de propósito - são
+mais 4 containers que a maioria do trabalho do dia a dia não precisa):
+
+```bash
+docker compose --profile whatsapp up -d
+```
+
+Isso sobe `evolution-api` (a API em si) e `evolution-postgres`/`evolution-redis`
+(armazenamento próprio do Evolution, separado do Postgres da aplicação).
+
+### 2. Crie a instância e pareie um número de WhatsApp
+
+Via REST puro (a imagem oficial de UI, `evolution-manager`, tem um bug de nginx conhecido e não
+foi incluída aqui - ver comentário em `docker-compose.yml`). Defina `EVOLUTION_API_KEY` no seu
+`.env` **antes** de subir o container (ou reinicie `evolution-api` depois de mudar), e use o mesmo
+valor abaixo:
+
+```bash
+# Cria a instância (troque "sua-chave-aqui" pela mesma de EVOLUTION_API_KEY no seu .env)
+curl -X POST http://localhost:8085/instance/create \
+  -H "apikey: sua-chave-aqui" -H "Content-Type: application/json" \
+  -d '{"instanceName":"escritorio","integration":"WHATSAPP-BAILEYS","qrcode":true}'
+```
+
+A resposta traz `qrcode.base64` - uma imagem PNG em base64 (`data:image/png;base64,...`). Copie só
+a parte depois da vírgula, decodifique e abra como imagem (num terminal Unix:
+`echo "<base64>" | base64 -d > qrcode.png` e abra o arquivo; no PowerShell:
+`[IO.File]::WriteAllBytes("qrcode.png", [Convert]::FromBase64String("<base64>"))`). Escaneie com o
+WhatsApp do número que vai **enviar** os avisos - **não precisa ser o número do chefe**, só o
+"remetente" (o chefe só recebe mensagem, não precisa parear nada). O QR expira em minutos; se
+demorar, gere outro com `GET /instance/connect/escritorio` (mesma API key).
+
+Confirme que conectou:
+
+```bash
+curl http://localhost:8085/instance/connectionState/escritorio -H "apikey: sua-chave-aqui"
+# {"instance":{"instanceName":"escritorio","state":"open"}} = conectado
+```
+
+### 3. Configure e ligue no backend
+
+No `.env` da raiz (o mesmo já usado pra remapear portas - ver Troubleshooting):
+
+```
+EVOLUTION_API_KEY=escolha-uma-chave-qualquer
+EVOLUTION_CHEFE_NUMERO=5511999999999
+EVOLUTION_HABILITADO=true
+```
+
+- `EVOLUTION_API_KEY`: qualquer string - é só a senha entre o backend e o `evolution-api`, os dois
+  containers usam o mesmo valor (ver `AUTHENTICATION_API_KEY` em `docker-compose.yml`).
+- `EVOLUTION_CHEFE_NUMERO`: o WhatsApp que **recebe** os avisos - código do país + DDD + número,
+  só dígitos (Brasil: `55` + DDD com 2 dígitos + número, geralmente 12-13 dígitos no total; ex.
+  `5511999999999`). Deixe em branco pra manter a integração desligada mesmo com
+  `EVOLUTION_HABILITADO=true` (nenhuma mensagem sai sem um número de destino).
+- `EVOLUTION_HABILITADO=true`: sem isso, o backend nunca tenta enviar nada, mesmo com o Evolution
+  API no ar e pareado - é o interruptor final.
+
+Reinicie o backend (`docker compose up -d backend` se estiver em container, ou reinicie o
+`./mvnw spring-boot:run` se estiver rodando direto na máquina) pra pegar as novas variáveis.
+
+A partir daí, toda vez que alguém bater entrada ou saída (`PontoService.marcar`), o chefe recebe
+uma mensagem de texto no número configurado - envio assíncrono e best-effort (ver
+`NotificacaoPontoWhatsApp`): se o Evolution API estiver fora do ar, o registro de ponto continua
+sendo salvo normalmente, só o aviso que não sai (fica logado como aviso no backend).
+
 ## Ciclo de desenvolvimento (TDD)
 
 Ver [docs/testing-strategy.md](docs/testing-strategy.md) para o workflow completo. Resumo: teste de domínio no backend primeiro, depois web/repositório, depois componente no frontend, E2E só para os fluxos críticos listados lá.
@@ -76,5 +151,8 @@ Ver [docs/testing-strategy.md](docs/testing-strategy.md) para o workflow complet
   MAILPIT_SMTP_PORT=1026
   MAILPIT_UI_PORT=8026
   ```
+
+  A porta do perfil `whatsapp` (`EVOLUTION_API_PORT`, padrão 8085) segue o mesmo mecanismo, mas só
+  importa se você subir esse perfil (ver "Integração com WhatsApp" acima).
 
   O `docker compose up` já lê o `.env` automaticamente. **Não use `docker-compose.override.yml` pra isso** — listas como `ports:` se *concatenam* entre `docker-compose.yml` e o override em vez de substituir, então a porta padrão (5432) continua sendo reivindicada junto com a nova, e o conflito persiste. Rodando backend/frontend direto na máquina (fora de container), aponte `spring.datasource.url` / `VITE_BACKEND_URL` pra essas mesmas portas. As portas padrão do projeto (5432, 8080, 5173, 1025, 8025) continuam sendo as documentadas — o `.env` é só local, pra rodar em paralelo com outro projeto que já as ocupa. Só o `SPRING_MAIL_PORT` do container `backend` (`docker-compose.yml`) fica fixo em `1025` mesmo com `MAILPIT_SMTP_PORT` remapeado - é tráfego container-a-container dentro da rede do compose, não passa pela porta remapeada do host.

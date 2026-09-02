@@ -31,6 +31,17 @@ app:
     # Segredo de DEV apenas. Em qualquer ambiente real, sobrescrever via variável
     # de ambiente APP_JWT_SEGREDO com um valor gerado (nunca versionar o de produção).
     segredo: troque-este-segredo-em-producao-defina-a-variavel-app-jwt-segredo
+  evolution:
+    # Pedido do cliente: avisar o chefe no WhatsApp (via Evolution API) sempre que alguém bate
+    # entrada/saída (ver `NotificacaoPontoWhatsApp`). Desligado por padrão (`habilitado: false`) -
+    # exige uma instância do Evolution API pareada com um número real via QR code antes de fazer
+    # sentido ligar (ver DEVELOPMENT.md "Integração com WhatsApp"). Em produção, sobrescrever via
+    # variáveis de ambiente APP_EVOLUTION_*.
+    base-url: http://localhost:8085
+    api-key: troque-esta-chave-defina-a-variavel-app-evolution-api-key
+    instancia: escritorio
+    chefe-numero: ""
+    habilitado: false
 
 management:
   endpoints:
