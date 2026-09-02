@@ -15,7 +15,6 @@ function card(id: number, colunaId: number) {
     criadoPorId: 1,
     criadoEm: '2026-01-15T09:00:00Z',
     arquivado: false,
-    etiquetas: [],
   }
 }
 

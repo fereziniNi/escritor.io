@@ -1,10 +1,3 @@
-export interface Etiqueta {
-  id: number
-  projetoId: number
-  nome: string
-  cor: string
-}
-
 export interface Comentario {
   id: number
   cardId: number
@@ -63,7 +56,6 @@ export interface Card {
   criadoPorId: number
   criadoEm: string
   arquivado: boolean
-  etiquetas: Etiqueta[]
 }
 
 export interface ColunaComCards {

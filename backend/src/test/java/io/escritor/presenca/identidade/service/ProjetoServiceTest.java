@@ -11,10 +11,7 @@ import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.identidade.web.AdicionarMembroProjetoRequest;
 import io.escritor.presenca.identidade.web.CriarProjetoRequest;
 import io.escritor.presenca.kanban.domain.Card;
-import io.escritor.presenca.kanban.domain.CardEtiqueta;
 import io.escritor.presenca.kanban.domain.Coluna;
-import io.escritor.presenca.kanban.domain.Etiqueta;
-import io.escritor.presenca.kanban.repository.CardEtiquetaRepository;
 import io.escritor.presenca.kanban.repository.CardRepository;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
 import java.time.LocalDate;
@@ -53,9 +50,6 @@ class ProjetoServiceTest {
     @Mock
     private CardRepository cardRepository;
 
-    @Mock
-    private CardEtiquetaRepository cardEtiquetaRepository;
-
     private final Usuario usuario = usuarioComId(1L);
     private final Usuario outroUsuario = usuarioComId(2L);
 
@@ -79,8 +73,7 @@ class ProjetoServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ProjetoService(
-                projetoRepository, membroProjetoRepository, usuarioRepository, colunaRepository, cardRepository, cardEtiquetaRepository);
+        service = new ProjetoService(projetoRepository, membroProjetoRepository, usuarioRepository, colunaRepository, cardRepository);
     }
 
     @Test
@@ -167,7 +160,6 @@ class ProjetoServiceTest {
         when(membroProjetoRepository.findByProjeto(projeto)).thenReturn(List.of(membroProjeto(projeto, usuario)));
         when(colunaRepository.findByProjetoOrderByOrdemAsc(projeto)).thenReturn(List.of(coluna));
         when(cardRepository.findByColunaOrderByPosicaoAsc(coluna)).thenReturn(List.of(card));
-        when(cardEtiquetaRepository.findByCard(card)).thenReturn(List.of());
 
         var detalhe = service.buscarDetalhe(1L, usuario);
 
@@ -177,33 +169,8 @@ class ProjetoServiceTest {
         assertThat(detalhe.colunas().get(0).limiteWip()).isEqualTo(3);
         assertThat(detalhe.colunas().get(0).cards()).hasSize(1);
         assertThat(detalhe.colunas().get(0).cards().get(0).titulo()).isEqualTo("Corrigir bug");
-        assertThat(detalhe.colunas().get(0).cards().get(0).etiquetas()).isEmpty();
         assertThat(detalhe.membros()).hasSize(1);
         assertThat(detalhe.membros().get(0).usuarioId()).isEqualTo(usuario.getId());
-    }
-
-    @Test
-    void buscarDetalheTrazEtiquetasAplicadasNoCard() {
-        Projeto projeto = projetoComId(1L, "Backlog");
-        Coluna coluna = new Coluna(projeto, "A fazer", 0, null);
-        ReflectionTestUtils.setField(coluna, "id", 5L);
-        Card card = new Card(coluna, "Corrigir bug", null, 1024.0, null, null, null, usuario);
-        Etiqueta etiqueta = new Etiqueta(projeto, "Urgente", "#FF0000");
-        ReflectionTestUtils.setField(etiqueta, "id", 2L);
-
-        when(projetoRepository.findById(1L)).thenReturn(Optional.of(projeto));
-        when(membroProjetoRepository.findByUsuario(usuario)).thenReturn(List.of(membroProjeto(projeto, usuario)));
-        when(membroProjetoRepository.findByProjeto(projeto)).thenReturn(List.of(membroProjeto(projeto, usuario)));
-        when(colunaRepository.findByProjetoOrderByOrdemAsc(projeto)).thenReturn(List.of(coluna));
-        when(cardRepository.findByColunaOrderByPosicaoAsc(coluna)).thenReturn(List.of(card));
-        when(cardEtiquetaRepository.findByCard(card)).thenReturn(List.of(new CardEtiqueta(card, etiqueta)));
-
-        var detalhe = service.buscarDetalhe(1L, usuario);
-
-        var etiquetasDoCard = detalhe.colunas().get(0).cards().get(0).etiquetas();
-        assertThat(etiquetasDoCard).hasSize(1);
-        assertThat(etiquetasDoCard.get(0).nome()).isEqualTo("Urgente");
-        assertThat(etiquetasDoCard.get(0).cor()).isEqualTo("#FF0000");
     }
 
     @Test

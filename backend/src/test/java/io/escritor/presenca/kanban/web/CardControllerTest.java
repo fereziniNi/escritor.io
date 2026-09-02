@@ -3,12 +3,10 @@ package io.escritor.presenca.kanban.web;
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.AcessoNegadoException;
-import io.escritor.presenca.kanban.domain.EtiquetaDeOutroProjetoException;
 import io.escritor.presenca.kanban.domain.LimiteWipExcedidoException;
 import io.escritor.presenca.kanban.service.CardComentarioService;
 import io.escritor.presenca.kanban.service.CardEventoService;
 import io.escritor.presenca.kanban.service.CardService;
-import io.escritor.presenca.kanban.service.EtiquetaService;
 import io.escritor.presenca.seguranca.JwtService;
 import io.escritor.presenca.seguranca.SecurityConfig;
 import java.time.Instant;
@@ -43,9 +41,6 @@ class CardControllerTest {
     private CardService cardService;
 
     @MockitoBean
-    private EtiquetaService etiquetaService;
-
-    @MockitoBean
     private CardComentarioService cardComentarioService;
 
     @MockitoBean
@@ -70,7 +65,7 @@ class CardControllerTest {
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
         when(cardService.mover(eq(1L), eq(2L), eq(0), any()))
                 .thenReturn(new CardResponse(
-                        1L, 2L, "Corrigir bug", null, 1024.0, null, null, null, 1L, Instant.now(), false, java.util.List.of()));
+                        1L, 2L, "Corrigir bug", null, 1024.0, null, null, null, 1L, Instant.now(), false));
 
         mockMvc.perform(patch("/cards/1/mover")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -118,65 +113,6 @@ class CardControllerTest {
                                 {"indice":0}
                                 """))
                 .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void aplicarEtiquetaSemAutenticacaoRetorna401() throws Exception {
-        mockMvc.perform(post("/cards/1/etiquetas")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"etiquetaId":2}
-                                """))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    @WithMockUser
-    void qualquerUsuarioAutenticadoPodeAplicarEtiqueta() throws Exception {
-        when(etiquetaService.aplicar(1L, 2L)).thenReturn(new EtiquetaResponse(2L, 9L, "Urgente", "#FF0000"));
-
-        mockMvc.perform(post("/cards/1/etiquetas")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"etiquetaId":2}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.nome").value("Urgente"));
-    }
-
-    @Test
-    @WithMockUser
-    void aplicarEtiquetaDeOutroProjetoRetorna400() throws Exception {
-        when(etiquetaService.aplicar(1L, 2L)).thenThrow(new EtiquetaDeOutroProjetoException(2L, 1L));
-
-        mockMvc.perform(post("/cards/1/etiquetas")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"etiquetaId":2}
-                                """))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @WithMockUser
-    void aplicarEtiquetaSemEtiquetaIdRetorna400() throws Exception {
-        mockMvc.perform(post("/cards/1/etiquetas")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void removerEtiquetaSemAutenticacaoRetorna401() throws Exception {
-        mockMvc.perform(delete("/cards/1/etiquetas/2")).andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    @WithMockUser
-    void qualquerUsuarioAutenticadoPodeRemoverEtiqueta() throws Exception {
-        mockMvc.perform(delete("/cards/1/etiquetas/2")).andExpect(status().isNoContent());
-
-        verify(etiquetaService).remover(1L, 2L);
     }
 
     @Test

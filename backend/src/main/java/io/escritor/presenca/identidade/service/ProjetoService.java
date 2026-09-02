@@ -12,14 +12,11 @@ import io.escritor.presenca.identidade.web.CriarProjetoRequest;
 import io.escritor.presenca.identidade.web.MembroProjetoResponse;
 import io.escritor.presenca.identidade.web.ProjetoDetalheResponse;
 import io.escritor.presenca.identidade.web.ProjetoResponse;
-import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.Coluna;
-import io.escritor.presenca.kanban.repository.CardEtiquetaRepository;
 import io.escritor.presenca.kanban.repository.CardRepository;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
 import io.escritor.presenca.kanban.web.CardResponse;
 import io.escritor.presenca.kanban.web.ColunaComCardsResponse;
-import io.escritor.presenca.kanban.web.EtiquetaResponse;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -27,11 +24,10 @@ import org.springframework.stereotype.Service;
 
 /**
  * Pedido do cliente (via usuário): "remova essa parte de quadro, vamos trabalhar apenas com
- * projeto" - Projeto absorve por completo o que era {@code QuadroService}: colunas, cards,
- * etiquetas e a atribuição individual que decide quem vê o quê ({@link MembroProjeto}). Continua
- * sem bypass de ADMIN na visibilidade (nunca teve, nem quando era quadro) - por isso {@link
- * #criar} adiciona quem cria como membro, senão a própria pessoa não veria o projeto que acabou
- * de criar.
+ * projeto" - Projeto absorve por completo o que era {@code QuadroService}: colunas, cards e a
+ * atribuição individual que decide quem vê o quê ({@link MembroProjeto}). Continua sem bypass de
+ * ADMIN na visibilidade (nunca teve, nem quando era quadro) - por isso {@link #criar} adiciona
+ * quem cria como membro, senão a própria pessoa não veria o projeto que acabou de criar.
  */
 @Service
 public class ProjetoService {
@@ -41,21 +37,18 @@ public class ProjetoService {
     private final UsuarioRepository usuarioRepository;
     private final ColunaRepository colunaRepository;
     private final CardRepository cardRepository;
-    private final CardEtiquetaRepository cardEtiquetaRepository;
 
     public ProjetoService(
             ProjetoRepository projetoRepository,
             MembroProjetoRepository membroProjetoRepository,
             UsuarioRepository usuarioRepository,
             ColunaRepository colunaRepository,
-            CardRepository cardRepository,
-            CardEtiquetaRepository cardEtiquetaRepository) {
+            CardRepository cardRepository) {
         this.projetoRepository = projetoRepository;
         this.membroProjetoRepository = membroProjetoRepository;
         this.usuarioRepository = usuarioRepository;
         this.colunaRepository = colunaRepository;
         this.cardRepository = cardRepository;
-        this.cardEtiquetaRepository = cardEtiquetaRepository;
     }
 
     public ProjetoResponse criar(CriarProjetoRequest request, Usuario criador) {
@@ -135,20 +128,9 @@ public class ProjetoService {
 
     private ColunaComCardsResponse paraColunaComCards(Coluna coluna) {
         List<CardResponse> cards = cardRepository.findByColunaOrderByPosicaoAsc(coluna).stream()
-                .map(card -> CardResponse.de(card, etiquetasDoCard(card)))
+                .map(CardResponse::de)
                 .toList();
         return new ColunaComCardsResponse(coluna.getId(), coluna.getNome(), coluna.getOrdem(), coluna.getLimiteWip(), cards);
-    }
-
-    /**
-     * Um `findByCard` por card (N+1) em vez de um JOIN - mesma simplicidade explícita de
-     * {@link #listarVisiveis} (PRD: até 10 usuários, escala pequena o bastante pra não precisar
-     * de query complexa aqui).
-     */
-    private List<EtiquetaResponse> etiquetasDoCard(Card card) {
-        return cardEtiquetaRepository.findByCard(card).stream()
-                .map(cardEtiqueta -> EtiquetaResponse.de(cardEtiqueta.getEtiqueta()))
-                .toList();
     }
 
     private Set<Long> projetoIdsDoUsuario(Usuario usuario) {

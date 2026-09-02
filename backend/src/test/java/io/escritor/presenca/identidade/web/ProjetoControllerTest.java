@@ -8,11 +8,9 @@ import io.escritor.presenca.identidade.service.ProjetoService;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.OrdemColunaDuplicadaException;
 import io.escritor.presenca.kanban.service.ColunaService;
-import io.escritor.presenca.kanban.service.EtiquetaService;
 import io.escritor.presenca.kanban.web.CardResponse;
 import io.escritor.presenca.kanban.web.ColunaComCardsResponse;
 import io.escritor.presenca.kanban.web.ColunaResponse;
-import io.escritor.presenca.kanban.web.EtiquetaResponse;
 import io.escritor.presenca.seguranca.JwtService;
 import io.escritor.presenca.seguranca.SecurityConfig;
 import java.time.LocalDate;
@@ -47,9 +45,6 @@ class ProjetoControllerTest {
 
     @MockitoBean
     private ColunaService colunaService;
-
-    @MockitoBean
-    private EtiquetaService etiquetaService;
 
     @MockitoBean
     private ContextoUsuarioAutenticado contextoUsuarioAutenticado;
@@ -129,7 +124,7 @@ class ProjetoControllerTest {
                                 null,
                                 List.of(new CardResponse(
                                         7L, 5L, "Corrigir bug", null, 1024.0, null, null, null, 1L,
-                                        java.time.Instant.parse("2026-01-15T09:00:00Z"), false, List.of())))),
+                                        java.time.Instant.parse("2026-01-15T09:00:00Z"), false)))),
                         List.of(new MembroProjetoResponse(1L, "Ana Souza"))));
 
         mockMvc.perform(get("/projetos/1"))
@@ -269,100 +264,5 @@ class ProjetoControllerTest {
                                 {"nome":"A fazer","ordem":0}
                                 """))
                 .andExpect(status().isConflict());
-    }
-
-    @Test
-    void criarEtiquetaSemAutenticacaoRetorna401() throws Exception {
-        mockMvc.perform(post("/projetos/1/etiquetas")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"nome":"Urgente","cor":"#FF0000"}
-                                """))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    @WithMockUser(roles = "COLABORADOR")
-    void criarEtiquetaComPapelColaboradorRetorna403() throws Exception {
-        mockMvc.perform(post("/projetos/1/etiquetas")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"nome":"Urgente","cor":"#FF0000"}
-                                """))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    @WithMockUser(roles = "GESTOR")
-    void criarEtiquetaComPapelGestorRetorna201() throws Exception {
-        when(etiquetaService.criar(1L, "Urgente", "#FF0000"))
-                .thenReturn(new EtiquetaResponse(1L, 1L, "Urgente", "#FF0000"));
-
-        mockMvc.perform(post("/projetos/1/etiquetas")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"nome":"Urgente","cor":"#FF0000"}
-                                """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.nome").value("Urgente"))
-                .andExpect(jsonPath("$.cor").value("#FF0000"));
-    }
-
-    @Test
-    @WithMockUser(roles = "GESTOR")
-    void criarEtiquetaSemNomeRetorna400() throws Exception {
-        mockMvc.perform(post("/projetos/1/etiquetas")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"cor":"#FF0000"}
-                                """))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @WithMockUser(roles = "GESTOR")
-    void criarEtiquetaSemCorRetorna400() throws Exception {
-        mockMvc.perform(post("/projetos/1/etiquetas")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"nome":"Urgente"}
-                                """))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @WithMockUser(roles = "GESTOR")
-    void criarEtiquetaEmProjetoInexistenteRetorna404() throws Exception {
-        when(etiquetaService.criar(999L, "Urgente", "#FF0000")).thenThrow(new RecursoNaoEncontradoException("não encontrado"));
-
-        mockMvc.perform(post("/projetos/999/etiquetas")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"nome":"Urgente","cor":"#FF0000"}
-                                """))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    void listarEtiquetasSemAutenticacaoRetorna401() throws Exception {
-        mockMvc.perform(get("/projetos/1/etiquetas")).andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    @WithMockUser
-    void listarEtiquetasRetornaAsDoProjeto() throws Exception {
-        when(etiquetaService.listar(1L)).thenReturn(List.of(new EtiquetaResponse(2L, 1L, "Urgente", "#FF0000")));
-
-        mockMvc.perform(get("/projetos/1/etiquetas"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].nome").value("Urgente"));
-    }
-
-    @Test
-    @WithMockUser
-    void listarEtiquetasDeProjetoInexistenteRetorna404() throws Exception {
-        when(etiquetaService.listar(999L)).thenThrow(new RecursoNaoEncontradoException("não encontrado"));
-
-        mockMvc.perform(get("/projetos/999/etiquetas")).andExpect(status().isNotFound());
     }
 }

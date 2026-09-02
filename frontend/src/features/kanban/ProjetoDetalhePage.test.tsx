@@ -7,6 +7,7 @@ import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { useAuthStore } from '../auth/authStore'
 import { ProjetoDetalhePage } from './ProjetoDetalhePage'
+import type { ColunaComCards } from './types'
 
 const server = setupServer()
 
@@ -61,20 +62,15 @@ const PROJETO_DETALHE = {
           criadoPorId: 1,
           criadoEm: '2026-01-15T09:00:00Z',
           arquivado: false,
-          etiquetas: [],
         },
       ],
     },
   ],
 }
 
-function semEtiquetasDoProjeto() {
-  return http.get('/projetos/1/etiquetas', () => HttpResponse.json([]))
-}
-
 describe('ProjetoDetalhePage', () => {
   it('mostra o nome do projeto, as colunas e os cards', async () => {
-    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)), semEtiquetasDoProjeto())
+    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
 
     renderPagina()
 
@@ -84,7 +80,7 @@ describe('ProjetoDetalhePage', () => {
   })
 
   it('mostra os membros do projeto', async () => {
-    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)), semEtiquetasDoProjeto())
+    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
 
     renderPagina()
 
@@ -92,7 +88,7 @@ describe('ProjetoDetalhePage', () => {
   })
 
   it('colaborador não vê o formulário de adicionar membro', async () => {
-    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)), semEtiquetasDoProjeto())
+    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
 
     renderPagina()
 
@@ -105,7 +101,6 @@ describe('ProjetoDetalhePage', () => {
     let membros = PROJETO_DETALHE.membros
     server.use(
       http.get('/projetos/1', () => HttpResponse.json({ ...PROJETO_DETALHE, membros })),
-      semEtiquetasDoProjeto(),
       http.post('/projetos/1/membros', async ({ request }) => {
         const corpo = (await request.json()) as { usuarioId: number }
         membros = [...membros, { usuarioId: corpo.usuarioId, usuarioNome: 'Beto Lima' }]
@@ -122,26 +117,24 @@ describe('ProjetoDetalhePage', () => {
     expect(await screen.findByText('Beto Lima')).toBeInTheDocument()
   })
 
-  it('cria um card na coluna certa e ele aparece sem reload manual', async () => {
-    let colunas = PROJETO_DETALHE.colunas
+  it('cria uma tarefa na coluna certa e ela aparece sem reload manual', async () => {
+    let colunas: ColunaComCards[] = PROJETO_DETALHE.colunas
     server.use(
       http.get('/projetos/1', () => HttpResponse.json({ ...PROJETO_DETALHE, colunas })),
-      semEtiquetasDoProjeto(),
       http.post('/colunas/5/cards', async ({ request }) => {
-        const corpo = (await request.json()) as { titulo: string }
+        const corpo = (await request.json()) as { titulo: string; responsavelId: number | null; estimativaMinutos: number | null }
         const novoCard = {
           id: 8,
           colunaId: 5,
           titulo: corpo.titulo,
           descricao: null,
           posicao: 2048,
-          responsavelId: null,
+          responsavelId: corpo.responsavelId,
           prazo: null,
-          estimativaMinutos: null,
+          estimativaMinutos: corpo.estimativaMinutos,
           criadoPorId: 1,
           criadoEm: '2026-01-15T10:00:00Z',
           arquivado: false,
-          etiquetas: [],
         }
         colunas = [{ ...colunas[0], cards: [...colunas[0].cards, novoCard] }]
         return HttpResponse.json(novoCard, { status: 201 })
@@ -151,10 +144,49 @@ describe('ProjetoDetalhePage', () => {
     renderPagina()
 
     await screen.findByText('Corrigir bug')
-    await user.type(screen.getByLabelText(/novo card/i), 'Escrever testes')
-    await user.click(screen.getByRole('button', { name: /adicionar card/i }))
+    await user.type(screen.getByLabelText(/nova tarefa/i), 'Escrever testes')
+    await user.click(screen.getByRole('button', { name: /adicionar tarefa/i }))
 
     expect(await screen.findByText('Escrever testes')).toBeInTheDocument()
+  })
+
+  it('cria uma tarefa com responsável e tempo estimado', async () => {
+    let colunas: ColunaComCards[] = PROJETO_DETALHE.colunas
+    server.use(
+      http.get('/projetos/1', () => HttpResponse.json({ ...PROJETO_DETALHE, colunas })),
+      http.post('/colunas/5/cards', async ({ request }) => {
+        const corpo = (await request.json()) as { titulo: string; responsavelId: number | null; estimativaMinutos: number | null }
+        expect(corpo.responsavelId).toBe(1)
+        expect(corpo.estimativaMinutos).toBe(90)
+        const novoCard = {
+          id: 8,
+          colunaId: 5,
+          titulo: corpo.titulo,
+          descricao: null,
+          posicao: 2048,
+          responsavelId: corpo.responsavelId,
+          prazo: null,
+          estimativaMinutos: corpo.estimativaMinutos,
+          criadoPorId: 1,
+          criadoEm: '2026-01-15T10:00:00Z',
+          arquivado: false,
+        }
+        colunas = [{ ...colunas[0], cards: [...colunas[0].cards, novoCard] }]
+        return HttpResponse.json(novoCard, { status: 201 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.type(screen.getByLabelText(/nova tarefa/i), 'Escrever testes')
+    await user.type(screen.getByLabelText(/id do responsável/i), '1')
+    await user.type(screen.getByLabelText(/tempo estimado/i), '90')
+    await user.click(screen.getByRole('button', { name: /adicionar tarefa/i }))
+
+    expect(await screen.findByText('Escrever testes')).toBeInTheDocument()
+    expect(await screen.findByText('👤 Ana Souza')).toBeInTheDocument()
+    expect(screen.getByText('⏱️ 90 min')).toBeInTheDocument()
   })
 
   it('mostra a ocupação vs. o limite de WIP quando a coluna tem limite', async () => {
@@ -165,7 +197,6 @@ describe('ProjetoDetalhePage', () => {
           colunas: [{ ...PROJETO_DETALHE.colunas[0], nome: 'Em progresso', limiteWip: 3 }],
         }),
       ),
-      semEtiquetasDoProjeto(),
     )
 
     renderPagina()
@@ -175,7 +206,7 @@ describe('ProjetoDetalhePage', () => {
   })
 
   it('coluna sem limite de WIP não mostra contador', async () => {
-    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)), semEtiquetasDoProjeto())
+    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
 
     renderPagina()
 
@@ -184,128 +215,15 @@ describe('ProjetoDetalhePage', () => {
   })
 
   it('projeto sem colunas mostra mensagem vazia', async () => {
-    server.use(
-      http.get('/projetos/1', () => HttpResponse.json({ ...PROJETO_DETALHE, colunas: [] })),
-      semEtiquetasDoProjeto(),
-    )
+    server.use(http.get('/projetos/1', () => HttpResponse.json({ ...PROJETO_DETALHE, colunas: [] })))
 
     renderPagina()
 
     expect(await screen.findByText(/nenhuma coluna/i)).toBeInTheDocument()
   })
 
-  it('mostra as etiquetas já aplicadas no card', async () => {
-    server.use(
-      http.get('/projetos/1', () =>
-        HttpResponse.json({
-          ...PROJETO_DETALHE,
-          colunas: [
-            {
-              ...PROJETO_DETALHE.colunas[0],
-              cards: [
-                {
-                  ...PROJETO_DETALHE.colunas[0].cards[0],
-                  etiquetas: [{ id: 2, projetoId: 1, nome: 'Urgente', cor: '#FF0000' }],
-                },
-              ],
-            },
-          ],
-        }),
-      ),
-      semEtiquetasDoProjeto(),
-    )
-
-    renderPagina()
-
-    expect(await screen.findByText('Urgente')).toBeInTheDocument()
-  })
-
-  it('gestor cria uma etiqueta nova no projeto', async () => {
-    useAuthStore.getState().definirSessao('token-fake', 'GESTOR')
-    let etiquetas: Array<{ id: number; projetoId: number; nome: string; cor: string }> = []
-    server.use(
-      http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)),
-      http.get('/projetos/1/etiquetas', () => HttpResponse.json(etiquetas)),
-      http.post('/projetos/1/etiquetas', async ({ request }) => {
-        const corpo = (await request.json()) as { nome: string; cor: string }
-        const nova = { id: 9, projetoId: 1, nome: corpo.nome, cor: corpo.cor }
-        etiquetas = [...etiquetas, nova]
-        return HttpResponse.json(nova, { status: 201 })
-      }),
-    )
-    const user = userEvent.setup()
-    renderPagina()
-
-    await screen.findByText('Corrigir bug')
-    await user.type(screen.getByLabelText(/nome da etiqueta/i), 'Bug')
-    await user.type(screen.getByLabelText(/cor da etiqueta/i), '#00FF00')
-    await user.click(screen.getByRole('button', { name: /criar etiqueta/i }))
-
-    expect(await screen.findByText('Bug')).toBeInTheDocument()
-  })
-
-  it('colaborador não vê o formulário de criar etiqueta', async () => {
-    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)), semEtiquetasDoProjeto())
-
-    renderPagina()
-
-    await screen.findByText('Corrigir bug')
-    expect(screen.queryByLabelText(/nome da etiqueta/i)).not.toBeInTheDocument()
-  })
-
-  it('aplica uma etiqueta existente no card e ela aparece sem reload manual', async () => {
-    let etiquetasDoCard: Array<{ id: number; projetoId: number; nome: string; cor: string }> = []
-    server.use(
-      http.get('/projetos/1', () =>
-        HttpResponse.json({
-          ...PROJETO_DETALHE,
-          colunas: [{ ...PROJETO_DETALHE.colunas[0], cards: [{ ...PROJETO_DETALHE.colunas[0].cards[0], etiquetas: etiquetasDoCard }] }],
-        }),
-      ),
-      http.get('/projetos/1/etiquetas', () => HttpResponse.json([{ id: 2, projetoId: 1, nome: 'Urgente', cor: '#FF0000' }])),
-      http.post('/cards/7/etiquetas', async ({ request }) => {
-        const corpo = (await request.json()) as { etiquetaId: number }
-        expect(corpo.etiquetaId).toBe(2)
-        etiquetasDoCard = [{ id: 2, projetoId: 1, nome: 'Urgente', cor: '#FF0000' }]
-        return HttpResponse.json(etiquetasDoCard[0])
-      }),
-    )
-    const user = userEvent.setup()
-    renderPagina()
-
-    await screen.findByText('Corrigir bug')
-    await user.selectOptions(screen.getByLabelText(/aplicar etiqueta/i), '2')
-    await user.click(screen.getByRole('button', { name: /^aplicar$/i }))
-
-    expect(await screen.findByText('Urgente')).toBeInTheDocument()
-  })
-
-  it('remove uma etiqueta do card e ela some sem reload manual', async () => {
-    let etiquetasDoCard = [{ id: 2, projetoId: 1, nome: 'Urgente', cor: '#FF0000' }]
-    server.use(
-      http.get('/projetos/1', () =>
-        HttpResponse.json({
-          ...PROJETO_DETALHE,
-          colunas: [{ ...PROJETO_DETALHE.colunas[0], cards: [{ ...PROJETO_DETALHE.colunas[0].cards[0], etiquetas: etiquetasDoCard }] }],
-        }),
-      ),
-      semEtiquetasDoProjeto(),
-      http.delete('/cards/7/etiquetas/2', () => {
-        etiquetasDoCard = []
-        return new HttpResponse(null, { status: 204 })
-      }),
-    )
-    const user = userEvent.setup()
-    renderPagina()
-
-    await screen.findByText('Urgente')
-    await user.click(screen.getByRole('button', { name: /remover urgente/i }))
-
-    await waitFor(() => expect(screen.queryByText('Urgente')).not.toBeInTheDocument())
-  })
-
   it('não busca comentários antes do card ser expandido', async () => {
-    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)), semEtiquetasDoProjeto())
+    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
 
     renderPagina()
 
@@ -316,7 +234,6 @@ describe('ProjetoDetalhePage', () => {
   it('expande o card e mostra os comentários existentes', async () => {
     server.use(
       http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)),
-      semEtiquetasDoProjeto(),
       http.get('/cards/7/comentarios', () =>
         HttpResponse.json([{ id: 1, cardId: 7, autorId: 1, texto: 'Já revisei', criadoEm: '2026-01-15T10:00:00Z' }]),
       ),
@@ -334,7 +251,6 @@ describe('ProjetoDetalhePage', () => {
     let comentarios: Array<{ id: number; cardId: number; autorId: number; texto: string; criadoEm: string }> = []
     server.use(
       http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)),
-      semEtiquetasDoProjeto(),
       http.get('/cards/7/comentarios', () => HttpResponse.json(comentarios)),
       http.post('/cards/7/comentarios', async ({ request }) => {
         const corpo = (await request.json()) as { texto: string }
@@ -358,7 +274,6 @@ describe('ProjetoDetalhePage', () => {
   it('mostra erro quando o usuário não tem acesso ao projeto do card', async () => {
     server.use(
       http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)),
-      semEtiquetasDoProjeto(),
       http.get('/cards/7/comentarios', () => new HttpResponse(null, { status: 403 })),
     )
     const user = userEvent.setup()
@@ -371,7 +286,7 @@ describe('ProjetoDetalhePage', () => {
   })
 
   it('não busca o histórico antes do card ser expandido', async () => {
-    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)), semEtiquetasDoProjeto())
+    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
 
     renderPagina()
 
@@ -382,7 +297,6 @@ describe('ProjetoDetalhePage', () => {
   it('expande o histórico e mostra os eventos em ordem cronológica com rótulo legível', async () => {
     server.use(
       http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)),
-      semEtiquetasDoProjeto(),
       http.get('/cards/7/eventos', () =>
         HttpResponse.json([
           { id: 1, cardId: 7, autorId: 1, tipo: 'CRIACAO', de: null, para: 'A fazer', criadoEm: '2026-01-15T09:00:00Z' },
@@ -415,7 +329,6 @@ describe('ProjetoDetalhePage', () => {
   it('mostra erro quando o histórico não pode ser carregado', async () => {
     server.use(
       http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)),
-      semEtiquetasDoProjeto(),
       http.get('/cards/7/eventos', () => new HttpResponse(null, { status: 403 })),
     )
     const user = userEvent.setup()
@@ -430,7 +343,6 @@ describe('ProjetoDetalhePage', () => {
   it('inicia o timer do card e troca o botão pra Parar', async () => {
     server.use(
       http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)),
-      semEtiquetasDoProjeto(),
       http.post('/cards/7/apontamentos/timer', () =>
         HttpResponse.json(
           {
@@ -461,7 +373,6 @@ describe('ProjetoDetalhePage', () => {
   it('para o timer do card e volta pro botão Iniciar', async () => {
     server.use(
       http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)),
-      semEtiquetasDoProjeto(),
       http.post('/cards/7/apontamentos/timer', () =>
         HttpResponse.json(
           {
@@ -507,7 +418,6 @@ describe('ProjetoDetalhePage', () => {
   it('timer encerrado em outro lugar mostra erro ao parar e volta pro estado inicial', async () => {
     server.use(
       http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)),
-      semEtiquetasDoProjeto(),
       http.post('/cards/7/apontamentos/timer', () =>
         HttpResponse.json(
           {
@@ -539,7 +449,7 @@ describe('ProjetoDetalhePage', () => {
   })
 
   it('não busca apontamentos antes do card ser expandido', async () => {
-    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)), semEtiquetasDoProjeto())
+    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
 
     renderPagina()
 
@@ -550,7 +460,6 @@ describe('ProjetoDetalhePage', () => {
   it('expande e mostra os apontamentos existentes do card', async () => {
     server.use(
       http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)),
-      semEtiquetasDoProjeto(),
       http.get('/cards/7/apontamentos', () =>
         HttpResponse.json([
           {
@@ -582,7 +491,6 @@ describe('ProjetoDetalhePage', () => {
     let apontamentos: unknown[] = []
     server.use(
       http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)),
-      semEtiquetasDoProjeto(),
       http.get('/cards/7/apontamentos', () => HttpResponse.json(apontamentos)),
       http.post('/cards/7/apontamentos', async ({ request }) => {
         const corpo = (await request.json()) as { minutos: number; descricao: string | null }
@@ -631,7 +539,6 @@ describe('ProjetoDetalhePage', () => {
     }
     server.use(
       http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)),
-      semEtiquetasDoProjeto(),
       http.get('/cards/7/apontamentos', () => HttpResponse.json([apontamento])),
       http.patch('/apontamentos/1', async ({ request }) => {
         const corpo = (await request.json()) as { fim: string | null; descricao: string | null }
@@ -677,7 +584,6 @@ describe('ProjetoDetalhePage', () => {
     ]
     server.use(
       http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)),
-      semEtiquetasDoProjeto(),
       http.get('/cards/7/apontamentos', () => HttpResponse.json(apontamentos)),
       http.delete('/apontamentos/1', () => {
         apontamentos = []

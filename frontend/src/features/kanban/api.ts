@@ -1,14 +1,26 @@
 import { apiFetch } from '../../shared/api/http'
-import type { Apontamento, Card, Comentario, Etiqueta, EventoCard, TotalApontado, TotalPorCard } from './types'
+import type { Apontamento, Card, Comentario, EventoCard, TotalApontado, TotalPorCard } from './types'
 
-export async function criarCard(dados: { colunaId: number; titulo: string }): Promise<Card> {
+/** Pedido do cliente: qualquer pessoa (não só admin/gestor) pode criar tarefa, atribuir a alguém
+ * (por id do usuário - mesma disciplina de não montar dropdown pra API que não existe pra todo
+ * mundo, ver comentário em `RelatoriosPage`) e definir quanto tempo ela deve levar. */
+export async function criarCard(dados: {
+  colunaId: number
+  titulo: string
+  responsavelId: number | null
+  estimativaMinutos: number | null
+}): Promise<Card> {
   const response = await apiFetch(`/colunas/${dados.colunaId}/cards`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ titulo: dados.titulo }),
+    body: JSON.stringify({
+      titulo: dados.titulo,
+      responsavelId: dados.responsavelId,
+      estimativaMinutos: dados.estimativaMinutos,
+    }),
   })
   if (!response.ok) {
-    throw new Error('Não foi possível criar o card')
+    throw new Error('Não foi possível criar a tarefa')
   }
   return response.json()
 }
@@ -23,45 +35,6 @@ export async function moverCard(dados: { cardId: number; colunaId: number; indic
     throw new Error('Não foi possível mover o card')
   }
   return response.json()
-}
-
-export async function listarEtiquetas(projetoId: number): Promise<Etiqueta[]> {
-  const response = await apiFetch(`/projetos/${projetoId}/etiquetas`)
-  if (!response.ok) {
-    throw new Error('Não foi possível carregar as etiquetas')
-  }
-  return response.json()
-}
-
-export async function criarEtiqueta(dados: { projetoId: number; nome: string; cor: string }): Promise<Etiqueta> {
-  const response = await apiFetch(`/projetos/${dados.projetoId}/etiquetas`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nome: dados.nome, cor: dados.cor }),
-  })
-  if (!response.ok) {
-    throw new Error('Não foi possível criar a etiqueta')
-  }
-  return response.json()
-}
-
-export async function aplicarEtiqueta(dados: { cardId: number; etiquetaId: number }): Promise<Etiqueta> {
-  const response = await apiFetch(`/cards/${dados.cardId}/etiquetas`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ etiquetaId: dados.etiquetaId }),
-  })
-  if (!response.ok) {
-    throw new Error('Não foi possível aplicar a etiqueta')
-  }
-  return response.json()
-}
-
-export async function removerEtiqueta(dados: { cardId: number; etiquetaId: number }): Promise<void> {
-  const response = await apiFetch(`/cards/${dados.cardId}/etiquetas/${dados.etiquetaId}`, { method: 'DELETE' })
-  if (!response.ok) {
-    throw new Error('Não foi possível remover a etiqueta')
-  }
 }
 
 export async function listarComentarios(cardId: number): Promise<Comentario[]> {

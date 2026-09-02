@@ -27,8 +27,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * Iniciar timer é aberto a qualquer usuário autenticado em qualquer card, mesma simplificação
- * conhecida já usada pra criar card/aplicar etiqueta (S3.6/S3.13) - ainda não verifica acesso ao
- * projeto dono do card.
+ * conhecida já usada pra criar card (S3.6) - ainda não verifica acesso ao projeto dono do card.
  */
 @Service
 public class ApontamentoService {

@@ -17,27 +17,23 @@ import { useAuthStore } from '../auth/authStore'
 import { adicionarMembroAoProjeto, buscarProjeto } from '../organizacao/api'
 import type { MembroProjeto, ProjetoDetalhe } from '../organizacao/types'
 import {
-  aplicarEtiqueta,
   criarApontamentoManual,
   criarCard,
   criarComentario,
-  criarEtiqueta,
   editarApontamento,
   excluirApontamento,
   iniciarTimer,
   listarApontamentos,
   listarComentarios,
-  listarEtiquetas,
   listarEventos,
   moverCard,
   pararTimer,
-  removerEtiqueta,
 } from './api'
 import { formatarDuracao } from './formatarDuracao'
 import { moverCardOtimista } from './moverCardOtimista'
 import { resolverMovimento } from './resolverMovimento'
 import { rotuloEvento } from './rotuloEvento'
-import type { Apontamento, Card, ColunaComCards, Etiqueta } from './types'
+import type { Apontamento, Card, ColunaComCards } from './types'
 import { useProjetoWebSocket } from './useProjetoWebSocket'
 import './Kanban.css'
 
@@ -384,21 +380,7 @@ function ApontamentosDoCard({ cardId }: { cardId: number }) {
   )
 }
 
-function CardArrastavel({
-  card,
-  etiquetasDisponiveis,
-  etiquetaSelecionada,
-  onEtiquetaSelecionadaChange,
-  onAplicarEtiqueta,
-  onRemoverEtiqueta,
-}: {
-  card: Card
-  etiquetasDisponiveis: Etiqueta[]
-  etiquetaSelecionada: string
-  onEtiquetaSelecionadaChange: (valor: string) => void
-  onAplicarEtiqueta: () => void
-  onRemoverEtiqueta: (etiquetaId: number) => void
-}) {
+function CardArrastavel({ card, nomeDoResponsavel }: { card: Card; nomeDoResponsavel: string | null }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
     data: { type: 'card', colunaId: card.colunaId, cardId: card.id },
@@ -410,52 +392,21 @@ function CardArrastavel({
     opacity: isDragging ? 0.5 : 1,
   }
 
-  const idsJaAplicados = new Set(card.etiquetas.map((etiqueta) => etiqueta.id))
-  const etiquetasParaAplicar = etiquetasDisponiveis.filter((etiqueta) => !idsJaAplicados.has(etiqueta.id))
-
   return (
     <li ref={setNodeRef} style={style} className="kanban-card">
       {/* Handle de arrastar isolado num elemento próprio: {...attributes} inclui role="button" do
-      dnd-kit, e colocar isso no <li> inteiro (que também contém o select/botões de etiqueta)
-      aninharia elementos interativos dentro de um role="button" - ARIA inválido que faz o nome
-      acessível do card "engolir" o aria-label dos botões filhos (confirmado num browser real,
-      não pego pelo jsdom dos testes de componente). */}
+      dnd-kit, e colocar isso no <li> inteiro (que também contém o resto do card) aninharia
+      elementos interativos dentro de um role="button" - ARIA inválido que faz o nome acessível do
+      card "engolir" o aria-label dos botões filhos (confirmado num browser real, não pego pelo
+      jsdom dos testes de componente). */}
       <span className="kanban-card-titulo" {...attributes} {...listeners}>
         {card.titulo}
       </span>
-      {card.etiquetas.length > 0 && (
-        <ul className="kanban-etiquetas">
-          {card.etiquetas.map((etiqueta) => (
-            <li key={etiqueta.id} className="kanban-etiqueta" style={{ backgroundColor: etiqueta.cor }}>
-              {etiqueta.nome}
-              <button type="button" aria-label={`Remover ${etiqueta.nome}`} onClick={() => onRemoverEtiqueta(etiqueta.id)}>
-                ×
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {etiquetasParaAplicar.length > 0 && (
-        <div className="kanban-aplicar-etiqueta">
-          <label htmlFor={`aplicar-etiqueta-${card.id}`} className="sr-only">
-            Aplicar etiqueta
-          </label>
-          <select
-            id={`aplicar-etiqueta-${card.id}`}
-            value={etiquetaSelecionada}
-            onChange={(evento) => onEtiquetaSelecionadaChange(evento.target.value)}
-          >
-            <option value="">Selecione…</option>
-            {etiquetasParaAplicar.map((etiqueta) => (
-              <option key={etiqueta.id} value={etiqueta.id}>
-                {etiqueta.nome}
-              </option>
-            ))}
-          </select>
-          <button type="button" className="botao-pequeno" disabled={etiquetaSelecionada === ''} onClick={onAplicarEtiqueta}>
-            Aplicar
-          </button>
-        </div>
+      {(nomeDoResponsavel || card.estimativaMinutos !== null) && (
+        <p className="kanban-card-meta">
+          {nomeDoResponsavel && <span>👤 {nomeDoResponsavel}</span>}
+          {card.estimativaMinutos !== null && <span>⏱️ {card.estimativaMinutos} min</span>}
+        </p>
       )}
       <TimerDoCard cardId={card.id} />
       <ApontamentosDoCard cardId={card.id} />
@@ -467,24 +418,16 @@ function CardArrastavel({
 
 function ColunaComDrop({
   coluna,
-  etiquetasDisponiveis,
-  etiquetaSelecionadaPorCard,
-  onEtiquetaSelecionadaChange,
-  onAplicarEtiqueta,
-  onRemoverEtiqueta,
-  tituloNovoCard,
-  onTituloChange,
+  nomePorUsuarioId,
+  novoCard,
+  onNovoCardChange,
   onCriarCard,
   criandoCard,
 }: {
   coluna: ColunaComCards
-  etiquetasDisponiveis: Etiqueta[]
-  etiquetaSelecionadaPorCard: Record<number, string>
-  onEtiquetaSelecionadaChange: (cardId: number, valor: string) => void
-  onAplicarEtiqueta: (cardId: number) => void
-  onRemoverEtiqueta: (cardId: number, etiquetaId: number) => void
-  tituloNovoCard: string
-  onTituloChange: (valor: string) => void
+  nomePorUsuarioId: Map<number, string>
+  novoCard: { titulo: string; responsavelId: string; estimativaMinutos: string }
+  onNovoCardChange: (valor: { titulo: string; responsavelId: string; estimativaMinutos: string }) => void
   onCriarCard: () => void
   criandoCard: boolean
 }) {
@@ -507,11 +450,7 @@ function ColunaComDrop({
             <CardArrastavel
               key={card.id}
               card={card}
-              etiquetasDisponiveis={etiquetasDisponiveis}
-              etiquetaSelecionada={etiquetaSelecionadaPorCard[card.id] ?? ''}
-              onEtiquetaSelecionadaChange={(valor) => onEtiquetaSelecionadaChange(card.id, valor)}
-              onAplicarEtiqueta={() => onAplicarEtiqueta(card.id)}
-              onRemoverEtiqueta={(etiquetaId) => onRemoverEtiqueta(card.id, etiquetaId)}
+              nomeDoResponsavel={card.responsavelId === null ? null : (nomePorUsuarioId.get(card.responsavelId) ?? null)}
             />
           ))}
         </ul>
@@ -525,17 +464,36 @@ function ColunaComDrop({
         }}
       >
         <label htmlFor={`titulo-card-${coluna.id}`} className="sr-only">
-          Novo card
+          Nova tarefa
         </label>
         <input
           id={`titulo-card-${coluna.id}`}
-          value={tituloNovoCard}
-          onChange={(evento) => onTituloChange(evento.target.value)}
-          placeholder="+ Novo card"
+          value={novoCard.titulo}
+          onChange={(evento) => onNovoCardChange({ ...novoCard, titulo: evento.target.value })}
+          placeholder="+ Nova tarefa"
           required
         />
+        <label htmlFor={`responsavel-card-${coluna.id}`} className="sr-only">
+          Id do responsável (opcional)
+        </label>
+        <input
+          id={`responsavel-card-${coluna.id}`}
+          value={novoCard.responsavelId}
+          onChange={(evento) => onNovoCardChange({ ...novoCard, responsavelId: evento.target.value })}
+          placeholder="Id do responsável"
+        />
+        <label htmlFor={`estimativa-card-${coluna.id}`} className="sr-only">
+          Tempo estimado em minutos (opcional)
+        </label>
+        <input
+          id={`estimativa-card-${coluna.id}`}
+          type="number"
+          value={novoCard.estimativaMinutos}
+          onChange={(evento) => onNovoCardChange({ ...novoCard, estimativaMinutos: evento.target.value })}
+          placeholder="Tempo estimado (min)"
+        />
         <button type="submit" className="botao-pequeno" disabled={criandoCard}>
-          Adicionar card
+          Adicionar tarefa
         </button>
       </form>
     </section>
@@ -609,6 +567,8 @@ function MembrosDoProjeto({
   )
 }
 
+const NOVO_CARD_VAZIO = { titulo: '', responsavelId: '', estimativaMinutos: '' }
+
 /**
  * `projetoIdProp` é opcional - só existe pro `PainelProjetos` (dock do Escritório, "uma tela só")
  * poder passar o id direto, sem precisar de uma rota `/projetos/:id` de verdade. `useParams()`
@@ -620,12 +580,9 @@ export function ProjetoDetalhePage({ projetoIdProp }: { projetoIdProp?: number }
   const projetoId = projetoIdProp ?? Number(id)
   const queryClient = useQueryClient()
   const papel = useAuthStore((estado) => estado.papel)
-  const podeCriarEtiqueta = papel === 'GESTOR' || papel === 'ADMIN'
+  const podeGerenciarMembros = papel === 'GESTOR' || papel === 'ADMIN'
 
-  const [tituloPorColuna, setTituloPorColuna] = useState<Record<number, string>>({})
-  const [etiquetaSelecionadaPorCard, setEtiquetaSelecionadaPorCard] = useState<Record<number, string>>({})
-  const [nomeEtiqueta, setNomeEtiqueta] = useState('')
-  const [corEtiqueta, setCorEtiqueta] = useState('')
+  const [novoCardPorColuna, setNovoCardPorColuna] = useState<Record<number, typeof NOVO_CARD_VAZIO>>({})
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -637,11 +594,6 @@ export function ProjetoDetalhePage({ projetoIdProp }: { projetoIdProp?: number }
     queryFn: () => buscarProjeto(projetoId),
   })
 
-  const etiquetasQuery = useQuery({
-    queryKey: ['projetos', projetoId, 'etiquetas'],
-    queryFn: () => listarEtiquetas(projetoId),
-  })
-
   // S3.11: quando outro usuário arrasta um card neste projeto, o backend broadcasta pelo
   // websocket e este hook invalida a query acima - o projeto atualiza sem reload manual.
   useProjetoWebSocket(projetoId)
@@ -650,31 +602,7 @@ export function ProjetoDetalhePage({ projetoIdProp }: { projetoIdProp?: number }
     mutationFn: criarCard,
     onSuccess: (_dados, variaveis) => {
       queryClient.invalidateQueries({ queryKey: ['projetos', projetoId] })
-      setTituloPorColuna((atual) => ({ ...atual, [variaveis.colunaId]: '' }))
-    },
-  })
-
-  const criarEtiquetaMutation = useMutation({
-    mutationFn: criarEtiqueta,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projetos', projetoId, 'etiquetas'] })
-      setNomeEtiqueta('')
-      setCorEtiqueta('')
-    },
-  })
-
-  const aplicarEtiquetaMutation = useMutation({
-    mutationFn: aplicarEtiqueta,
-    onSuccess: (_dados, variaveis) => {
-      queryClient.invalidateQueries({ queryKey: ['projetos', projetoId] })
-      setEtiquetaSelecionadaPorCard((atual) => ({ ...atual, [variaveis.cardId]: '' }))
-    },
-  })
-
-  const removerEtiquetaMutation = useMutation({
-    mutationFn: removerEtiqueta,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projetos', projetoId] })
+      setNovoCardPorColuna((atual) => ({ ...atual, [variaveis.colunaId]: NOVO_CARD_VAZIO }))
     },
   })
 
@@ -730,7 +658,7 @@ export function ProjetoDetalhePage({ projetoIdProp }: { projetoIdProp?: number }
   }
 
   const projeto = projetoQuery.data
-  const etiquetasDisponiveis = etiquetasQuery.data ?? []
+  const nomePorUsuarioId = new Map(projeto.membros.map((membro) => [membro.usuarioId, membro.usuarioNome]))
 
   return (
     <main className="pagina" style={{ maxWidth: 'none' }}>
@@ -741,40 +669,12 @@ export function ProjetoDetalhePage({ projetoIdProp }: { projetoIdProp?: number }
         <h1>{projeto.nome}</h1>
       </div>
 
-      <MembrosDoProjeto projetoId={projetoId} membros={projeto.membros} podeGerenciar={podeCriarEtiqueta} />
-
-      {podeCriarEtiqueta && (
-        <form
-          className="secao cartao kanban-etiqueta-form"
-          onSubmit={(evento) => {
-            evento.preventDefault()
-            criarEtiquetaMutation.mutate({ projetoId, nome: nomeEtiqueta, cor: corEtiqueta })
-          }}
-        >
-          <div className="campo">
-            <label htmlFor="nome-etiqueta">Nome da etiqueta</label>
-            <input id="nome-etiqueta" value={nomeEtiqueta} onChange={(evento) => setNomeEtiqueta(evento.target.value)} required />
-          </div>
-
-          <div className="campo">
-            <label htmlFor="cor-etiqueta">Cor da etiqueta</label>
-            <input id="cor-etiqueta" value={corEtiqueta} onChange={(evento) => setCorEtiqueta(evento.target.value)} required />
-          </div>
-
-          <div className="campo-acoes" style={{ gridColumn: 'unset' }}>
-            <button type="submit" disabled={criarEtiquetaMutation.isPending}>
-              🏷️ Criar etiqueta
-            </button>
-          </div>
-          {criarEtiquetaMutation.isError && <p className="mensagem-erro">Não foi possível criar a etiqueta.</p>}
-        </form>
-      )}
+      <MembrosDoProjeto projetoId={projetoId} membros={projeto.membros} podeGerenciar={podeGerenciarMembros} />
 
       {projeto.colunas.length === 0 && <p className="mensagem-vazia">Nenhuma coluna neste projeto ainda.</p>}
 
       {moverCardMutation.isError && <p className="mensagem-erro">Não foi possível mover o card.</p>}
-      {aplicarEtiquetaMutation.isError && <p className="mensagem-erro">Não foi possível aplicar a etiqueta.</p>}
-      {removerEtiquetaMutation.isError && <p className="mensagem-erro">Não foi possível remover a etiqueta.</p>}
+      {criarCardMutation.isError && <p className="mensagem-erro">Não foi possível criar a tarefa.</p>}
 
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
         <div className="kanban-board">
@@ -782,23 +682,18 @@ export function ProjetoDetalhePage({ projetoIdProp }: { projetoIdProp?: number }
           <ColunaComDrop
             key={coluna.id}
             coluna={coluna}
-            etiquetasDisponiveis={etiquetasDisponiveis}
-            etiquetaSelecionadaPorCard={etiquetaSelecionadaPorCard}
-            onEtiquetaSelecionadaChange={(cardId, valor) =>
-              setEtiquetaSelecionadaPorCard((atual) => ({ ...atual, [cardId]: valor }))
-            }
-            onAplicarEtiqueta={(cardId) => {
-              const etiquetaId = Number(etiquetaSelecionadaPorCard[cardId])
-              if (etiquetaId) {
-                aplicarEtiquetaMutation.mutate({ cardId, etiquetaId })
-              }
+            nomePorUsuarioId={nomePorUsuarioId}
+            novoCard={novoCardPorColuna[coluna.id] ?? NOVO_CARD_VAZIO}
+            onNovoCardChange={(valor) => setNovoCardPorColuna((atual) => ({ ...atual, [coluna.id]: valor }))}
+            onCriarCard={() => {
+              const dados = novoCardPorColuna[coluna.id] ?? NOVO_CARD_VAZIO
+              criarCardMutation.mutate({
+                colunaId: coluna.id,
+                titulo: dados.titulo,
+                responsavelId: dados.responsavelId === '' ? null : Number(dados.responsavelId),
+                estimativaMinutos: dados.estimativaMinutos === '' ? null : Number(dados.estimativaMinutos),
+              })
             }}
-            onRemoverEtiqueta={(cardId, etiquetaId) => removerEtiquetaMutation.mutate({ cardId, etiquetaId })}
-            tituloNovoCard={tituloPorColuna[coluna.id] ?? ''}
-            onTituloChange={(valor) => setTituloPorColuna((atual) => ({ ...atual, [coluna.id]: valor }))}
-            onCriarCard={() =>
-              criarCardMutation.mutate({ colunaId: coluna.id, titulo: tituloPorColuna[coluna.id] ?? '' })
-            }
             criandoCard={criarCardMutation.isPending}
           />
         ))}

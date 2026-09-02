@@ -13,10 +13,10 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 /**
- * Comentar exige acesso ao projeto do card (PRD/S3.15) - diferente de criar/mover card e
- * aplicar/remover etiqueta (S3.6/S3.8/S3.13), que são simplificações conhecidas abertas a
- * qualquer autenticado. Reaproveita {@link ProjetoService#usuarioPodeVer}, a mesma regra de
- * visibilidade de {@code GET /projetos/{id}}.
+ * Comentar exige acesso ao projeto do card (PRD/S3.15) - diferente de criar/mover card
+ * (S3.6/S3.8), que são simplificações conhecidas abertas a qualquer autenticado. Reaproveita
+ * {@link ProjetoService#usuarioPodeVer}, a mesma regra de visibilidade de {@code GET
+ * /projetos/{id}}.
  */
 @Service
 public class CardComentarioService {

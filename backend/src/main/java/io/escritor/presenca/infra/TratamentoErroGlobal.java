@@ -7,13 +7,10 @@ import io.escritor.presenca.apontamento.domain.FimAntesDoInicioException;
 import io.escritor.presenca.apontamento.domain.LancamentoManualInvalidoException;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.AcessoNegadoException;
-import io.escritor.presenca.kanban.domain.CorEtiquetaObrigatoriaException;
 import io.escritor.presenca.kanban.domain.EstimativaInvalidaException;
-import io.escritor.presenca.kanban.domain.EtiquetaDeOutroProjetoException;
 import io.escritor.presenca.kanban.domain.LimiteWipExcedidoException;
 import io.escritor.presenca.kanban.domain.LimiteWipInvalidoException;
 import io.escritor.presenca.kanban.domain.NomeColunaObrigatorioException;
-import io.escritor.presenca.kanban.domain.NomeEtiquetaObrigatorioException;
 import io.escritor.presenca.kanban.domain.OrdemColunaDuplicadaException;
 import io.escritor.presenca.kanban.domain.TextoComentarioObrigatorioException;
 import io.escritor.presenca.kanban.domain.TituloCardObrigatorioException;
@@ -64,21 +61,6 @@ public class TratamentoErroGlobal {
 
     @ExceptionHandler(EstimativaInvalidaException.class)
     ResponseEntity<Void> tratarEstimativaInvalida() {
-        return ResponseEntity.badRequest().build();
-    }
-
-    @ExceptionHandler(NomeEtiquetaObrigatorioException.class)
-    ResponseEntity<Void> tratarNomeEtiquetaObrigatorio() {
-        return ResponseEntity.badRequest().build();
-    }
-
-    @ExceptionHandler(CorEtiquetaObrigatoriaException.class)
-    ResponseEntity<Void> tratarCorEtiquetaObrigatoria() {
-        return ResponseEntity.badRequest().build();
-    }
-
-    @ExceptionHandler(EtiquetaDeOutroProjetoException.class)
-    ResponseEntity<Void> tratarEtiquetaDeOutroProjeto() {
         return ResponseEntity.badRequest().build();
     }
 

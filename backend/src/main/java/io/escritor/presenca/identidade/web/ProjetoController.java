@@ -3,11 +3,8 @@ package io.escritor.presenca.identidade.web;
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
 import io.escritor.presenca.identidade.service.ProjetoService;
 import io.escritor.presenca.kanban.service.ColunaService;
-import io.escritor.presenca.kanban.service.EtiquetaService;
 import io.escritor.presenca.kanban.web.ColunaResponse;
 import io.escritor.presenca.kanban.web.CriarColunaRequest;
-import io.escritor.presenca.kanban.web.CriarEtiquetaRequest;
-import io.escritor.presenca.kanban.web.EtiquetaResponse;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -23,8 +20,8 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Pedido do cliente (via usuário): "remova essa parte de quadro, vamos trabalhar apenas com
  * projeto" - este controller absorve por completo o que era {@code QuadroController} (colunas,
- * etiquetas, membros), além de criar/listar projeto que já existia. Criar continua GESTOR/ADMIN
- * (mesmo papel que já criava quadro antes da fusão - só listar/ver detalhe é aberto a qualquer
+ * membros), além de criar/listar projeto que já existia. Criar continua GESTOR/ADMIN (mesmo
+ * papel que já criava quadro antes da fusão - só listar/ver detalhe é aberto a qualquer
  * autenticado, e mesmo assim filtrado por visibilidade em {@link ProjetoService#listarVisiveis}).
  */
 @RestController
@@ -33,17 +30,12 @@ public class ProjetoController {
 
     private final ProjetoService projetoService;
     private final ColunaService colunaService;
-    private final EtiquetaService etiquetaService;
     private final ContextoUsuarioAutenticado contextoUsuarioAutenticado;
 
     public ProjetoController(
-            ProjetoService projetoService,
-            ColunaService colunaService,
-            EtiquetaService etiquetaService,
-            ContextoUsuarioAutenticado contextoUsuarioAutenticado) {
+            ProjetoService projetoService, ColunaService colunaService, ContextoUsuarioAutenticado contextoUsuarioAutenticado) {
         this.projetoService = projetoService;
         this.colunaService = colunaService;
-        this.etiquetaService = etiquetaService;
         this.contextoUsuarioAutenticado = contextoUsuarioAutenticado;
     }
 
@@ -76,17 +68,5 @@ public class ProjetoController {
     @PreAuthorize("hasAnyRole('GESTOR', 'ADMIN')")
     public ColunaResponse criarColuna(@PathVariable Long id, @Valid @RequestBody CriarColunaRequest request) {
         return colunaService.criar(id, request.nome(), request.ordem(), request.limiteWip());
-    }
-
-    @PostMapping("/{id}/etiquetas")
-    @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('GESTOR', 'ADMIN')")
-    public EtiquetaResponse criarEtiqueta(@PathVariable Long id, @Valid @RequestBody CriarEtiquetaRequest request) {
-        return etiquetaService.criar(id, request.nome(), request.cor());
-    }
-
-    @GetMapping("/{id}/etiquetas")
-    public List<EtiquetaResponse> listarEtiquetas(@PathVariable Long id) {
-        return etiquetaService.listar(id);
     }
 }
