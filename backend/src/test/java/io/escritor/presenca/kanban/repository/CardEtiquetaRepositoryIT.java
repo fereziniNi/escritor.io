@@ -1,13 +1,16 @@
 package io.escritor.presenca.kanban.repository;
 
 import io.escritor.presenca.identidade.domain.Papel;
+import io.escritor.presenca.identidade.domain.Projeto;
+import io.escritor.presenca.identidade.domain.StatusProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
+import io.escritor.presenca.identidade.repository.ProjetoRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.CardEtiqueta;
 import io.escritor.presenca.kanban.domain.Coluna;
 import io.escritor.presenca.kanban.domain.Etiqueta;
-import io.escritor.presenca.kanban.domain.Quadro;
+import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -31,7 +34,7 @@ class CardEtiquetaRepositoryIT {
     static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16").withInitScript("db-init/criar-papel-app.sql");
 
     @Autowired
-    private QuadroRepository quadroRepository;
+    private ProjetoRepository projetoRepository;
 
     @Autowired
     private ColunaRepository colunaRepository;
@@ -50,11 +53,11 @@ class CardEtiquetaRepositoryIT {
 
     @Test
     void persisteERecuperaVinculo() {
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
         Usuario autor = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480));
         Card card = cardRepository.saveAndFlush(new Card(coluna, "Corrigir bug", null, 1024.0, null, null, null, autor));
-        Etiqueta etiqueta = etiquetaRepository.saveAndFlush(new Etiqueta(quadro, "Urgente", "#FF0000"));
+        Etiqueta etiqueta = etiquetaRepository.saveAndFlush(new Etiqueta(projeto, "Urgente", "#FF0000"));
 
         cardEtiquetaRepository.saveAndFlush(new CardEtiqueta(card, etiqueta));
 
@@ -63,11 +66,11 @@ class CardEtiquetaRepositoryIT {
 
     @Test
     void rejeitaEtiquetaDuplicadaNoMesmoCard() {
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
         Usuario autor = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480));
         Card card = cardRepository.saveAndFlush(new Card(coluna, "Corrigir bug", null, 1024.0, null, null, null, autor));
-        Etiqueta etiqueta = etiquetaRepository.saveAndFlush(new Etiqueta(quadro, "Urgente", "#FF0000"));
+        Etiqueta etiqueta = etiquetaRepository.saveAndFlush(new Etiqueta(projeto, "Urgente", "#FF0000"));
         cardEtiquetaRepository.saveAndFlush(new CardEtiqueta(card, etiqueta));
 
         CardEtiqueta duplicado = new CardEtiqueta(card, etiqueta);
@@ -78,11 +81,11 @@ class CardEtiquetaRepositoryIT {
 
     @Test
     void removeVinculoPorCardEEtiqueta() {
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
         Usuario autor = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480));
         Card card = cardRepository.saveAndFlush(new Card(coluna, "Corrigir bug", null, 1024.0, null, null, null, autor));
-        Etiqueta etiqueta = etiquetaRepository.saveAndFlush(new Etiqueta(quadro, "Urgente", "#FF0000"));
+        Etiqueta etiqueta = etiquetaRepository.saveAndFlush(new Etiqueta(projeto, "Urgente", "#FF0000"));
         cardEtiquetaRepository.saveAndFlush(new CardEtiqueta(card, etiqueta));
 
         cardEtiquetaRepository.deleteByCardAndEtiqueta(card, etiqueta);

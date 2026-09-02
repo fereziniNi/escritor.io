@@ -1,7 +1,10 @@
 package io.escritor.presenca.kanban.repository;
 
+import io.escritor.presenca.identidade.domain.Projeto;
+import io.escritor.presenca.identidade.domain.StatusProjeto;
+import io.escritor.presenca.identidade.repository.ProjetoRepository;
 import io.escritor.presenca.kanban.domain.Coluna;
-import io.escritor.presenca.kanban.domain.Quadro;
+import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -25,43 +28,47 @@ class ColunaRepositoryIT {
     static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16").withInitScript("db-init/criar-papel-app.sql");
 
     @Autowired
-    private QuadroRepository quadroRepository;
+    private ProjetoRepository projetoRepository;
 
     @Autowired
     private ColunaRepository colunaRepository;
 
+    private static Projeto novoProjeto(String nome) {
+        return new Projeto(nome, "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null);
+    }
+
     @Test
     void persisteERecuperaColuna() {
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
+        Projeto projeto = projetoRepository.saveAndFlush(novoProjeto("Backlog"));
 
-        Coluna salva = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Coluna salva = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
 
         Coluna recuperada = colunaRepository.findById(salva.getId()).orElseThrow();
-        assertThat(recuperada.getQuadro().getId()).isEqualTo(quadro.getId());
+        assertThat(recuperada.getProjeto().getId()).isEqualTo(projeto.getId());
         assertThat(recuperada.getNome()).isEqualTo("A fazer");
         assertThat(recuperada.getOrdem()).isZero();
         assertThat(recuperada.getLimiteWip()).isNull();
     }
 
     @Test
-    void rejeitaOrdemDuplicadaNoMesmoQuadro() {
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
-        colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+    void rejeitaOrdemDuplicadaNoMesmoProjeto() {
+        Projeto projeto = projetoRepository.saveAndFlush(novoProjeto("Backlog"));
+        colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
 
-        Coluna duplicada = new Coluna(quadro, "Outra", 0, null);
+        Coluna duplicada = new Coluna(projeto, "Outra", 0, null);
 
         assertThatThrownBy(() -> colunaRepository.saveAndFlush(duplicada))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
-    void permiteAMesmaOrdemEmQuadrosDiferentes() {
-        Quadro quadroA = quadroRepository.saveAndFlush(new Quadro("Backlog A", null));
-        Quadro quadroB = quadroRepository.saveAndFlush(new Quadro("Backlog B", null));
-        colunaRepository.saveAndFlush(new Coluna(quadroA, "A fazer", 0, null));
+    void permiteAMesmaOrdemEmProjetosDiferentes() {
+        Projeto projetoA = projetoRepository.saveAndFlush(novoProjeto("Backlog A"));
+        Projeto projetoB = projetoRepository.saveAndFlush(novoProjeto("Backlog B"));
+        colunaRepository.saveAndFlush(new Coluna(projetoA, "A fazer", 0, null));
 
-        Coluna colunaDeOutroQuadro = colunaRepository.saveAndFlush(new Coluna(quadroB, "A fazer", 0, null));
+        Coluna colunaDeOutroProjeto = colunaRepository.saveAndFlush(new Coluna(projetoB, "A fazer", 0, null));
 
-        assertThat(colunaDeOutroQuadro.getId()).isNotNull();
+        assertThat(colunaDeOutroProjeto.getId()).isNotNull();
     }
 }

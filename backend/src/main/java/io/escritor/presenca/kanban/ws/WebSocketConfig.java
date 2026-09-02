@@ -9,18 +9,18 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 @EnableWebSocket
 public class WebSocketConfig implements WebSocketConfigurer {
 
-    private final QuadroWebSocketHandler quadroWebSocketHandler;
-    private final QuadroHandshakeInterceptor quadroHandshakeInterceptor;
+    private final ProjetoWebSocketHandler projetoWebSocketHandler;
+    private final ProjetoHandshakeInterceptor projetoHandshakeInterceptor;
 
-    public WebSocketConfig(QuadroWebSocketHandler quadroWebSocketHandler, QuadroHandshakeInterceptor quadroHandshakeInterceptor) {
-        this.quadroWebSocketHandler = quadroWebSocketHandler;
-        this.quadroHandshakeInterceptor = quadroHandshakeInterceptor;
+    public WebSocketConfig(ProjetoWebSocketHandler projetoWebSocketHandler, ProjetoHandshakeInterceptor projetoHandshakeInterceptor) {
+        this.projetoWebSocketHandler = projetoWebSocketHandler;
+        this.projetoHandshakeInterceptor = projetoHandshakeInterceptor;
     }
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(quadroWebSocketHandler, "/ws/quadro/*")
-                .addInterceptors(quadroHandshakeInterceptor)
+        registry.addHandler(projetoWebSocketHandler, "/ws/projeto/*")
+                .addInterceptors(projetoHandshakeInterceptor)
                 .setAllowedOriginPatterns("*");
     }
 }

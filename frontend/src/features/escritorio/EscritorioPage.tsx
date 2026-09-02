@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { HealthStatus } from '../../app/HealthStatus'
 import { useAuthStore } from '../auth/authStore'
 import { ColaboradoresPage } from '../organizacao/ColaboradoresPage'
-import { ProjetosPage } from '../organizacao/ProjetosPage'
 import { RelatoriosPage } from '../relatorios/RelatoriosPage'
 import { buscarMapaAtivo } from './api'
 import './EscritorioPage.css'
@@ -15,8 +14,8 @@ import { calcularParesProximos, usuariosProximosDeAlguem } from './mundo/proximi
 import { calcularDestinoParaStatus } from './mundo/statusParaZona'
 import { useMovimentoTeclado } from './mundo/useMovimentoTeclado'
 import { PainelFlutuante } from './PainelFlutuante'
-import { PainelKanban } from './PainelKanban'
 import { PainelPonto } from './PainelPonto'
+import { PainelProjetos } from './PainelProjetos'
 import { SugestaoRegistrarEntrada } from './SugestaoRegistrarEntrada'
 import type { StatusAvatar } from './types'
 import type { PainelId } from './ui/BarraFerramentas'
@@ -28,7 +27,6 @@ import { usePresencaWebSocket } from './usePresencaWebSocket'
 
 const TITULO_PAINEL: Record<PainelId, string> = {
   ponto: '⏱️ Ponto',
-  kanban: '📋 Quadros',
   relatorios: '📊 Relatórios',
   projetos: '📁 Projetos',
   colaboradores: '🧑‍💼 Colaboradores',
@@ -134,12 +132,11 @@ export function EscritorioPage() {
         <PainelFlutuante
           titulo={TITULO_PAINEL[painelAberto]}
           aoFechar={() => setPainelAberto(null)}
-          largo={painelAberto === 'kanban'}
+          largo={painelAberto === 'projetos'}
         >
           {painelAberto === 'ponto' && <PainelPonto />}
-          {painelAberto === 'kanban' && <PainelKanban />}
           {painelAberto === 'relatorios' && <RelatoriosPage />}
-          {painelAberto === 'projetos' && <ProjetosPage />}
+          {painelAberto === 'projetos' && <PainelProjetos />}
           {painelAberto === 'colaboradores' && <ColaboradoresPage />}
         </PainelFlutuante>
       )}

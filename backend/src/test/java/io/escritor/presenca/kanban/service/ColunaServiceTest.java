@@ -1,11 +1,13 @@
 package io.escritor.presenca.kanban.service;
 
+import io.escritor.presenca.identidade.domain.Projeto;
+import io.escritor.presenca.identidade.domain.StatusProjeto;
+import io.escritor.presenca.identidade.repository.ProjetoRepository;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.NomeColunaObrigatorioException;
 import io.escritor.presenca.kanban.domain.OrdemColunaDuplicadaException;
-import io.escritor.presenca.kanban.domain.Quadro;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
-import io.escritor.presenca.kanban.repository.QuadroRepository;
+import java.time.LocalDate;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,40 +30,40 @@ class ColunaServiceTest {
     private ColunaRepository colunaRepository;
 
     @Mock
-    private QuadroRepository quadroRepository;
+    private ProjetoRepository projetoRepository;
 
-    private final Quadro quadro = quadroComId(1L);
+    private final Projeto projeto = projetoComId(1L);
 
     private ColunaService service;
 
-    private static Quadro quadroComId(Long id) {
-        Quadro quadro = new Quadro("Backlog", null);
-        ReflectionTestUtils.setField(quadro, "id", id);
-        return quadro;
+    private static Projeto projetoComId(Long id) {
+        Projeto projeto = new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null);
+        ReflectionTestUtils.setField(projeto, "id", id);
+        return projeto;
     }
 
     @BeforeEach
     void setUp() {
-        service = new ColunaService(colunaRepository, quadroRepository);
+        service = new ColunaService(colunaRepository, projetoRepository);
     }
 
     @Test
     void criaColunaComOrdemLivre() {
-        when(quadroRepository.findById(1L)).thenReturn(Optional.of(quadro));
-        when(colunaRepository.existsByQuadroAndOrdem(quadro, 0)).thenReturn(false);
+        when(projetoRepository.findById(1L)).thenReturn(Optional.of(projeto));
+        when(colunaRepository.existsByProjetoAndOrdem(projeto, 0)).thenReturn(false);
         when(colunaRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
 
         var resposta = service.criar(1L, "A fazer", 0, null);
 
         assertThat(resposta.nome()).isEqualTo("A fazer");
         assertThat(resposta.ordem()).isZero();
-        assertThat(resposta.quadroId()).isEqualTo(1L);
+        assertThat(resposta.projetoId()).isEqualTo(1L);
     }
 
     @Test
     void criarComOrdemJaUsadaLancaExcecaoSemSalvar() {
-        when(quadroRepository.findById(1L)).thenReturn(Optional.of(quadro));
-        when(colunaRepository.existsByQuadroAndOrdem(quadro, 0)).thenReturn(true);
+        when(projetoRepository.findById(1L)).thenReturn(Optional.of(projeto));
+        when(colunaRepository.existsByProjetoAndOrdem(projeto, 0)).thenReturn(true);
 
         assertThatThrownBy(() -> service.criar(1L, "A fazer", 0, null))
                 .isInstanceOf(OrdemColunaDuplicadaException.class);
@@ -70,8 +72,8 @@ class ColunaServiceTest {
     }
 
     @Test
-    void criarEmQuadroInexistenteLancaRecursoNaoEncontrado() {
-        when(quadroRepository.findById(99L)).thenReturn(Optional.empty());
+    void criarEmProjetoInexistenteLancaRecursoNaoEncontrado() {
+        when(projetoRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.criar(99L, "A fazer", 0, null))
                 .isInstanceOf(RecursoNaoEncontradoException.class);
@@ -79,8 +81,8 @@ class ColunaServiceTest {
 
     @Test
     void criarSemNomeLancaExcecaoSemSalvar() {
-        when(quadroRepository.findById(1L)).thenReturn(Optional.of(quadro));
-        when(colunaRepository.existsByQuadroAndOrdem(quadro, 0)).thenReturn(false);
+        when(projetoRepository.findById(1L)).thenReturn(Optional.of(projeto));
+        when(colunaRepository.existsByProjetoAndOrdem(projeto, 0)).thenReturn(false);
 
         assertThatThrownBy(() -> service.criar(1L, "   ", 0, null))
                 .isInstanceOf(NomeColunaObrigatorioException.class);
@@ -89,14 +91,14 @@ class ColunaServiceTest {
     }
 
     @Test
-    void duasColunasDeQuadrosDiferentesPodemTerAMesmaOrdem() {
-        Quadro outroQuadro = quadroComId(2L);
-        when(quadroRepository.findById(2L)).thenReturn(Optional.of(outroQuadro));
-        when(colunaRepository.existsByQuadroAndOrdem(outroQuadro, 0)).thenReturn(false);
+    void duasColunasDeProjetosDiferentesPodemTerAMesmaOrdem() {
+        Projeto outroProjeto = projetoComId(2L);
+        when(projetoRepository.findById(2L)).thenReturn(Optional.of(outroProjeto));
+        when(colunaRepository.existsByProjetoAndOrdem(outroProjeto, 0)).thenReturn(false);
         when(colunaRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
 
         var resposta = service.criar(2L, "A fazer", 0, null);
 
-        assertThat(resposta.quadroId()).isEqualTo(2L);
+        assertThat(resposta.projetoId()).isEqualTo(2L);
     }
 }

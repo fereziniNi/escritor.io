@@ -1,15 +1,17 @@
 package io.escritor.presenca.kanban.web;
 
+import io.escritor.presenca.identidade.domain.MembroProjeto;
 import io.escritor.presenca.identidade.domain.Papel;
+import io.escritor.presenca.identidade.domain.Projeto;
+import io.escritor.presenca.identidade.domain.StatusProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
+import io.escritor.presenca.identidade.repository.MembroProjetoRepository;
+import io.escritor.presenca.identidade.repository.ProjetoRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.kanban.domain.Coluna;
-import io.escritor.presenca.kanban.domain.MembroQuadro;
-import io.escritor.presenca.kanban.domain.Quadro;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
-import io.escritor.presenca.kanban.repository.MembroQuadroRepository;
-import io.escritor.presenca.kanban.repository.QuadroRepository;
 import io.escritor.presenca.seguranca.JwtService;
+import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -43,13 +45,13 @@ class CardEventoControllerIT {
     private JwtService jwtService;
 
     @Autowired
-    private MembroQuadroRepository membroQuadroRepository;
+    private MembroProjetoRepository membroProjetoRepository;
 
     @Autowired
     private UsuarioRepository usuarioRepository;
 
     @Autowired
-    private QuadroRepository quadroRepository;
+    private ProjetoRepository projetoRepository;
 
     @Autowired
     private ColunaRepository colunaRepository;
@@ -63,13 +65,17 @@ class CardEventoControllerIT {
         return restTestClient;
     }
 
+    private static Projeto novoProjeto(String nome) {
+        return new Projeto(nome, "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null);
+    }
+
     @Test
     void criarECardMoverGeramEventoSozinhosSemNenhumEndpointDeEventoSerChamado() {
         Usuario membro = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-evt@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
-        membroQuadroRepository.saveAndFlush(new MembroQuadro(quadro, membro));
-        Coluna colunaA = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
-        Coluna colunaB = colunaRepository.saveAndFlush(new Coluna(quadro, "Em progresso", 1, null));
+        Projeto projeto = projetoRepository.saveAndFlush(novoProjeto("Backlog"));
+        membroProjetoRepository.saveAndFlush(new MembroProjeto(projeto, membro));
+        Coluna colunaA = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
+        Coluna colunaB = colunaRepository.saveAndFlush(new Coluna(projeto, "Em progresso", 1, null));
         String token = jwtService.gerarAccessToken(membro.getId(), Papel.COLABORADOR);
 
         Long cardId = client().post()
@@ -143,11 +149,11 @@ class CardEventoControllerIT {
     }
 
     @Test
-    void usuarioSemAcessoAoQuadroRecebe403AoListarEventos() {
+    void usuarioSemAcessoAoProjetoRecebe403AoListarEventos() {
         Usuario dono = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-evt2@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog Privado", null));
-        membroQuadroRepository.saveAndFlush(new MembroQuadro(quadro, dono));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Projeto projeto = projetoRepository.saveAndFlush(novoProjeto("Backlog Privado"));
+        membroProjetoRepository.saveAndFlush(new MembroProjeto(projeto, dono));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
         String tokenDono = jwtService.gerarAccessToken(dono.getId(), Papel.COLABORADOR);
 
         Long cardId = client().post()

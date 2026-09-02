@@ -1,11 +1,13 @@
 package io.escritor.presenca.identidade.service;
 
+import io.escritor.presenca.identidade.domain.MembroProjeto;
 import io.escritor.presenca.identidade.domain.Papel;
+import io.escritor.presenca.identidade.domain.Projeto;
+import io.escritor.presenca.identidade.domain.StatusProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
+import io.escritor.presenca.identidade.repository.MembroProjetoRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
-import io.escritor.presenca.kanban.domain.MembroQuadro;
-import io.escritor.presenca.kanban.domain.Quadro;
-import io.escritor.presenca.kanban.repository.MembroQuadroRepository;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,7 +33,7 @@ import static org.mockito.Mockito.when;
 class VisibilidadeUsuarioServiceTest {
 
     @Mock
-    private MembroQuadroRepository membroQuadroRepository;
+    private MembroProjetoRepository membroProjetoRepository;
 
     @Mock
     private UsuarioRepository usuarioRepository;
@@ -44,15 +46,15 @@ class VisibilidadeUsuarioServiceTest {
         return usuario;
     }
 
-    private static Quadro quadroComId(Long id) {
-        Quadro quadro = new Quadro("Sistema " + id, null);
-        ReflectionTestUtils.setField(quadro, "id", id);
-        return quadro;
+    private static Projeto projetoComId(Long id) {
+        Projeto projeto = new Projeto("Sistema " + id, "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null);
+        ReflectionTestUtils.setField(projeto, "id", id);
+        return projeto;
     }
 
     @BeforeEach
     void setUp() {
-        service = new VisibilidadeUsuarioService(membroQuadroRepository, usuarioRepository);
+        service = new VisibilidadeUsuarioService(membroProjetoRepository, usuarioRepository);
     }
 
     @Test
@@ -71,7 +73,7 @@ class VisibilidadeUsuarioServiceTest {
     }
 
     @Test
-    void adminVeQualquerUsuarioSemChecarQuadro() {
+    void adminVeQualquerUsuarioSemChecarProjeto() {
         Usuario admin = usuarioComId(9L, Papel.ADMIN);
         Usuario qualquerUsuario = usuarioComId(2L, Papel.COLABORADOR);
 
@@ -79,22 +81,22 @@ class VisibilidadeUsuarioServiceTest {
     }
 
     @Test
-    void gestorVeMembroDoMesmoQuadro() {
+    void gestorVeMembroDoMesmoProjeto() {
         Usuario gestor = usuarioComId(2L, Papel.GESTOR);
         Usuario membro = usuarioComId(3L, Papel.COLABORADOR);
-        Quadro quadroComum = quadroComId(10L);
-        when(membroQuadroRepository.findByUsuario(gestor)).thenReturn(List.of(new MembroQuadro(quadroComum, gestor)));
-        when(membroQuadroRepository.existsByQuadroInAndUsuario(List.of(quadroComum), membro)).thenReturn(true);
+        Projeto projetoComum = projetoComId(10L);
+        when(membroProjetoRepository.findByUsuario(gestor)).thenReturn(List.of(new MembroProjeto(projetoComum, gestor)));
+        when(membroProjetoRepository.existsByProjetoInAndUsuario(List.of(projetoComum), membro)).thenReturn(true);
 
         assertThat(service.podeVer(gestor, membro)).isTrue();
     }
 
     @Test
-    void gestorNaoVeUsuarioForaDosQuadrosDosQuaisParticipa() {
+    void gestorNaoVeUsuarioForaDosProjetosDosQuaisParticipa() {
         Usuario gestor = usuarioComId(2L, Papel.GESTOR);
         Usuario forasteiro = usuarioComId(4L, Papel.COLABORADOR);
-        when(membroQuadroRepository.findByUsuario(gestor)).thenReturn(List.of());
-        when(membroQuadroRepository.existsByQuadroInAndUsuario(List.of(), forasteiro)).thenReturn(false);
+        when(membroProjetoRepository.findByUsuario(gestor)).thenReturn(List.of());
+        when(membroProjetoRepository.existsByProjetoInAndUsuario(List.of(), forasteiro)).thenReturn(false);
 
         assertThat(service.podeVer(gestor, forasteiro)).isFalse();
     }

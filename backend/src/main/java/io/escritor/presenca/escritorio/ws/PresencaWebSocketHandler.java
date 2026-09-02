@@ -28,7 +28,7 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 /**
- * PRD §5/§3.5: handler puro (sem STOMP), mesmo espírito de {@code QuadroWebSocketHandler}
+ * PRD §5/§3.5: handler puro (sem STOMP), mesmo espírito de {@code ProjetoWebSocketHandler}
  * (kanban, S3.11), mas global - não há "sala"/id de recurso aqui, só um canal único de presença
  * pra todo mundo autenticado. Estado vivo (posição, status) fica só neste mapa em memória, nunca
  * no banco (PRD). Conectar registra o usuário com posição inicial (0,0) e status

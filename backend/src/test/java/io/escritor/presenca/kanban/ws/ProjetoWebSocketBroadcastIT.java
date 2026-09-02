@@ -1,17 +1,19 @@
 package io.escritor.presenca.kanban.ws;
 
+import io.escritor.presenca.identidade.domain.MembroProjeto;
 import io.escritor.presenca.identidade.domain.Papel;
+import io.escritor.presenca.identidade.domain.Projeto;
+import io.escritor.presenca.identidade.domain.StatusProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
+import io.escritor.presenca.identidade.repository.MembroProjetoRepository;
+import io.escritor.presenca.identidade.repository.ProjetoRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.Coluna;
-import io.escritor.presenca.kanban.domain.MembroQuadro;
-import io.escritor.presenca.kanban.domain.Quadro;
 import io.escritor.presenca.kanban.repository.CardRepository;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
-import io.escritor.presenca.kanban.repository.MembroQuadroRepository;
-import io.escritor.presenca.kanban.repository.QuadroRepository;
 import io.escritor.presenca.seguranca.JwtService;
+import java.time.LocalDate;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -37,7 +39,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class QuadroWebSocketBroadcastIT {
+class ProjetoWebSocketBroadcastIT {
 
     @Container
     @ServiceConnection
@@ -50,13 +52,13 @@ class QuadroWebSocketBroadcastIT {
     private JwtService jwtService;
 
     @Autowired
-    private MembroQuadroRepository membroQuadroRepository;
+    private MembroProjetoRepository membroProjetoRepository;
 
     @Autowired
     private UsuarioRepository usuarioRepository;
 
     @Autowired
-    private QuadroRepository quadroRepository;
+    private ProjetoRepository projetoRepository;
 
     @Autowired
     private ColunaRepository colunaRepository;
@@ -73,21 +75,25 @@ class QuadroWebSocketBroadcastIT {
         return restTestClient;
     }
 
+    private static Projeto novoProjeto(String nome) {
+        return new Projeto(nome, "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null);
+    }
+
     @Test
-    void doisClientesConectadosAoMesmoQuadroRecebemOMovimentoDeCard() throws Exception {
+    void doisClientesConectadosAoMesmoProjetoRecebemOMovimentoDeCard() throws Exception {
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-ws@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Board WS", null));
-        membroQuadroRepository.saveAndFlush(new MembroQuadro(quadro, usuario));
-        Coluna origem = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
-        Coluna destino = colunaRepository.saveAndFlush(new Coluna(quadro, "Em progresso", 1, null));
+        Projeto projeto = projetoRepository.saveAndFlush(novoProjeto("Board WS"));
+        membroProjetoRepository.saveAndFlush(new MembroProjeto(projeto, usuario));
+        Coluna origem = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
+        Coluna destino = colunaRepository.saveAndFlush(new Coluna(projeto, "Em progresso", 1, null));
         Card card = cardRepository.saveAndFlush(new Card(origem, "Card WS", null, 1024.0, null, null, null, usuario));
 
         String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
 
         BlockingQueue<String> mensagens1 = new LinkedBlockingQueue<>();
         BlockingQueue<String> mensagens2 = new LinkedBlockingQueue<>();
-        WebSocketSession sessao1 = conectar(quadro.getId(), token, mensagens1);
-        WebSocketSession sessao2 = conectar(quadro.getId(), token, mensagens2);
+        WebSocketSession sessao1 = conectar(projeto.getId(), token, mensagens1);
+        WebSocketSession sessao2 = conectar(projeto.getId(), token, mensagens2);
         try {
             client().patch()
                     .uri("/cards/{id}/mover", card.getId())
@@ -112,30 +118,30 @@ class QuadroWebSocketBroadcastIT {
     }
 
     @Test
-    void handshakeERecusadoParaUsuarioSemAcessoAoQuadro() {
+    void handshakeERecusadoParaUsuarioSemAcessoAoProjeto() {
         Usuario semAcesso = usuarioRepository.saveAndFlush(new Usuario("Bia Rocha", "bia-ws@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Board Privado", null));
+        Projeto projeto = projetoRepository.saveAndFlush(novoProjeto("Board Privado"));
         String token = jwtService.gerarAccessToken(semAcesso.getId(), Papel.COLABORADOR);
 
-        assertThatThrownBy(() -> conectar(quadro.getId(), token, new LinkedBlockingQueue<>()))
+        assertThatThrownBy(() -> conectar(projeto.getId(), token, new LinkedBlockingQueue<>()))
                 .isInstanceOf(ExecutionException.class);
     }
 
     @Test
     void handshakeERecusadoSemToken() {
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Board Sem Token", null));
+        Projeto projeto = projetoRepository.saveAndFlush(novoProjeto("Board Sem Token"));
 
         assertThatThrownBy(() -> {
             StandardWebSocketClient wsClient = new StandardWebSocketClient();
-            wsClient.execute(new TextWebSocketHandler() {}, "ws://localhost:" + port + "/ws/quadro/" + quadro.getId())
+            wsClient.execute(new TextWebSocketHandler() {}, "ws://localhost:" + port + "/ws/projeto/" + projeto.getId())
                     .get(5, TimeUnit.SECONDS);
         }).isInstanceOf(ExecutionException.class);
     }
 
-    private WebSocketSession conectar(Long quadroId, String token, BlockingQueue<String> mensagens)
+    private WebSocketSession conectar(Long projetoId, String token, BlockingQueue<String> mensagens)
             throws ExecutionException, InterruptedException, TimeoutException {
         StandardWebSocketClient wsClient = new StandardWebSocketClient();
-        String uri = "ws://localhost:" + port + "/ws/quadro/" + quadroId + "?token=" + token;
+        String uri = "ws://localhost:" + port + "/ws/projeto/" + projetoId + "?token=" + token;
         return wsClient
                 .execute(
                         new TextWebSocketHandler() {

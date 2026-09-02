@@ -21,9 +21,9 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Mover/aplicar etiqueta/remover etiqueta são abertos a qualquer usuário autenticado, mesma
  * simplificação conhecida de criar card (ColunaController, S3.6) - ainda não verifica acesso ao
- * quadro dono do card (mover precisa de {@link ContextoUsuarioAutenticado} mesmo assim, desde
+ * projeto dono do card (mover precisa de {@link ContextoUsuarioAutenticado} mesmo assim, desde
  * S3.17, só pra registrar quem fez a mudança de coluna no histórico). Comentar (S3.15) e ler o
- * histórico (S3.17) exigem acesso ao quadro (403 sem ele).
+ * histórico (S3.17) exigem acesso ao projeto (403 sem ele).
  */
 @RestController
 @RequestMapping("/cards")

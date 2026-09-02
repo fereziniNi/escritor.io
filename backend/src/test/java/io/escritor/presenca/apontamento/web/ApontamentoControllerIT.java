@@ -3,22 +3,21 @@ package io.escritor.presenca.apontamento.web;
 import io.escritor.presenca.apontamento.domain.Apontamento;
 import io.escritor.presenca.apontamento.domain.OrigemApontamento;
 import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
+import io.escritor.presenca.identidade.domain.MembroProjeto;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Projeto;
 import io.escritor.presenca.identidade.domain.StatusProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
+import io.escritor.presenca.identidade.repository.MembroProjetoRepository;
 import io.escritor.presenca.identidade.repository.ProjetoRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.Coluna;
-import io.escritor.presenca.kanban.domain.MembroQuadro;
-import io.escritor.presenca.kanban.domain.Quadro;
 import io.escritor.presenca.kanban.repository.CardRepository;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
-import io.escritor.presenca.kanban.repository.MembroQuadroRepository;
-import io.escritor.presenca.kanban.repository.QuadroRepository;
 import io.escritor.presenca.seguranca.JwtService;
 import java.time.Instant;
+import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -57,9 +56,6 @@ class ApontamentoControllerIT {
     private UsuarioRepository usuarioRepository;
 
     @Autowired
-    private QuadroRepository quadroRepository;
-
-    @Autowired
     private ColunaRepository colunaRepository;
 
     @Autowired
@@ -69,7 +65,7 @@ class ApontamentoControllerIT {
     private ApontamentoRepository apontamentoRepository;
 
     @Autowired
-    private MembroQuadroRepository membroQuadroRepository;
+    private MembroProjetoRepository membroProjetoRepository;
 
     @Autowired
     private ProjetoRepository projetoRepository;
@@ -86,8 +82,8 @@ class ApontamentoControllerIT {
     @Test
     void iniciarUmSegundoTimerEncerraOPrimeiroDeVerdade() {
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-apt@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
         var cardA = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         var cardB = cardRepository.saveAndFlush(new Card(coluna, "Card B", null, 2048.0, null, null, null, usuario));
         String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
@@ -123,8 +119,8 @@ class ApontamentoControllerIT {
     @Test
     void pararEncerraOTimerDeVerdadeEDepoisPermiteAbrirOutro() {
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-parar@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
         var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
 
@@ -162,8 +158,8 @@ class ApontamentoControllerIT {
     void pararApontamentoDeOutroUsuarioRecebe403DeVerdade() {
         Usuario dono = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-dono@escritor.io", Papel.COLABORADOR, 480));
         Usuario outro = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-outro@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
         var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, dono));
         String tokenDono = jwtService.gerarAccessToken(dono.getId(), Papel.COLABORADOR);
         String tokenOutro = jwtService.gerarAccessToken(outro.getId(), Papel.COLABORADOR);
@@ -190,8 +186,8 @@ class ApontamentoControllerIT {
     @Test
     void pararApontamentoJaEncerradoRecebe409DeVerdade() {
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-409@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
         var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
 
@@ -220,8 +216,8 @@ class ApontamentoControllerIT {
     @Test
     void criaLancamentoManualComMinutosDireto() {
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-manual@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
         var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
 
@@ -244,8 +240,8 @@ class ApontamentoControllerIT {
     @Test
     void criaLancamentoManualComIntervaloExplicito() {
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-manual2@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
         var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
 
@@ -266,8 +262,8 @@ class ApontamentoControllerIT {
     @Test
     void criarLancamentoManualComMinutosEIntervaloJuntosRecebe400DeVerdade() {
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-manual3@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
         var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
 
@@ -285,8 +281,8 @@ class ApontamentoControllerIT {
     @Test
     void editarRecalculaMinutosEPersisteDeVerdade() {
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-editar@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
         var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
 
@@ -327,8 +323,8 @@ class ApontamentoControllerIT {
     void editarApontamentoDeOutroUsuarioRecebe403DeVerdadeENaoMudaNada() {
         Usuario dono = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-editar-dono@escritor.io", Papel.COLABORADOR, 480));
         Usuario outro = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-editar-outro@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
         var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, dono));
         String tokenDono = jwtService.gerarAccessToken(dono.getId(), Papel.COLABORADOR);
         String tokenOutro = jwtService.gerarAccessToken(outro.getId(), Papel.COLABORADOR);
@@ -363,8 +359,8 @@ class ApontamentoControllerIT {
     @Test
     void excluirRemoveALinhaDeVerdade() {
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-excluir@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
         var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
 
@@ -395,8 +391,8 @@ class ApontamentoControllerIT {
     void excluirApontamentoDeOutroUsuarioRecebe403DeVerdadeENaoApaga() {
         Usuario dono = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-excluir-dono@escritor.io", Papel.COLABORADOR, 480));
         Usuario outro = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-excluir-outro@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
         var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, dono));
         String tokenDono = jwtService.gerarAccessToken(dono.getId(), Papel.COLABORADOR);
         String tokenOutro = jwtService.gerarAccessToken(outro.getId(), Papel.COLABORADOR);
@@ -427,8 +423,8 @@ class ApontamentoControllerIT {
     @Test
     void listaOsApontamentosDoCardMaisRecentePrimeiroDeVerdade() {
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-listar@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
         var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
 
@@ -478,8 +474,8 @@ class ApontamentoControllerIT {
     @Test
     void colaboradorVeOsProprosApontamentosNoPeriodoDeVerdade() {
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s410-self@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
         Card card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         apontamentoRepository.saveAndFlush(new Apontamento(
                 usuario, card, Instant.parse("2026-01-15T09:00:00Z"), Instant.parse("2026-01-15T10:00:00Z"), null, OrigemApontamento.MANUAL));
@@ -508,13 +504,13 @@ class ApontamentoControllerIT {
     }
 
     @Test
-    void gestorVeApontamentosDeMembroDoMesmoQuadroDeVerdade() {
+    void gestorVeApontamentosDeMembroDoMesmoProjetoDeVerdade() {
         Usuario gestor = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s410-gestor@escritor.io", Papel.GESTOR, 480));
         Usuario membro = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s410-membro@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
-        membroQuadroRepository.saveAndFlush(new MembroQuadro(quadro, gestor));
-        membroQuadroRepository.saveAndFlush(new MembroQuadro(quadro, membro));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
+        membroProjetoRepository.saveAndFlush(new MembroProjeto(projeto, gestor));
+        membroProjetoRepository.saveAndFlush(new MembroProjeto(projeto, membro));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
         Card card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, membro));
         apontamentoRepository.saveAndFlush(new Apontamento(
                 membro, card, Instant.parse("2026-01-15T09:00:00Z"), Instant.parse("2026-01-15T10:00:00Z"), null, OrigemApontamento.MANUAL));
@@ -530,7 +526,7 @@ class ApontamentoControllerIT {
     }
 
     @Test
-    void gestorTentandoVerApontamentosDeUsuarioForaDoQuadroRecebe403DeVerdade() {
+    void gestorTentandoVerApontamentosDeUsuarioForaDoProjetoRecebe403DeVerdade() {
         Usuario gestor = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s410-gestorfora@escritor.io", Papel.GESTOR, 480));
         Usuario forasteiro = usuarioRepository.saveAndFlush(new Usuario("Caio Reis", "caio-s410-forasteiro@escritor.io", Papel.COLABORADOR, 480));
         String tokenGestor = jwtService.gerarAccessToken(gestor.getId(), Papel.GESTOR);
@@ -550,8 +546,8 @@ class ApontamentoControllerIT {
     void adminVeApontamentosDeQualquerUsuarioDeVerdade() {
         Usuario admin = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s410-admin@escritor.io", Papel.ADMIN, 480));
         Usuario qualquerUsuario = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s410-qualquer@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
         Card card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, qualquerUsuario));
         apontamentoRepository.saveAndFlush(new Apontamento(
                 qualquerUsuario, card, Instant.parse("2026-01-15T09:00:00Z"), Instant.parse("2026-01-15T10:00:00Z"), null, OrigemApontamento.MANUAL));
@@ -585,8 +581,8 @@ class ApontamentoControllerIT {
     @Test
     void listaOTotalApontadoPorCardDeVerdadeIgnorandoTimerAberto() {
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s54-porcard@escritor.io", Papel.COLABORADOR, 480));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
         Card cardA = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
         Card cardB = cardRepository.saveAndFlush(new Card(coluna, "Card B", null, 2048.0, null, null, null, usuario));
         apontamentoRepository.saveAndFlush(new Apontamento(
@@ -618,8 +614,7 @@ class ApontamentoControllerIT {
     void gestorConsultaOTotalApontadoPorProjetoDeVerdade() {
         Usuario gestor = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s55-gestor@escritor.io", Papel.GESTOR, 480));
         Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Projeto S55", "Cliente", StatusProjeto.ATIVO, java.time.LocalDate.now(), null));
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", projeto));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
         Card card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, gestor));
         apontamentoRepository.saveAndFlush(new Apontamento(
                 gestor, card, Instant.parse("2026-01-15T09:00:00Z"), Instant.parse("2026-01-15T10:00:00Z"), null, OrigemApontamento.MANUAL));

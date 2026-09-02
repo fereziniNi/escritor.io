@@ -4,11 +4,12 @@ import io.escritor.presenca.apontamento.domain.Apontamento;
 import io.escritor.presenca.apontamento.domain.OrigemApontamento;
 import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
 import io.escritor.presenca.identidade.domain.Papel;
+import io.escritor.presenca.identidade.domain.Projeto;
+import io.escritor.presenca.identidade.domain.StatusProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.service.VisibilidadeUsuarioService;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.Coluna;
-import io.escritor.presenca.kanban.domain.Quadro;
 import io.escritor.presenca.ponto.domain.EstadoDia;
 import io.escritor.presenca.ponto.domain.JornadaDeOutroUsuarioException;
 import io.escritor.presenca.ponto.domain.OrigemRegistroPonto;
@@ -59,8 +60,8 @@ class JornadaServiceTest {
     }
 
     private static Card cardComId(Long id) {
-        Quadro quadro = new Quadro("Backlog", null);
-        Coluna coluna = new Coluna(quadro, "A fazer", 0, null);
+        Projeto projeto = new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null);
+        Coluna coluna = new Coluna(projeto, "A fazer", 0, null);
         Card card = new Card(coluna, "Corrigir bug", null, 1024.0, null, null, null, usuarioComId(1L, 480));
         ReflectionTestUtils.setField(card, "id", id);
         return card;

@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 
 /**
- * Modal genérico usado pelo dock do Escritório (S6, reskin) - cada função do app (ponto, kanban,
+ * Modal genérico usado pelo dock do Escritório (S6, reskin) - cada função do app (ponto, projetos,
  * relatórios, admin) abre como um painel flutuando por cima do mapa, em vez de navegar pra outra
  * URL: "uma tela só, tudo integrado nela", pedido do usuário depois do roadmap completo. Fecha no
  * X, clicando fora, ou Esc - três jeitos óbvios de sair, nenhum deles surpreendente.
@@ -16,8 +16,8 @@ export function PainelFlutuante({
   titulo: string
   aoFechar: () => void
   children: ReactNode
-  /** Quadros do Kanban podem ter várias colunas lado a lado - o painel padrão (760px) forçaria
-   * rolagem horizontal cedo demais, então esse painel específico pede mais largura. */
+  /** Projetos (board kanban) podem ter várias colunas lado a lado - o painel padrão (760px)
+   * forçaria rolagem horizontal cedo demais, então esse painel específico pede mais largura. */
   largo?: boolean
 }) {
   useEffect(() => {

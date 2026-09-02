@@ -3,7 +3,7 @@ import { renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAuthStore } from '../auth/authStore'
-import { useQuadroWebSocket } from './useQuadroWebSocket'
+import { useProjetoWebSocket } from './useProjetoWebSocket'
 
 /**
  * jsdom não implementa WebSocket de verdade - mesma filosofia já usada pro drag-and-drop
@@ -60,34 +60,34 @@ function wrapper({ children }: { children: ReactNode }) {
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
 }
 
-describe('useQuadroWebSocket', () => {
-  it('conecta em /ws/quadro/{id} com o token da sessão', () => {
-    renderHook(() => useQuadroWebSocket(5), { wrapper })
+describe('useProjetoWebSocket', () => {
+  it('conecta em /ws/projeto/{id} com o token da sessão', () => {
+    renderHook(() => useProjetoWebSocket(5), { wrapper })
 
     expect(WebSocketFalso.instancias).toHaveLength(1)
-    expect(WebSocketFalso.instancias[0].url).toContain('/ws/quadro/5')
+    expect(WebSocketFalso.instancias[0].url).toContain('/ws/projeto/5')
     expect(WebSocketFalso.instancias[0].url).toContain('token=token-fake')
   })
 
-  it('invalida a query do quadro ao receber uma mensagem', async () => {
+  it('invalida a query do projeto ao receber uma mensagem', async () => {
     const queryClient = new QueryClient()
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
     function wrapperComClient({ children }: { children: ReactNode }) {
       return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     }
 
-    renderHook(() => useQuadroWebSocket(5), { wrapper: wrapperComClient })
+    renderHook(() => useProjetoWebSocket(5), { wrapper: wrapperComClient })
     WebSocketFalso.instancias[0].disparaMensagem()
 
     await waitFor(() => {
-      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['quadros', 5] })
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['projetos', 5] })
     })
   })
 
   it('reconecta se a conexão cair sem ter sido fechada pelo próprio componente', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
 
-    renderHook(() => useQuadroWebSocket(5), { wrapper })
+    renderHook(() => useProjetoWebSocket(5), { wrapper })
     expect(WebSocketFalso.instancias).toHaveLength(1)
 
     WebSocketFalso.instancias[0].disparaQuedaDeConexao()
@@ -99,7 +99,7 @@ describe('useQuadroWebSocket', () => {
   it('fecha a conexão ao desmontar e não tenta reconectar depois disso', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
 
-    const { unmount } = renderHook(() => useQuadroWebSocket(5), { wrapper })
+    const { unmount } = renderHook(() => useProjetoWebSocket(5), { wrapper })
     const socket = WebSocketFalso.instancias[0]
 
     unmount()

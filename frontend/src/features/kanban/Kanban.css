@@ -3,23 +3,23 @@
  * fácil de utilizar") - antes era só `<main>`/`<section>`/`<ul>` sem nenhuma classe própria.
  * Nenhum texto tocado aqui: só layout/cor. Alguns rótulos de botão são testados com matcher exato
  * ancorado (ex. `/^editar$/i`, `/^salvar$/i`, `/^lançar$/i`, `/^aplicar$/i`, `/^comentar$/i`) e o
- * <h1> do quadro/`<h2>` "Backlog" de coluna são testados via nome acessível exato - por isso esses
+ * <h1> do projeto/`<h2>` "Backlog" de coluna são testados via nome acessível exato - por isso esses
  * textos ficam sem ícone/decoração, só a classe muda a aparência.
  */
 
-.kanban-quadro-cabecalho {
+.kanban-projeto-cabecalho {
   display: flex;
   align-items: center;
   gap: 0.6rem;
   margin-bottom: 1.25rem;
 }
 
-.kanban-quadro-icone {
+.kanban-projeto-icone {
   font-size: 1.6rem;
   line-height: 1;
 }
 
-.kanban-quadro-cabecalho h1 {
+.kanban-projeto-cabecalho h1 {
   margin: 0;
 }
 

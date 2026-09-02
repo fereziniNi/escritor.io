@@ -16,7 +16,7 @@ function tokenFalsoCom(sub: string): string {
 
 const TOKEN_USUARIO_1 = tokenFalsoCom('1')
 
-/** jsdom não implementa WebSocket de verdade - mesma filosofia de `useQuadroWebSocket.test.tsx`. */
+/** jsdom não implementa WebSocket de verdade - mesma filosofia de `useProjetoWebSocket.test.tsx`. */
 class WebSocketFalso {
   static instancias: WebSocketFalso[] = []
 

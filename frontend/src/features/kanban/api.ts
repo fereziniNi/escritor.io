@@ -1,45 +1,5 @@
 import { apiFetch } from '../../shared/api/http'
-import type { Apontamento, Card, Comentario, Etiqueta, EventoCard, Quadro, QuadroDetalhe, TotalApontado, TotalPorCard } from './types'
-
-export async function listarQuadros(): Promise<Quadro[]> {
-  const response = await apiFetch('/quadros')
-  if (!response.ok) {
-    throw new Error('Não foi possível carregar os quadros')
-  }
-  return response.json()
-}
-
-export async function criarQuadro(dados: { nome: string; projetoId: number | null }): Promise<Quadro> {
-  const response = await apiFetch('/quadros', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(dados),
-  })
-  if (!response.ok) {
-    throw new Error('Não foi possível criar o quadro')
-  }
-  return response.json()
-}
-
-export async function buscarQuadro(id: number): Promise<QuadroDetalhe> {
-  const response = await apiFetch(`/quadros/${id}`)
-  if (!response.ok) {
-    throw new Error('Não foi possível carregar o quadro')
-  }
-  return response.json()
-}
-
-/** Pedido do cliente: atribuição individual de pessoa ao quadro ("sistema"), sem Equipe no meio. */
-export async function adicionarMembroAoQuadro(dados: { quadroId: number; usuarioId: number }): Promise<void> {
-  const response = await apiFetch(`/quadros/${dados.quadroId}/membros`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ usuarioId: dados.usuarioId }),
-  })
-  if (!response.ok) {
-    throw new Error('Não foi possível adicionar o membro ao quadro')
-  }
-}
+import type { Apontamento, Card, Comentario, Etiqueta, EventoCard, TotalApontado, TotalPorCard } from './types'
 
 export async function criarCard(dados: { colunaId: number; titulo: string }): Promise<Card> {
   const response = await apiFetch(`/colunas/${dados.colunaId}/cards`, {
@@ -65,16 +25,16 @@ export async function moverCard(dados: { cardId: number; colunaId: number; indic
   return response.json()
 }
 
-export async function listarEtiquetas(quadroId: number): Promise<Etiqueta[]> {
-  const response = await apiFetch(`/quadros/${quadroId}/etiquetas`)
+export async function listarEtiquetas(projetoId: number): Promise<Etiqueta[]> {
+  const response = await apiFetch(`/projetos/${projetoId}/etiquetas`)
   if (!response.ok) {
     throw new Error('Não foi possível carregar as etiquetas')
   }
   return response.json()
 }
 
-export async function criarEtiqueta(dados: { quadroId: number; nome: string; cor: string }): Promise<Etiqueta> {
-  const response = await apiFetch(`/quadros/${dados.quadroId}/etiquetas`, {
+export async function criarEtiqueta(dados: { projetoId: number; nome: string; cor: string }): Promise<Etiqueta> {
+  const response = await apiFetch(`/projetos/${dados.projetoId}/etiquetas`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ nome: dados.nome, cor: dados.cor }),

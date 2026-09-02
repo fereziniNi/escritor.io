@@ -35,7 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * estado em memória e devolve um snapshot de verdade, e que desconectar estaciona o avatar como
  * {@code OFFLINE} em "Fora do trabalho" em vez de removê-lo do registro (pedido do usuário: "o
  * personagem fica em Fora do trabalho") - não um mock do handler, a stack WebSocket real (mesmo
- * padrão de {@code QuadroWebSocketBroadcastIT}, kanban S3.11).
+ * padrão de {@code ProjetoWebSocketBroadcastIT}, kanban S3.11).
  */
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)

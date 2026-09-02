@@ -3,7 +3,7 @@ package io.escritor.presenca.kanban.web;
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.AcessoNegadoException;
-import io.escritor.presenca.kanban.domain.EtiquetaDeOutroQuadroException;
+import io.escritor.presenca.kanban.domain.EtiquetaDeOutroProjetoException;
 import io.escritor.presenca.kanban.domain.LimiteWipExcedidoException;
 import io.escritor.presenca.kanban.service.CardComentarioService;
 import io.escritor.presenca.kanban.service.CardEventoService;
@@ -146,8 +146,8 @@ class CardControllerTest {
 
     @Test
     @WithMockUser
-    void aplicarEtiquetaDeOutroQuadroRetorna400() throws Exception {
-        when(etiquetaService.aplicar(1L, 2L)).thenThrow(new EtiquetaDeOutroQuadroException(2L, 1L));
+    void aplicarEtiquetaDeOutroProjetoRetorna400() throws Exception {
+        when(etiquetaService.aplicar(1L, 2L)).thenThrow(new EtiquetaDeOutroProjetoException(2L, 1L));
 
         mockMvc.perform(post("/cards/1/etiquetas")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -207,7 +207,7 @@ class CardControllerTest {
 
     @Test
     @WithMockUser
-    void criarComentarioSemAcessoAoQuadroRetorna403() throws Exception {
+    void criarComentarioSemAcessoAoProjetoRetorna403() throws Exception {
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
         when(cardComentarioService.criar(eq(1L), eq("Já revisei"), any()))
                 .thenThrow(new AcessoNegadoException("sem acesso"));
@@ -263,7 +263,7 @@ class CardControllerTest {
 
     @Test
     @WithMockUser
-    void listarComentariosSemAcessoAoQuadroRetorna403() throws Exception {
+    void listarComentariosSemAcessoAoProjetoRetorna403() throws Exception {
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
         when(cardComentarioService.listar(eq(1L), any())).thenThrow(new AcessoNegadoException("sem acesso"));
 
@@ -289,7 +289,7 @@ class CardControllerTest {
 
     @Test
     @WithMockUser
-    void listarEventosSemAcessoAoQuadroRetorna403() throws Exception {
+    void listarEventosSemAcessoAoProjetoRetorna403() throws Exception {
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
         when(cardEventoService.listar(eq(1L), any())).thenThrow(new AcessoNegadoException("sem acesso"));
 

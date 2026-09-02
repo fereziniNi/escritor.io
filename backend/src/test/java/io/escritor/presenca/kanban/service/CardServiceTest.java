@@ -1,6 +1,8 @@
 package io.escritor.presenca.kanban.service;
 
 import io.escritor.presenca.identidade.domain.Papel;
+import io.escritor.presenca.identidade.domain.Projeto;
+import io.escritor.presenca.identidade.domain.StatusProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
@@ -9,14 +11,14 @@ import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.CardEvento;
 import io.escritor.presenca.kanban.domain.Coluna;
 import io.escritor.presenca.kanban.domain.LimiteWipExcedidoException;
-import io.escritor.presenca.kanban.domain.Quadro;
 import io.escritor.presenca.kanban.domain.TipoEventoCard;
 import io.escritor.presenca.kanban.domain.TituloCardObrigatorioException;
 import io.escritor.presenca.kanban.repository.CardEventoRepository;
 import io.escritor.presenca.kanban.repository.CardRepository;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
 import io.escritor.presenca.kanban.web.CardResponse;
-import io.escritor.presenca.kanban.ws.QuadroWebSocketHandler;
+import io.escritor.presenca.kanban.ws.ProjetoWebSocketHandler;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,7 +51,7 @@ class CardServiceTest {
     private UsuarioRepository usuarioRepository;
 
     @Mock
-    private QuadroWebSocketHandler quadroWebSocketHandler;
+    private ProjetoWebSocketHandler projetoWebSocketHandler;
 
     @Mock
     private CardEventoRepository cardEventoRepository;
@@ -64,8 +66,8 @@ class CardServiceTest {
     }
 
     private static Coluna colunaComId(Long id, Integer limiteWip) {
-        Quadro quadro = new Quadro("Backlog", null);
-        Coluna coluna = new Coluna(quadro, "A fazer", 0, limiteWip);
+        Projeto projeto = new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null);
+        Coluna coluna = new Coluna(projeto, "A fazer", 0, limiteWip);
         ReflectionTestUtils.setField(coluna, "id", id);
         return coluna;
     }
@@ -84,7 +86,7 @@ class CardServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new CardService(cardRepository, colunaRepository, usuarioRepository, quadroWebSocketHandler, cardEventoRepository);
+        service = new CardService(cardRepository, colunaRepository, usuarioRepository, projetoWebSocketHandler, cardEventoRepository);
     }
 
     @Test
@@ -184,7 +186,7 @@ class CardServiceTest {
         assertThatThrownBy(() -> service.mover(10L, 2L, 0, criadoPor)).isInstanceOf(LimiteWipExcedidoException.class);
 
         verify(cardRepository, never()).save(any());
-        verify(quadroWebSocketHandler, never()).broadcastCardMovido(any(), any());
+        verify(projetoWebSocketHandler, never()).broadcastCardMovido(any(), any());
         verify(cardEventoRepository, never()).save(any());
     }
 
@@ -306,7 +308,7 @@ class CardServiceTest {
     }
 
     @Test
-    void moverBroadcastaOCardMovidoPraSessoesDoQuadroDeDestino() {
+    void moverBroadcastaOCardMovidoPraSessoesDoProjetoDeDestino() {
         Coluna destino = colunaComId(2L);
         Card card = cardComId(10L, coluna, 1024.0);
         when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
@@ -317,7 +319,7 @@ class CardServiceTest {
         service.mover(10L, 2L, 0, criadoPor);
 
         var captor = ArgumentCaptor.forClass(CardResponse.class);
-        verify(quadroWebSocketHandler).broadcastCardMovido(eq(destino.getQuadro().getId()), captor.capture());
+        verify(projetoWebSocketHandler).broadcastCardMovido(eq(destino.getProjeto().getId()), captor.capture());
         assertThat(captor.getValue().id()).isEqualTo(10L);
         assertThat(captor.getValue().colunaId()).isEqualTo(2L);
     }
@@ -330,7 +332,7 @@ class CardServiceTest {
 
         service.criar(1L, "Corrigir bug", null, null, null, null, criadoPor);
 
-        verify(quadroWebSocketHandler, never()).broadcastCardMovido(any(), any());
+        verify(projetoWebSocketHandler, never()).broadcastCardMovido(any(), any());
     }
 
     @Test

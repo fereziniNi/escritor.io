@@ -17,7 +17,6 @@ import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.identidade.service.VisibilidadeUsuarioService;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.Coluna;
-import io.escritor.presenca.kanban.domain.Quadro;
 import io.escritor.presenca.kanban.repository.CardRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -81,8 +80,8 @@ class ApontamentoServiceTest {
     }
 
     private static Card cardComId(Long id, String titulo) {
-        Quadro quadro = new Quadro("Backlog", null);
-        Coluna coluna = new Coluna(quadro, "A fazer", 0, null);
+        Projeto projeto = new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, java.time.LocalDate.now(), null);
+        Coluna coluna = new Coluna(projeto, "A fazer", 0, null);
         Card card = new Card(coluna, titulo, null, 1024.0, null, null, null, usuarioComId(1L));
         ReflectionTestUtils.setField(card, "id", id);
         return card;
@@ -355,7 +354,7 @@ class ApontamentoServiceTest {
     /**
      * A partir de S5.2, resolução/autorização de `usuarioIdFiltro` é inteiramente responsabilidade
      * de {@link VisibilidadeUsuarioService#resolverAlvo} - o comportamento exaustivo por papel
-     * (colaborador/gestor/admin, quadros em comum etc.) já é coberto em `VisibilidadeUsuarioServiceTest`
+     * (colaborador/gestor/admin, projetos em comum etc.) já é coberto em `VisibilidadeUsuarioServiceTest`
      * e não precisa ser retestado aqui; estes dois testes só provam que `ApontamentoService` usa o
      * alvo resolvido pra consultar, e que uma exceção de `resolverAlvo` propaga sem tocar o
      * repositório de apontamentos.
@@ -431,7 +430,7 @@ class ApontamentoServiceTest {
     }
 
     @Test
-    void totalApontadoPorProjetoSomaOsApontamentosFechadosDosCardsDosQuadrosVinculados() {
+    void totalApontadoPorProjetoSomaOsApontamentosFechadosDosCardsDasColunasDoProjeto() {
         Projeto projeto = projetoComId(20L);
         Instant inicio = agora.minus(1, ChronoUnit.DAYS);
         Apontamento primeiro = new Apontamento(
@@ -439,7 +438,7 @@ class ApontamentoServiceTest {
         Apontamento segundo = new Apontamento(
                 usuario, card, inicio.plus(3, ChronoUnit.HOURS), inicio.plus(3, ChronoUnit.HOURS).plusSeconds(1800), null, OrigemApontamento.MANUAL);
         when(projetoRepository.findById(20L)).thenReturn(Optional.of(projeto));
-        when(apontamentoRepository.findByCard_Coluna_Quadro_ProjetoAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(
+        when(apontamentoRepository.findByCard_Coluna_ProjetoAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(
                         projeto, inicio, agora))
                 .thenReturn(List.of(primeiro, segundo));
 
@@ -454,7 +453,7 @@ class ApontamentoServiceTest {
                 .isInstanceOf(FiltroRelatorioInvalidoException.class);
 
         verify(apontamentoRepository, never())
-                .findByCard_Coluna_Quadro_ProjetoAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(any(), any(), any());
+                .findByCard_Coluna_ProjetoAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(any(), any(), any());
     }
 
     @Test

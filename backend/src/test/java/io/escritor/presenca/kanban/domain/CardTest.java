@@ -1,6 +1,8 @@
 package io.escritor.presenca.kanban.domain;
 
 import io.escritor.presenca.identidade.domain.Papel;
+import io.escritor.presenca.identidade.domain.Projeto;
+import io.escritor.presenca.identidade.domain.StatusProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
@@ -10,8 +12,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CardTest {
 
-    private final Quadro quadro = new Quadro("Backlog", null);
-    private final Coluna coluna = new Coluna(quadro, "A fazer", 0, null);
+    private final Projeto projeto = new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null);
+    private final Coluna coluna = new Coluna(projeto, "A fazer", 0, null);
     private final Usuario criadoPor = new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480);
 
     @Test
@@ -69,7 +71,7 @@ class CardTest {
     @Test
     void moverAtualizaColunaEPosicao() {
         Card card = new Card(coluna, "Corrigir bug", null, 1024.0, null, null, null, criadoPor);
-        Coluna outraColuna = new Coluna(quadro, "Em progresso", 1, null);
+        Coluna outraColuna = new Coluna(projeto, "Em progresso", 1, null);
 
         card.mover(outraColuna, 2048.0);
 

@@ -6,11 +6,12 @@ import { EscritorioPage } from './features/escritorio/EscritorioPage'
 
 /**
  * Uma tela só depois de logado (pedido do usuário): o Escritório é a `HomePage` agora - ponto,
- * quadros, relatórios e admin de projetos viraram painéis do dock dentro dela (ver
- * `EscritorioPage`/`PainelFlutuante`), não rotas separadas pra navegar. As páginas que alimentam
- * esses painéis (`QuadrosPage`, `QuadroDetalhePage`, `RelatoriosPage`, `ProjetosPage`) continuam
- * existindo como componentes normais, só não têm mais rota própria aqui - `PainelKanban` usa um
- * `MemoryRouter` isolado só pra elas continuarem navegando entre si sem tocar a URL do navegador.
+ * projetos (que também é o board/kanban, ver `PainelProjetos`) e relatórios viraram painéis do
+ * dock dentro dela (ver `EscritorioPage`/`PainelFlutuante`), não rotas separadas pra navegar. As
+ * páginas que alimentam esses painéis (`ProjetosPage`, `ProjetoDetalhePage`, `RelatoriosPage`)
+ * continuam existindo como componentes normais, só não têm mais rota própria aqui - `PainelProjetos`
+ * mantém localmente "qual projeto está selecionado" só pra elas trocarem de visão sem tocar a URL
+ * do navegador.
  */
 function App() {
   return (

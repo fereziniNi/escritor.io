@@ -9,7 +9,7 @@ import { formatarMinutos, formatarSaldo } from '../ponto/formatarMinutos'
 /**
  * Seletor de pessoa é um id numérico digitado, não um dropdown de nomes de propósito (S5.8): não
  * existe ainda um `GET /usuarios` que um gestor possa chamar pra listar os membros dos próprios
- * quadros (só admin cadastra usuário, sem endpoint de listagem) - mesma disciplina de não construir
+ * projetos (só admin cadastra usuário, sem endpoint de listagem) - mesma disciplina de não construir
  * UI pra uma API que não existe (S4.4).
  */
 export function RelatoriosPage() {

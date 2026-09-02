@@ -32,12 +32,10 @@ public interface ApontamentoRepository extends JpaRepository<Apontamento, Long> 
             Usuario usuario, Instant inicio, Instant fim);
 
     /**
-     * Travessia `card.coluna.quadro.projeto` (S5.5) - agregação por projeto, diferente de S5.4
-     * (por card): soma todos os apontamentos fechados de todos os cards de todos os quadros
-     * vinculados ao projeto, não só de um usuário. `Quadro.projeto` é opcional, então esse é um
-     * `INNER JOIN` implícito do Spring Data - um card cujo quadro não tem projeto vinculado
-     * simplesmente não aparece, sem erro.
+     * Travessia `card.coluna.projeto` (S5.5) - agregação por projeto, diferente de S5.4 (por
+     * card): soma todos os apontamentos fechados de todos os cards de todas as colunas do
+     * projeto, não só de um usuário.
      */
-    List<Apontamento> findByCard_Coluna_Quadro_ProjetoAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(
+    List<Apontamento> findByCard_Coluna_ProjetoAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(
             Projeto projeto, Instant inicio, Instant fim);
 }

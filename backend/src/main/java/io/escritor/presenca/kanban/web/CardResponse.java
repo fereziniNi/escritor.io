@@ -21,7 +21,7 @@ public record CardResponse(
 
     /**
      * Usado por criar/mover (S3.6/S3.8), onde o card recém-criado/movido nunca tem etiquetas
-     * novas pra mostrar na hora - o frontend já invalida e busca o quadro de novo depois dessas
+     * novas pra mostrar na hora - o frontend já invalida e busca o projeto de novo depois dessas
      * mutações (S3.7/S3.9), o que traz a lista completa via {@link #de(Card, List)}.
      */
     public static CardResponse de(Card card) {

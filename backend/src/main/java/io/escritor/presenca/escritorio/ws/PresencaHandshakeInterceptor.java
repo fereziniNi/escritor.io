@@ -17,9 +17,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Autentica o handshake de {@code /ws/presenca} sozinho, mesmo motivo/mecanismo de {@code
- * QuadroHandshakeInterceptor} (kanban, S3.11): o WebSocket nativo do browser não permite setar o
+ * ProjetoHandshakeInterceptor} (kanban, S3.11): o WebSocket nativo do browser não permite setar o
  * header {@code Authorization}, então o access token viaja como query param (?token=). Diferente
- * do handshake de quadro, não há checagem de autorização por recurso aqui - qualquer usuário
+ * do handshake de projeto, não há checagem de autorização por recurso aqui - qualquer usuário
  * autenticado pode entrar no mapa (PRD: "usar o mapa" é ação de qualquer papel, não só
  * gestor/admin) - só 401 (sem token/token inválido), nunca 403.
  */

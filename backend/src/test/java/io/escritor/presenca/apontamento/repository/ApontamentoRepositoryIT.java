@@ -10,10 +10,8 @@ import io.escritor.presenca.identidade.repository.ProjetoRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.Coluna;
-import io.escritor.presenca.kanban.domain.Quadro;
 import io.escritor.presenca.kanban.repository.CardRepository;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
-import io.escritor.presenca.kanban.repository.QuadroRepository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -44,9 +42,6 @@ class ApontamentoRepositoryIT {
     private ProjetoRepository projetoRepository;
 
     @Autowired
-    private QuadroRepository quadroRepository;
-
-    @Autowired
     private ColunaRepository colunaRepository;
 
     @Autowired
@@ -59,8 +54,8 @@ class ApontamentoRepositoryIT {
     private ApontamentoRepository apontamentoRepository;
 
     private Card criarCard(Usuario usuario) {
-        Quadro quadro = quadroRepository.saveAndFlush(new Quadro("Backlog", null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(quadro, "A fazer", 0, null));
+        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
+        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
         return cardRepository.saveAndFlush(new Card(coluna, "Corrigir bug", null, 1024.0, null, null, null, usuario));
     }
 
@@ -176,10 +171,8 @@ class ApontamentoRepositoryIT {
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480));
         Projeto projetoA = projetoRepository.saveAndFlush(new Projeto("Projeto A", "Cliente", StatusProjeto.ATIVO, LocalDate.now(), null));
         Projeto projetoB = projetoRepository.saveAndFlush(new Projeto("Projeto B", "Cliente", StatusProjeto.ATIVO, LocalDate.now(), null));
-        Quadro quadroA = quadroRepository.saveAndFlush(new Quadro("Quadro A", projetoA));
-        Quadro quadroB = quadroRepository.saveAndFlush(new Quadro("Quadro B", projetoB));
-        Coluna colunaA = colunaRepository.saveAndFlush(new Coluna(quadroA, "A fazer", 0, null));
-        Coluna colunaB = colunaRepository.saveAndFlush(new Coluna(quadroB, "A fazer", 0, null));
+        Coluna colunaA = colunaRepository.saveAndFlush(new Coluna(projetoA, "A fazer", 0, null));
+        Coluna colunaB = colunaRepository.saveAndFlush(new Coluna(projetoB, "A fazer", 0, null));
         Card cardA = cardRepository.saveAndFlush(new Card(colunaA, "Card A", null, 1024.0, null, null, null, usuario));
         Card cardB = cardRepository.saveAndFlush(new Card(colunaB, "Card B", null, 1024.0, null, null, null, usuario));
         Apontamento doProjetoA = apontamentoRepository.saveAndFlush(new Apontamento(
@@ -187,7 +180,7 @@ class ApontamentoRepositoryIT {
         apontamentoRepository.saveAndFlush(new Apontamento(
                 usuario, cardB, Instant.parse("2026-01-15T09:00:00Z"), Instant.parse("2026-01-15T10:00:00Z"), null, OrigemApontamento.MANUAL));
 
-        var encontrados = apontamentoRepository.findByCard_Coluna_Quadro_ProjetoAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(
+        var encontrados = apontamentoRepository.findByCard_Coluna_ProjetoAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(
                 projetoA, Instant.parse("2026-01-01T00:00:00Z"), Instant.parse("2026-02-01T00:00:00Z"));
 
         assertThat(encontrados).extracting(Apontamento::getId).containsExactly(doProjetoA.getId());

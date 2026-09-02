@@ -14,10 +14,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { useAuthStore } from '../auth/authStore'
+import { adicionarMembroAoProjeto, buscarProjeto } from '../organizacao/api'
+import type { MembroProjeto, ProjetoDetalhe } from '../organizacao/types'
 import {
-  adicionarMembroAoQuadro,
   aplicarEtiqueta,
-  buscarQuadro,
   criarApontamentoManual,
   criarCard,
   criarComentario,
@@ -37,8 +37,8 @@ import { formatarDuracao } from './formatarDuracao'
 import { moverCardOtimista } from './moverCardOtimista'
 import { resolverMovimento } from './resolverMovimento'
 import { rotuloEvento } from './rotuloEvento'
-import type { Apontamento, Card, ColunaComCards, Etiqueta, MembroQuadro, QuadroDetalhe } from './types'
-import { useQuadroWebSocket } from './useQuadroWebSocket'
+import type { Apontamento, Card, ColunaComCards, Etiqueta } from './types'
+import { useProjetoWebSocket } from './useProjetoWebSocket'
 import './Kanban.css'
 
 function ComentariosDoCard({ cardId }: { cardId: number }) {
@@ -46,8 +46,8 @@ function ComentariosDoCard({ cardId }: { cardId: number }) {
   const [aberto, setAberto] = useState(false)
   const [texto, setTexto] = useState('')
 
-  // Só busca quando expandido - evitar um GET por card só de renderizar o quadro, mesmo espírito
-  // do N+1 já assumido em QuadroService.paraColunaComCards (S3.14).
+  // Só busca quando expandido - evitar um GET por card só de renderizar o projeto, mesmo espírito
+  // do N+1 já assumido em ProjetoService.paraColunaComCards (S3.14).
   const comentariosQuery = useQuery({
     queryKey: ['cards', cardId, 'comentarios'],
     queryFn: () => listarComentarios(cardId),
@@ -543,34 +543,34 @@ function ColunaComDrop({
 }
 
 /**
- * Pedido do cliente: sem Equipe - pessoas são atribuídas direto ao quadro ("sistema"). Adicionar
- * é por id de usuário (mesma disciplina de não montar dropdown pra uma API de listagem que não
- * existe, ver comentário em `RelatoriosPage`); a lista de membros já traz o nome de quem foi
- * adicionado.
+ * Pedido do cliente: sem Equipe/Quadro separado - pessoas são atribuídas direto ao projeto (o
+ * "sistema"). Adicionar é por id de usuário (mesma disciplina de não montar dropdown pra uma API
+ * de listagem que não existe, ver comentário em `RelatoriosPage`); a lista de membros já traz o
+ * nome de quem foi adicionado.
  */
-function MembrosDoQuadro({
-  quadroId,
+function MembrosDoProjeto({
+  projetoId,
   membros,
   podeGerenciar,
 }: {
-  quadroId: number
-  membros: MembroQuadro[]
+  projetoId: number
+  membros: MembroProjeto[]
   podeGerenciar: boolean
 }) {
   const queryClient = useQueryClient()
   const [usuarioId, setUsuarioId] = useState('')
 
   const adicionarMutation = useMutation({
-    mutationFn: () => adicionarMembroAoQuadro({ quadroId, usuarioId: Number(usuarioId) }),
+    mutationFn: () => adicionarMembroAoProjeto({ projetoId, usuarioId: Number(usuarioId) }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['quadros', quadroId] })
+      queryClient.invalidateQueries({ queryKey: ['projetos', projetoId] })
       setUsuarioId('')
     },
   })
 
   return (
     <section className="secao cartao kanban-membros">
-      <h2 className="secao-titulo">👥 Membros do quadro</h2>
+      <h2 className="secao-titulo">👥 Membros do projeto</h2>
       {membros.length === 0 && <p className="mensagem-vazia">Nenhum membro ainda.</p>}
       {membros.length > 0 && (
         <ul className="lista-cartoes">
@@ -610,14 +610,14 @@ function MembrosDoQuadro({
 }
 
 /**
- * `quadroIdProp` é opcional - só existe pro `PainelKanban` (dock do Escritório, "uma tela só")
- * poder passar o id direto, sem precisar de uma rota `/kanban/:id` de verdade. `useParams()`
+ * `projetoIdProp` é opcional - só existe pro `PainelProjetos` (dock do Escritório, "uma tela só")
+ * poder passar o id direto, sem precisar de uma rota `/projetos/:id` de verdade. `useParams()`
  * continua sendo chamado incondicionalmente (regra dos hooks), só o resultado é ignorado quando
- * `quadroIdProp` vem preenchido.
+ * `projetoIdProp` vem preenchido.
  */
-export function QuadroDetalhePage({ quadroIdProp }: { quadroIdProp?: number } = {}) {
+export function ProjetoDetalhePage({ projetoIdProp }: { projetoIdProp?: number } = {}) {
   const { id } = useParams()
-  const quadroId = quadroIdProp ?? Number(id)
+  const projetoId = projetoIdProp ?? Number(id)
   const queryClient = useQueryClient()
   const papel = useAuthStore((estado) => estado.papel)
   const podeCriarEtiqueta = papel === 'GESTOR' || papel === 'ADMIN'
@@ -632,24 +632,24 @@ export function QuadroDetalhePage({ quadroIdProp }: { quadroIdProp?: number } = 
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
-  const quadroQuery = useQuery({
-    queryKey: ['quadros', quadroId],
-    queryFn: () => buscarQuadro(quadroId),
+  const projetoQuery = useQuery({
+    queryKey: ['projetos', projetoId],
+    queryFn: () => buscarProjeto(projetoId),
   })
 
   const etiquetasQuery = useQuery({
-    queryKey: ['quadros', quadroId, 'etiquetas'],
-    queryFn: () => listarEtiquetas(quadroId),
+    queryKey: ['projetos', projetoId, 'etiquetas'],
+    queryFn: () => listarEtiquetas(projetoId),
   })
 
-  // S3.11: quando outro usuário arrasta um card neste quadro, o backend broadcasta pelo
-  // websocket e este hook invalida a query acima - o quadro atualiza sem reload manual.
-  useQuadroWebSocket(quadroId)
+  // S3.11: quando outro usuário arrasta um card neste projeto, o backend broadcasta pelo
+  // websocket e este hook invalida a query acima - o projeto atualiza sem reload manual.
+  useProjetoWebSocket(projetoId)
 
   const criarCardMutation = useMutation({
     mutationFn: criarCard,
     onSuccess: (_dados, variaveis) => {
-      queryClient.invalidateQueries({ queryKey: ['quadros', quadroId] })
+      queryClient.invalidateQueries({ queryKey: ['projetos', projetoId] })
       setTituloPorColuna((atual) => ({ ...atual, [variaveis.colunaId]: '' }))
     },
   })
@@ -657,7 +657,7 @@ export function QuadroDetalhePage({ quadroIdProp }: { quadroIdProp?: number } = 
   const criarEtiquetaMutation = useMutation({
     mutationFn: criarEtiqueta,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['quadros', quadroId, 'etiquetas'] })
+      queryClient.invalidateQueries({ queryKey: ['projetos', projetoId, 'etiquetas'] })
       setNomeEtiqueta('')
       setCorEtiqueta('')
     },
@@ -666,7 +666,7 @@ export function QuadroDetalhePage({ quadroIdProp }: { quadroIdProp?: number } = 
   const aplicarEtiquetaMutation = useMutation({
     mutationFn: aplicarEtiqueta,
     onSuccess: (_dados, variaveis) => {
-      queryClient.invalidateQueries({ queryKey: ['quadros', quadroId] })
+      queryClient.invalidateQueries({ queryKey: ['projetos', projetoId] })
       setEtiquetaSelecionadaPorCard((atual) => ({ ...atual, [variaveis.cardId]: '' }))
     },
   })
@@ -674,18 +674,18 @@ export function QuadroDetalhePage({ quadroIdProp }: { quadroIdProp?: number } = 
   const removerEtiquetaMutation = useMutation({
     mutationFn: removerEtiqueta,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['quadros', quadroId] })
+      queryClient.invalidateQueries({ queryKey: ['projetos', projetoId] })
     },
   })
 
   const moverCardMutation = useMutation({
     mutationFn: moverCard,
     onMutate: async (variaveis) => {
-      await queryClient.cancelQueries({ queryKey: ['quadros', quadroId] })
-      const anterior = queryClient.getQueryData<QuadroDetalhe>(['quadros', quadroId])
+      await queryClient.cancelQueries({ queryKey: ['projetos', projetoId] })
+      const anterior = queryClient.getQueryData<ProjetoDetalhe>(['projetos', projetoId])
       if (anterior) {
-        queryClient.setQueryData<QuadroDetalhe>(
-          ['quadros', quadroId],
+        queryClient.setQueryData<ProjetoDetalhe>(
+          ['projetos', projetoId],
           moverCardOtimista(anterior, variaveis.cardId, variaveis.colunaId, variaveis.indice),
         )
       }
@@ -693,18 +693,18 @@ export function QuadroDetalhePage({ quadroIdProp }: { quadroIdProp?: number } = 
     },
     onError: (_erro, _variaveis, contexto) => {
       if (contexto?.anterior) {
-        queryClient.setQueryData(['quadros', quadroId], contexto.anterior)
+        queryClient.setQueryData(['projetos', projetoId], contexto.anterior)
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['quadros', quadroId] })
+      queryClient.invalidateQueries({ queryKey: ['projetos', projetoId] })
     },
   })
 
   function handleDragEnd(evento: DragEndEvent) {
     const { active, over } = evento
     const dadosAtivo = active.data.current as { type: 'card'; cardId: number; colunaId: number } | undefined
-    if (!dadosAtivo || !quadroQuery.data) {
+    if (!dadosAtivo || !projetoQuery.data) {
       return
     }
 
@@ -713,7 +713,7 @@ export function QuadroDetalhePage({ quadroIdProp }: { quadroIdProp?: number } = 
       | { type: 'card'; colunaId: number; cardId: number }
       | undefined
 
-    const movimento = resolverMovimento(quadroQuery.data.colunas, dadosAtivo.cardId, dadosAlvo)
+    const movimento = resolverMovimento(projetoQuery.data.colunas, dadosAtivo.cardId, dadosAlvo)
     if (!movimento) {
       return
     }
@@ -721,34 +721,34 @@ export function QuadroDetalhePage({ quadroIdProp }: { quadroIdProp?: number } = 
     moverCardMutation.mutate({ cardId: dadosAtivo.cardId, colunaId: movimento.colunaId, indice: movimento.indice })
   }
 
-  if (quadroQuery.isPending) {
+  if (projetoQuery.isPending) {
     return <p className="mensagem-carregando">Carregando…</p>
   }
 
-  if (quadroQuery.isError) {
-    return <p className="mensagem-erro">Não foi possível carregar o quadro.</p>
+  if (projetoQuery.isError) {
+    return <p className="mensagem-erro">Não foi possível carregar o projeto.</p>
   }
 
-  const quadro = quadroQuery.data
+  const projeto = projetoQuery.data
   const etiquetasDisponiveis = etiquetasQuery.data ?? []
 
   return (
     <main className="pagina" style={{ maxWidth: 'none' }}>
-      <div className="kanban-quadro-cabecalho">
-        <span className="kanban-quadro-icone" aria-hidden="true">
+      <div className="kanban-projeto-cabecalho">
+        <span className="kanban-projeto-icone" aria-hidden="true">
           📋
         </span>
-        <h1>{quadro.nome}</h1>
+        <h1>{projeto.nome}</h1>
       </div>
 
-      <MembrosDoQuadro quadroId={quadroId} membros={quadro.membros} podeGerenciar={podeCriarEtiqueta} />
+      <MembrosDoProjeto projetoId={projetoId} membros={projeto.membros} podeGerenciar={podeCriarEtiqueta} />
 
       {podeCriarEtiqueta && (
         <form
           className="secao cartao kanban-etiqueta-form"
           onSubmit={(evento) => {
             evento.preventDefault()
-            criarEtiquetaMutation.mutate({ quadroId, nome: nomeEtiqueta, cor: corEtiqueta })
+            criarEtiquetaMutation.mutate({ projetoId, nome: nomeEtiqueta, cor: corEtiqueta })
           }}
         >
           <div className="campo">
@@ -770,7 +770,7 @@ export function QuadroDetalhePage({ quadroIdProp }: { quadroIdProp?: number } = 
         </form>
       )}
 
-      {quadro.colunas.length === 0 && <p className="mensagem-vazia">Nenhuma coluna neste quadro ainda.</p>}
+      {projeto.colunas.length === 0 && <p className="mensagem-vazia">Nenhuma coluna neste projeto ainda.</p>}
 
       {moverCardMutation.isError && <p className="mensagem-erro">Não foi possível mover o card.</p>}
       {aplicarEtiquetaMutation.isError && <p className="mensagem-erro">Não foi possível aplicar a etiqueta.</p>}
@@ -778,7 +778,7 @@ export function QuadroDetalhePage({ quadroIdProp }: { quadroIdProp?: number } = 
 
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
         <div className="kanban-board">
-        {quadro.colunas.map((coluna) => (
+        {projeto.colunas.map((coluna) => (
           <ColunaComDrop
             key={coluna.id}
             coluna={coluna}

@@ -10,10 +10,9 @@ import jakarta.persistence.Table;
 
 /**
  * Vínculo N:N entre {@link Card} e {@link Etiqueta} (PRD §3.3: `CardEtiqueta card_id,
- * etiqueta_id`) - mesmo formato de {@link MembroQuadro} do E0: entidade própria com id gerado,
- * não uma chave composta, e a unicidade (card_id, etiqueta_id) é garantida
- * em banco ({@code uk_card_etiqueta_card_etiqueta}, V16), provada em
- * {@code CardEtiquetaRepositoryIT}.
+ * etiqueta_id`) - mesmo formato de {@code MembroProjeto}: entidade própria com id gerado, não
+ * uma chave composta, e a unicidade (card_id, etiqueta_id) é garantida em banco
+ * ({@code uk_card_etiqueta_card_etiqueta}, V16), provada em {@code CardEtiquetaRepositoryIT}.
  */
 @Entity
 @Table(name = "card_etiqueta")

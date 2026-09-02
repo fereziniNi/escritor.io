@@ -13,8 +13,8 @@ import java.time.Instant;
 
 /**
  * PRD §3.3: `CardComentario id, card_id, autor_id, texto, criado_em`. Quem pode comentar (acesso
- * ao quadro do card) é checado no serviço ({@code CardComentarioService}), não aqui - esta
- * entidade não tem como saber quem está autenticado nem a regra de visibilidade do quadro.
+ * ao projeto do card) é checado no serviço ({@code CardComentarioService}), não aqui - esta
+ * entidade não tem como saber quem está autenticado nem a regra de visibilidade do projeto.
  */
 @Entity
 @Table(name = "card_comentario")

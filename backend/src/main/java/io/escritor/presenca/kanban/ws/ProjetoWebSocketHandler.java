@@ -15,47 +15,47 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 /**
- * PRD §5: "Spring WebSocket nativo com um handler por domínio (/ws/presenca, /ws/quadro/{id}).
- * STOMP só se quiser roteamento por tópico pronto - com 10 usuários, não é necessário." Handler
- * puro, sem broker: cada sessão fica registrada sob o {@code quadroId} resolvido no handshake
- * (ver {@link QuadroHandshakeInterceptor}) e {@link #broadcastCardMovido} manda a mesma mensagem
- * pra todas as sessões daquele quadro, incluindo a de quem disparou o `PATCH /cards/{id}/mover` -
- * o card movido não é reaplicado localmente no cliente que arrastou, então redundância aqui é
- * inofensiva (a UI já reflete o resultado otimista/revalidado da própria mutação).
+ * PRD §5: "Spring WebSocket nativo com um handler por domínio (/ws/presenca, /ws/projeto/{id})."
+ * Handler puro, sem broker: cada sessão fica registrada sob o {@code projetoId} resolvido no
+ * handshake (ver {@link ProjetoHandshakeInterceptor}) e {@link #broadcastCardMovido} manda a
+ * mesma mensagem pra todas as sessões daquele projeto, incluindo a de quem disparou o
+ * `PATCH /cards/{id}/mover` - o card movido não é reaplicado localmente no cliente que arrastou,
+ * então redundância aqui é inofensiva (a UI já reflete o resultado otimista/revalidado da
+ * própria mutação).
  */
 @Component
-public class QuadroWebSocketHandler extends TextWebSocketHandler {
+public class ProjetoWebSocketHandler extends TextWebSocketHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(QuadroWebSocketHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(ProjetoWebSocketHandler.class);
 
-    private final Map<Long, Set<WebSocketSession>> sessoesPorQuadro = new ConcurrentHashMap<>();
+    private final Map<Long, Set<WebSocketSession>> sessoesPorProjeto = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper;
 
-    public QuadroWebSocketHandler(ObjectMapper objectMapper) {
+    public ProjetoWebSocketHandler(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
-        Long quadroId = quadroId(session);
-        sessoesPorQuadro.computeIfAbsent(quadroId, id -> ConcurrentHashMap.newKeySet()).add(session);
+        Long projetoId = projetoId(session);
+        sessoesPorProjeto.computeIfAbsent(projetoId, id -> ConcurrentHashMap.newKeySet()).add(session);
     }
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        Set<WebSocketSession> sessoes = sessoesPorQuadro.get(quadroId(session));
+        Set<WebSocketSession> sessoes = sessoesPorProjeto.get(projetoId(session));
         if (sessoes != null) {
             sessoes.remove(session);
         }
     }
 
-    public void broadcastCardMovido(Long quadroId, CardResponse card) {
-        Set<WebSocketSession> sessoes = sessoesPorQuadro.get(quadroId);
+    public void broadcastCardMovido(Long projetoId, CardResponse card) {
+        Set<WebSocketSession> sessoes = sessoesPorProjeto.get(projetoId);
         if (sessoes == null || sessoes.isEmpty()) {
             return;
         }
 
-        String payload = objectMapper.writeValueAsString(new QuadroEventoWs("CARD_MOVIDO", card));
+        String payload = objectMapper.writeValueAsString(new ProjetoEventoWs("CARD_MOVIDO", card));
         TextMessage mensagem = new TextMessage(payload);
         for (WebSocketSession sessao : sessoes) {
             enviar(sessao, mensagem);
@@ -75,10 +75,10 @@ public class QuadroWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    private Long quadroId(WebSocketSession session) {
-        return (Long) session.getAttributes().get(QuadroHandshakeInterceptor.ATRIBUTO_QUADRO_ID);
+    private Long projetoId(WebSocketSession session) {
+        return (Long) session.getAttributes().get(ProjetoHandshakeInterceptor.ATRIBUTO_PROJETO_ID);
     }
 
-    private record QuadroEventoWs(String tipo, CardResponse card) {
+    private record ProjetoEventoWs(String tipo, CardResponse card) {
     }
 }

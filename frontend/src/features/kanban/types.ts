@@ -1,19 +1,6 @@
-export interface Quadro {
-  id: number
-  nome: string
-  projetoId: number | null
-  arquivado: boolean
-}
-
-/** Pedido do cliente: sem Equipe - pessoa é atribuída direto ao quadro ("sistema"). */
-export interface MembroQuadro {
-  usuarioId: number
-  usuarioNome: string
-}
-
 export interface Etiqueta {
   id: number
-  quadroId: number
+  projetoId: number
   nome: string
   cor: string
 }
@@ -85,13 +72,4 @@ export interface ColunaComCards {
   ordem: number
   limiteWip: number | null
   cards: Card[]
-}
-
-export interface QuadroDetalhe {
-  id: number
-  nome: string
-  projetoId: number | null
-  arquivado: boolean
-  colunas: ColunaComCards[]
-  membros: MembroQuadro[]
 }

@@ -1,15 +1,18 @@
 package io.escritor.presenca.kanban.domain;
 
 import io.escritor.presenca.identidade.domain.Papel;
+import io.escritor.presenca.identidade.domain.Projeto;
+import io.escritor.presenca.identidade.domain.StatusProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
+import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class CardEventoTest {
 
-    private final Quadro quadro = new Quadro("Backlog", null);
-    private final Coluna coluna = new Coluna(quadro, "A fazer", 0, null);
+    private final Projeto projeto = new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null);
+    private final Coluna coluna = new Coluna(projeto, "A fazer", 0, null);
     private final Usuario autor = new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480);
     private final Card card = new Card(coluna, "Corrigir bug", null, 1024.0, null, null, null, autor);
 

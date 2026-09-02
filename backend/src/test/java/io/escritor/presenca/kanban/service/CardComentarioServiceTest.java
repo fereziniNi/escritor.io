@@ -1,15 +1,18 @@
 package io.escritor.presenca.kanban.service;
 
 import io.escritor.presenca.identidade.domain.Papel;
+import io.escritor.presenca.identidade.domain.Projeto;
+import io.escritor.presenca.identidade.domain.StatusProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
+import io.escritor.presenca.identidade.service.ProjetoService;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.AcessoNegadoException;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.CardComentario;
 import io.escritor.presenca.kanban.domain.Coluna;
-import io.escritor.presenca.kanban.domain.Quadro;
 import io.escritor.presenca.kanban.repository.CardComentarioRepository;
 import io.escritor.presenca.kanban.repository.CardRepository;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,18 +40,18 @@ class CardComentarioServiceTest {
     private CardComentarioRepository cardComentarioRepository;
 
     @Mock
-    private QuadroService quadroService;
+    private ProjetoService projetoService;
 
     private CardComentarioService service;
 
-    private static Quadro quadroComId(Long id) {
-        Quadro quadro = new Quadro("Backlog", null);
-        ReflectionTestUtils.setField(quadro, "id", id);
-        return quadro;
+    private static Projeto projetoComId(Long id) {
+        Projeto projeto = new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null);
+        ReflectionTestUtils.setField(projeto, "id", id);
+        return projeto;
     }
 
-    private static Card cardComId(Long id, Quadro quadro, Usuario criadoPor) {
-        Coluna coluna = new Coluna(quadro, "A fazer", 0, null);
+    private static Card cardComId(Long id, Projeto projeto, Usuario criadoPor) {
+        Coluna coluna = new Coluna(projeto, "A fazer", 0, null);
         Card card = new Card(coluna, "Corrigir bug", null, 1024.0, null, null, null, criadoPor);
         ReflectionTestUtils.setField(card, "id", id);
         return card;
@@ -62,17 +65,17 @@ class CardComentarioServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new CardComentarioService(cardRepository, cardComentarioRepository, quadroService);
+        service = new CardComentarioService(cardRepository, cardComentarioRepository, projetoService);
     }
 
     @Test
-    void criaComentarioQuandoUsuarioTemAcessoAoQuadro() {
+    void criaComentarioQuandoUsuarioTemAcessoAoProjeto() {
         Usuario criadoPor = usuarioComId(1L);
-        Quadro quadro = quadroComId(10L);
-        Card card = cardComId(5L, quadro, criadoPor);
+        Projeto projeto = projetoComId(10L);
+        Card card = cardComId(5L, projeto, criadoPor);
         Usuario autor = usuarioComId(2L);
         when(cardRepository.findById(5L)).thenReturn(Optional.of(card));
-        when(quadroService.usuarioPodeVer(10L, autor)).thenReturn(true);
+        when(projetoService.usuarioPodeVer(10L, autor)).thenReturn(true);
         when(cardComentarioRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
 
         var resposta = service.criar(5L, "Já revisei", autor);
@@ -83,13 +86,13 @@ class CardComentarioServiceTest {
     }
 
     @Test
-    void criarSemAcessoAoQuadroLancaAcessoNegado() {
+    void criarSemAcessoAoProjetoLancaAcessoNegado() {
         Usuario criadoPor = usuarioComId(1L);
-        Quadro quadro = quadroComId(10L);
-        Card card = cardComId(5L, quadro, criadoPor);
+        Projeto projeto = projetoComId(10L);
+        Card card = cardComId(5L, projeto, criadoPor);
         Usuario semAcesso = usuarioComId(3L);
         when(cardRepository.findById(5L)).thenReturn(Optional.of(card));
-        when(quadroService.usuarioPodeVer(10L, semAcesso)).thenReturn(false);
+        when(projetoService.usuarioPodeVer(10L, semAcesso)).thenReturn(false);
 
         assertThatThrownBy(() -> service.criar(5L, "Já revisei", semAcesso)).isInstanceOf(AcessoNegadoException.class);
 
@@ -107,13 +110,13 @@ class CardComentarioServiceTest {
     @Test
     void listaComentariosEmOrdemCronologicaQuandoUsuarioTemAcesso() {
         Usuario criadoPor = usuarioComId(1L);
-        Quadro quadro = quadroComId(10L);
-        Card card = cardComId(5L, quadro, criadoPor);
+        Projeto projeto = projetoComId(10L);
+        Card card = cardComId(5L, projeto, criadoPor);
         Usuario usuario = usuarioComId(2L);
         CardComentario primeiro = new CardComentario(card, "Primeiro", criadoPor);
         CardComentario segundo = new CardComentario(card, "Segundo", criadoPor);
         when(cardRepository.findById(5L)).thenReturn(Optional.of(card));
-        when(quadroService.usuarioPodeVer(10L, usuario)).thenReturn(true);
+        when(projetoService.usuarioPodeVer(10L, usuario)).thenReturn(true);
         when(cardComentarioRepository.findByCardOrderByCriadoEmAsc(card)).thenReturn(List.of(primeiro, segundo));
 
         var resposta = service.listar(5L, usuario);
@@ -124,13 +127,13 @@ class CardComentarioServiceTest {
     }
 
     @Test
-    void listarSemAcessoAoQuadroLancaAcessoNegado() {
+    void listarSemAcessoAoProjetoLancaAcessoNegado() {
         Usuario criadoPor = usuarioComId(1L);
-        Quadro quadro = quadroComId(10L);
-        Card card = cardComId(5L, quadro, criadoPor);
+        Projeto projeto = projetoComId(10L);
+        Card card = cardComId(5L, projeto, criadoPor);
         Usuario semAcesso = usuarioComId(3L);
         when(cardRepository.findById(5L)).thenReturn(Optional.of(card));
-        when(quadroService.usuarioPodeVer(10L, semAcesso)).thenReturn(false);
+        when(projetoService.usuarioPodeVer(10L, semAcesso)).thenReturn(false);
 
         assertThatThrownBy(() -> service.listar(5L, semAcesso)).isInstanceOf(AcessoNegadoException.class);
 

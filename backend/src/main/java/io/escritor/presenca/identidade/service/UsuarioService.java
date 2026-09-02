@@ -30,7 +30,7 @@ public class UsuarioService {
     }
 
     /** Tela de admin "gerenciar colaboradores" (pedido do usuário) - lista todo mundo, sem
-     * paginação (mesmo padrão simples de {@code QuadroService.listarVisiveis}, volume esperado é baixo). */
+     * paginação (mesmo padrão simples de {@code ProjetoService.listarVisiveis}, volume esperado é baixo). */
     public List<UsuarioResponse> listar() {
         return usuarioRepository.findAll().stream().map(UsuarioResponse::de).toList();
     }

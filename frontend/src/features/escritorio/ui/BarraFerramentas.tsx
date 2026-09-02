@@ -2,7 +2,7 @@ import { ControlesAudioVideo } from './ControlesAudioVideo'
 import { MenuUsuario } from './MenuUsuario'
 import type { StatusAvatar } from '../types'
 
-export type PainelId = 'ponto' | 'kanban' | 'relatorios' | 'projetos' | 'colaboradores'
+export type PainelId = 'ponto' | 'relatorios' | 'projetos' | 'colaboradores'
 
 /**
  * Toolbar inferior - substitui o `.escritorio-dock` antigo (botões com texto+emoji lado a lado)
@@ -57,12 +57,12 @@ export function BarraFerramentas({
         </button>
         <button
           type="button"
-          className={`escritorio-toolbar-botao${painelAberto === 'kanban' ? ' escritorio-toolbar-botao--ativo' : ''}`}
-          aria-label="Quadros"
-          title="Quadros"
-          onClick={() => aoAbrirPainel('kanban')}
+          className={`escritorio-toolbar-botao${painelAberto === 'projetos' ? ' escritorio-toolbar-botao--ativo' : ''}`}
+          aria-label="Projetos"
+          title="Projetos"
+          onClick={() => aoAbrirPainel('projetos')}
         >
-          📋
+          📁
         </button>
         {(papel === 'GESTOR' || papel === 'ADMIN') && (
           <button
@@ -76,26 +76,15 @@ export function BarraFerramentas({
           </button>
         )}
         {papel === 'ADMIN' && (
-          <>
-            <button
-              type="button"
-              className={`escritorio-toolbar-botao${painelAberto === 'projetos' ? ' escritorio-toolbar-botao--ativo' : ''}`}
-              aria-label="Projetos"
-              title="Projetos"
-              onClick={() => aoAbrirPainel('projetos')}
-            >
-              📁
-            </button>
-            <button
-              type="button"
-              className={`escritorio-toolbar-botao${painelAberto === 'colaboradores' ? ' escritorio-toolbar-botao--ativo' : ''}`}
-              aria-label="Colaboradores"
-              title="Colaboradores"
-              onClick={() => aoAbrirPainel('colaboradores')}
-            >
-              🧑‍💼
-            </button>
-          </>
+          <button
+            type="button"
+            className={`escritorio-toolbar-botao${painelAberto === 'colaboradores' ? ' escritorio-toolbar-botao--ativo' : ''}`}
+            aria-label="Colaboradores"
+            title="Colaboradores"
+            onClick={() => aoAbrirPainel('colaboradores')}
+          >
+            🧑‍💼
+          </button>
         )}
       </div>
 

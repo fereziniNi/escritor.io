@@ -30,7 +30,7 @@ public class SecurityConfig {
                         // o status original por 401 antes do corpo do erro ser escrito.
                         // /ws/** também é público aqui de propósito: o WebSocket nativo do browser não
                         // permite setar o header Authorization no handshake, então a autenticação desse
-                        // path é feita à parte, via query param, por QuadroHandshakeInterceptor - não por
+                        // path é feita à parte, via query param, por ProjetoHandshakeInterceptor - não por
                         // este filtro. Deixar authenticated() aqui derrubaria todo handshake com 401 antes
                         // do interceptor sequer rodar.
                         .requestMatchers("/health", "/auth/**", "/error", "/ws/**").permitAll()

@@ -28,7 +28,7 @@ import org.springframework.stereotype.Service;
 /**
  * Iniciar timer é aberto a qualquer usuário autenticado em qualquer card, mesma simplificação
  * conhecida já usada pra criar card/aplicar etiqueta (S3.6/S3.13) - ainda não verifica acesso ao
- * quadro dono do card.
+ * projeto dono do card.
  */
 @Service
 public class ApontamentoService {
@@ -236,13 +236,10 @@ public class ApontamentoService {
     /**
      * "Onde o esforço foi" por projeto (S5.5) - a agregação que S4.10 deixou de fora de propósito.
      * Diferente de {@link #listarTotalPorCard}, não é sobre um usuário: soma todos os apontamentos
-     * fechados de todos os cards de todos os quadros vinculados ao projeto, de qualquer pessoa que
-     * apontou tempo neles - por isso o endpoint é restrito a gestor/admin no controller
-     * (`@PreAuthorize`), não checado aqui via {@link VisibilidadeUsuarioService} (que é sobre "ver
-     * dados de outro usuário", um eixo diferente de "ver dados de um projeto"). Pedido do cliente:
-     * sem Equipe - só "por projeto" agora, `equipeId` saiu (era a outra metade de um XOR que
-     * existia aqui). `Quadro.projeto` é opcional - um card cujo quadro não tem projeto vinculado
-     * simplesmente não entra na soma, via `INNER JOIN` implícito do Spring Data.
+     * fechados de todos os cards de todas as colunas do projeto, de qualquer pessoa que apontou
+     * tempo neles - por isso o endpoint é restrito a gestor/admin no controller (`@PreAuthorize`),
+     * não checado aqui via {@link VisibilidadeUsuarioService} (que é sobre "ver dados de outro
+     * usuário", um eixo diferente de "ver dados de um projeto").
      */
     public TotalApontadoResponse totalApontadoPorProjeto(Long projetoId, Instant inicio, Instant fim) {
         if (projetoId == null) {
@@ -253,7 +250,7 @@ public class ApontamentoService {
                 .findById(projetoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Projeto não encontrado: " + projetoId));
         List<Apontamento> apontamentos = apontamentoRepository
-                .findByCard_Coluna_Quadro_ProjetoAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(projeto, inicio, fim);
+                .findByCard_Coluna_ProjetoAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(projeto, inicio, fim);
 
         long totalMinutos = apontamentos.stream().mapToLong(Apontamento::getMinutos).sum();
         return new TotalApontadoResponse(totalMinutos);

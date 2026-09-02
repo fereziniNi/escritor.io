@@ -1,6 +1,7 @@
 package io.escritor.presenca.kanban.service;
 
 import io.escritor.presenca.identidade.domain.Usuario;
+import io.escritor.presenca.identidade.service.ProjetoService;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.AcessoNegadoException;
 import io.escritor.presenca.kanban.domain.Card;
@@ -13,7 +14,7 @@ import org.springframework.stereotype.Service;
 /**
  * Só lê - quem escreve {@link io.escritor.presenca.kanban.domain.CardEvento} é
  * {@link CardService}, no mesmo método que executa a ação que o evento registra (S3.17). Ler o
- * histórico exige acesso ao quadro do card, mesma regra e mesmo 403 de
+ * histórico exige acesso ao projeto do card, mesma regra e mesmo 403 de
  * {@link CardComentarioService} (S3.15).
  */
 @Service
@@ -21,20 +22,20 @@ public class CardEventoService {
 
     private final CardRepository cardRepository;
     private final CardEventoRepository cardEventoRepository;
-    private final QuadroService quadroService;
+    private final ProjetoService projetoService;
 
-    public CardEventoService(CardRepository cardRepository, CardEventoRepository cardEventoRepository, QuadroService quadroService) {
+    public CardEventoService(CardRepository cardRepository, CardEventoRepository cardEventoRepository, ProjetoService projetoService) {
         this.cardRepository = cardRepository;
         this.cardEventoRepository = cardEventoRepository;
-        this.quadroService = quadroService;
+        this.projetoService = projetoService;
     }
 
     public List<CardEventoResponse> listar(Long cardId, Usuario usuario) {
         Card card = cardRepository.findById(cardId).orElseThrow(() -> new RecursoNaoEncontradoException("Card não encontrado: " + cardId));
 
-        Long quadroId = card.getColuna().getQuadro().getId();
-        if (!quadroService.usuarioPodeVer(quadroId, usuario)) {
-            throw new AcessoNegadoException("Usuário não tem acesso ao quadro deste card");
+        Long projetoId = card.getColuna().getProjeto().getId();
+        if (!projetoService.usuarioPodeVer(projetoId, usuario)) {
+            throw new AcessoNegadoException("Usuário não tem acesso ao projeto deste card");
         }
 
         return cardEventoRepository.findByCardOrderByCriadoEmAsc(card).stream().map(CardEventoResponse::de).toList();

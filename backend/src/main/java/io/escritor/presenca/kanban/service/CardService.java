@@ -13,7 +13,7 @@ import io.escritor.presenca.kanban.repository.CardEventoRepository;
 import io.escritor.presenca.kanban.repository.CardRepository;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
 import io.escritor.presenca.kanban.web.CardResponse;
-import io.escritor.presenca.kanban.ws.QuadroWebSocketHandler;
+import io.escritor.presenca.kanban.ws.ProjetoWebSocketHandler;
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -24,19 +24,19 @@ public class CardService {
     private final CardRepository cardRepository;
     private final ColunaRepository colunaRepository;
     private final UsuarioRepository usuarioRepository;
-    private final QuadroWebSocketHandler quadroWebSocketHandler;
+    private final ProjetoWebSocketHandler projetoWebSocketHandler;
     private final CardEventoRepository cardEventoRepository;
 
     public CardService(
             CardRepository cardRepository,
             ColunaRepository colunaRepository,
             UsuarioRepository usuarioRepository,
-            QuadroWebSocketHandler quadroWebSocketHandler,
+            ProjetoWebSocketHandler projetoWebSocketHandler,
             CardEventoRepository cardEventoRepository) {
         this.cardRepository = cardRepository;
         this.colunaRepository = colunaRepository;
         this.usuarioRepository = usuarioRepository;
-        this.quadroWebSocketHandler = quadroWebSocketHandler;
+        this.projetoWebSocketHandler = projetoWebSocketHandler;
         this.cardEventoRepository = cardEventoRepository;
     }
 
@@ -109,7 +109,7 @@ public class CardService {
                     new CardEvento(salvo, autor, TipoEventoCard.MUDANCA_COLUNA, colunaAnterior.getNome(), novaColuna.getNome()));
         }
 
-        quadroWebSocketHandler.broadcastCardMovido(novaColuna.getQuadro().getId(), response);
+        projetoWebSocketHandler.broadcastCardMovido(novaColuna.getProjeto().getId(), response);
 
         return response;
     }

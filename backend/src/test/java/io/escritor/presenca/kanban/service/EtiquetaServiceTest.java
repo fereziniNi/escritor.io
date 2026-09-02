@@ -1,18 +1,20 @@
 package io.escritor.presenca.kanban.service;
 
 import io.escritor.presenca.identidade.domain.Papel;
+import io.escritor.presenca.identidade.domain.Projeto;
+import io.escritor.presenca.identidade.domain.StatusProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
+import io.escritor.presenca.identidade.repository.ProjetoRepository;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.CardEtiqueta;
 import io.escritor.presenca.kanban.domain.Coluna;
 import io.escritor.presenca.kanban.domain.Etiqueta;
-import io.escritor.presenca.kanban.domain.EtiquetaDeOutroQuadroException;
-import io.escritor.presenca.kanban.domain.Quadro;
+import io.escritor.presenca.kanban.domain.EtiquetaDeOutroProjetoException;
 import io.escritor.presenca.kanban.repository.CardEtiquetaRepository;
 import io.escritor.presenca.kanban.repository.CardRepository;
 import io.escritor.presenca.kanban.repository.EtiquetaRepository;
-import io.escritor.presenca.kanban.repository.QuadroRepository;
+import java.time.LocalDate;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,7 +37,7 @@ class EtiquetaServiceTest {
     private EtiquetaRepository etiquetaRepository;
 
     @Mock
-    private QuadroRepository quadroRepository;
+    private ProjetoRepository projetoRepository;
 
     @Mock
     private CardRepository cardRepository;
@@ -45,20 +47,20 @@ class EtiquetaServiceTest {
 
     private EtiquetaService service;
 
-    private static Quadro quadroComId(Long id) {
-        Quadro quadro = new Quadro("Backlog", null);
-        ReflectionTestUtils.setField(quadro, "id", id);
-        return quadro;
+    private static Projeto projetoComId(Long id) {
+        Projeto projeto = new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null);
+        ReflectionTestUtils.setField(projeto, "id", id);
+        return projeto;
     }
 
-    private static Coluna colunaComId(Long id, Quadro quadro) {
-        Coluna coluna = new Coluna(quadro, "A fazer", 0, null);
+    private static Coluna colunaComId(Long id, Projeto projeto) {
+        Coluna coluna = new Coluna(projeto, "A fazer", 0, null);
         ReflectionTestUtils.setField(coluna, "id", id);
         return coluna;
     }
 
-    private static Etiqueta etiquetaComId(Long id, Quadro quadro) {
-        Etiqueta etiqueta = new Etiqueta(quadro, "Urgente", "#FF0000");
+    private static Etiqueta etiquetaComId(Long id, Projeto projeto) {
+        Etiqueta etiqueta = new Etiqueta(projeto, "Urgente", "#FF0000");
         ReflectionTestUtils.setField(etiqueta, "id", id);
         return etiqueta;
     }
@@ -72,35 +74,35 @@ class EtiquetaServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new EtiquetaService(etiquetaRepository, quadroRepository, cardRepository, cardEtiquetaRepository);
+        service = new EtiquetaService(etiquetaRepository, projetoRepository, cardRepository, cardEtiquetaRepository);
     }
 
     @Test
-    void criaEtiquetaNoQuadro() {
-        Quadro quadro = quadroComId(1L);
-        when(quadroRepository.findById(1L)).thenReturn(Optional.of(quadro));
+    void criaEtiquetaNoProjeto() {
+        Projeto projeto = projetoComId(1L);
+        when(projetoRepository.findById(1L)).thenReturn(Optional.of(projeto));
         when(etiquetaRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
 
         var resposta = service.criar(1L, "Urgente", "#FF0000");
 
         assertThat(resposta.nome()).isEqualTo("Urgente");
         assertThat(resposta.cor()).isEqualTo("#FF0000");
-        assertThat(resposta.quadroId()).isEqualTo(1L);
+        assertThat(resposta.projetoId()).isEqualTo(1L);
     }
 
     @Test
-    void criarEmQuadroInexistenteLancaRecursoNaoEncontrado() {
-        when(quadroRepository.findById(99L)).thenReturn(Optional.empty());
+    void criarEmProjetoInexistenteLancaRecursoNaoEncontrado() {
+        when(projetoRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.criar(99L, "Urgente", "#FF0000")).isInstanceOf(RecursoNaoEncontradoException.class);
     }
 
     @Test
-    void listaEtiquetasDoQuadro() {
-        Quadro quadro = quadroComId(1L);
-        when(quadroRepository.findById(1L)).thenReturn(Optional.of(quadro));
-        when(etiquetaRepository.findByQuadroOrderByNomeAsc(quadro))
-                .thenReturn(java.util.List.of(etiquetaComId(2L, quadro)));
+    void listaEtiquetasDoProjeto() {
+        Projeto projeto = projetoComId(1L);
+        when(projetoRepository.findById(1L)).thenReturn(Optional.of(projeto));
+        when(etiquetaRepository.findByProjetoOrderByNomeAsc(projeto))
+                .thenReturn(java.util.List.of(etiquetaComId(2L, projeto)));
 
         var resposta = service.listar(1L);
 
@@ -109,18 +111,18 @@ class EtiquetaServiceTest {
     }
 
     @Test
-    void listarDeQuadroInexistenteLancaRecursoNaoEncontrado() {
-        when(quadroRepository.findById(99L)).thenReturn(Optional.empty());
+    void listarDeProjetoInexistenteLancaRecursoNaoEncontrado() {
+        when(projetoRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.listar(99L)).isInstanceOf(RecursoNaoEncontradoException.class);
     }
 
     @Test
-    void aplicaEtiquetaDoMesmoQuadroAoCard() {
-        Quadro quadro = quadroComId(1L);
-        Coluna coluna = colunaComId(5L, quadro);
+    void aplicaEtiquetaDoMesmoProjetoAoCard() {
+        Projeto projeto = projetoComId(1L);
+        Coluna coluna = colunaComId(5L, projeto);
         Card card = cardComId(10L, coluna);
-        Etiqueta etiqueta = etiquetaComId(2L, quadro);
+        Etiqueta etiqueta = etiquetaComId(2L, projeto);
         when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
         when(etiquetaRepository.findById(2L)).thenReturn(Optional.of(etiqueta));
         when(cardEtiquetaRepository.existsByCardAndEtiqueta(card, etiqueta)).thenReturn(false);
@@ -133,10 +135,10 @@ class EtiquetaServiceTest {
 
     @Test
     void aplicarEtiquetaJaAplicadaEIdempotente() {
-        Quadro quadro = quadroComId(1L);
-        Coluna coluna = colunaComId(5L, quadro);
+        Projeto projeto = projetoComId(1L);
+        Coluna coluna = colunaComId(5L, projeto);
         Card card = cardComId(10L, coluna);
-        Etiqueta etiqueta = etiquetaComId(2L, quadro);
+        Etiqueta etiqueta = etiquetaComId(2L, projeto);
         when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
         when(etiquetaRepository.findById(2L)).thenReturn(Optional.of(etiqueta));
         when(cardEtiquetaRepository.existsByCardAndEtiqueta(card, etiqueta)).thenReturn(true);
@@ -147,16 +149,16 @@ class EtiquetaServiceTest {
     }
 
     @Test
-    void aplicarEtiquetaDeOutroQuadroLancaExcecao() {
-        Quadro quadroDoCard = quadroComId(1L);
-        Quadro quadroDaEtiqueta = quadroComId(2L);
-        Coluna coluna = colunaComId(5L, quadroDoCard);
+    void aplicarEtiquetaDeOutroProjetoLancaExcecao() {
+        Projeto projetoDoCard = projetoComId(1L);
+        Projeto projetoDaEtiqueta = projetoComId(2L);
+        Coluna coluna = colunaComId(5L, projetoDoCard);
         Card card = cardComId(10L, coluna);
-        Etiqueta etiqueta = etiquetaComId(3L, quadroDaEtiqueta);
+        Etiqueta etiqueta = etiquetaComId(3L, projetoDaEtiqueta);
         when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
         when(etiquetaRepository.findById(3L)).thenReturn(Optional.of(etiqueta));
 
-        assertThatThrownBy(() -> service.aplicar(10L, 3L)).isInstanceOf(EtiquetaDeOutroQuadroException.class);
+        assertThatThrownBy(() -> service.aplicar(10L, 3L)).isInstanceOf(EtiquetaDeOutroProjetoException.class);
 
         verify(cardEtiquetaRepository, never()).save(any());
     }
@@ -170,8 +172,8 @@ class EtiquetaServiceTest {
 
     @Test
     void aplicarEtiquetaInexistenteLancaRecursoNaoEncontrado() {
-        Quadro quadro = quadroComId(1L);
-        Coluna coluna = colunaComId(5L, quadro);
+        Projeto projeto = projetoComId(1L);
+        Coluna coluna = colunaComId(5L, projeto);
         Card card = cardComId(10L, coluna);
         when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
         when(etiquetaRepository.findById(999L)).thenReturn(Optional.empty());
@@ -181,10 +183,10 @@ class EtiquetaServiceTest {
 
     @Test
     void removeEtiquetaDoCard() {
-        Quadro quadro = quadroComId(1L);
-        Coluna coluna = colunaComId(5L, quadro);
+        Projeto projeto = projetoComId(1L);
+        Coluna coluna = colunaComId(5L, projeto);
         Card card = cardComId(10L, coluna);
-        Etiqueta etiqueta = etiquetaComId(2L, quadro);
+        Etiqueta etiqueta = etiquetaComId(2L, projeto);
         when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
         when(etiquetaRepository.findById(2L)).thenReturn(Optional.of(etiqueta));
 

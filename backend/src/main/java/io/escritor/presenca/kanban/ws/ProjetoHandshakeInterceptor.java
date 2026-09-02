@@ -2,7 +2,7 @@ package io.escritor.presenca.kanban.ws;
 
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
-import io.escritor.presenca.kanban.service.QuadroService;
+import io.escritor.presenca.identidade.service.ProjetoService;
 import io.escritor.presenca.seguranca.JwtService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
@@ -19,30 +19,30 @@ import org.springframework.web.socket.server.HandshakeInterceptor;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Autentica e autoriza o handshake de {@code /ws/quadro/{id}} sozinho, sem passar pelo
+ * Autentica e autoriza o handshake de {@code /ws/projeto/{id}} sozinho, sem passar pelo
  * {@code JwtAuthenticationFilter} do Spring Security (por isso o path é liberado em
  * {@code SecurityConfig}): o WebSocket nativo do browser não permite setar o header
  * `Authorization`, então o access token viaja como query param (`?token=`) - único lugar do app
  * onde isso acontece, e só pro handshake em si (mensagens depois disso não carregam token de
  * novo). Rejeita com 401 (sem token/token inválido) ou 403 (token válido, mas
- * {@link QuadroService#usuarioPodeVer} nega) antes mesmo do upgrade pra WebSocket acontecer -
- * mesma regra de visibilidade de {@code GET /quadros/{id}} (S3.2/S3.7), não uma nova.
+ * {@link ProjetoService#usuarioPodeVer} nega) antes mesmo do upgrade pra WebSocket acontecer -
+ * mesma regra de visibilidade de {@code GET /projetos/{id}}, não uma nova.
  */
 @Component
-public class QuadroHandshakeInterceptor implements HandshakeInterceptor {
+public class ProjetoHandshakeInterceptor implements HandshakeInterceptor {
 
-    static final String ATRIBUTO_QUADRO_ID = "quadroId";
+    static final String ATRIBUTO_PROJETO_ID = "projetoId";
 
-    private static final Pattern PADRAO_PATH = Pattern.compile("/ws/quadro/(\\d+)$");
+    private static final Pattern PADRAO_PATH = Pattern.compile("/ws/projeto/(\\d+)$");
 
     private final JwtService jwtService;
     private final UsuarioRepository usuarioRepository;
-    private final QuadroService quadroService;
+    private final ProjetoService projetoService;
 
-    public QuadroHandshakeInterceptor(JwtService jwtService, UsuarioRepository usuarioRepository, QuadroService quadroService) {
+    public ProjetoHandshakeInterceptor(JwtService jwtService, UsuarioRepository usuarioRepository, ProjetoService projetoService) {
         this.jwtService = jwtService;
         this.usuarioRepository = usuarioRepository;
-        this.quadroService = quadroService;
+        this.projetoService = projetoService;
     }
 
     @Override
@@ -53,19 +53,19 @@ public class QuadroHandshakeInterceptor implements HandshakeInterceptor {
             response.setStatusCode(HttpStatus.NOT_FOUND);
             return false;
         }
-        Long quadroId = Long.valueOf(matcher.group(1));
+        Long projetoId = Long.valueOf(matcher.group(1));
 
         Optional<Usuario> usuario = autenticar(request);
         if (usuario.isEmpty()) {
             response.setStatusCode(HttpStatus.UNAUTHORIZED);
             return false;
         }
-        if (!quadroService.usuarioPodeVer(quadroId, usuario.get())) {
+        if (!projetoService.usuarioPodeVer(projetoId, usuario.get())) {
             response.setStatusCode(HttpStatus.FORBIDDEN);
             return false;
         }
 
-        attributes.put(ATRIBUTO_QUADRO_ID, quadroId);
+        attributes.put(ATRIBUTO_PROJETO_ID, projetoId);
         return true;
     }
 

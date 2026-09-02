@@ -1,11 +1,13 @@
 package io.escritor.presenca.apontamento.domain;
 
 import io.escritor.presenca.identidade.domain.Papel;
+import io.escritor.presenca.identidade.domain.Projeto;
+import io.escritor.presenca.identidade.domain.StatusProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.Coluna;
-import io.escritor.presenca.kanban.domain.Quadro;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.Test;
 
@@ -14,8 +16,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ApontamentoTest {
 
-    private final Quadro quadro = new Quadro("Backlog", null);
-    private final Coluna coluna = new Coluna(quadro, "A fazer", 0, null);
+    private final Projeto projeto = new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null);
+    private final Coluna coluna = new Coluna(projeto, "A fazer", 0, null);
     private final Usuario usuario = new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480);
     private final Card card = new Card(coluna, "Corrigir bug", null, 1024.0, null, null, null, usuario);
     private final Instant inicio = Instant.parse("2026-01-15T09:00:00Z");

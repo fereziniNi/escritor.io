@@ -13,9 +13,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Criar card é aberto a qualquer usuário autenticado (PRD: "Como usuário, quero criar cards...",
- * sem restrição de papel) - diferente de criar quadro/coluna, que é só GESTOR/ADMIN. Ainda não
- * verifica se o usuário tem acesso ao quadro dono desta coluna (mesma regra de
- * RegraVisibilidadeQuadro) - fica como simplificação conhecida até uma fatia futura de
+ * sem restrição de papel) - diferente de criar projeto/coluna, que é só GESTOR/ADMIN. Ainda não
+ * verifica se o usuário tem acesso ao projeto dono desta coluna (mesma regra de
+ * RegraVisibilidadeProjeto) - fica como simplificação conhecida até uma fatia futura de
  * autorização por card.
  */
 @RestController

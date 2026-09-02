@@ -1,6 +1,6 @@
 import { apiFetch } from '../../shared/api/http'
 import type { Papel } from '../auth/types'
-import type { Colaborador, Projeto, StatusProjeto } from './types'
+import type { Colaborador, Projeto, ProjetoDetalhe, StatusProjeto } from './types'
 
 export async function listarProjetos(): Promise<Projeto[]> {
   const response = await apiFetch('/projetos')
@@ -25,6 +25,27 @@ export async function criarProjeto(
     throw new Error('Não foi possível criar o projeto')
   }
   return response.json()
+}
+
+export async function buscarProjeto(id: number): Promise<ProjetoDetalhe> {
+  const response = await apiFetch(`/projetos/${id}`)
+  if (!response.ok) {
+    throw new Error('Não foi possível carregar o projeto')
+  }
+  return response.json()
+}
+
+/** Pedido do cliente: atribuição individual de pessoa ao projeto (o "sistema"), sem Equipe/Quadro
+ * no meio. */
+export async function adicionarMembroAoProjeto(dados: { projetoId: number; usuarioId: number }): Promise<void> {
+  const response = await apiFetch(`/projetos/${dados.projetoId}/membros`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ usuarioId: dados.usuarioId }),
+  })
+  if (!response.ok) {
+    throw new Error('Não foi possível adicionar o membro ao projeto')
+  }
 }
 
 export async function listarColaboradores(): Promise<Colaborador[]> {
