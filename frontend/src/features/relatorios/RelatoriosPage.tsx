@@ -1,39 +1,48 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
+import { CampoPessoa } from '../../shared/CampoPessoa'
+import { encontrarPessoaPorNome } from '../../shared/encontrarPessoaPorNome'
 import { formatarDataBr } from '../../shared/formatarData'
 import { buscarTotalApontadoPorProjeto } from '../kanban/api'
-import { listarProjetos } from '../organizacao/api'
+import { listarPessoas, listarProjetos } from '../organizacao/api'
 import { buscarDiasInconsistentes, buscarEspelhoDoMes } from '../ponto/api'
 import { formatarMinutos, formatarSaldo } from '../ponto/formatarMinutos'
 
 /**
- * Seletor de pessoa é um id numérico digitado, não um dropdown de nomes de propósito (S5.8): não
- * existe ainda um `GET /usuarios` que um gestor possa chamar pra listar os membros dos próprios
- * projetos (só admin cadastra usuário, sem endpoint de listagem) - mesma disciplina de não construir
- * UI pra uma API que não existe (S4.4).
+ * Pedido do cliente: pessoa referenciada por nome, não por id, em qualquer lugar do sistema - o
+ * campo digita o nome e sugere as pessoas cadastradas (`CampoPessoa`); em branco continua
+ * significando "eu mesmo" (comportamento anterior preservado).
  */
 export function RelatoriosPage() {
-  const [usuarioIdTexto, setUsuarioIdTexto] = useState('')
+  const [nomeUsuario, setNomeUsuario] = useState('')
   const [inicio, setInicio] = useState('')
   const [fim, setFim] = useState('')
   const [projetoId, setProjetoId] = useState('')
 
-  const usuarioId = usuarioIdTexto === '' ? null : Number(usuarioIdTexto)
+  const pessoasQuery = useQuery({ queryKey: ['pessoas'], queryFn: listarPessoas })
+  const pessoas = pessoasQuery.data ?? []
+  const pessoaEncontrada = encontrarPessoaPorNome(pessoas, nomeUsuario)
+  const nomeNaoEncontrado = nomeUsuario.trim() !== '' && pessoaEncontrada === null
+  const usuarioId = pessoaEncontrada ? pessoaEncontrada.id : null
   const periodoCompleto = inicio !== '' && fim !== ''
   const inicioInstante = `${inicio}T00:00:00Z`
   const fimInstante = `${fim}T00:00:00Z`
 
   const projetosQuery = useQuery({ queryKey: ['projetos'], queryFn: listarProjetos })
 
+  // `nomeNaoEncontrado` entra na queryKey (não só em `enabled`) de propósito: sem isso, digitar um
+  // nome desconhecido reaproveitaria o cache de `usuarioId: null` (o mesmo da busca "eu mesmo" com
+  // o campo vazio) e o saldo de outra pessoa continuaria na tela junto da mensagem de erro.
   const espelhoQuery = useQuery({
-    queryKey: ['ponto', 'espelho-do-mes', usuarioId],
+    queryKey: ['ponto', 'espelho-do-mes', usuarioId, nomeNaoEncontrado],
     queryFn: () => buscarEspelhoDoMes(usuarioId ?? undefined),
+    enabled: !nomeNaoEncontrado,
   })
 
   const diasInconsistentesQuery = useQuery({
-    queryKey: ['ponto', 'dias-inconsistentes', usuarioId, inicio, fim],
+    queryKey: ['ponto', 'dias-inconsistentes', usuarioId, inicio, fim, nomeNaoEncontrado],
     queryFn: () => buscarDiasInconsistentes({ usuarioId, inicio: inicioInstante, fim: fimInstante }),
-    enabled: periodoCompleto,
+    enabled: periodoCompleto && !nomeNaoEncontrado,
   })
 
   const totalApontadoQuery = useQuery({
@@ -56,12 +65,15 @@ export function RelatoriosPage() {
       <form className="secao cartao">
         <div className="formulario">
           <div className="campo">
-            <label htmlFor="usuario-id-relatorio">Usuário (id, em branco = eu mesmo)</label>
-            <input
-              id="usuario-id-relatorio"
-              value={usuarioIdTexto}
-              onChange={(evento) => setUsuarioIdTexto(evento.target.value)}
+            <CampoPessoa
+              id="nome-usuario-relatorio"
+              label="Usuário (nome, em branco = eu mesmo)"
+              valor={nomeUsuario}
+              aoMudarValor={setNomeUsuario}
+              pessoas={pessoas}
+              placeholder="Nome da pessoa"
             />
+            {nomeNaoEncontrado && <p className="mensagem-erro">Pessoa não encontrada</p>}
           </div>
 
           <div className="campo">
@@ -99,7 +111,7 @@ export function RelatoriosPage() {
 
       <section className="secao cartao">
         <h2 className="secao-titulo">💰 Saldo</h2>
-        {espelhoQuery.isPending && <p className="mensagem-carregando">Carregando…</p>}
+        {!nomeNaoEncontrado && espelhoQuery.isPending && <p className="mensagem-carregando">Carregando…</p>}
         {espelhoQuery.isError && <p className="mensagem-erro">Não foi possível carregar o saldo.</p>}
         {espelhoQuery.data && <p>Saldo acumulado: {formatarSaldo(espelhoQuery.data.saldoAcumuladoNoPeriodo)}</p>}
       </section>

@@ -14,8 +14,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { useAuthStore } from '../auth/authStore'
-import { adicionarMembroAoProjeto, buscarProjeto } from '../organizacao/api'
-import type { MembroProjeto, ProjetoDetalhe } from '../organizacao/types'
+import { CampoPessoa } from '../../shared/CampoPessoa'
+import { encontrarPessoaPorNome, type PessoaBasica } from '../../shared/encontrarPessoaPorNome'
+import { adicionarMembroAoProjeto, buscarProjeto, listarPessoas } from '../organizacao/api'
+import type { ProjetoDetalhe } from '../organizacao/types'
 import {
   criarApontamentoManual,
   criarCard,
@@ -418,7 +420,7 @@ function CardArrastavel({ card, nomeDoResponsavel }: { card: Card; nomeDoRespons
 
 function ColunaComDrop({
   coluna,
-  membros,
+  pessoas,
   nomePorUsuarioId,
   novoCard,
   onNovoCardChange,
@@ -426,7 +428,7 @@ function ColunaComDrop({
   criandoCard,
 }: {
   coluna: ColunaComCards
-  membros: MembroProjeto[]
+  pessoas: PessoaBasica[]
   nomePorUsuarioId: Map<number, string>
   novoCard: { titulo: string; responsavelNome: string; estimativaMinutos: string }
   onNovoCardChange: (valor: { titulo: string; responsavelNome: string; estimativaMinutos: string }) => void
@@ -434,6 +436,8 @@ function ColunaComDrop({
   criandoCard: boolean
 }) {
   const { setNodeRef } = useDroppable({ id: `coluna-${coluna.id}`, data: { type: 'coluna', colunaId: coluna.id } })
+  const responsavelDigitado = novoCard.responsavelNome.trim() !== ''
+  const responsavelEncontrado = encontrarPessoaPorNome(pessoas, novoCard.responsavelNome) !== null
 
   return (
     <section ref={setNodeRef} className="kanban-coluna">
@@ -475,26 +479,16 @@ function ColunaComDrop({
           placeholder="+ Nova tarefa"
           required
         />
-        <label htmlFor={`responsavel-card-${coluna.id}`} className="sr-only">
-          Nome do responsável (opcional)
-        </label>
-        <input
+        <CampoPessoa
           id={`responsavel-card-${coluna.id}`}
-          list={`membros-do-projeto-${coluna.id}`}
-          value={novoCard.responsavelNome}
-          onChange={(evento) => onNovoCardChange({ ...novoCard, responsavelNome: evento.target.value })}
+          label="Nome do responsável (opcional)"
+          labelSrOnly
+          valor={novoCard.responsavelNome}
+          aoMudarValor={(texto) => onNovoCardChange({ ...novoCard, responsavelNome: texto })}
+          pessoas={pessoas}
           placeholder="Nome do responsável"
-          autoComplete="off"
         />
-        {/* <datalist> é a forma nativa mais simples de "digita o nome, aparecem as opções"
-        (pedido do usuário) sem precisar de um componente de combobox próprio nem de um
-        GET /usuarios pra todo mundo (esse é admin-only, ver UsuarioController) - a lista de
-        membros do projeto já veio junto com `buscarProjeto`, então já tem nome de sobra aqui. */}
-        <datalist id={`membros-do-projeto-${coluna.id}`}>
-          {membros.map((membro) => (
-            <option key={membro.usuarioId} value={membro.usuarioNome} />
-          ))}
-        </datalist>
+        {responsavelDigitado && !responsavelEncontrado && <span className="mensagem-erro">Pessoa não encontrada</span>}
         <label htmlFor={`estimativa-card-${coluna.id}`} className="sr-only">
           Tempo estimado em minutos (opcional)
         </label>
@@ -515,27 +509,33 @@ function ColunaComDrop({
 
 /**
  * Pedido do cliente: sem Equipe/Quadro separado - pessoas são atribuídas direto ao projeto (o
- * "sistema"). Adicionar é por id de usuário (mesma disciplina de não montar dropdown pra uma API
- * de listagem que não existe, ver comentário em `RelatoriosPage`); a lista de membros já traz o
- * nome de quem foi adicionado.
+ * "sistema"). Adicionar é por nome (pedido: "referenciar o nome dela e não o ID... a pessoa
+ * preenchendo o nome e já aparecer as pessoas cadastradas ou Pessoa não encontrada") - a lista de
+ * sugestões vem de TODAS as pessoas cadastradas (`GET /usuarios/basico`), não só de quem já é
+ * membro, porque atribuir alguém que ainda não é membro é justamente o caso de uso daqui.
  */
 function MembrosDoProjeto({
   projetoId,
   membros,
+  pessoas,
   podeGerenciar,
 }: {
   projetoId: number
-  membros: MembroProjeto[]
+  membros: { usuarioId: number; usuarioNome: string }[]
+  pessoas: PessoaBasica[]
   podeGerenciar: boolean
 }) {
   const queryClient = useQueryClient()
-  const [usuarioId, setUsuarioId] = useState('')
+  const [nomeDigitado, setNomeDigitado] = useState('')
+
+  const pessoaEncontrada = encontrarPessoaPorNome(pessoas, nomeDigitado)
+  const naoEncontrada = nomeDigitado.trim() !== '' && pessoaEncontrada === null
 
   const adicionarMutation = useMutation({
-    mutationFn: () => adicionarMembroAoProjeto({ projetoId, usuarioId: Number(usuarioId) }),
+    mutationFn: () => adicionarMembroAoProjeto({ projetoId, usuarioId: pessoaEncontrada!.id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projetos', projetoId] })
-      setUsuarioId('')
+      setNomeDigitado('')
     },
   })
 
@@ -557,24 +557,27 @@ function MembrosDoProjeto({
           className="kanban-card-form"
           onSubmit={(evento) => {
             evento.preventDefault()
-            adicionarMutation.mutate()
+            if (pessoaEncontrada) {
+              adicionarMutation.mutate()
+            }
           }}
         >
-          <label htmlFor="usuario-id-membro" className="sr-only">
-            Adicionar membro (id do usuário)
-          </label>
-          <input
-            id="usuario-id-membro"
-            value={usuarioId}
-            onChange={(evento) => setUsuarioId(evento.target.value)}
-            placeholder="Id do usuário"
-            required
+          <CampoPessoa
+            id="nome-membro"
+            label="Adicionar membro (nome)"
+            labelSrOnly
+            valor={nomeDigitado}
+            aoMudarValor={setNomeDigitado}
+            pessoas={pessoas}
+            placeholder="Nome da pessoa"
+            obrigatorio
           />
-          <button type="submit" className="botao-pequeno" disabled={adicionarMutation.isPending}>
+          <button type="submit" className="botao-pequeno" disabled={adicionarMutation.isPending || !pessoaEncontrada}>
             ➕ Adicionar membro
           </button>
         </form>
       )}
+      {naoEncontrada && <p className="mensagem-erro">Pessoa não encontrada</p>}
       {adicionarMutation.isError && <p className="mensagem-erro">Não foi possível adicionar o membro.</p>}
     </section>
   )
@@ -606,6 +609,15 @@ export function ProjetoDetalhePage({ projetoIdProp }: { projetoIdProp?: number }
     queryKey: ['projetos', projetoId],
     queryFn: () => buscarProjeto(projetoId),
   })
+
+  // Pedido do cliente: sugestões de nome (membro do projeto ou responsável de tarefa) vêm de
+  // TODAS as pessoas cadastradas, não só de quem já é membro do projeto - atribuir alguém que
+  // ainda não é membro é um caso de uso legítimo (ex.: primeira tarefa de alguém no projeto).
+  const pessoasQuery = useQuery({
+    queryKey: ['pessoas'],
+    queryFn: listarPessoas,
+  })
+  const pessoas = pessoasQuery.data ?? []
 
   // S3.11: quando outro usuário arrasta um card neste projeto, o backend broadcasta pelo
   // websocket e este hook invalida a query acima - o projeto atualiza sem reload manual.
@@ -671,7 +683,11 @@ export function ProjetoDetalhePage({ projetoIdProp }: { projetoIdProp?: number }
   }
 
   const projeto = projetoQuery.data
-  const nomePorUsuarioId = new Map(projeto.membros.map((membro) => [membro.usuarioId, membro.usuarioNome]))
+  // Membros do projeto entram primeiro, pessoas cadastradas sobrescrevem/completam depois - assim
+  // um responsável de tarefa que ainda não é membro do projeto também aparece corretamente no
+  // card enquanto `pessoasQuery` ainda não terminou de carregar.
+  const nomePorUsuarioId = new Map<number, string>(projeto.membros.map((membro) => [membro.usuarioId, membro.usuarioNome]))
+  pessoas.forEach((pessoa) => nomePorUsuarioId.set(pessoa.id, pessoa.nome))
 
   return (
     <main className="pagina" style={{ maxWidth: 'none' }}>
@@ -682,7 +698,7 @@ export function ProjetoDetalhePage({ projetoIdProp }: { projetoIdProp?: number }
         <h1>{projeto.nome}</h1>
       </div>
 
-      <MembrosDoProjeto projetoId={projetoId} membros={projeto.membros} podeGerenciar={podeGerenciarMembros} />
+      <MembrosDoProjeto projetoId={projetoId} membros={projeto.membros} pessoas={pessoas} podeGerenciar={podeGerenciarMembros} />
 
       {projeto.colunas.length === 0 && <p className="mensagem-vazia">Nenhuma coluna neste projeto ainda.</p>}
 
@@ -695,18 +711,17 @@ export function ProjetoDetalhePage({ projetoIdProp }: { projetoIdProp?: number }
           <ColunaComDrop
             key={coluna.id}
             coluna={coluna}
-            membros={projeto.membros}
+            pessoas={pessoas}
             nomePorUsuarioId={nomePorUsuarioId}
             novoCard={novoCardPorColuna[coluna.id] ?? NOVO_CARD_VAZIO}
             onNovoCardChange={(valor) => setNovoCardPorColuna((atual) => ({ ...atual, [coluna.id]: valor }))}
             onCriarCard={() => {
               const dados = novoCardPorColuna[coluna.id] ?? NOVO_CARD_VAZIO
-              const nomeDigitado = dados.responsavelNome.trim().toLowerCase()
-              const responsavel = projeto.membros.find((membro) => membro.usuarioNome.trim().toLowerCase() === nomeDigitado)
+              const responsavel = encontrarPessoaPorNome(pessoas, dados.responsavelNome)
               criarCardMutation.mutate({
                 colunaId: coluna.id,
                 titulo: dados.titulo,
-                responsavelId: responsavel ? responsavel.usuarioId : null,
+                responsavelId: responsavel ? responsavel.id : null,
                 estimativaMinutos: dados.estimativaMinutos === '' ? null : Number(dados.estimativaMinutos),
               })
             }}

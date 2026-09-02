@@ -1,6 +1,19 @@
 import { apiFetch } from '../../shared/api/http'
+import type { PessoaBasica } from '../../shared/encontrarPessoaPorNome'
 import type { Papel } from '../auth/types'
 import type { Colaborador, Projeto, ProjetoDetalhe, StatusProjeto } from './types'
+
+/** Pedido do cliente: referenciar pessoa por nome, não por id, em qualquer lugar do sistema -
+ * `GET /usuarios/basico` é a versão enxuta (id+nome, sem papel/carga diária/email) de
+ * `listarColaboradores`, aberta a qualquer autenticado (não só admin) pra alimentar o
+ * autocomplete de "escolher uma pessoa" (`CampoPessoa`). */
+export async function listarPessoas(): Promise<PessoaBasica[]> {
+  const response = await apiFetch('/usuarios/basico')
+  if (!response.ok) {
+    throw new Error('Não foi possível carregar as pessoas cadastradas')
+  }
+  return response.json()
+}
 
 export async function listarProjetos(): Promise<Projeto[]> {
   const response = await apiFetch('/projetos')

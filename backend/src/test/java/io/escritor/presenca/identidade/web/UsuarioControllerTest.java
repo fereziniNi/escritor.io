@@ -101,6 +101,22 @@ class UsuarioControllerTest {
     }
 
     @Test
+    void rejeitaListagemBasicaSemAutenticacao() throws Exception {
+        mockMvc.perform(get("/usuarios/basico")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "COLABORADOR")
+    void listagemBasicaEAbertaAQualquerPapelAutenticado() throws Exception {
+        when(usuarioService.listarBasico()).thenReturn(java.util.List.of(new UsuarioBasicoResponse(1L, "Ana Souza")));
+
+        mockMvc.perform(get("/usuarios/basico"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(1))
+                .andExpect(jsonPath("$[0].nome").value("Ana Souza"));
+    }
+
+    @Test
     void rejeitaAtualizarCargaDiariaSemAutenticacao() throws Exception {
         mockMvc.perform(patch("/usuarios/1/carga-diaria")
                         .contentType(MediaType.APPLICATION_JSON)

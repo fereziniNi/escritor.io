@@ -9,7 +9,16 @@ import { useAuthStore } from '../auth/authStore'
 import { ProjetoDetalhePage } from './ProjetoDetalhePage'
 import type { ColunaComCards } from './types'
 
-const server = setupServer()
+// Pedido do cliente: sugestões de pessoa vêm de TODAS as pessoas cadastradas (`GET
+// /usuarios/basico`), não só de quem já é membro do projeto - handler padrão restaurado a cada
+// teste por `resetHandlers`, então todo teste tem essa lista disponível mesmo sem chamar
+// `server.use` de novo.
+const PESSOAS_CADASTRADAS = [
+  { id: 1, nome: 'Ana Souza' },
+  { id: 2, nome: 'Beto Lima' },
+]
+
+const server = setupServer(http.get('/usuarios/basico', () => HttpResponse.json(PESSOAS_CADASTRADAS)))
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
@@ -111,10 +120,25 @@ describe('ProjetoDetalhePage', () => {
     renderPagina()
 
     await screen.findByText('Ana Souza')
-    await user.type(screen.getByLabelText(/adicionar membro/i), '2')
+    // pedido do usuário: digita o nome, não o id - "Beto Lima" é sugerido porque está em
+    // TODAS as pessoas cadastradas, mesmo ainda não sendo membro deste projeto.
+    await user.type(screen.getByLabelText(/adicionar membro/i), 'Beto Lima')
     await user.click(screen.getByRole('button', { name: /adicionar membro/i }))
 
     expect(await screen.findByText('Beto Lima')).toBeInTheDocument()
+  })
+
+  it('nome que não é de nenhuma pessoa cadastrada mostra "Pessoa não encontrada" e não deixa adicionar', async () => {
+    useAuthStore.getState().definirSessao('token-fake', 'GESTOR')
+    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Ana Souza')
+    await user.type(screen.getByLabelText(/adicionar membro/i), 'Alguém que não existe')
+
+    expect(await screen.findByText(/pessoa não encontrada/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /adicionar membro/i })).toBeDisabled()
   })
 
   it('cria uma tarefa na coluna certa e ela aparece sem reload manual', async () => {
@@ -180,8 +204,8 @@ describe('ProjetoDetalhePage', () => {
 
     await screen.findByText('Corrigir bug')
     await user.type(screen.getByLabelText(/nova tarefa/i), 'Escrever testes')
-    // pedido do usuário: digita o nome, não o id - a pessoa aparece como opção porque já é
-    // membro do projeto (lista de sugestões vem do <datalist>, sem GET /usuarios nenhum).
+    // pedido do usuário: digita o nome, não o id - a pessoa aparece como opção porque está em
+    // TODAS as pessoas cadastradas (GET /usuarios/basico), não só entre os membros do projeto.
     await user.type(screen.getByLabelText(/nome do responsável/i), 'Ana Souza')
     await user.type(screen.getByLabelText(/tempo estimado/i), '90')
     await user.click(screen.getByRole('button', { name: /adicionar tarefa/i }))
@@ -191,7 +215,7 @@ describe('ProjetoDetalhePage', () => {
     expect(screen.getByText('⏱️ 90 min')).toBeInTheDocument()
   })
 
-  it('sugere os membros do projeto como opções pro campo de responsável', async () => {
+  it('sugere todas as pessoas cadastradas (não só os membros do projeto) como opções pro campo de responsável', async () => {
     server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
 
     renderPagina()
@@ -200,11 +224,10 @@ describe('ProjetoDetalhePage', () => {
     const campoResponsavel = screen.getByLabelText(/nome do responsável/i)
     const listaId = campoResponsavel.getAttribute('list')
     const datalist = document.getElementById(listaId!) as HTMLDataListElement
-    expect(datalist).not.toBeNull()
-    expect(Array.from(datalist.options).map((opcao) => opcao.value)).toEqual(['Ana Souza'])
+    await waitFor(() => expect(Array.from(datalist.options).map((opcao) => opcao.value)).toEqual(['Ana Souza', 'Beto Lima']))
   })
 
-  it('nome de responsável que não é membro do projeto cria a tarefa sem atribuir ninguém', async () => {
+  it('nome de responsável que não bate com nenhuma pessoa cadastrada mostra "Pessoa não encontrada" e cria a tarefa sem atribuir ninguém', async () => {
     let colunas: ColunaComCards[] = PROJETO_DETALHE.colunas
     server.use(
       http.get('/projetos/1', () => HttpResponse.json({ ...PROJETO_DETALHE, colunas })),
@@ -234,6 +257,9 @@ describe('ProjetoDetalhePage', () => {
     await screen.findByText('Corrigir bug')
     await user.type(screen.getByLabelText(/nova tarefa/i), 'Tarefa sem dono')
     await user.type(screen.getByLabelText(/nome do responsável/i), 'Alguém que não existe')
+
+    expect(await screen.findByText(/pessoa não encontrada/i)).toBeInTheDocument()
+
     await user.click(screen.getByRole('button', { name: /adicionar tarefa/i }))
 
     expect(await screen.findByText('Tarefa sem dono')).toBeInTheDocument()

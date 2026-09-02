@@ -48,6 +48,20 @@ class UsuarioServiceTest {
     }
 
     @Test
+    void listaBasicoTrazSoIdENomeDosUsuariosAtivos() {
+        Usuario ana = comId(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480), 1L);
+        Usuario beto = comId(new Usuario("Beto Lima", "beto@escritor.io", Papel.GESTOR, 360), 2L);
+        when(usuarioRepository.findByAtivoTrueOrderByNomeAsc()).thenReturn(List.of(ana, beto));
+
+        var pessoas = usuarioService.listarBasico();
+
+        assertThat(pessoas).hasSize(2);
+        assertThat(pessoas.get(0).id()).isEqualTo(1L);
+        assertThat(pessoas.get(0).nome()).isEqualTo("Ana Souza");
+        assertThat(pessoas.get(1).nome()).isEqualTo("Beto Lima");
+    }
+
+    @Test
     void atualizaACargaDiariaDeUmUsuarioExistente() {
         Usuario ana = comId(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480), 1L);
         when(usuarioRepository.findById(1L)).thenReturn(Optional.of(ana));

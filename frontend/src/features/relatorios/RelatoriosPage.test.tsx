@@ -7,7 +7,14 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { useAuthStore } from '../auth/authStore'
 import { RelatoriosPage } from './RelatoriosPage'
 
-const server = setupServer()
+// Pedido do cliente: filtrar relatório por pessoa é por nome, não por id - handler padrão
+// restaurado a cada teste por `resetHandlers`.
+const PESSOAS_CADASTRADAS = [
+  { id: 1, nome: 'Ana Souza' },
+  { id: 2, nome: 'Beto Lima' },
+]
+
+const server = setupServer(http.get('/usuarios/basico', () => HttpResponse.json(PESSOAS_CADASTRADAS)))
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
@@ -89,5 +96,40 @@ describe('RelatoriosPage', () => {
     await user.selectOptions(screen.getByLabelText(/projeto/i), '11')
 
     expect(await screen.findByText('Total apontado: 0h45')).toBeInTheDocument()
+  })
+
+  it('digita o nome de uma pessoa cadastrada e filtra o saldo por ela', async () => {
+    // Não usa `handlersPadrao()` aqui: ela já registra um handler estático pra
+    // `/ponto/espelho-do-mes`, e o primeiro handler cadastrado pra uma rota "ganha" no MSW - o
+    // handler abaixo (que lê `usuarioId` da query) nunca seria chamado se viesse depois dele.
+    server.use(
+      http.get('/projetos', () => HttpResponse.json([])),
+      http.get('/ponto/espelho-do-mes', ({ request }) => {
+        const url = new URL(request.url)
+        const usuarioId = url.searchParams.get('usuarioId')
+        return HttpResponse.json({ dias: [], saldoAcumuladoNoPeriodo: usuarioId === '2' ? 120 : 60 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Saldo acumulado: +1h00')
+    // pedido do usuário: digita o nome, não o id - "Beto Lima" está entre as pessoas cadastradas.
+    await user.type(screen.getByLabelText(/usuário/i), 'Beto Lima')
+
+    expect(await screen.findByText('Saldo acumulado: +2h00')).toBeInTheDocument()
+  })
+
+  it('nome que não bate com nenhuma pessoa cadastrada mostra "Pessoa não encontrada" e não dispara a consulta', async () => {
+    server.use(...handlersPadrao())
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Saldo acumulado: +1h00')
+    await user.type(screen.getByLabelText(/usuário/i), 'Alguém que não existe')
+
+    expect(await screen.findByText(/pessoa não encontrada/i)).toBeInTheDocument()
+    // sem usuário resolvido, o saldo anterior (do "eu mesmo" inicial) some da tela.
+    expect(screen.queryByText(/saldo acumulado/i)).not.toBeInTheDocument()
   })
 })
