@@ -80,36 +80,7 @@ docker compose --profile whatsapp up -d
 Isso sobe `evolution-api` (a API em si) e `evolution-postgres`/`evolution-redis`
 (armazenamento próprio do Evolution, separado do Postgres da aplicação).
 
-### 2. Crie a instância e pareie um número de WhatsApp
-
-Via REST puro (a imagem oficial de UI, `evolution-manager`, tem um bug de nginx conhecido e não
-foi incluída aqui - ver comentário em `docker-compose.yml`). Defina `EVOLUTION_API_KEY` no seu
-`.env` **antes** de subir o container (ou reinicie `evolution-api` depois de mudar), e use o mesmo
-valor abaixo:
-
-```bash
-# Cria a instância (troque "sua-chave-aqui" pela mesma de EVOLUTION_API_KEY no seu .env)
-curl -X POST http://localhost:8085/instance/create \
-  -H "apikey: sua-chave-aqui" -H "Content-Type: application/json" \
-  -d '{"instanceName":"escritorio","integration":"WHATSAPP-BAILEYS","qrcode":true}'
-```
-
-A resposta traz `qrcode.base64` - uma imagem PNG em base64 (`data:image/png;base64,...`). Copie só
-a parte depois da vírgula, decodifique e abra como imagem (num terminal Unix:
-`echo "<base64>" | base64 -d > qrcode.png` e abra o arquivo; no PowerShell:
-`[IO.File]::WriteAllBytes("qrcode.png", [Convert]::FromBase64String("<base64>"))`). Escaneie com o
-WhatsApp do número que vai **enviar** os avisos - **não precisa ser o número do chefe**, só o
-"remetente" (o chefe só recebe mensagem, não precisa parear nada). O QR expira em minutos; se
-demorar, gere outro com `GET /instance/connect/escritorio` (mesma API key).
-
-Confirme que conectou:
-
-```bash
-curl http://localhost:8085/instance/connectionState/escritorio -H "apikey: sua-chave-aqui"
-# {"instance":{"instanceName":"escritorio","state":"open"}} = conectado
-```
-
-### 3. Configure e ligue no backend
+### 2. Configure e ligue no backend
 
 No `.env` da raiz (o mesmo já usado pra remapear portas - ver Troubleshooting):
 
@@ -125,11 +96,41 @@ EVOLUTION_HABILITADO=true
   só dígitos (Brasil: `55` + DDD com 2 dígitos + número, geralmente 12-13 dígitos no total; ex.
   `5511999999999`). Deixe em branco pra manter a integração desligada mesmo com
   `EVOLUTION_HABILITADO=true` (nenhuma mensagem sai sem um número de destino).
-- `EVOLUTION_HABILITADO=true`: sem isso, o backend nunca tenta enviar nada, mesmo com o Evolution
-  API no ar e pareado - é o interruptor final.
+- `EVOLUTION_HABILITADO=true`: sem isso, nem o backend tenta enviar nada, nem a tela do passo 3
+  abaixo consegue gerar QR code - é o interruptor geral.
 
 Reinicie o backend (`docker compose up -d backend` se estiver em container, ou reinicie o
 `./mvnw spring-boot:run` se estiver rodando direto na máquina) pra pegar as novas variáveis.
+
+### 3. Pareie um número de WhatsApp direto na plataforma
+
+Como ADMIN, abra o painel **📱 WhatsApp** na barra de ferramentas do Escritório (só ADMIN vê o
+botão). A tela (`IntegracaoWhatsAppPage`, chamando `GET /admin/whatsapp/estado`) mostra o QR code
+na hora - o backend cria a instância no Evolution API automaticamente na primeira vez. Escaneie
+com o WhatsApp do número que vai **enviar** os avisos (Aparelhos conectados → Conectar um
+aparelho) - **não precisa ser o número do chefe**, só o "remetente" (o chefe só recebe mensagem,
+não precisa parear nada). A tela atualiza sozinha (poll a cada poucos segundos) e mostra "✅
+Conectado" assim que o celular escaneia - não precisa recarregar a página.
+
+<details>
+<summary>Alternativa via REST puro (sem abrir o navegador)</summary>
+
+```bash
+# Cria a instância e já devolve o QR code em base64 (troque "sua-chave-aqui" pela mesma de
+# EVOLUTION_API_KEY no seu .env)
+curl -X POST http://localhost:8085/instance/create \
+  -H "apikey: sua-chave-aqui" -H "Content-Type: application/json" \
+  -d '{"instanceName":"escritorio","integration":"WHATSAPP-BAILEYS","qrcode":true}'
+```
+
+A resposta traz `qrcode.base64` (`data:image/png;base64,...`) - copie a parte depois da vírgula,
+decodifique e abra como imagem (Unix: `echo "<base64>" | base64 -d > qrcode.png`; PowerShell:
+`[IO.File]::WriteAllBytes("qrcode.png", [Convert]::FromBase64String("<base64>"))`). Se o QR
+expirar antes de escanear, gere outro com `GET /instance/connect/escritorio` (mesma API key - essa
+chamada devolve o QR direto na raiz da resposta, não aninhado em `qrcode` como a de criar).
+Confirme que conectou com `GET /instance/connectionState/escritorio` (`state":"open"` = conectado).
+
+</details>
 
 A partir daí, toda vez que alguém bater entrada ou saída (`PontoService.marcar`), o chefe recebe
 uma mensagem de texto no número configurado - envio assíncrono e best-effort (ver

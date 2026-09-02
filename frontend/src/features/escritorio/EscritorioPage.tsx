@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { HealthStatus } from '../../app/HealthStatus'
 import { useAuthStore } from '../auth/authStore'
+import { IntegracaoWhatsAppPage } from '../integracoes/IntegracaoWhatsAppPage'
 import { ColaboradoresPage } from '../organizacao/ColaboradoresPage'
 import { RelatoriosPage } from '../relatorios/RelatoriosPage'
 import { buscarMapaAtivo } from './api'
@@ -29,6 +30,7 @@ const TITULO_PAINEL: Record<PainelId, string> = {
   relatorios: '📊 Relatórios',
   projetos: '📁 Projetos',
   colaboradores: '🧑‍💼 Colaboradores',
+  whatsapp: '📱 WhatsApp',
 }
 
 /**
@@ -136,6 +138,7 @@ export function EscritorioPage() {
           {painelAberto === 'relatorios' && <RelatoriosPage />}
           {painelAberto === 'projetos' && <PainelProjetos />}
           {painelAberto === 'colaboradores' && <ColaboradoresPage />}
+          {painelAberto === 'whatsapp' && <IntegracaoWhatsAppPage />}
         </PainelFlutuante>
       )}
 

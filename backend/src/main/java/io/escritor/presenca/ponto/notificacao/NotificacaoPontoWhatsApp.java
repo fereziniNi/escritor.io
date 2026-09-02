@@ -24,11 +24,12 @@ import org.springframework.web.client.RestClient;
  * notificacaoExecutor} (ver {@code AsyncConfig}), nunca no {@code SimpleAsyncExecutor} padrão.
  *
  * <p>Fica desligado por padrão ({@code app.evolution.habilitado=false}) - a integração exige
- * pareamento manual de um número real de WhatsApp via QR code (Evolution Manager, ver
- * DEVELOPMENT.md "Integração com WhatsApp") antes de fazer sentido ligar; sem isso, toda
- * tentativa de envio falharia de qualquer jeito. Erros de rede/API nunca sobem daqui - só ficam
- * registrados em log - pra nunca comprometer o registro de ponto (que já é a fonte de verdade e
- * já foi salvo) por causa de um provedor de mensageria fora do ar.
+ * pareamento manual de um número real de WhatsApp via QR code (tela de admin dentro da própria
+ * aplicação, ver {@code WhatsAppIntegracaoController}/{@code EvolutionInstanceService}) antes de
+ * fazer sentido ligar; sem isso, toda tentativa de envio falharia de qualquer jeito. Erros de
+ * rede/API nunca sobem daqui - só ficam registrados em log - pra nunca comprometer o registro de
+ * ponto (que já é a fonte de verdade e já foi salvo) por causa de um provedor de mensageria fora
+ * do ar.
  */
 @Component
 public class NotificacaoPontoWhatsApp implements NotificacaoPonto {

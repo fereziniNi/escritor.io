@@ -11,6 +11,7 @@ export default defineConfig({
         [
           '/health',
           '/auth',
+          '/admin',
           '/usuarios',
           '/equipes',
           '/projetos',

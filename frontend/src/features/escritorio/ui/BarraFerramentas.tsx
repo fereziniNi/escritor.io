@@ -2,7 +2,7 @@ import { ControlesAudioVideo } from './ControlesAudioVideo'
 import { MenuUsuario } from './MenuUsuario'
 import type { StatusAvatar } from '../types'
 
-export type PainelId = 'ponto' | 'relatorios' | 'projetos' | 'colaboradores'
+export type PainelId = 'ponto' | 'relatorios' | 'projetos' | 'colaboradores' | 'whatsapp'
 
 /**
  * Toolbar inferior - substitui o `.escritorio-dock` antigo (botões com texto+emoji lado a lado)
@@ -84,6 +84,17 @@ export function BarraFerramentas({
             onClick={() => aoAbrirPainel('colaboradores')}
           >
             🧑‍💼
+          </button>
+        )}
+        {papel === 'ADMIN' && (
+          <button
+            type="button"
+            className={`escritorio-toolbar-botao${painelAberto === 'whatsapp' ? ' escritorio-toolbar-botao--ativo' : ''}`}
+            aria-label="WhatsApp"
+            title="WhatsApp"
+            onClick={() => aoAbrirPainel('whatsapp')}
+          >
+            📱
           </button>
         )}
       </div>
