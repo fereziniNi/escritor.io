@@ -254,7 +254,6 @@ Status do avatar: `DISPONIVEL | FOCO | REUNIAO | ALMOCO | AUSENTE`. `AUSENTE` é
 - Movimento enviado ao servidor no máximo a cada 100 ms, com interpolação no cliente
 - Servidor valida colisões — o cliente nunca é fonte de verdade sobre posição
 - Reconexão automática do WebSocket com backoff exponencial
-- Ao entrar no mapa sem ponto aberto, exibir sugestão (não automação) de registrar entrada
 
 ### E6 — Extras
 

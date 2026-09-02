@@ -16,7 +16,6 @@ import { useMovimentoTeclado } from './mundo/useMovimentoTeclado'
 import { PainelFlutuante } from './PainelFlutuante'
 import { PainelPonto } from './PainelPonto'
 import { PainelProjetos } from './PainelProjetos'
-import { SugestaoRegistrarEntrada } from './SugestaoRegistrarEntrada'
 import type { StatusAvatar } from './types'
 import type { PainelId } from './ui/BarraFerramentas'
 import { BarraFerramentas } from './ui/BarraFerramentas'
@@ -113,7 +112,6 @@ export function EscritorioPage() {
 
   return (
     <section className="escritorio-pagina">
-      <SugestaoRegistrarEntrada aoClicarRegistrar={() => setPainelAberto('ponto')} />
       <CronometroTrabalho />
       <Notificacoes itens={notificacoes} />
 

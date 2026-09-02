@@ -20,8 +20,7 @@ vi.mock('./mundo/CamadaMundo', () => ({
   CamadaMundo: () => <div data-testid="mundo-canvas-host" />,
 }))
 
-/** Ponto aberto de propósito, pra `SugestaoRegistrarEntrada` (S6.11) não interferir nestes testes.
- * `CronometroTrabalho` (canto superior direito) também bate em `/ponto/estado-atual` em toda
+/** `CronometroTrabalho` (canto superior direito) bate em `/ponto/estado-atual` em toda
  * renderização da página, não só quando o painel de Ponto está aberto - por isso esse handler entra
  * em praticamente todo teste, mesmo os que não mexem com ponto. */
 function handlerPontoAberto() {
@@ -272,25 +271,6 @@ describe('EscritorioPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Fechar' }))
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-  })
-
-  it('clicar no aviso de registrar entrada abre o painel de ponto', async () => {
-    server.use(
-      http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)),
-      http.get('/ponto/estado-atual', () =>
-        HttpResponse.json({ ultimoTipo: null, ultimoMomento: null, segundosTrabalhadosAteAgora: 0, proximasOpcoes: ['ENTRADA'] }),
-      ),
-      handlerHealthOk(),
-      handlerJornadaVazia(),
-      handlerSemApontamentoPorCard(),
-      http.get('/ponto/espelho-do-mes', () => HttpResponse.json({ dias: [], saldoAcumuladoNoPeriodo: 0 })),
-    )
-    renderPagina()
-    await screen.findByTestId('mundo-canvas-host')
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Ir pra tela de ponto' }))
-
-    expect(await screen.findByRole('dialog', { name: /Ponto/ })).toBeInTheDocument()
   })
 
   it('mostra erro quando não há mapa ativo', async () => {
