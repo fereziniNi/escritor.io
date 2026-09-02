@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { encontrarPessoaPorNome } from './encontrarPessoaPorNome'
+import { encontrarPessoaPorNome, existeSugestaoPara } from './encontrarPessoaPorNome'
 
 const PESSOAS = [
   { id: 1, nome: 'Ana Souza' },
@@ -30,5 +30,24 @@ describe('encontrarPessoaPorNome', () => {
 
   it('não faz match parcial - "Ana" sozinho não encontra "Ana Souza"', () => {
     expect(encontrarPessoaPorNome(PESSOAS, 'Ana')).toBeNull()
+  })
+})
+
+describe('existeSugestaoPara', () => {
+  it('é permissivo com nome parcial - "b" ainda é candidato a "Beto Lima"', () => {
+    expect(existeSugestaoPara(PESSOAS, 'b')).toBe(true)
+  })
+
+  it('considera nome vazio como "ainda não é erro"', () => {
+    expect(existeSugestaoPara(PESSOAS, '')).toBe(true)
+    expect(existeSugestaoPara(PESSOAS, '   ')).toBe(true)
+  })
+
+  it('só fica falso quando nenhuma pessoa bate nem parcialmente', () => {
+    expect(existeSugestaoPara(PESSOAS, 'Alguém que não existe')).toBe(false)
+  })
+
+  it('ignora maiúsculas/minúsculas, igual encontrarPessoaPorNome', () => {
+    expect(existeSugestaoPara(PESSOAS, 'BETO')).toBe(true)
   })
 })

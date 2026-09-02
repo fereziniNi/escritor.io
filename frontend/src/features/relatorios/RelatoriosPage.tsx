@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { CampoPessoa } from '../../shared/CampoPessoa'
-import { encontrarPessoaPorNome } from '../../shared/encontrarPessoaPorNome'
+import { encontrarPessoaPorNome, existeSugestaoPara } from '../../shared/encontrarPessoaPorNome'
 import { formatarDataBr } from '../../shared/formatarData'
 import { buscarTotalApontadoPorProjeto } from '../kanban/api'
 import { listarPessoas, listarProjetos } from '../organizacao/api'
@@ -22,7 +22,10 @@ export function RelatoriosPage() {
   const pessoasQuery = useQuery({ queryKey: ['pessoas'], queryFn: listarPessoas })
   const pessoas = pessoasQuery.data ?? []
   const pessoaEncontrada = encontrarPessoaPorNome(pessoas, nomeUsuario)
-  const nomeNaoEncontrado = nomeUsuario.trim() !== '' && pessoaEncontrada === null
+  // Substring, não nome exato: "b" enquanto o usuário ainda está digitando "Beto Lima" (que
+  // `CampoPessoa` já sugere no dropdown) não deve acender "Pessoa não encontrada" nem desligar a
+  // consulta - só quando não sobra candidato nenhum pro nome digitado.
+  const nomeNaoEncontrado = !existeSugestaoPara(pessoas, nomeUsuario)
   const usuarioId = pessoaEncontrada ? pessoaEncontrada.id : null
   const periodoCompleto = inicio !== '' && fim !== ''
   const inicioInstante = `${inicio}T00:00:00Z`

@@ -141,6 +141,21 @@ describe('ProjetoDetalhePage', () => {
     expect(screen.getByRole('button', { name: /adicionar membro/i })).toBeDisabled()
   })
 
+  it('nome parcial que ainda é candidato a alguém cadastrado não mostra "Pessoa não encontrada"', async () => {
+    useAuthStore.getState().definirSessao('token-fake', 'GESTOR')
+    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Ana Souza')
+    // "b" ainda pode virar "Beto Lima" - a mensagem de erro não deve aparecer atrás do próprio
+    // dropdown de sugestões enquanto o nome está incompleto.
+    await user.type(screen.getByLabelText(/adicionar membro/i), 'b')
+
+    expect(await screen.findByText('Beto Lima')).toBeInTheDocument() // opção sugerida no dropdown
+    expect(screen.queryByText(/pessoa não encontrada/i)).not.toBeInTheDocument()
+  })
+
   it('cria uma tarefa na coluna certa e ela aparece sem reload manual', async () => {
     let colunas: ColunaComCards[] = PROJETO_DETALHE.colunas
     server.use(
@@ -217,14 +232,14 @@ describe('ProjetoDetalhePage', () => {
 
   it('sugere todas as pessoas cadastradas (não só os membros do projeto) como opções pro campo de responsável', async () => {
     server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
-
+    const user = userEvent.setup()
     renderPagina()
 
     await screen.findByText('Corrigir bug')
-    const campoResponsavel = screen.getByLabelText(/nome do responsável/i)
-    const listaId = campoResponsavel.getAttribute('list')
-    const datalist = document.getElementById(listaId!) as HTMLDataListElement
-    await waitFor(() => expect(Array.from(datalist.options).map((opcao) => opcao.value)).toEqual(['Ana Souza', 'Beto Lima']))
+    await user.click(screen.getByLabelText(/nome do responsável/i))
+
+    const opcoes = await screen.findAllByRole('option')
+    expect(opcoes.map((opcao) => opcao.textContent)).toEqual(['Ana Souza', 'Beto Lima'])
   })
 
   it('nome de responsável que não bate com nenhuma pessoa cadastrada mostra "Pessoa não encontrada" e cria a tarefa sem atribuir ninguém', async () => {

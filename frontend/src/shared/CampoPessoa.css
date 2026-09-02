@@ -1,0 +1,44 @@
+/* Pedido do cliente: "deixe esse select esteticamente mais bonito e diminua a caixa de texto" -
+   largura contida (em vez de esticar até preencher a linha do formulário, como um <input> comum
+   dentro de `.kanban-card-form`/`.formulario`) e uma lista de sugestões própria, na mesma
+   linguagem visual (cores, raio de borda, sombra) do resto do app - ver tokens em `index.css`. */
+.campo-pessoa {
+  position: relative;
+  width: 13rem;
+  max-width: 100%;
+}
+
+.campo-pessoa-input {
+  width: 100%;
+}
+
+/* `top`/`left`/`width` vêm inline (calculados em JS via `getBoundingClientRect` do input) - a
+   lista é portalizada pra `document.body` de propósito, então `position: fixed` aqui é relativa à
+   viewport, não a algum ancestral com `overflow: hidden` (ex.: o painel flutuante do Escritório). */
+.campo-pessoa-lista {
+  position: fixed;
+  z-index: 1000;
+  margin: 0;
+  padding: 0.35rem;
+  list-style: none;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  box-shadow: var(--sombra-cartao);
+  max-height: 13rem;
+  overflow-y: auto;
+}
+
+.campo-pessoa-opcao {
+  padding: 0.45em 0.6em;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  color: var(--cor-texto);
+}
+
+.campo-pessoa-opcao:hover,
+.campo-pessoa-opcao.ativa {
+  background: var(--cor-primaria-clara);
+  color: var(--cor-primaria-escura);
+}

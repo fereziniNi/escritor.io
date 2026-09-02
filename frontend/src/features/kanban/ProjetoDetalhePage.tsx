@@ -15,7 +15,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { useAuthStore } from '../auth/authStore'
 import { CampoPessoa } from '../../shared/CampoPessoa'
-import { encontrarPessoaPorNome, type PessoaBasica } from '../../shared/encontrarPessoaPorNome'
+import { encontrarPessoaPorNome, existeSugestaoPara, type PessoaBasica } from '../../shared/encontrarPessoaPorNome'
 import { adicionarMembroAoProjeto, buscarProjeto, listarPessoas } from '../organizacao/api'
 import type { ProjetoDetalhe } from '../organizacao/types'
 import {
@@ -436,8 +436,10 @@ function ColunaComDrop({
   criandoCard: boolean
 }) {
   const { setNodeRef } = useDroppable({ id: `coluna-${coluna.id}`, data: { type: 'coluna', colunaId: coluna.id } })
-  const responsavelDigitado = novoCard.responsavelNome.trim() !== ''
-  const responsavelEncontrado = encontrarPessoaPorNome(pessoas, novoCard.responsavelNome) !== null
+  // Substring, não nome exato: "b" enquanto o usuário ainda está digitando "Beto Lima" (que
+  // `CampoPessoa` já sugere no dropdown) não deve acender "Pessoa não encontrada" - só quando não
+  // sobra candidato nenhum.
+  const responsavelNaoEncontrado = !existeSugestaoPara(pessoas, novoCard.responsavelNome)
 
   return (
     <section ref={setNodeRef} className="kanban-coluna">
@@ -488,7 +490,7 @@ function ColunaComDrop({
           pessoas={pessoas}
           placeholder="Nome do responsável"
         />
-        {responsavelDigitado && !responsavelEncontrado && <span className="mensagem-erro">Pessoa não encontrada</span>}
+        {responsavelNaoEncontrado && <span className="mensagem-erro">Pessoa não encontrada</span>}
         <label htmlFor={`estimativa-card-${coluna.id}`} className="sr-only">
           Tempo estimado em minutos (opcional)
         </label>
@@ -529,7 +531,9 @@ function MembrosDoProjeto({
   const [nomeDigitado, setNomeDigitado] = useState('')
 
   const pessoaEncontrada = encontrarPessoaPorNome(pessoas, nomeDigitado)
-  const naoEncontrada = nomeDigitado.trim() !== '' && pessoaEncontrada === null
+  // Mesmo raciocínio de `responsavelNaoEncontrado` acima: substring, não nome exato, senão a
+  // mensagem aparece atrás do próprio dropdown de sugestões enquanto o nome ainda está incompleto.
+  const naoEncontrada = !existeSugestaoPara(pessoas, nomeDigitado)
 
   const adicionarMutation = useMutation({
     mutationFn: () => adicionarMembroAoProjeto({ projetoId, usuarioId: pessoaEncontrada!.id }),
