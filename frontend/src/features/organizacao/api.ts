@@ -61,6 +61,22 @@ export async function adicionarMembroAoProjeto(dados: { projetoId: number; usuar
   }
 }
 
+/** Pedido do cliente: "o admin pode adicionar as seções de um projeto (a fazer, fazendo, feito,
+ * revisão, testando)" - mesma permissão de `adicionarMembroAoProjeto` (GESTOR/ADMIN, ver
+ * `ProjetoController`). `ordem` decide a posição da coluna no board; quem chama calcula o próximo
+ * valor livre a partir das colunas já carregadas. `limiteWip` fica de fora por enquanto - não foi
+ * pedido e o backend já aceita null. */
+export async function criarColuna(dados: { projetoId: number; nome: string; ordem: number }): Promise<void> {
+  const response = await apiFetch(`/projetos/${dados.projetoId}/colunas`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nome: dados.nome, ordem: dados.ordem, limiteWip: null }),
+  })
+  if (!response.ok) {
+    throw new Error('Não foi possível criar a seção')
+  }
+}
+
 export async function listarColaboradores(): Promise<Colaborador[]> {
   const response = await apiFetch('/usuarios')
   if (!response.ok) {

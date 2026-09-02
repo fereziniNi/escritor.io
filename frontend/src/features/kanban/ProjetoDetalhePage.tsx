@@ -16,7 +16,7 @@ import { useParams } from 'react-router'
 import { useAuthStore } from '../auth/authStore'
 import { CampoPessoa } from '../../shared/CampoPessoa'
 import { encontrarPessoaPorNome, existeSugestaoPara, type PessoaBasica } from '../../shared/encontrarPessoaPorNome'
-import { adicionarMembroAoProjeto, buscarProjeto, listarPessoas } from '../organizacao/api'
+import { adicionarMembroAoProjeto, buscarProjeto, criarColuna, listarPessoas } from '../organizacao/api'
 import type { ProjetoDetalhe } from '../organizacao/types'
 import {
   criarApontamentoManual,
@@ -587,6 +587,76 @@ function MembrosDoProjeto({
   )
 }
 
+/**
+ * Pedido do cliente: "o admin pode adicionar as seções de um projeto (a fazer, fazendo, feito,
+ * revisão, testando)" - antes só existia a coluna seedada por padrão ("A fazer"), sem nenhuma
+ * forma de acrescentar outras pelo frontend (o endpoint `POST /projetos/{id}/colunas` já existia
+ * no backend, só faltava a tela). `ordem` é calculada aqui a partir das colunas já carregadas -
+ * o backend rejeita duas colunas com a mesma ordem no mesmo projeto.
+ */
+function NovaColuna({ projetoId, proximaOrdem }: { projetoId: number; proximaOrdem: number }) {
+  const queryClient = useQueryClient()
+  const [aberto, setAberto] = useState(false)
+  const [nome, setNome] = useState('')
+
+  const criarMutation = useMutation({
+    mutationFn: () => criarColuna({ projetoId, nome, ordem: proximaOrdem }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projetos', projetoId] })
+      setNome('')
+      setAberto(false)
+    },
+  })
+
+  if (!aberto) {
+    return (
+      <button type="button" className="botao-secundario kanban-nova-coluna-botao" onClick={() => setAberto(true)}>
+        ➕ Nova seção
+      </button>
+    )
+  }
+
+  return (
+    <section className="kanban-coluna kanban-nova-coluna">
+      <form
+        className="formulario formulario-largo"
+        onSubmit={(evento) => {
+          evento.preventDefault()
+          criarMutation.mutate()
+        }}
+      >
+        <div className="campo">
+          <label htmlFor="nome-nova-secao">Nome da seção</label>
+          <input
+            id="nome-nova-secao"
+            value={nome}
+            onChange={(evento) => setNome(evento.target.value)}
+            placeholder="Ex.: Revisão, Testando..."
+            required
+            autoFocus
+          />
+        </div>
+        <div className="campo-acoes">
+          <button type="submit" className="botao-pequeno" disabled={criarMutation.isPending}>
+            Adicionar
+          </button>
+          <button
+            type="button"
+            className="botao-secundario botao-pequeno"
+            onClick={() => {
+              setAberto(false)
+              setNome('')
+            }}
+          >
+            Cancelar
+          </button>
+        </div>
+      </form>
+      {criarMutation.isError && <p className="mensagem-erro">Não foi possível criar a seção.</p>}
+    </section>
+  )
+}
+
 const NOVO_CARD_VAZIO = { titulo: '', responsavelNome: '', estimativaMinutos: '' }
 
 /**
@@ -600,7 +670,9 @@ export function ProjetoDetalhePage({ projetoIdProp }: { projetoIdProp?: number }
   const projetoId = projetoIdProp ?? Number(id)
   const queryClient = useQueryClient()
   const papel = useAuthStore((estado) => estado.papel)
-  const podeGerenciarMembros = papel === 'GESTOR' || papel === 'ADMIN'
+  // GESTOR/ADMIN: mesma permissão pra adicionar membro e pra adicionar seção (coluna) - ambas
+  // `@PreAuthorize("hasAnyRole('GESTOR', 'ADMIN')")` no backend (`ProjetoController`).
+  const podeGerenciarProjeto = papel === 'GESTOR' || papel === 'ADMIN'
 
   const [novoCardPorColuna, setNovoCardPorColuna] = useState<Record<number, typeof NOVO_CARD_VAZIO>>({})
 
@@ -702,7 +774,7 @@ export function ProjetoDetalhePage({ projetoIdProp }: { projetoIdProp?: number }
         <h1>{projeto.nome}</h1>
       </div>
 
-      <MembrosDoProjeto projetoId={projetoId} membros={projeto.membros} pessoas={pessoas} podeGerenciar={podeGerenciarMembros} />
+      <MembrosDoProjeto projetoId={projetoId} membros={projeto.membros} pessoas={pessoas} podeGerenciar={podeGerenciarProjeto} />
 
       {projeto.colunas.length === 0 && <p className="mensagem-vazia">Nenhuma coluna neste projeto ainda.</p>}
 
@@ -732,6 +804,12 @@ export function ProjetoDetalhePage({ projetoIdProp }: { projetoIdProp?: number }
             criandoCard={criarCardMutation.isPending}
           />
         ))}
+        {podeGerenciarProjeto && (
+          <NovaColuna
+            projetoId={projetoId}
+            proximaOrdem={projeto.colunas.reduce((maior, coluna) => Math.max(maior, coluna.ordem), -1) + 1}
+          />
+        )}
         </div>
       </DndContext>
     </main>

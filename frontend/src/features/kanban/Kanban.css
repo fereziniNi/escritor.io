@@ -42,6 +42,29 @@
   gap: 0.7rem;
 }
 
+/* Pedido do cliente: "o admin pode adicionar as seções de um projeto" - botão/formulário no fim
+   do board, na mesma largura de uma coluna comum pra ficar visualmente na mesma "fileira". */
+.kanban-nova-coluna-botao {
+  flex: 0 0 220px;
+  align-self: stretch;
+  background: transparent;
+  color: var(--cor-texto-suave);
+  border: 2px dashed var(--cor-borda);
+  border-radius: var(--raio-borda);
+  box-shadow: none;
+}
+
+.kanban-nova-coluna-botao:hover {
+  color: var(--cor-primaria-escura);
+  border-color: var(--cor-primaria);
+  transform: none;
+  box-shadow: none;
+}
+
+.kanban-nova-coluna {
+  background: var(--cor-superficie);
+}
+
 .kanban-coluna-titulo {
   display: flex;
   align-items: center;

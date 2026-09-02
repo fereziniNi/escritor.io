@@ -314,6 +314,56 @@ describe('ProjetoDetalhePage', () => {
     expect(await screen.findByText(/nenhuma coluna/i)).toBeInTheDocument()
   })
 
+  it('colaborador não vê o botão de nova seção', async () => {
+    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
+
+    renderPagina()
+
+    await screen.findByText('A fazer')
+    expect(screen.queryByRole('button', { name: /nova seção/i })).not.toBeInTheDocument()
+  })
+
+  it('gestor cria uma nova seção (coluna) e ela aparece no board sem reload manual', async () => {
+    useAuthStore.getState().definirSessao('token-fake', 'GESTOR')
+    let colunas: ColunaComCards[] = PROJETO_DETALHE.colunas
+    server.use(
+      http.get('/projetos/1', () => HttpResponse.json({ ...PROJETO_DETALHE, colunas })),
+      http.post('/projetos/1/colunas', async ({ request }) => {
+        const corpo = (await request.json()) as { nome: string; ordem: number; limiteWip: number | null }
+        // única coluna existente é "A fazer" com ordem 0 - a próxima deve ser 1.
+        expect(corpo.ordem).toBe(1)
+        expect(corpo.limiteWip).toBeNull()
+        const nova = { id: 99, nome: corpo.nome, ordem: corpo.ordem, limiteWip: null, cards: [] }
+        colunas = [...colunas, nova]
+        return HttpResponse.json({ id: 99, projetoId: 1, nome: corpo.nome, ordem: corpo.ordem, limiteWip: null }, { status: 201 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('A fazer')
+    await user.click(screen.getByRole('button', { name: /nova seção/i }))
+    await user.type(screen.getByLabelText(/nome da seção/i), 'Revisão')
+    await user.click(screen.getByRole('button', { name: /^adicionar$/i }))
+
+    expect(await screen.findByText('Revisão')).toBeInTheDocument()
+  })
+
+  it('cancelar a criação de seção fecha o formulário sem enviar nada', async () => {
+    useAuthStore.getState().definirSessao('token-fake', 'GESTOR')
+    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('A fazer')
+    await user.click(screen.getByRole('button', { name: /nova seção/i }))
+    await user.type(screen.getByLabelText(/nome da seção/i), 'Não devia ir')
+    await user.click(screen.getByRole('button', { name: /cancelar/i }))
+
+    expect(screen.queryByLabelText(/nome da seção/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /nova seção/i })).toBeInTheDocument()
+  })
+
   it('não busca comentários antes do card ser expandido', async () => {
     server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
 
