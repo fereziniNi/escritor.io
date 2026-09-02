@@ -418,6 +418,7 @@ function CardArrastavel({ card, nomeDoResponsavel }: { card: Card; nomeDoRespons
 
 function ColunaComDrop({
   coluna,
+  membros,
   nomePorUsuarioId,
   novoCard,
   onNovoCardChange,
@@ -425,9 +426,10 @@ function ColunaComDrop({
   criandoCard,
 }: {
   coluna: ColunaComCards
+  membros: MembroProjeto[]
   nomePorUsuarioId: Map<number, string>
-  novoCard: { titulo: string; responsavelId: string; estimativaMinutos: string }
-  onNovoCardChange: (valor: { titulo: string; responsavelId: string; estimativaMinutos: string }) => void
+  novoCard: { titulo: string; responsavelNome: string; estimativaMinutos: string }
+  onNovoCardChange: (valor: { titulo: string; responsavelNome: string; estimativaMinutos: string }) => void
   onCriarCard: () => void
   criandoCard: boolean
 }) {
@@ -474,14 +476,25 @@ function ColunaComDrop({
           required
         />
         <label htmlFor={`responsavel-card-${coluna.id}`} className="sr-only">
-          Id do responsável (opcional)
+          Nome do responsável (opcional)
         </label>
         <input
           id={`responsavel-card-${coluna.id}`}
-          value={novoCard.responsavelId}
-          onChange={(evento) => onNovoCardChange({ ...novoCard, responsavelId: evento.target.value })}
-          placeholder="Id do responsável"
+          list={`membros-do-projeto-${coluna.id}`}
+          value={novoCard.responsavelNome}
+          onChange={(evento) => onNovoCardChange({ ...novoCard, responsavelNome: evento.target.value })}
+          placeholder="Nome do responsável"
+          autoComplete="off"
         />
+        {/* <datalist> é a forma nativa mais simples de "digita o nome, aparecem as opções"
+        (pedido do usuário) sem precisar de um componente de combobox próprio nem de um
+        GET /usuarios pra todo mundo (esse é admin-only, ver UsuarioController) - a lista de
+        membros do projeto já veio junto com `buscarProjeto`, então já tem nome de sobra aqui. */}
+        <datalist id={`membros-do-projeto-${coluna.id}`}>
+          {membros.map((membro) => (
+            <option key={membro.usuarioId} value={membro.usuarioNome} />
+          ))}
+        </datalist>
         <label htmlFor={`estimativa-card-${coluna.id}`} className="sr-only">
           Tempo estimado em minutos (opcional)
         </label>
@@ -567,7 +580,7 @@ function MembrosDoProjeto({
   )
 }
 
-const NOVO_CARD_VAZIO = { titulo: '', responsavelId: '', estimativaMinutos: '' }
+const NOVO_CARD_VAZIO = { titulo: '', responsavelNome: '', estimativaMinutos: '' }
 
 /**
  * `projetoIdProp` é opcional - só existe pro `PainelProjetos` (dock do Escritório, "uma tela só")
@@ -682,15 +695,18 @@ export function ProjetoDetalhePage({ projetoIdProp }: { projetoIdProp?: number }
           <ColunaComDrop
             key={coluna.id}
             coluna={coluna}
+            membros={projeto.membros}
             nomePorUsuarioId={nomePorUsuarioId}
             novoCard={novoCardPorColuna[coluna.id] ?? NOVO_CARD_VAZIO}
             onNovoCardChange={(valor) => setNovoCardPorColuna((atual) => ({ ...atual, [coluna.id]: valor }))}
             onCriarCard={() => {
               const dados = novoCardPorColuna[coluna.id] ?? NOVO_CARD_VAZIO
+              const nomeDigitado = dados.responsavelNome.trim().toLowerCase()
+              const responsavel = projeto.membros.find((membro) => membro.usuarioNome.trim().toLowerCase() === nomeDigitado)
               criarCardMutation.mutate({
                 colunaId: coluna.id,
                 titulo: dados.titulo,
-                responsavelId: dados.responsavelId === '' ? null : Number(dados.responsavelId),
+                responsavelId: responsavel ? responsavel.usuarioId : null,
                 estimativaMinutos: dados.estimativaMinutos === '' ? null : Number(dados.estimativaMinutos),
               })
             }}

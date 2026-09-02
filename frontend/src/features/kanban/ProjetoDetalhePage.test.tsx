@@ -150,7 +150,7 @@ describe('ProjetoDetalhePage', () => {
     expect(await screen.findByText('Escrever testes')).toBeInTheDocument()
   })
 
-  it('cria uma tarefa com responsável e tempo estimado', async () => {
+  it('cria uma tarefa com responsável (digitado pelo nome) e tempo estimado', async () => {
     let colunas: ColunaComCards[] = PROJETO_DETALHE.colunas
     server.use(
       http.get('/projetos/1', () => HttpResponse.json({ ...PROJETO_DETALHE, colunas })),
@@ -180,13 +180,64 @@ describe('ProjetoDetalhePage', () => {
 
     await screen.findByText('Corrigir bug')
     await user.type(screen.getByLabelText(/nova tarefa/i), 'Escrever testes')
-    await user.type(screen.getByLabelText(/id do responsável/i), '1')
+    // pedido do usuário: digita o nome, não o id - a pessoa aparece como opção porque já é
+    // membro do projeto (lista de sugestões vem do <datalist>, sem GET /usuarios nenhum).
+    await user.type(screen.getByLabelText(/nome do responsável/i), 'Ana Souza')
     await user.type(screen.getByLabelText(/tempo estimado/i), '90')
     await user.click(screen.getByRole('button', { name: /adicionar tarefa/i }))
 
     expect(await screen.findByText('Escrever testes')).toBeInTheDocument()
     expect(await screen.findByText('👤 Ana Souza')).toBeInTheDocument()
     expect(screen.getByText('⏱️ 90 min')).toBeInTheDocument()
+  })
+
+  it('sugere os membros do projeto como opções pro campo de responsável', async () => {
+    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
+
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    const campoResponsavel = screen.getByLabelText(/nome do responsável/i)
+    const listaId = campoResponsavel.getAttribute('list')
+    const datalist = document.getElementById(listaId!) as HTMLDataListElement
+    expect(datalist).not.toBeNull()
+    expect(Array.from(datalist.options).map((opcao) => opcao.value)).toEqual(['Ana Souza'])
+  })
+
+  it('nome de responsável que não é membro do projeto cria a tarefa sem atribuir ninguém', async () => {
+    let colunas: ColunaComCards[] = PROJETO_DETALHE.colunas
+    server.use(
+      http.get('/projetos/1', () => HttpResponse.json({ ...PROJETO_DETALHE, colunas })),
+      http.post('/colunas/5/cards', async ({ request }) => {
+        const corpo = (await request.json()) as { titulo: string; responsavelId: number | null }
+        expect(corpo.responsavelId).toBeNull()
+        const novoCard = {
+          id: 9,
+          colunaId: 5,
+          titulo: corpo.titulo,
+          descricao: null,
+          posicao: 2048,
+          responsavelId: null,
+          prazo: null,
+          estimativaMinutos: null,
+          criadoPorId: 1,
+          criadoEm: '2026-01-15T10:00:00Z',
+          arquivado: false,
+        }
+        colunas = [{ ...colunas[0], cards: [...colunas[0].cards, novoCard] }]
+        return HttpResponse.json(novoCard, { status: 201 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.type(screen.getByLabelText(/nova tarefa/i), 'Tarefa sem dono')
+    await user.type(screen.getByLabelText(/nome do responsável/i), 'Alguém que não existe')
+    await user.click(screen.getByRole('button', { name: /adicionar tarefa/i }))
+
+    expect(await screen.findByText('Tarefa sem dono')).toBeInTheDocument()
+    expect(screen.queryByText(/👤/)).not.toBeInTheDocument()
   })
 
   it('mostra a ocupação vs. o limite de WIP quando a coluna tem limite', async () => {
