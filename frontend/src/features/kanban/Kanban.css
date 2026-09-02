@@ -162,6 +162,13 @@
   font-size: 0.85rem;
 }
 
+/* Pedido do usuário: "no historico deve estar o dia hora" - dia/hora de cada linha do Histórico
+   num tom mais discreto que o texto do evento em si. */
+.kanban-historico-quando {
+  color: var(--cor-texto-suave);
+  font-variant-numeric: tabular-nums;
+}
+
 .kanban-timer {
   display: flex;
   align-items: center;

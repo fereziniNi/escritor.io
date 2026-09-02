@@ -18,7 +18,14 @@ const PESSOAS_CADASTRADAS = [
   { id: 2, nome: 'Beto Lima' },
 ]
 
-const server = setupServer(http.get('/usuarios/basico', () => HttpResponse.json(PESSOAS_CADASTRADAS)))
+// `HistoricoDoCard` agora busca apontamentos além de eventos (mescla os dois - pedido do usuário:
+// "no historico deve estar o dia hora e quanto tempo foi feita") - handler padrão de lista vazia
+// pro card fixo desta suíte (id 7), restaurado a cada teste por `resetHandlers`; testes que
+// precisam de apontamentos de verdade sobrescrevem com `server.use(...)`.
+const server = setupServer(
+  http.get('/usuarios/basico', () => HttpResponse.json(PESSOAS_CADASTRADAS)),
+  http.get('/cards/7/apontamentos', () => HttpResponse.json([])),
+)
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
@@ -436,7 +443,7 @@ describe('ProjetoDetalhePage', () => {
     expect(screen.queryByText(/card criado em/i)).not.toBeInTheDocument()
   })
 
-  it('expande o histórico e mostra os eventos em ordem cronológica com rótulo legível', async () => {
+  it('expande o histórico e mostra eventos e apontamentos mesclados, em ordem cronológica, com dia/hora', async () => {
     server.use(
       http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)),
       http.get('/cards/7/eventos', () =>
@@ -449,7 +456,25 @@ describe('ProjetoDetalhePage', () => {
             tipo: 'MUDANCA_COLUNA',
             de: 'A fazer',
             para: 'Em progresso',
+            criadoEm: '2026-01-15T11:00:00Z',
+          },
+        ]),
+      ),
+      // pedido do usuário: "no historico deve estar o dia hora e quanto tempo foi feita" - o
+      // apontamento (entre os dois eventos, pela hora de início) precisa aparecer na mesma lista.
+      http.get('/cards/7/apontamentos', () =>
+        HttpResponse.json([
+          {
+            id: 1,
+            usuarioId: 1,
+            cardId: 7,
+            inicio: '2026-01-15T10:00:00Z',
+            fim: '2026-01-15T10:45:00Z',
+            minutos: 45,
+            descricao: null,
+            origem: 'TIMER',
             criadoEm: '2026-01-15T10:00:00Z',
+            editadoEm: '2026-01-15T10:45:00Z',
           },
         ]),
       ),
@@ -464,8 +489,52 @@ describe('ProjetoDetalhePage', () => {
     const itens = within(lista).getAllByRole('listitem')
     expect(itens.map((item) => item.textContent)).toEqual([
       expect.stringContaining('Card criado em "A fazer"'),
+      expect.stringContaining('45 min apontados (timer)'),
       expect.stringContaining('Movido de "A fazer" para "Em progresso"'),
     ])
+    // dia/hora precisa estar visível, não só o rótulo do evento/apontamento.
+    expect(itens[0].textContent).toMatch(/\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}/)
+  })
+
+  it('iniciar e parar o timer atualiza o histórico já aberto, sem precisar fechar e reabrir', async () => {
+    // Handler com estado (mesmo padrão de `let colunas`/`let membros` nos outros testes): o
+    // ponto do teste é justamente ver o apontamento aparecer DEPOIS de iniciar o timer, então o
+    // GET precisa refletir o POST que aconteceu antes dele - um handler estático sempre-vazio não
+    // provaria nada sobre a invalidação de cache que este teste existe pra cobrir.
+    let apontamentos: unknown[] = []
+    server.use(
+      http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)),
+      http.get('/cards/7/eventos', () => HttpResponse.json([])),
+      http.get('/cards/7/apontamentos', () => HttpResponse.json(apontamentos)),
+      http.post('/cards/7/apontamentos/timer', () => {
+        const novo = {
+          id: 1,
+          usuarioId: 1,
+          cardId: 7,
+          inicio: '2026-01-15T09:00:00Z',
+          fim: null,
+          minutos: null,
+          descricao: null,
+          origem: 'TIMER',
+          criadoEm: '2026-01-15T09:00:00Z',
+          editadoEm: '2026-01-15T09:00:00Z',
+        }
+        apontamentos = [novo]
+        return HttpResponse.json(novo, { status: 201 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    // Histórico aberto ANTES de iniciar o timer - é exatamente o cenário do relato do usuário.
+    await user.click(screen.getByRole('button', { name: /histórico/i }))
+    await screen.findByRole('list', { name: /histórico do card/i })
+    expect(screen.queryByText(/timer iniciado/i)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /iniciar timer/i }))
+
+    expect(await screen.findByText(/timer iniciado, ainda em andamento/i)).toBeInTheDocument()
   })
 
   it('mostra erro quando o histórico não pode ser carregado', async () => {

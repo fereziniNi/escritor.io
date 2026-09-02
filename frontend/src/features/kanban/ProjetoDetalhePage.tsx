@@ -16,6 +16,7 @@ import { useParams } from 'react-router'
 import { useAuthStore } from '../auth/authStore'
 import { CampoPessoa } from '../../shared/CampoPessoa'
 import { encontrarPessoaPorNome, existeSugestaoPara, type PessoaBasica } from '../../shared/encontrarPessoaPorNome'
+import { formatarDataHoraBr } from '../../shared/formatarData'
 import { adicionarMembroAoProjeto, buscarProjeto, criarColuna, listarPessoas } from '../organizacao/api'
 import type { ProjetoDetalhe } from '../organizacao/types'
 import {
@@ -32,9 +33,9 @@ import {
   pararTimer,
 } from './api'
 import { formatarDuracao } from './formatarDuracao'
+import { mesclarHistorico } from './mesclarHistorico'
 import { moverCardOtimista } from './moverCardOtimista'
 import { resolverMovimento } from './resolverMovimento'
-import { rotuloEvento } from './rotuloEvento'
 import type { Apontamento, Card, ColunaComCards } from './types'
 import { useProjetoWebSocket } from './useProjetoWebSocket'
 import './Kanban.css'
@@ -105,6 +106,16 @@ function ComentariosDoCard({ cardId }: { cardId: number }) {
   )
 }
 
+/**
+ * Pedido do usuário: "eu iniciei o timer de uma atividade... mas ela não ficou marcada no
+ * historico!! no historico deve estar o dia hora e quanto tempo foi feita" - o Histórico mostrava
+ * só os eventos de ciclo de vida do card (`EventoCard`), nunca o tempo apontado. Agora mescla
+ * eventos com apontamentos (`mesclarHistorico`) numa única linha do tempo, com dia/hora
+ * (`formatarDataHoraBr`) na frente de cada item. Reaproveita a MESMA queryKey de
+ * `ApontamentosDoCard` (`['cards', cardId, 'apontamentos']`) de propósito - é o cache
+ * compartilhado do TanStack Query que faz o Histórico se atualizar sozinho quando `TimerDoCard`
+ * inicia/para um timer, sem duplicar a busca nem inventar um canal de sincronização novo.
+ */
 function HistoricoDoCard({ cardId }: { cardId: number }) {
   const [aberto, setAberto] = useState(false)
 
@@ -114,6 +125,13 @@ function HistoricoDoCard({ cardId }: { cardId: number }) {
     queryFn: () => listarEventos(cardId),
     enabled: aberto,
   })
+  const apontamentosQuery = useQuery({
+    queryKey: ['cards', cardId, 'apontamentos'],
+    queryFn: () => listarApontamentos(cardId),
+    enabled: aberto,
+  })
+
+  const linhas = mesclarHistorico(eventosQuery.data ?? [], apontamentosQuery.data ?? [])
 
   return (
     <div className="kanban-subsecao">
@@ -122,11 +140,13 @@ function HistoricoDoCard({ cardId }: { cardId: number }) {
       </button>
       {aberto && (
         <div className="kanban-subsecao-corpo">
-          {eventosQuery.isError && <p className="mensagem-erro">Não foi possível carregar o histórico.</p>}
+          {(eventosQuery.isError || apontamentosQuery.isError) && (
+            <p className="mensagem-erro">Não foi possível carregar o histórico.</p>
+          )}
           <ul aria-label="Histórico do card" className="kanban-subsecao-lista">
-            {eventosQuery.data?.map((evento) => (
-              <li key={evento.id} className="kanban-subsecao-item">
-                {rotuloEvento(evento)}
+            {linhas.map((linha) => (
+              <li key={linha.chave} className="kanban-subsecao-item">
+                <span className="kanban-historico-quando">{formatarDataHoraBr(linha.quando)}</span> — {linha.rotulo}
               </li>
             ))}
           </ul>
@@ -137,6 +157,7 @@ function HistoricoDoCard({ cardId }: { cardId: number }) {
 }
 
 function TimerDoCard({ cardId }: { cardId: number }) {
+  const queryClient = useQueryClient()
   // Estado só local de propósito (S4.4): não há endpoint ainda pra "qual timer está aberto" (fica
   // pra quando precisar), então um reload da página perde a referência de qual apontamento está
   // rodando aqui - o timer continua aberto no servidor, só a UI "esquece" até essa fatia futura.
@@ -151,17 +172,26 @@ function TimerDoCard({ cardId }: { cardId: number }) {
     return () => clearInterval(intervalo)
   }, [apontamentoAtivo])
 
+  // Pedido do usuário: "eu iniciei o timer... mas ela não ficou marcada no historico!!" - a causa
+  // era esta: nem iniciar nem parar invalidava `['cards', cardId, 'apontamentos']`, então quem já
+  // estava com o painel de Apontamentos/Histórico aberto não via nada mudar até fechar e reabrir.
+  // `ApontamentosDoCard`/`HistoricoDoCard` usam essa MESMA queryKey - invalidar aqui atualiza os
+  // dois de uma vez, sem acoplar este componente a nenhum dos dois diretamente.
   const iniciarMutation = useMutation({
     mutationFn: () => iniciarTimer(cardId),
     onSuccess: (apontamento) => {
       setApontamentoAtivo({ id: apontamento.id, inicio: apontamento.inicio })
       setAgora(Date.now())
+      queryClient.invalidateQueries({ queryKey: ['cards', cardId, 'apontamentos'] })
     },
   })
 
   const pararMutation = useMutation({
     mutationFn: () => pararTimer(apontamentoAtivo!.id),
-    onSuccess: () => setApontamentoAtivo(null),
+    onSuccess: () => {
+      setApontamentoAtivo(null)
+      queryClient.invalidateQueries({ queryKey: ['cards', cardId, 'apontamentos'] })
+    },
     // Se o servidor recusar (ex.: esse timer já foi encerrado por outro iniciado em outro card -
     // S4.2/S4.3), a suposição local de "ainda está rodando" já era falsa mesmo - some daqui.
     onError: () => setApontamentoAtivo(null),
