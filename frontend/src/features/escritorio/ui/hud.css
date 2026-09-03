@@ -94,7 +94,6 @@
    avatar" - clicar no próprio personagem abre o editor) - reset de botão nativo + affordance de
    clique, sem perder a aparência de "bolha" que já tinha como <span>. */
 .escritorio-menu-usuario-avatar {
-  position: relative;
   width: 40px;
   height: 40px;
   border: none;
@@ -115,17 +114,10 @@
   background: #4a4a62;
 }
 
-/* Pontinho de status (Fase de personagem com sprite pronto: a cor da roupa não é mais o sinal de
-   status, ver `avatarFactory.ts#desenharIndicadorStatus` - aqui na bolha da toolbar é a mesma
-   ideia, só que em DOM/CSS em vez de Pixi). */
-.escritorio-menu-usuario-status-ponto {
-  position: absolute;
-  bottom: 2px;
-  right: 3px;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  border: 1.5px solid #2b2b3a;
+.escritorio-menu-usuario-avatar svg {
+  width: 26px;
+  height: auto;
+  transform: translateY(3px);
 }
 
 .escritorio-menu-usuario-info {

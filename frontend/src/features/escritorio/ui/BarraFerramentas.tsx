@@ -1,4 +1,4 @@
-import type { Personagem } from '../avatar/personagens'
+import type { AparenciaAvatar } from '../avatar/aparenciaAvatar'
 import { ControlesAudioVideo } from './ControlesAudioVideo'
 import { MenuUsuario } from './MenuUsuario'
 import type { StatusAvatar } from '../types'
@@ -13,7 +13,7 @@ export type PainelId = 'ponto' | 'relatorios' | 'projetos' | 'colaboradores' | '
  */
 export function BarraFerramentas({
   nome,
-  meuPersonagem,
+  meuAparencia,
   meuStatus,
   aoMudarStatus,
   papel,
@@ -23,7 +23,7 @@ export function BarraFerramentas({
   aoAlternarParticipantes,
 }: {
   nome: string
-  meuPersonagem: Personagem
+  meuAparencia: AparenciaAvatar
   meuStatus: StatusAvatar
   aoMudarStatus: (status: StatusAvatar) => void
   papel: string | null
@@ -36,7 +36,7 @@ export function BarraFerramentas({
     <div className="escritorio-toolbar">
       <MenuUsuario
         nome={nome}
-        personagem={meuPersonagem}
+        aparencia={meuAparencia}
         status={meuStatus}
         aoMudarStatus={aoMudarStatus}
         aoAbrirEditorAvatar={() => aoAbrirPainel('avatar')}

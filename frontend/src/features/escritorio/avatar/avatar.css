@@ -1,8 +1,10 @@
 /**
- * Editor de personagem (`EditorAvatarPage.tsx`) - grade de miniaturas dos 6 personagens prontos
- * (Kenney RPG Urban Pack, CC0), bem mais simples que a versão anterior por camadas (sem abas, sem
- * grade de swatch de cor - era um sistema de misturar cabelo/roupa, agora é escolher um
- * personagem inteiro pronto).
+ * Editor de personagem (`EditorAvatarPage.tsx`) - abas + grade de swatches de cor + grade de
+ * miniaturas de estilo, mesma composição do editor do Gather usado como referência de UI. Volta a
+ * existir depois de uma passagem por sprites prontos (Kenney) - substitui o CSS de galeria de
+ * miniaturas que existia nesse meio tempo. Reaproveita `.botao-secundario`/`.botao-pequeno` já
+ * existentes pro resto (abas/opções de estilo), só os swatches de cor (círculos) e o card de
+ * prévia são classes novas.
  */
 
 .editor-avatar {
@@ -21,30 +23,68 @@
   justify-content: center;
 }
 
-.editor-avatar-galeria {
-  width: 100%;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.6rem;
+.editor-avatar-previa svg {
+  width: 64px;
+  height: auto;
 }
 
-.editor-avatar-opcao-personagem {
+.editor-avatar-abas {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.editor-avatar-aba-ativa {
+  background: var(--cor-primaria, #4f9f6f);
+  color: #fff;
+  border-color: transparent;
+}
+
+.editor-avatar-secao {
+  width: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.6rem;
-  background: var(--cor-superficie, #fff);
-  border: 2px solid var(--cor-borda, #d8dde3);
-  border-radius: var(--raio-borda, 12px);
-  cursor: pointer;
-  font-size: 0.8rem;
-  font-weight: 700;
+  gap: 0.5rem;
 }
 
-.editor-avatar-opcao-personagem-selecionada {
-  border-color: var(--cor-primaria, #4f9f6f);
-  background: var(--cor-primaria-clara, #eef2f6);
+.editor-avatar-subtitulo {
+  margin: 0.4rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--cor-texto-suave, #666);
+}
+
+.editor-avatar-opcoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.editor-avatar-opcao-selecionada {
+  background: var(--cor-primaria, #4f9f6f);
+  color: #fff;
+  border-color: transparent;
+}
+
+.editor-avatar-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.editor-avatar-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--cor-borda, #d8dde3);
+  cursor: pointer;
+  padding: 0;
+}
+
+.editor-avatar-swatch-selecionado {
+  border-color: var(--cor-primaria-escura, #2f6f45);
+  box-shadow: 0 0 0 2px var(--cor-primaria, #4f9f6f);
 }
 
 .editor-avatar-rodape {

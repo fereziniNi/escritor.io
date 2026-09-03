@@ -4,12 +4,13 @@ import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { APARENCIA_PADRAO } from './aparenciaAvatar'
 import { EditorAvatarPage } from './EditorAvatarPage'
 
-// Handler padrão de "personagem ainda padrão" (conta recém-criada), restaurado a cada teste por
+// Handler padrão de "aparência ainda padrão" (conta recém-criada), restaurado a cada teste por
 // `resetHandlers`; os testes que se importam com o valor sobrescrevem via `server.use(...)`.
 const server = setupServer(
-  http.get('/usuarios/me', () => HttpResponse.json({ id: 1, nome: 'Ana Souza', personagem: 'PERSONAGEM_VERDE' })),
+  http.get('/usuarios/me', () => HttpResponse.json({ id: 1, nome: 'Ana Souza', aparencia: APARENCIA_PADRAO })),
 )
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
@@ -34,55 +35,66 @@ describe('EditorAvatarPage', () => {
     expect(await screen.findByText(/não foi possível carregar seu avatar/i)).toBeInTheDocument()
   })
 
-  it('mostra a galeria com os 6 personagens e pré-seleciona o atual', async () => {
+  it('abre na aba Base, com Pele/Cabelo/Barba', async () => {
     renderPagina()
 
-    expect(await screen.findByRole('group', { name: /escolha o personagem/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /verde/i })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: /vermelho/i })).toHaveAttribute('aria-pressed', 'false')
-    expect(screen.getByRole('button', { name: /roxo/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /chapéu/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /cinza/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /bandana/i })).toBeInTheDocument()
+    expect(await screen.findByRole('tab', { name: 'Base' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('group', { name: /cor de pele/i })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: /estilo de cabelo/i })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Barba' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Nenhuma' })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('escolher outro personagem marca ele como selecionado', async () => {
+  it('troca pra aba Roupas e depois Acessórios', async () => {
     const user = userEvent.setup()
     renderPagina()
-    await screen.findByRole('group', { name: /escolha o personagem/i })
+    await screen.findByRole('tab', { name: 'Base' })
 
-    await user.click(screen.getByRole('button', { name: /roxo/i }))
+    await user.click(screen.getByRole('tab', { name: 'Roupas' }))
+    expect(screen.getByRole('group', { name: /estilo de roupa/i })).toBeInTheDocument()
 
-    expect(screen.getByRole('button', { name: /roxo/i })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: /verde/i })).toHaveAttribute('aria-pressed', 'false')
+    await user.click(screen.getByRole('tab', { name: 'Acessórios' }))
+    expect(screen.getByRole('group', { name: 'Óculos' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Chapéu' })).toBeInTheDocument()
   })
 
-  it('finalizar salva o personagem escolhido', async () => {
+  it('escolher uma barba marca ela como selecionada', async () => {
+    const user = userEvent.setup()
+    renderPagina()
+    await screen.findByRole('tab', { name: 'Base' })
+
+    await user.click(screen.getByRole('button', { name: 'Cavanhaque' }))
+
+    expect(screen.getByRole('button', { name: 'Cavanhaque' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Nenhuma' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('finalizar salva a aparência escolhida', async () => {
     server.use(
       http.patch('/usuarios/me/aparencia', async ({ request }) => {
-        const corpo = (await request.json()) as { personagem: string }
-        expect(corpo.personagem).toBe('PERSONAGEM_BANDANA')
-        return HttpResponse.json({ id: 1, nome: 'Ana Souza', personagem: 'PERSONAGEM_BANDANA' })
+        const corpo = (await request.json()) as { tipoBarba: string }
+        expect(corpo.tipoBarba).toBe('BARBA_CHEIA')
+        return HttpResponse.json({ id: 1, nome: 'Ana Souza', aparencia: { ...APARENCIA_PADRAO, tipoBarba: 'BARBA_CHEIA' } })
       }),
     )
     const user = userEvent.setup()
     renderPagina()
-    await screen.findByRole('group', { name: /escolha o personagem/i })
+    await screen.findByRole('tab', { name: 'Base' })
 
-    await user.click(screen.getByRole('button', { name: /bandana/i }))
+    await user.click(screen.getByRole('button', { name: 'Barba cheia' }))
     await user.click(screen.getByRole('button', { name: /finalizar/i }))
 
-    expect(await screen.findByText(/personagem salvo/i)).toBeInTheDocument()
+    expect(await screen.findByText(/aparência salva/i)).toBeInTheDocument()
   })
 
   it('mostra erro quando salvar falha', async () => {
     server.use(http.patch('/usuarios/me/aparencia', () => new HttpResponse(null, { status: 400 })))
     const user = userEvent.setup()
     renderPagina()
-    await screen.findByRole('group', { name: /escolha o personagem/i })
+    await screen.findByRole('tab', { name: 'Base' })
 
     await user.click(screen.getByRole('button', { name: /finalizar/i }))
 
-    expect(await screen.findByText(/não foi possível salvar o personagem/i)).toBeInTheDocument()
+    expect(await screen.findByText(/não foi possível salvar a aparência/i)).toBeInTheDocument()
   })
 })

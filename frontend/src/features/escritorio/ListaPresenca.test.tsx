@@ -1,15 +1,15 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { ListaPresenca } from './ListaPresenca'
-import { PERSONAGEM_PADRAO } from './avatar/personagens'
+import { APARENCIA_PADRAO } from './avatar/aparenciaAvatar'
 import type { EstadoPresencaUsuario, Zona } from './types'
 
 const FOCO: Zona = { id: 1, nome: 'Sala de foco', x: 0, y: 0, largura: 4, altura: 4, tipo: 'FOCO' }
 const REUNIAO: Zona = { id: 2, nome: 'Sala de reunião', x: 5, y: 0, largura: 5, altura: 5, tipo: 'REUNIAO' }
 const ZONAS = [FOCO, REUNIAO]
 
-const ANA: EstadoPresencaUsuario = { usuarioId: 1, nome: 'Ana', x: 1, y: 1, status: 'FOCO', personagem: PERSONAGEM_PADRAO }
-const BETO: EstadoPresencaUsuario = { usuarioId: 2, nome: 'Beto', x: 8, y: 8, status: 'DISPONIVEL', personagem: PERSONAGEM_PADRAO }
+const ANA: EstadoPresencaUsuario = { usuarioId: 1, nome: 'Ana', x: 1, y: 1, status: 'FOCO', aparencia: APARENCIA_PADRAO }
+const BETO: EstadoPresencaUsuario = { usuarioId: 2, nome: 'Beto', x: 8, y: 8, status: 'DISPONIVEL', aparencia: APARENCIA_PADRAO }
 
 describe('ListaPresenca', () => {
   it('agrupa cada usuário na zona onde a posição dele cai', () => {

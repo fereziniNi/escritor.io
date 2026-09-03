@@ -1,10 +1,10 @@
 import { apiFetch } from '../../../shared/api/http'
-import type { Personagem } from './personagens'
+import type { AparenciaAvatar } from './aparenciaAvatar'
 
 export interface MeuUsuarioResponse {
   id: number
   nome: string
-  personagem: Personagem
+  aparencia: AparenciaAvatar
 }
 
 export async function buscarMeuUsuario(): Promise<MeuUsuarioResponse> {
@@ -15,14 +15,14 @@ export async function buscarMeuUsuario(): Promise<MeuUsuarioResponse> {
   return response.json()
 }
 
-export async function atualizarMeuPersonagem(personagem: Personagem): Promise<MeuUsuarioResponse> {
+export async function atualizarMinhaAparencia(aparencia: AparenciaAvatar): Promise<MeuUsuarioResponse> {
   const response = await apiFetch('/usuarios/me/aparencia', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ personagem }),
+    body: JSON.stringify(aparencia),
   })
   if (!response.ok) {
-    throw new Error('Não foi possível salvar o personagem')
+    throw new Error('Não foi possível salvar a aparência')
   }
   return response.json()
 }

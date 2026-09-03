@@ -1,42 +1,39 @@
 import { extend, useTick } from '@pixi/react'
-import type { Container as PixiContainer, Graphics as PixiGraphics, Sprite as PixiSprite } from 'pixi.js'
-import { Container, Graphics, Sprite, Text, Texture } from 'pixi.js'
-import { useLayoutEffect, useMemo, useRef } from 'react'
-import { caminhoSprite, QUADROS_POR_CICLO, type Personagem } from '../avatar/personagens'
-import { desenharAnelDestaque, desenharAnelProximidade, desenharIndicadorStatus, desenharSombraAvatar } from './avatarFactory'
+import type { Container as PixiContainer, Graphics as PixiGraphics } from 'pixi.js'
+import { Container, Graphics, Text } from 'pixi.js'
+import { useCallback, useLayoutEffect, useMemo, useRef } from 'react'
+import type { AparenciaAvatar } from '../avatar/aparenciaAvatar'
+import {
+  corCalcaParaRoupa,
+  desenharAnelDestaque,
+  desenharAnelProximidade,
+  desenharBarba,
+  desenharCabelo,
+  desenharChapeu,
+  desenharCorpoBase,
+  desenharIndicadorStatus,
+  desenharOculos,
+  desenharPerna,
+  desenharRoupa,
+  desenharSombraAvatar,
+  PIVO_PERNA_DIREITA,
+  PIVO_PERNA_ESQUERDA,
+} from './avatarFactory'
 import { TILE_PX } from './constantes'
 import { DURACAO_GLIDE_MS, interpolarPosicao } from './glide'
 import type { PosicaoTile } from './movimento'
 
-extend({ Container, Graphics, Sprite, Text })
+extend({ Container, Graphics, Text })
 
-/** Tamanho do sprite exibido (nativo é 16×16 - com escala "nearest" pra manter o pixel art nítido,
- * ver `precarregarSpritesPersonagens`). Primeira versão era 22px (menor que o tile de 32px,
- * usuário achou "muito pequeno"); foi pra 46px; usuário pediu "diminua cerca de 30%" - 46×0.7≈32,
- * que cai bem no tamanho do próprio tile (`TILE_PX`). */
-const TAMANHO_SPRITE_PX = 32
+/** Escala aplicada por cima das coordenadas nativas de `PixelCharacterSvg` (viewBox 24×30) - dá um
+ * personagem de ~31×39px. Maior que a primeira versão desenhada à mão (`ea212ee`, 1.1) - o usuário
+ * já deixou claro em 2 rodadas com os sprites Kenney que "muito pequeno" é um problema recorrente,
+ * melhor começar generoso e ajustar depois via feedback (mesmo padrão iterativo já usado 2x nesta
+ * sessão pro tamanho do sprite). */
+const ESCALA_AVATAR = 1.3
 
-/** Troca a textura do sprite E reafirma o tamanho exibido a partir dela. `Texture.from(url)` só
- * resolve pra textura de verdade se a URL já estiver no `Cache` do Pixi (preenchido antecipadamente
- * por `precarregarSpritesPersonagens`, chamado em `EscritorioPage`) - sem isso ela fica presa num
- * placeholder 1×1, e como `width`/`height` (JSX) calculam a escala a partir do tamanho da textura
- * *no momento em que são aplicados*, ficar só nesses props não corrige a escala se a textura mudar
- * depois (foi exatamente o bug visto na checagem visual desta feature: avatar virava um retângulo
- * esticado). Reaplicar `width`/`height` toda vez que a textura troca evita essa dessincronia,
- * mesmo se por algum motivo a textura ainda não estiver pronta. */
-function aplicarQuadro(sprite: PixiSprite, personagem: Personagem, quadro: number) {
-  sprite.texture = Texture.from(caminhoSprite(personagem, quadro))
-  sprite.width = TAMANHO_SPRITE_PX
-  sprite.height = TAMANHO_SPRITE_PX
-}
-
-/** Ponto "no chão" (pés) ancorado na posição-mundo do avatar - é ao mesmo tempo o `pivot` de
- * `corpoContainerRef` e o `x`/`y` do próprio sprite (âncora dele é `{x:0.5,y:1}`, ou seja, o
- * centro-base da textura), então os dois se cancelam: o sprite sempre renderiza com os pés
- * exatamente em (0,0) de `raizRef`, crescendo pra cima conforme `TAMANHO_SPRITE_PX` - mudar o
- * tamanho do sprite não desloca os pés. Sombra/indicador (`avatarFactory.ts`) usam esse mesmo
- * `y` (`CHAO_Y` lá, igual a este `PIVO_BASE.y`) pelo mesmo motivo: ficar grudado no chão
- * independente da altura do personagem em cima. */
+/** (x,y) local do ponto que fica ancorado na posição-mundo do avatar: base da caixa 24×30, um
+ * pouco acima do fundo das pernas (27) pra "pisar" visualmente no chão em vez de flutuar. */
 const PIVO_BASE = { x: 12, y: 27 }
 
 const COR_TEXTO_NOME = 0xffffff
@@ -45,33 +42,38 @@ const COR_TEXTO_NOME = 0xffffff
  * apagado - dá pra ver que "tem alguém ali" sem parecer alguém realmente presente/ativo. */
 const ALPHA_OFFLINE = 0.45
 
-/** Duração de cada quadro do ciclo de caminhada (12 quadros × 70ms ≈ 840ms por volta completa) -
- * só avança enquanto o avatar está de fato andando (glide em progresso), parado fica sempre no
- * quadro 0 (idle). */
-const DURACAO_QUADRO_MS = 70
+/** Velocidade (rad/ms) e amplitude (rad) do balanço de perna enquanto anda - valores escolhidos
+ * pra completar um ciclo perceptível dentro da duração de um glide (`DURACAO_GLIDE_MS`). */
+const VELOCIDADE_PERNA = 0.02
+const AMPLITUDE_PERNA = 0.5
 
-/** Bob de espera (Fase 5, polish, ainda vale pro sprite) - o corpo balança bem sutilmente mesmo
- * parado, mesma sensação de antes. */
+/** Bob de espera - o corpo balança bem sutilmente mesmo parado. */
 const VELOCIDADE_BOB = 0.0035
 const AMPLITUDE_BOB_PX = 1.6
 
+function hexParaNumero(cor: string): number {
+  return Number(cor.replace('#', '0x'))
+}
+
 /**
- * Avatar no mundo Pixi - substitui `AvatarNoMapa`/`useAnimacaoPersonagem` (mapa em DOM) e, mais
- * recentemente, o corpo desenhado à mão via `PIXI.Graphics` por um sprite de verdade (pedido do
- * usuário: "adicionar game-assets... sobre characteres", ver `avatar/personagens.ts`). Só recebe a
- * posição em tile *confirmada* (inteira, vinda do servidor via `usePresencaWebSocket`); toda a
- * suavização visual (glide entre tiles, direção inferida do delta, quadro de caminhada, bob de
- * espera, pulso de proximidade) é interna, dirigida por `useTick`.
+ * Avatar no mundo Pixi - volta a ser desenhado em camadas via `PIXI.Graphics` depois de uma
+ * passagem por sprites prontos (Kenney): o usuário mandou um print do editor de personagem do
+ * próprio Gather como referência e pediu "voltar ao sistema desenhado à mão, bem mais detalhado"
+ * (ver `avatarFactory.ts` pro detalhe visual em si). Só recebe a posição em tile *confirmada*
+ * (inteira, vinda do servidor via `usePresencaWebSocket`); toda a suavização visual (glide entre
+ * tiles, direção inferida do delta, balanço de perna enquanto anda, bob de espera, pulso de
+ * proximidade) é interna, dirigida por `useTick`.
  *
  * Perf (lição das duas rodadas de correção desta sessão): nada aqui passa por `useState` - os
- * objetos Pixi (`Container`/`Sprite`/`Graphics`) são mutados direto via `ref` dentro do `useTick`,
- * sem nenhum re-render do React envolvido.
+ * objetos Pixi (`Container`/`Graphics`) são mutados direto via `ref` dentro do `useTick`. Cada
+ * camada da aparência (`desenharRoupaMemo`/`desenharCabeloMemo`/etc.) é memoizada só na própria
+ * dependência - trocar o chapéu não redesenha o cabelo, por exemplo.
  */
 export function AvatarPixi({
   tileX,
   tileY,
   nome,
-  personagem,
+  aparencia,
   status,
   destaque,
   proximo = false,
@@ -80,9 +82,9 @@ export function AvatarPixi({
   tileX: number
   tileY: number
   nome: string
-  personagem: Personagem
-  /** Cor do status (`COR_STATUS[status]`) - vira o pontinho indicador (o sprite pronto não tem
-   * como recolorir só a roupa igual o avatar desenhado à mão tinha). */
+  aparencia: AparenciaAvatar
+  /** Cor do status (`COR_STATUS[status]`) - só usada pro pontinho indicador, não mais pra colorir
+   * a roupa. */
   status: string
   destaque: boolean
   /** Fase 3 - alguém está dentro do raio de proximidade deste avatar (`proximidade.ts`). */
@@ -91,34 +93,48 @@ export function AvatarPixi({
    * avatar renderiza apagado + nome com sufixo, pra não parecer alguém realmente presente. */
   offline?: boolean
 }) {
-  const corStatusNumero = useMemo(() => Number(status.replace('#', '0x')), [status])
-  const desenharIndicadorMemo = useMemo(() => (g: PixiGraphics) => desenharIndicadorStatus(g, corStatusNumero), [corStatusNumero])
-  // Os anéis precisam saber o tamanho do sprite pra envolver o corpo inteiro (não só os pés) -
-  // `TAMANHO_SPRITE_PX` é uma constante do módulo, então a closure é estável, mas ainda memoiza
-  // (mesmo padrão do indicador acima) pra manter a mesma referência de função entre renders.
-  const desenharDestaqueMemo = useMemo(() => (g: PixiGraphics) => desenharAnelDestaque(g, TAMANHO_SPRITE_PX), [])
-  const desenharProximidadeMemo = useMemo(() => (g: PixiGraphics) => desenharAnelProximidade(g, TAMANHO_SPRITE_PX), [])
+  const corPeleNumero = useMemo(() => hexParaNumero(aparencia.corPele), [aparencia.corPele])
+  const corCabeloNumero = useMemo(() => hexParaNumero(aparencia.corCabelo), [aparencia.corCabelo])
+  const corRoupaNumero = useMemo(() => hexParaNumero(aparencia.corRoupa), [aparencia.corRoupa])
+  const corCalcaNumero = useMemo(() => corCalcaParaRoupa(corRoupaNumero), [corRoupaNumero])
+  const corStatusNumero = useMemo(() => hexParaNumero(status), [status])
+
+  // Este componente re-renderiza a cada tick (o bob de espera - ver `useTick` abaixo - roda
+  // sempre, parado ou não), então cada camada precisa da própria closure memoizada na própria
+  // dependência - sem isso, todo mundo redesenharia a 60fps à toa.
+  const desenharPernaMemo = useCallback((g: PixiGraphics) => desenharPerna(g, corCalcaNumero), [corCalcaNumero])
+  const desenharRoupaMemo = useCallback(
+    (g: PixiGraphics) => desenharRoupa(g, aparencia.estiloRoupa, corRoupaNumero, corPeleNumero),
+    [aparencia.estiloRoupa, corRoupaNumero, corPeleNumero],
+  )
+  const desenharCorpoMemo = useCallback((g: PixiGraphics) => desenharCorpoBase(g, corPeleNumero), [corPeleNumero])
+  const desenharBarbaMemo = useCallback(
+    (g: PixiGraphics) => desenharBarba(g, aparencia.tipoBarba, corCabeloNumero),
+    [aparencia.tipoBarba, corCabeloNumero],
+  )
+  const desenharCabeloMemo = useCallback((g: PixiGraphics) => desenharCabelo(g, aparencia.estiloCabelo, corCabeloNumero), [aparencia.estiloCabelo, corCabeloNumero])
+  const desenharOculosMemo = useCallback((g: PixiGraphics) => desenharOculos(g, aparencia.oculos), [aparencia.oculos])
+  const desenharChapeuMemo = useCallback((g: PixiGraphics) => desenharChapeu(g, aparencia.chapeu), [aparencia.chapeu])
+  const desenharIndicadorMemo = useCallback((g: PixiGraphics) => desenharIndicadorStatus(g, corStatusNumero), [corStatusNumero])
 
   const raizRef = useRef<PixiContainer | null>(null)
   const corpoContainerRef = useRef<PixiContainer | null>(null)
-  const spriteRef = useRef<PixiSprite | null>(null)
+  const pernaEsquerdaRef = useRef<PixiGraphics | null>(null)
+  const pernaDireitaRef = useRef<PixiGraphics | null>(null)
   const anelProximidadeRef = useRef<PixiGraphics | null>(null)
 
   const alvoRef = useRef<PosicaoTile>({ x: tileX, y: tileY })
   const inicioGlideRef = useRef<PosicaoTile>({ x: tileX, y: tileY })
   const posicaoAtualRef = useRef<PosicaoTile>({ x: tileX, y: tileY })
   const progressoRef = useRef(1)
-  const tempoQuadroRef = useRef(0)
-  const quadroAtualRef = useRef(0)
+  const tempoAnimadoRef = useRef(0)
   const tempoPulsoRef = useRef(0)
   const tempoBobRef = useRef(0)
   const direcaoRef = useRef<'esquerda' | 'direita'>('direita')
-  const personagemRef = useRef(personagem)
-  personagemRef.current = personagem
 
-  // Posição/escala/pivô/textura iniciais só precisam ser aplicados uma vez, na montagem - depois
-  // disso quem move é o `useTick` abaixo, direto nos objetos Pixi (nunca mais via prop reativa,
-  // pra não ter re-render nenhum disputando com a mutação imperativa).
+  // Posição/escala/pivô iniciais só precisam ser aplicados uma vez, na montagem - depois disso
+  // quem move é o `useTick` abaixo, direto nos objetos Pixi (nunca mais via prop reativa, pra não
+  // ter re-render nenhum disputando com a mutação imperativa).
   useLayoutEffect(() => {
     if (raizRef.current) {
       raizRef.current.x = tileX * TILE_PX + TILE_PX / 2
@@ -126,22 +142,12 @@ export function AvatarPixi({
     }
     if (corpoContainerRef.current) {
       corpoContainerRef.current.pivot.set(PIVO_BASE.x, PIVO_BASE.y)
+      corpoContainerRef.current.scale.set(ESCALA_AVATAR, ESCALA_AVATAR)
     }
-    if (spriteRef.current) {
-      aplicarQuadro(spriteRef.current, personagem, 0)
-    }
-    // roda só na montagem de propósito - tileX/tileY/personagem aqui são só o valor inicial;
-    // mudanças subsequentes são tratadas pelos efeitos/tick abaixo.
+    // roda só na montagem de propósito - tileX/tileY aqui são só o valor inicial; mudanças
+    // subsequentes são tratadas pelo efeito de glide logo abaixo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  // Troca de personagem (o usuário salvou uma escolha nova no editor) não depende de mover - a
-  // textura do quadro atual precisa atualizar sozinha, sem esperar o próximo passo.
-  useLayoutEffect(() => {
-    if (spriteRef.current) {
-      aplicarQuadro(spriteRef.current, personagem, quadroAtualRef.current)
-    }
-  }, [personagem])
 
   useLayoutEffect(() => {
     if (alvoRef.current.x === tileX && alvoRef.current.y === tileY) {
@@ -154,7 +160,7 @@ export function AvatarPixi({
     if (tileX !== partida.x) {
       direcaoRef.current = tileX < partida.x ? 'esquerda' : 'direita'
       if (corpoContainerRef.current) {
-        corpoContainerRef.current.scale.x = direcaoRef.current === 'esquerda' ? -1 : 1
+        corpoContainerRef.current.scale.x = (direcaoRef.current === 'esquerda' ? -1 : 1) * ESCALA_AVATAR
       }
     }
     // posicaoAtualRef de propósito fora das deps: só nos importa o valor no momento em que
@@ -163,8 +169,7 @@ export function AvatarPixi({
   }, [tileX, tileY])
 
   useTick((ticker) => {
-    const andando = progressoRef.current < 1
-    if (andando) {
+    if (progressoRef.current < 1) {
       progressoRef.current = Math.min(1, progressoRef.current + ticker.deltaMS / DURACAO_GLIDE_MS)
       posicaoAtualRef.current = interpolarPosicao(inicioGlideRef.current, alvoRef.current, progressoRef.current)
       if (raizRef.current) {
@@ -172,20 +177,13 @@ export function AvatarPixi({
         raizRef.current.y = posicaoAtualRef.current.y * TILE_PX + TILE_PX
       }
 
-      tempoQuadroRef.current += ticker.deltaMS
-      if (tempoQuadroRef.current >= DURACAO_QUADRO_MS) {
-        tempoQuadroRef.current = 0
-        quadroAtualRef.current = (quadroAtualRef.current + 1) % QUADROS_POR_CICLO
-        if (spriteRef.current) {
-          aplicarQuadro(spriteRef.current, personagemRef.current, quadroAtualRef.current)
-        }
-      }
-    } else if (quadroAtualRef.current !== 0) {
-      quadroAtualRef.current = 0
-      tempoQuadroRef.current = 0
-      if (spriteRef.current) {
-        aplicarQuadro(spriteRef.current, personagemRef.current, 0)
-      }
+      tempoAnimadoRef.current += ticker.deltaMS
+      const angulo = Math.sin(tempoAnimadoRef.current * VELOCIDADE_PERNA) * AMPLITUDE_PERNA
+      if (pernaEsquerdaRef.current) pernaEsquerdaRef.current.rotation = angulo
+      if (pernaDireitaRef.current) pernaDireitaRef.current.rotation = -angulo
+    } else {
+      if (pernaEsquerdaRef.current && pernaEsquerdaRef.current.rotation !== 0) pernaEsquerdaRef.current.rotation = 0
+      if (pernaDireitaRef.current && pernaDireitaRef.current.rotation !== 0) pernaDireitaRef.current.rotation = 0
     }
 
     if (proximo && anelProximidadeRef.current) {
@@ -203,23 +201,23 @@ export function AvatarPixi({
     <pixiContainer ref={raizRef} alpha={offline ? ALPHA_OFFLINE : 1}>
       <pixiContainer ref={corpoContainerRef}>
         <pixiGraphics draw={desenharSombraAvatar} />
-        {destaque && <pixiGraphics draw={desenharDestaqueMemo} />}
-        {proximo && <pixiGraphics ref={anelProximidadeRef} draw={desenharProximidadeMemo} />}
-        <pixiSprite
-          ref={spriteRef}
-          anchor={{ x: 0.5, y: 1 }}
-          x={PIVO_BASE.x}
-          y={PIVO_BASE.y}
-          width={TAMANHO_SPRITE_PX}
-          height={TAMANHO_SPRITE_PX}
-        />
+        {destaque && <pixiGraphics draw={desenharAnelDestaque} />}
+        {proximo && <pixiGraphics ref={anelProximidadeRef} draw={desenharAnelProximidade} />}
+        <pixiGraphics draw={desenharPernaMemo} ref={pernaEsquerdaRef} x={PIVO_PERNA_ESQUERDA.x} y={PIVO_PERNA_ESQUERDA.y} />
+        <pixiGraphics draw={desenharPernaMemo} ref={pernaDireitaRef} x={PIVO_PERNA_DIREITA.x} y={PIVO_PERNA_DIREITA.y} />
+        <pixiGraphics draw={desenharRoupaMemo} />
+        <pixiGraphics draw={desenharCorpoMemo} />
+        <pixiGraphics draw={desenharBarbaMemo} />
+        <pixiGraphics draw={desenharCabeloMemo} />
+        <pixiGraphics draw={desenharOculosMemo} />
+        <pixiGraphics draw={desenharChapeuMemo} />
         <pixiGraphics draw={desenharIndicadorMemo} />
       </pixiContainer>
 
       <pixiText
         text={offline ? `${nome} (offline)` : nome}
         anchor={{ x: 0.5, y: 1 }}
-        y={-TAMANHO_SPRITE_PX - 6}
+        y={-PIVO_BASE.y * ESCALA_AVATAR - 6}
         style={{ fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: '800', fill: COR_TEXTO_NOME, stroke: { color: 0x2b2b3a, width: 3 } }}
       />
     </pixiContainer>

@@ -1,4 +1,4 @@
-import type { Personagem } from './avatar/personagens'
+import type { AparenciaAvatar } from './avatar/aparenciaAvatar'
 
 export type TipoZona = 'FOCO' | 'REUNIAO' | 'CAFE' | 'ATENDIMENTO' | 'LIVRE'
 
@@ -31,5 +31,5 @@ export interface EstadoPresencaUsuario {
   x: number
   y: number
   status: StatusAvatar
-  personagem: Personagem
+  aparencia: AparenciaAvatar
 }

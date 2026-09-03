@@ -66,7 +66,7 @@ public class UsuarioController {
     }
 
     @PatchMapping("/me/aparencia")
-    public UsuarioResponse atualizarMinhaAparencia(@Valid @RequestBody AtualizarPersonagemRequest request) {
-        return usuarioService.atualizarMeuPersonagem(contextoUsuarioAutenticado.usuarioAtual(), request);
+    public UsuarioResponse atualizarMinhaAparencia(@Valid @RequestBody AtualizarAparenciaRequest request) {
+        return usuarioService.atualizarMinhaAparencia(contextoUsuarioAutenticado.usuarioAtual(), request);
     }
 }

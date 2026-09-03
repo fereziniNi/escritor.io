@@ -1,10 +1,12 @@
 package io.escritor.presenca.identidade.service;
 
 import io.escritor.presenca.escritorio.ws.PresencaWebSocketHandler;
+import io.escritor.presenca.identidade.domain.AparenciaAvatar;
+import io.escritor.presenca.identidade.domain.PaletaAparenciaAvatar;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
+import io.escritor.presenca.identidade.web.AtualizarAparenciaRequest;
 import io.escritor.presenca.identidade.web.AtualizarCargaDiariaRequest;
-import io.escritor.presenca.identidade.web.AtualizarPersonagemRequest;
 import io.escritor.presenca.identidade.web.CriarUsuarioRequest;
 import io.escritor.presenca.identidade.web.UsuarioBasicoResponse;
 import io.escritor.presenca.identidade.web.UsuarioResponse;
@@ -78,19 +80,31 @@ public class UsuarioService {
     }
 
     /**
-     * Pedido do usuário: "adicionar game-assets... sobre characteres" - troca o sistema de
-     * personalização por camadas por escolher entre os 6 personagens prontos (ver
-     * {@code Personagem}). Sem validação extra aqui (era {@code PaletaAparenciaAvatar#validar}
-     * na versão por camadas) - {@code AtualizarPersonagemRequest} já é um enum fechado, não tem
-     * combinação inválida possível de chegar até aqui. Notifica quem já está conectado no mundo
-     * assim que salva - sem isso, colegas só veriam o personagem novo depois de reconectar (ver
-     * {@link PresencaWebSocketHandler#atualizarPersonagem}).
+     * Pedido do usuário: "a opção para todos detalhar da melhor maneira possível o avatar" - volta
+     * a existir depois de uma passagem por sprites prontos (Kenney), por pedido explícito do
+     * usuário ("voltar ao sistema desenhado à mão, bem mais detalhado"). Valida as 3 cores contra a
+     * paleta curada ({@link PaletaAparenciaAvatar#validar}) antes de salvar - os 4 campos de estilo
+     * (incluindo `tipoBarba`) já são enums fechados, o Jackson rejeita valor fora deles antes de
+     * chegar aqui. Notifica quem já está conectado no mundo assim que salva - sem isso, colegas só
+     * veriam a aparência nova depois de reconectar (ver
+     * {@link PresencaWebSocketHandler#atualizarAparencia}).
      */
-    public UsuarioResponse atualizarMeuPersonagem(Usuario usuarioAutenticado, AtualizarPersonagemRequest request) {
-        usuarioAutenticado.alterarPersonagem(request.personagem());
+    public UsuarioResponse atualizarMinhaAparencia(Usuario usuarioAutenticado, AtualizarAparenciaRequest request) {
+        PaletaAparenciaAvatar.validar(request.corPele(), request.corCabelo(), request.corRoupa());
+
+        AparenciaAvatar novaAparencia = new AparenciaAvatar(
+                request.corPele(),
+                request.estiloCabelo(),
+                request.corCabelo(),
+                request.estiloRoupa(),
+                request.corRoupa(),
+                request.oculos(),
+                request.chapeu(),
+                request.tipoBarba());
+        usuarioAutenticado.alterarAparencia(novaAparencia);
         Usuario salvo = usuarioRepository.save(usuarioAutenticado);
 
-        presencaWebSocketHandler.atualizarPersonagem(salvo.getId(), request.personagem());
+        presencaWebSocketHandler.atualizarAparencia(salvo.getId(), novaAparencia);
 
         return UsuarioResponse.de(salvo);
     }
