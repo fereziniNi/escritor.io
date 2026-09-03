@@ -2,7 +2,6 @@ package io.escritor.presenca.apontamento.service;
 
 import io.escritor.presenca.apontamento.domain.Apontamento;
 import io.escritor.presenca.apontamento.domain.ApontamentoDeOutroUsuarioException;
-import io.escritor.presenca.apontamento.domain.ApontamentoJaEncerradoException;
 import io.escritor.presenca.apontamento.domain.FiltroRelatorioInvalidoException;
 import io.escritor.presenca.apontamento.domain.LancamentoManualInvalidoException;
 import io.escritor.presenca.apontamento.domain.OrigemApontamento;
@@ -27,7 +26,6 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -38,7 +36,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -90,96 +87,6 @@ class ApontamentoServiceTest {
     @BeforeEach
     void setUp() {
         service = new ApontamentoService(apontamentoRepository, cardRepository, visibilidadeUsuarioService, projetoRepository, clock);
-    }
-
-    @Test
-    void iniciaTimerQuandoNaoHaTimerAbertoAnterior() {
-        when(cardRepository.findById(5L)).thenReturn(Optional.of(card));
-        when(apontamentoRepository.findFirstByUsuarioAndFimIsNull(usuario)).thenReturn(Optional.empty());
-        when(apontamentoRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
-
-        var resposta = service.iniciarTimer(5L, usuario);
-
-        assertThat(resposta.cardId()).isEqualTo(5L);
-        assertThat(resposta.usuarioId()).isEqualTo(1L);
-        assertThat(resposta.inicio()).isEqualTo(agora);
-        assertThat(resposta.fim()).isNull();
-        assertThat(resposta.origem()).isEqualTo("TIMER");
-        verify(apontamentoRepository, times(1)).save(any());
-    }
-
-    @Test
-    void iniciarNovoTimerEncerraOTimerAbertoAnteriorAutomaticamente() {
-        Instant inicioAntigo = agora.minus(90, ChronoUnit.MINUTES);
-        Apontamento timerAberto = new Apontamento(usuario, card, inicioAntigo, null, null, OrigemApontamento.TIMER);
-        when(cardRepository.findById(5L)).thenReturn(Optional.of(card));
-        when(apontamentoRepository.findFirstByUsuarioAndFimIsNull(usuario)).thenReturn(Optional.of(timerAberto));
-        when(apontamentoRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
-
-        service.iniciarTimer(5L, usuario);
-
-        var captor = ArgumentCaptor.forClass(Apontamento.class);
-        verify(apontamentoRepository, times(2)).save(captor.capture());
-        Apontamento primeiroSalvo = captor.getAllValues().get(0);
-        assertThat(primeiroSalvo).isSameAs(timerAberto);
-        assertThat(primeiroSalvo.getFim()).isEqualTo(agora);
-        assertThat(primeiroSalvo.getMinutos()).isEqualTo(90);
-    }
-
-    @Test
-    void iniciarTimerEmCardInexistenteLancaRecursoNaoEncontrado() {
-        when(cardRepository.findById(999L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.iniciarTimer(999L, usuario)).isInstanceOf(RecursoNaoEncontradoException.class);
-
-        verify(apontamentoRepository, never()).save(any());
-    }
-
-    @Test
-    void pararEncerraOTimerDoProprioUsuario() {
-        Instant inicio = agora.minus(30, ChronoUnit.MINUTES);
-        Apontamento timerAberto = new Apontamento(usuario, card, inicio, null, null, OrigemApontamento.TIMER);
-        ReflectionTestUtils.setField(timerAberto, "id", 7L);
-        when(apontamentoRepository.findById(7L)).thenReturn(Optional.of(timerAberto));
-        when(apontamentoRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
-
-        var resposta = service.parar(7L, usuario);
-
-        assertThat(resposta.fim()).isEqualTo(agora);
-        assertThat(resposta.minutos()).isEqualTo(30);
-        verify(apontamentoRepository).save(timerAberto);
-    }
-
-    @Test
-    void pararApontamentoDeOutroUsuarioLancaExcecao() {
-        Usuario dono = usuarioComId(1L);
-        Usuario outro = usuarioComId(2L);
-        Apontamento timerAberto = new Apontamento(dono, card, agora.minus(10, ChronoUnit.MINUTES), null, null, OrigemApontamento.TIMER);
-        ReflectionTestUtils.setField(timerAberto, "id", 7L);
-        when(apontamentoRepository.findById(7L)).thenReturn(Optional.of(timerAberto));
-
-        assertThatThrownBy(() -> service.parar(7L, outro)).isInstanceOf(ApontamentoDeOutroUsuarioException.class);
-
-        verify(apontamentoRepository, never()).save(any());
-    }
-
-    @Test
-    void pararApontamentoJaEncerradoLancaExcecao() {
-        Apontamento jaEncerrado = new Apontamento(
-                usuario, card, agora.minus(60, ChronoUnit.MINUTES), agora.minus(30, ChronoUnit.MINUTES), null, OrigemApontamento.TIMER);
-        ReflectionTestUtils.setField(jaEncerrado, "id", 7L);
-        when(apontamentoRepository.findById(7L)).thenReturn(Optional.of(jaEncerrado));
-
-        assertThatThrownBy(() -> service.parar(7L, usuario)).isInstanceOf(ApontamentoJaEncerradoException.class);
-
-        verify(apontamentoRepository, never()).save(any());
-    }
-
-    @Test
-    void pararApontamentoInexistenteLancaRecursoNaoEncontrado() {
-        when(apontamentoRepository.findById(999L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.parar(999L, usuario)).isInstanceOf(RecursoNaoEncontradoException.class);
     }
 
     @Test
@@ -331,24 +238,23 @@ class ApontamentoServiceTest {
     }
 
     @Test
-    void iniciarTimerTruncaInstantParaMilissegundosPraNaoPerderPrecisaoNoRoundTripComOFrontend() {
+    void criarManualComMinutosTruncaInstantParaMilissegundosPraNaoPerderPrecisaoNoRoundTripComOFrontend() {
         // Instant.now() do servidor costuma ter precisão de microssegundos/nanossegundos - o
         // frontend (S4.7, editar inline) recebe esse instante via JSON, reparseia com o JS Date
-        // (só milissegundos) e reenvia num PATCH futuro. Se o inicio salvo tiver sub-milissegundos
+        // (só milissegundos) e reenvia num PATCH futuro. Se o fim salvo tiver sub-milissegundos
         // não visíveis pro cliente, o fim recalculado no browser fica alguns microssegundos ANTES
-        // do inicio de verdade, e Duration.toMinutes() trunca a duração 1 minuto a menos - achado
+        // do fim de verdade, e Duration.toMinutes() trunca a duração 1 minuto a menos - achado
         // testando a edição inline num browser real, não um artefato de teste.
         Instant instanteComMicrossegundos = Instant.parse("2026-01-15T12:00:00.123456Z");
         Clock clockComMicrossegundos = Clock.fixed(instanteComMicrossegundos, ZoneOffset.UTC);
         ApontamentoService servicoComMicrossegundos = new ApontamentoService(
                 apontamentoRepository, cardRepository, visibilidadeUsuarioService, projetoRepository, clockComMicrossegundos);
         when(cardRepository.findById(5L)).thenReturn(Optional.of(card));
-        when(apontamentoRepository.findFirstByUsuarioAndFimIsNull(usuario)).thenReturn(Optional.empty());
         when(apontamentoRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
 
-        var resposta = servicoComMicrossegundos.iniciarTimer(5L, usuario);
+        var resposta = servicoComMicrossegundos.criarManual(5L, null, null, 30, null, usuario);
 
-        assertThat(resposta.inicio().getNano() % 1_000_000).isZero();
+        assertThat(resposta.fim().getNano() % 1_000_000).isZero();
     }
 
     /**

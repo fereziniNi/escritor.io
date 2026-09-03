@@ -32,11 +32,10 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * IT de ponta a ponta de propósito (S4.2/S4.3): prova que o serviço encerra o timer anterior
- * *antes* de inserir o novo - se a ordem estivesse errada, o índice único parcial de S4.1
- * (`uk_apontamento_timer_aberto_por_usuario`) rejeitaria o segundo `POST` com 500, não um mock
- * ensinado a "funcionar" escondendo esse bug. Também prova os 403/409 de `parar` contra a
- * autenticação/autorização reais, não um serviço mockado ensinado a devolver a exceção certa.
+ * IT de ponta a ponta de propósito (S4.2): prova o lançamento manual, edição e exclusão contra
+ * autenticação/autorização reais, não um serviço mockado ensinado a devolver a resposta certa. O
+ * "Iniciar timer" (`POST .../timer`) e "Parar" (`PATCH .../parar`) foram removidos a pedido do
+ * usuário ("Deixe somente os minutos trabalhados").
  */
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -77,140 +76,6 @@ class ApontamentoControllerIT {
             restTestClient = RestTestClient.bindToServer().baseUrl("http://localhost:" + port).build();
         }
         return restTestClient;
-    }
-
-    @Test
-    void iniciarUmSegundoTimerEncerraOPrimeiroDeVerdade() {
-        Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-apt@escritor.io", Papel.COLABORADOR, 480));
-        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
-        var cardA = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
-        var cardB = cardRepository.saveAndFlush(new Card(coluna, "Card B", null, 2048.0, null, null, null, usuario));
-        String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
-
-        Long primeiroId = client().post()
-                .uri("/cards/{id}/apontamentos/timer", cardA.getId())
-                .header("Authorization", "Bearer " + token)
-                .contentType(MediaType.APPLICATION_JSON)
-                .exchange()
-                .expectStatus().isCreated()
-                .expectBody(ApontamentoResponse.class)
-                .returnResult()
-                .getResponseBody()
-                .id();
-
-        client().post()
-                .uri("/cards/{id}/apontamentos/timer", cardB.getId())
-                .header("Authorization", "Bearer " + token)
-                .exchange()
-                .expectStatus().isCreated()
-                .expectBody()
-                .jsonPath("$.cardId").isEqualTo(cardB.getId())
-                .jsonPath("$.fim").doesNotExist();
-
-        var primeiro = apontamentoRepository.findById(primeiroId).orElseThrow();
-        assertThat(primeiro.getFim()).isNotNull();
-        assertThat(primeiro.getMinutos()).isNotNull();
-        assertThat(apontamentoRepository.findFirstByUsuarioAndFimIsNull(usuario)).isPresent();
-        assertThat(apontamentoRepository.findFirstByUsuarioAndFimIsNull(usuario).orElseThrow().getCard().getId())
-                .isEqualTo(cardB.getId());
-    }
-
-    @Test
-    void pararEncerraOTimerDeVerdadeEDepoisPermiteAbrirOutro() {
-        Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-parar@escritor.io", Papel.COLABORADOR, 480));
-        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
-        var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
-        String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
-
-        Long apontamentoId = client().post()
-                .uri("/cards/{id}/apontamentos/timer", card.getId())
-                .header("Authorization", "Bearer " + token)
-                .exchange()
-                .expectStatus().isCreated()
-                .expectBody(ApontamentoResponse.class)
-                .returnResult()
-                .getResponseBody()
-                .id();
-
-        client().patch()
-                .uri("/apontamentos/{id}/parar", apontamentoId)
-                .header("Authorization", "Bearer " + token)
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody()
-                .jsonPath("$.fim").exists()
-                .jsonPath("$.minutos").exists();
-
-        assertThat(apontamentoRepository.findFirstByUsuarioAndFimIsNull(usuario)).isEmpty();
-
-        // encerrado de verdade em banco (não só na resposta) - abrir outro timer não esbarra
-        // no índice único parcial, provando que o primeiro realmente ficou com fim preenchido.
-        client().post()
-                .uri("/cards/{id}/apontamentos/timer", card.getId())
-                .header("Authorization", "Bearer " + token)
-                .exchange()
-                .expectStatus().isCreated();
-    }
-
-    @Test
-    void pararApontamentoDeOutroUsuarioRecebe403DeVerdade() {
-        Usuario dono = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-dono@escritor.io", Papel.COLABORADOR, 480));
-        Usuario outro = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-outro@escritor.io", Papel.COLABORADOR, 480));
-        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
-        var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, dono));
-        String tokenDono = jwtService.gerarAccessToken(dono.getId(), Papel.COLABORADOR);
-        String tokenOutro = jwtService.gerarAccessToken(outro.getId(), Papel.COLABORADOR);
-
-        Long apontamentoId = client().post()
-                .uri("/cards/{id}/apontamentos/timer", card.getId())
-                .header("Authorization", "Bearer " + tokenDono)
-                .exchange()
-                .expectStatus().isCreated()
-                .expectBody(ApontamentoResponse.class)
-                .returnResult()
-                .getResponseBody()
-                .id();
-
-        client().patch()
-                .uri("/apontamentos/{id}/parar", apontamentoId)
-                .header("Authorization", "Bearer " + tokenOutro)
-                .exchange()
-                .expectStatus().isForbidden();
-
-        assertThat(apontamentoRepository.findById(apontamentoId).orElseThrow().getFim()).isNull();
-    }
-
-    @Test
-    void pararApontamentoJaEncerradoRecebe409DeVerdade() {
-        Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-409@escritor.io", Papel.COLABORADOR, 480));
-        Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
-        Coluna coluna = colunaRepository.saveAndFlush(new Coluna(projeto, "A fazer", 0, null));
-        var card = cardRepository.saveAndFlush(new Card(coluna, "Card A", null, 1024.0, null, null, null, usuario));
-        String token = jwtService.gerarAccessToken(usuario.getId(), Papel.COLABORADOR);
-
-        Long apontamentoId = client().post()
-                .uri("/cards/{id}/apontamentos/timer", card.getId())
-                .header("Authorization", "Bearer " + token)
-                .exchange()
-                .expectStatus().isCreated()
-                .expectBody(ApontamentoResponse.class)
-                .returnResult()
-                .getResponseBody()
-                .id();
-        client().patch()
-                .uri("/apontamentos/{id}/parar", apontamentoId)
-                .header("Authorization", "Bearer " + token)
-                .exchange()
-                .expectStatus().isOk();
-
-        client().patch()
-                .uri("/apontamentos/{id}/parar", apontamentoId)
-                .header("Authorization", "Bearer " + token)
-                .exchange()
-                .expectStatus().isEqualTo(409);
     }
 
     @Test

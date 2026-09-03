@@ -75,24 +75,14 @@ class ApontamentoRepositoryIT {
         assertThat(recuperado.getMinutos()).isNull();
     }
 
+    /**
+     * O índice único parcial (`uk_apontamento_timer_aberto_por_usuario`) segue existindo em banco
+     * mesmo depois da remoção do "Iniciar timer" - nada de novo o viola (lançamento manual sempre
+     * nasce com `fim` preenchido), mas o teste continua provando que a constraint em si não
+     * desapareceu de baixo dos pés de eventuais registros legados.
+     */
     @Test
-    void encontraOTimerAbertoDoUsuario() {
-        Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480));
-        Card card = criarCard(usuario);
-        Instant inicio = Instant.now();
-        apontamentoRepository.saveAndFlush(
-                new Apontamento(usuario, card, inicio.minus(2, ChronoUnit.HOURS), inicio.minus(1, ChronoUnit.HOURS), null, OrigemApontamento.MANUAL));
-        Apontamento timerAberto = apontamentoRepository.saveAndFlush(
-                new Apontamento(usuario, card, inicio, null, null, OrigemApontamento.TIMER));
-
-        var encontrado = apontamentoRepository.findFirstByUsuarioAndFimIsNull(usuario);
-
-        assertThat(encontrado).isPresent();
-        assertThat(encontrado.get().getId()).isEqualTo(timerAberto.getId());
-    }
-
-    @Test
-    void rejeitaDoisTimersAbertosParaOMesmoUsuario() {
+    void rejeitaDoisApontamentosSemFimParaOMesmoUsuario() {
         Usuario usuario = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480));
         Card card = criarCard(usuario);
         apontamentoRepository.saveAndFlush(new Apontamento(usuario, card, Instant.now(), null, null, OrigemApontamento.TIMER));

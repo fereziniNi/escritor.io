@@ -241,14 +241,3 @@
   font-variant-numeric: tabular-nums;
 }
 
-.kanban-timer {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.kanban-timer-cronometro {
-  font-family: var(--fonte-jogo);
-  font-size: 0.78rem;
-  color: var(--cor-acento-escuro);
-}

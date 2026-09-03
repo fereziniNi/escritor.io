@@ -6,27 +6,24 @@ import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.kanban.domain.Card;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ApontamentoRepository extends JpaRepository<Apontamento, Long> {
 
-    Optional<Apontamento> findFirstByUsuarioAndFimIsNull(Usuario usuario);
-
     List<Apontamento> findByCardOrderByInicioDesc(Card card);
 
     /**
-     * `FimIsNotNull` exclui timer ainda aberto do dia - equivalente a filtrar `minutos` não nulo
-     * (mesmo invariante de {@link Apontamento}: `fim` nulo = timer rodando, `minutos` só existe
-     * depois de encerrado), mas espelha a linguagem do domínio em vez do campo derivado.
+     * `FimIsNotNull` exclui qualquer registro legado sem `fim` (do "Iniciar timer", removido) -
+     * equivalente a filtrar `minutos` não nulo (mesmo invariante de {@link Apontamento}), mas
+     * espelha a linguagem do domínio em vez do campo derivado.
      */
     List<Apontamento> findByUsuarioAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(
             Usuario usuario, Instant inicioDoDia, Instant fimDoDia);
 
     /**
      * Sem `FimIsNotNull` de propósito, diferente da query acima (S4.8) - esta é uma listagem/
-     * relatório (S4.10), não uma soma, então um timer ainda aberto no período continua aparecendo
-     * (mesma escolha já feita pra listagem por card, S4.7).
+     * relatório (S4.10), não uma soma, então um eventual registro legado sem `fim` continua
+     * aparecendo (mesma escolha já feita pra listagem por card, S4.7).
      */
     List<Apontamento> findByUsuarioAndInicioGreaterThanEqualAndInicioLessThanOrderByInicioDesc(
             Usuario usuario, Instant inicio, Instant fim);

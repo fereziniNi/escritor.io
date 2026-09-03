@@ -33,17 +33,6 @@ public class ApontamentoController {
         this.contextoUsuarioAutenticado = contextoUsuarioAutenticado;
     }
 
-    @PostMapping("/cards/{id}/apontamentos/timer")
-    @ResponseStatus(HttpStatus.CREATED)
-    public ApontamentoResponse iniciarTimer(@PathVariable Long id) {
-        return apontamentoService.iniciarTimer(id, contextoUsuarioAutenticado.usuarioAtual());
-    }
-
-    @PatchMapping("/apontamentos/{id}/parar")
-    public ApontamentoResponse parar(@PathVariable Long id) {
-        return apontamentoService.parar(id, contextoUsuarioAutenticado.usuarioAtual());
-    }
-
     @PostMapping("/cards/{id}/apontamentos")
     @ResponseStatus(HttpStatus.CREATED)
     public ApontamentoResponse criarManual(@PathVariable Long id, @Valid @RequestBody CriarApontamentoManualRequest request) {

@@ -1,7 +1,6 @@
 package io.escritor.presenca.apontamento.web;
 
 import io.escritor.presenca.apontamento.domain.ApontamentoDeOutroUsuarioException;
-import io.escritor.presenca.apontamento.domain.ApontamentoJaEncerradoException;
 import io.escritor.presenca.apontamento.domain.LancamentoManualInvalidoException;
 import io.escritor.presenca.apontamento.service.ApontamentoService;
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
@@ -44,83 +43,6 @@ class ApontamentoControllerTest {
 
     @MockitoBean
     private ContextoUsuarioAutenticado contextoUsuarioAutenticado;
-
-    @Test
-    void iniciarTimerSemAutenticacaoRetorna401() throws Exception {
-        mockMvc.perform(post("/cards/1/apontamentos/timer")).andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    @WithMockUser
-    void qualquerUsuarioAutenticadoPodeIniciarTimer() throws Exception {
-        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
-        when(apontamentoService.iniciarTimer(eq(1L), any()))
-                .thenReturn(new ApontamentoResponse(
-                        10L, 2L, 1L, Instant.parse("2026-01-15T12:00:00Z"), null, null, null, "TIMER",
-                        Instant.parse("2026-01-15T12:00:00Z"), Instant.parse("2026-01-15T12:00:00Z")));
-
-        mockMvc.perform(post("/cards/1/apontamentos/timer"))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.cardId").value(1))
-                .andExpect(jsonPath("$.origem").value("TIMER"))
-                .andExpect(jsonPath("$.fim").doesNotExist());
-    }
-
-    @Test
-    @WithMockUser
-    void iniciarTimerEmCardInexistenteRetorna404() throws Exception {
-        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
-        when(apontamentoService.iniciarTimer(eq(999L), any())).thenThrow(new RecursoNaoEncontradoException("não encontrado"));
-
-        mockMvc.perform(post("/cards/999/apontamentos/timer")).andExpect(status().isNotFound());
-    }
-
-    @Test
-    void pararSemAutenticacaoRetorna401() throws Exception {
-        mockMvc.perform(patch("/apontamentos/1/parar")).andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    @WithMockUser
-    void usuarioAutenticadoParaOProprioTimer() throws Exception {
-        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
-        when(apontamentoService.parar(eq(1L), any()))
-                .thenReturn(new ApontamentoResponse(
-                        1L, 2L, 5L, Instant.parse("2026-01-15T12:00:00Z"), Instant.parse("2026-01-15T12:30:00Z"), 30, null,
-                        "TIMER", Instant.parse("2026-01-15T12:00:00Z"), Instant.parse("2026-01-15T12:30:00Z")));
-
-        mockMvc.perform(patch("/apontamentos/1/parar"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.minutos").value(30))
-                .andExpect(jsonPath("$.fim").exists());
-    }
-
-    @Test
-    @WithMockUser
-    void pararApontamentoDeOutroUsuarioRetorna403() throws Exception {
-        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
-        when(apontamentoService.parar(eq(1L), any())).thenThrow(new ApontamentoDeOutroUsuarioException());
-
-        mockMvc.perform(patch("/apontamentos/1/parar")).andExpect(status().isForbidden());
-    }
-
-    @Test
-    @WithMockUser
-    void pararApontamentoJaEncerradoRetorna409() throws Exception {
-        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
-        when(apontamentoService.parar(eq(1L), any())).thenThrow(new ApontamentoJaEncerradoException());
-
-        mockMvc.perform(patch("/apontamentos/1/parar")).andExpect(status().isConflict());
-    }
-
-    @Test
-    @WithMockUser
-    void pararApontamentoInexistenteRetorna404() throws Exception {
-        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
-        when(apontamentoService.parar(eq(999L), any())).thenThrow(new RecursoNaoEncontradoException("não encontrado"));
-
-        mockMvc.perform(patch("/apontamentos/999/parar")).andExpect(status().isNotFound());
-    }
 
     @Test
     void criarManualSemAutenticacaoRetorna401() throws Exception {

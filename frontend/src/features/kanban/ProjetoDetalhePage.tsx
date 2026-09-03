@@ -11,7 +11,7 @@ import {
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useParams } from 'react-router'
 import { useAuthStore } from '../auth/authStore'
 import { CampoPessoa } from '../../shared/CampoPessoa'
@@ -25,14 +25,11 @@ import {
   criarComentario,
   editarApontamento,
   excluirApontamento,
-  iniciarTimer,
   listarApontamentos,
   listarComentarios,
   listarEventos,
   moverCard,
-  pararTimer,
 } from './api'
-import { formatarDuracao } from './formatarDuracao'
 import { mesclarHistorico } from './mesclarHistorico'
 import { moverCardOtimista } from './moverCardOtimista'
 import { resolverMovimento } from './resolverMovimento'
@@ -108,8 +105,9 @@ function ComentariosSecao({ cardId }: { cardId: number }) {
  * eventos com apontamentos (`mesclarHistorico`) numa única linha do tempo, com dia/hora
  * (`formatarDataHoraBr`) na frente de cada item. Reaproveita a MESMA queryKey de
  * `ApontamentosSecao` (`['cards', cardId, 'apontamentos']`) de propósito - é o cache
- * compartilhado do TanStack Query que faz o Histórico se atualizar sozinho quando `TimerDoCard`
- * inicia/para um timer, sem duplicar a busca nem inventar um canal de sincronização novo.
+ * compartilhado do TanStack Query que faz o Histórico se atualizar sozinho quando um lançamento
+ * manual é criado/editado/excluído, sem duplicar a busca nem inventar um canal de sincronização
+ * novo.
  */
 function HistoricoSecao({ cardId }: { cardId: number }) {
   const eventosQuery = useQuery({ queryKey: ['cards', cardId, 'eventos'], queryFn: () => listarEventos(cardId) })
@@ -128,73 +126,6 @@ function HistoricoSecao({ cardId }: { cardId: number }) {
           </li>
         ))}
       </ul>
-    </div>
-  )
-}
-
-function TimerDoCard({ cardId }: { cardId: number }) {
-  const queryClient = useQueryClient()
-  // Estado só local de propósito (S4.4): não há endpoint ainda pra "qual timer está aberto" (fica
-  // pra quando precisar), então um reload da página perde a referência de qual apontamento está
-  // rodando aqui - o timer continua aberto no servidor, só a UI "esquece" até essa fatia futura.
-  const [apontamentoAtivo, setApontamentoAtivo] = useState<{ id: number; inicio: string } | null>(null)
-  const [agora, setAgora] = useState(() => Date.now())
-
-  useEffect(() => {
-    if (!apontamentoAtivo) {
-      return undefined
-    }
-    const intervalo = setInterval(() => setAgora(Date.now()), 1000)
-    return () => clearInterval(intervalo)
-  }, [apontamentoAtivo])
-
-  // Pedido do usuário: "eu iniciei o timer... mas ela não ficou marcada no historico!!" - a causa
-  // era esta: nem iniciar nem parar invalidava `['cards', cardId, 'apontamentos']`, então quem já
-  // estava com o painel de Apontamentos/Histórico aberto não via nada mudar até fechar e reabrir.
-  // `ApontamentosDoCard`/`HistoricoDoCard` usam essa MESMA queryKey - invalidar aqui atualiza os
-  // dois de uma vez, sem acoplar este componente a nenhum dos dois diretamente.
-  const iniciarMutation = useMutation({
-    mutationFn: () => iniciarTimer(cardId),
-    onSuccess: (apontamento) => {
-      setApontamentoAtivo({ id: apontamento.id, inicio: apontamento.inicio })
-      setAgora(Date.now())
-      queryClient.invalidateQueries({ queryKey: ['cards', cardId, 'apontamentos'] })
-    },
-  })
-
-  const pararMutation = useMutation({
-    mutationFn: () => pararTimer(apontamentoAtivo!.id),
-    onSuccess: () => {
-      setApontamentoAtivo(null)
-      queryClient.invalidateQueries({ queryKey: ['cards', cardId, 'apontamentos'] })
-    },
-    // Se o servidor recusar (ex.: esse timer já foi encerrado por outro iniciado em outro card -
-    // S4.2/S4.3), a suposição local de "ainda está rodando" já era falsa mesmo - some daqui.
-    onError: () => setApontamentoAtivo(null),
-  })
-
-  if (!apontamentoAtivo) {
-    return (
-      <div className="kanban-timer">
-        <button type="button" className="botao-pequeno" onClick={() => iniciarMutation.mutate()} disabled={iniciarMutation.isPending}>
-          ▶️ Iniciar timer
-        </button>
-        {iniciarMutation.isError && <p className="mensagem-erro">Não foi possível iniciar o timer.</p>}
-        {/* pararMutation também pode ter errado sem apontamentoAtivo: onError já zerou o
-        estado antes desta renderização, e a mensagem precisa sobreviver a essa troca de branch. */}
-        {pararMutation.isError && <p className="mensagem-erro">Não foi possível parar o timer.</p>}
-      </div>
-    )
-  }
-
-  const segundosDecorridos = (agora - new Date(apontamentoAtivo.inicio).getTime()) / 1000
-
-  return (
-    <div className="kanban-timer">
-      <span className="kanban-timer-cronometro">⏱️ {formatarDuracao(segundosDecorridos)}</span>
-      <button type="button" className="botao-perigo botao-pequeno" onClick={() => pararMutation.mutate()} disabled={pararMutation.isPending}>
-        ⏹️ Parar timer
-      </button>
     </div>
   )
 }
@@ -231,8 +162,9 @@ function LinhaApontamento({
         >
           {/* fim (e portanto minutos) só existe pra apontamento já encerrado - PATCH /apontamentos/{id}
           nunca aceita minutos direto (S4.6), então editar duração aqui recalcula fim a partir do
-          inicio original + minutos novos, mantendo o inicio intocado. Timer ainda aberto (fim nulo)
-          não tem duração pra editar ainda, só descrição. */}
+          inicio original + minutos novos, mantendo o inicio intocado. Um eventual apontamento
+          legado sem fim (de antes da remoção do "Iniciar timer") não tem duração pra editar
+          ainda, só descrição. */}
           {apontamento.fim !== null && (
             <div className="campo">
               <label htmlFor={`minutos-edicao-${apontamento.id}`}>Minutos</label>
@@ -378,9 +310,7 @@ function ApontamentosSecao({ cardId }: { cardId: number }) {
 
 /**
  * Pedido do usuário: "está muito complexo... facilite o front" - um único toggle no lugar dos três
- * que existiam antes (Apontamentos/Comentários/Histórico cada um com seu próprio botão). O timer
- * continua fora daqui, sempre visível no card (é a ação mais comum - escondê-lo atrás de um clique
- * a mais iria contra "facilitar o uso", não a favor).
+ * que existiam antes (Apontamentos/Comentários/Histórico cada um com seu próprio botão).
  */
 function DetalhesDoCard({ cardId }: { cardId: number }) {
   const [aberto, setAberto] = useState(false)
@@ -429,7 +359,6 @@ function CardArrastavel({ card, nomeDoResponsavel }: { card: Card; nomeDoRespons
           {card.estimativaMinutos !== null && <span className="badge badge-neutro">⏱️ {card.estimativaMinutos} min</span>}
         </p>
       )}
-      <TimerDoCard cardId={card.id} />
       <DetalhesDoCard cardId={card.id} />
     </li>
   )

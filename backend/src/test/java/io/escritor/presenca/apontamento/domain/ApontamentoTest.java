@@ -22,8 +22,13 @@ class ApontamentoTest {
     private final Card card = new Card(coluna, "Corrigir bug", null, 1024.0, null, null, null, usuario);
     private final Instant inicio = Instant.parse("2026-01-15T09:00:00Z");
 
+    /**
+     * O construtor ainda aceita {@code fim} nulo (sem calcular `minutos`) mesmo depois da remoção
+     * do "Iniciar timer" - é o formato dos registros legados de {@link OrigemApontamento#TIMER}
+     * que continuam existindo no banco.
+     */
     @Test
-    void abrirTimerSemFimNaoTemMinutosCalculadoAinda() {
+    void criarSemFimNaoTemMinutosCalculadoAinda() {
         Apontamento apontamento = new Apontamento(usuario, card, inicio, null, null, OrigemApontamento.TIMER);
 
         assertThat(apontamento.getUsuario()).isSameAs(usuario);
@@ -52,33 +57,6 @@ class ApontamentoTest {
 
         assertThatThrownBy(() -> new Apontamento(usuario, card, inicio, fimInvalido, null, OrigemApontamento.MANUAL))
                 .isInstanceOf(FimAntesDoInicioException.class);
-    }
-
-    @Test
-    void encerrarCalculaMinutos() {
-        Apontamento apontamento = new Apontamento(usuario, card, inicio, null, null, OrigemApontamento.TIMER);
-        Instant fim = inicio.plus(45, ChronoUnit.MINUTES);
-
-        apontamento.encerrar(fim);
-
-        assertThat(apontamento.getFim()).isEqualTo(fim);
-        assertThat(apontamento.getMinutos()).isEqualTo(45);
-    }
-
-    @Test
-    void encerrarComFimAntesDoInicioLancaExcecao() {
-        Apontamento apontamento = new Apontamento(usuario, card, inicio, null, null, OrigemApontamento.TIMER);
-
-        assertThatThrownBy(() -> apontamento.encerrar(inicio.minus(1, ChronoUnit.MINUTES)))
-                .isInstanceOf(FimAntesDoInicioException.class);
-    }
-
-    @Test
-    void encerrarUmApontamentoJaEncerradoLancaExcecao() {
-        Apontamento apontamento = new Apontamento(usuario, card, inicio, inicio.plus(30, ChronoUnit.MINUTES), null, OrigemApontamento.TIMER);
-
-        assertThatThrownBy(() -> apontamento.encerrar(inicio.plus(60, ChronoUnit.MINUTES)))
-                .isInstanceOf(ApontamentoJaEncerradoException.class);
     }
 
     @Test
@@ -131,7 +109,7 @@ class ApontamentoTest {
     }
 
     @Test
-    void editarUmTimerAindaAbertoContinuaSemMinutos() {
+    void editarUmApontamentoLegadoSemFimContinuaSemMinutos() {
         Apontamento apontamento = new Apontamento(usuario, card, inicio, null, null, OrigemApontamento.TIMER);
 
         apontamento.editar(inicio.plus(5, ChronoUnit.MINUTES), null, "Ajuste de início");

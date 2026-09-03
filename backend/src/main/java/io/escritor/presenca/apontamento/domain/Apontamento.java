@@ -18,8 +18,10 @@ import java.time.Instant;
 /**
  * PRD §3.4: diferente de {@code RegistroPonto} (E1), apontamento é editável de propósito - "é
  * dado de gestão, não de jornada". Sem `REVOKE`/hash encadeado aqui: {@code UPDATE}/{@code
- * DELETE} de verdade são o caminho normal (S4.6). {@code fim} nulo = timer rodando; {@code
- * minutos} só existe depois de encerrado ({@link #encerrar}), nunca calculado antecipadamente.
+ * DELETE} de verdade são o caminho normal (S4.6). Desde a remoção do "Iniciar timer" (só ficam
+ * lançamentos manuais - já nascem com {@code inicio}/{@code fim}/{@code minutos} completos), um
+ * `fim` nulo só pode acontecer em registros legados de {@link OrigemApontamento#TIMER} de antes
+ * dessa mudança.
  */
 @Entity
 @Table(name = "apontamento")
@@ -77,28 +79,10 @@ public class Apontamento {
     }
 
     /**
-     * Encerra um timer aberto (S4.3) - {@code fim}/{@code minutos} só nascem aqui pra quem foi
-     * criado sem eles. Um apontamento já encerrado não pode ser encerrado de novo (use edição,
-     * S4.6, pra corrigir um `fim` já existente).
-     */
-    public void encerrar(Instant fim) {
-        if (this.fim != null) {
-            throw new ApontamentoJaEncerradoException();
-        }
-        if (fim.isBefore(this.inicio)) {
-            throw new FimAntesDoInicioException();
-        }
-        this.fim = fim;
-        this.minutos = calcularMinutos(this.inicio, fim);
-        this.editadoEm = Instant.now();
-    }
-
-    /**
      * PATCH parcial (S4.6): só os campos não-nulos passados mudam - {@code inicio}/{@code fim}
      * omitidos mantêm os valores atuais. Editando o intervalo, {@code minutos} é recalculado do
-     * zero (nunca ajustado incrementalmente), mesma fonte única de verdade que {@link #encerrar}
-     * já usa. Se o resultado ainda não tem {@code fim} (editando só o início de um timer aberto,
-     * por exemplo), continua sem `minutos` - o mesmo timer, só com um horário de início corrigido.
+     * zero (nunca ajustado incrementalmente). Se o resultado ainda não tem {@code fim} (editando
+     * um registro legado de timer aberto que ainda exista), continua sem `minutos`.
      */
     public void editar(Instant novoInicio, Instant novoFim, String novaDescricao) {
         Instant inicioFinal = novoInicio != null ? novoInicio : this.inicio;

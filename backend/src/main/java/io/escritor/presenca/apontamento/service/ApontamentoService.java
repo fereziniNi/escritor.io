@@ -26,8 +26,10 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 /**
- * Iniciar timer é aberto a qualquer usuário autenticado em qualquer card, mesma simplificação
- * conhecida já usada pra criar card (S3.6) - ainda não verifica acesso ao projeto dono do card.
+ * Lançamento manual ({@link #criarManual}) é aberto a qualquer usuário autenticado em qualquer
+ * card, mesma simplificação conhecida já usada pra criar card (S3.6) - ainda não verifica acesso
+ * ao projeto dono do card. O "Iniciar timer" (S4.1/S4.3) foi removido a pedido do usuário
+ * ("Deixe somente os minutos trabalhados") - só fica o lançamento manual daqui pra frente.
  */
 @Service
 public class ApontamentoService {
@@ -62,47 +64,6 @@ public class ApontamentoService {
      */
     private Instant agora() {
         return Instant.now(clock).truncatedTo(ChronoUnit.MILLIS);
-    }
-
-    /**
-     * PRD: "no máximo um timer aberto por usuário; iniciar um novo encerra o anterior" - o timer
-     * anterior (se existir, em qualquer card) é encerrado com o mesmo instante em que o novo
-     * começa, antes do novo ser criado, senão o índice único parcial de S4.1
-     * (`uk_apontamento_timer_aberto_por_usuario`) rejeitaria o INSERT.
-     */
-    public ApontamentoResponse iniciarTimer(Long cardId, Usuario usuario) {
-        Card card = cardRepository.findById(cardId).orElseThrow(() -> new RecursoNaoEncontradoException("Card não encontrado: " + cardId));
-        Instant agora = agora();
-
-        apontamentoRepository.findFirstByUsuarioAndFimIsNull(usuario).ifPresent(timerAberto -> {
-            timerAberto.encerrar(agora);
-            apontamentoRepository.save(timerAberto);
-        });
-
-        Apontamento novo = new Apontamento(usuario, card, agora, null, null, OrigemApontamento.TIMER);
-        Apontamento salvo = apontamentoRepository.save(novo);
-
-        return ApontamentoResponse.de(salvo);
-    }
-
-    /**
-     * Só o próprio autor encerra o próprio timer - {@code encerrar()} (S4.1) já garante que um
-     * apontamento fechado não pode ser fechado de novo (`ApontamentoJaEncerradoException`), então
-     * esta camada só precisa checar dono e delegar.
-     */
-    public ApontamentoResponse parar(Long apontamentoId, Usuario usuario) {
-        Apontamento apontamento = apontamentoRepository
-                .findById(apontamentoId)
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Apontamento não encontrado: " + apontamentoId));
-
-        if (!apontamento.getUsuario().getId().equals(usuario.getId())) {
-            throw new ApontamentoDeOutroUsuarioException();
-        }
-
-        apontamento.encerrar(agora());
-        Apontamento salvo = apontamentoRepository.save(apontamento);
-
-        return ApontamentoResponse.de(salvo);
     }
 
     /**
@@ -179,7 +140,7 @@ public class ApontamentoService {
      * Sem checagem de dono aqui de propósito - a lista é do card (podem ser vários usuários
      * apontando tempo no mesmo card), não de um usuário; dono só importa pra editar/excluir um
      * apontamento específico ({@link #editar}/{@link #excluir}), mesma simplificação de acesso ao
-     * card já usada em {@link #iniciarTimer}/{@link #criarManual}.
+     * card já usada em {@link #criarManual}.
      */
     public List<ApontamentoResponse> listarPorCard(Long cardId) {
         Card card = cardRepository.findById(cardId).orElseThrow(() -> new RecursoNaoEncontradoException("Card não encontrado: " + cardId));
