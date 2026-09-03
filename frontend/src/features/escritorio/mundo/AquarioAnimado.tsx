@@ -1,6 +1,6 @@
 import { extend, useTick } from '@pixi/react'
 import { Container, Graphics } from 'pixi.js'
-import { useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { desenharPeixinho, desenharSombra, desenharTanqueAquario } from './spriteFactory'
 import { TILE_PX } from './constantes'
 
@@ -27,17 +27,28 @@ export function AquarioAnimado({ tileX, tileY }: { tileX: number; tileY: number 
     setTempo((atual) => atual + ticker.deltaMS)
   })
 
+  // `setTempo` roda a cada tick - sombra/tanque nunca mudam de forma (só a posição/escala dos
+  // peixes muda, via props do próprio `<pixiGraphics>`, sem precisar redesenhar nada), então essas
+  // duas closures ficam memoizadas de propósito (mesmo raciocínio de `PlantaAnimada.tsx`).
+  const desenharSombraMemo = useCallback((g: import('pixi.js').Graphics) => {
+    g.clear()
+    desenharSombra(g, 0, 0, TILE_PX * 0.84, TILE_PX * 0.6)
+  }, [])
+  // um `draw` estável por peixe (não recriado a cada tick) - só a forma em si; a "natação" é toda
+  // via x/y/scale do `<pixiGraphics>`, que não exige redesenho.
+  const desenharPeixesMemo = useMemo(() => PEIXES.map((peixe) => (g: import('pixi.js').Graphics) => desenharPeixinho(g, peixe.corCorpo)), [])
+
   const cx = tileX * TILE_PX + TILE_PX / 2
   const cy = tileY * TILE_PX + TILE_PX / 2
 
   return (
     <pixiContainer x={cx} y={cy}>
-      <pixiGraphics draw={(g) => { g.clear(); desenharSombra(g, 0, 0, TILE_PX * 0.84, TILE_PX * 0.6) }} />
+      <pixiGraphics draw={desenharSombraMemo} />
       <pixiGraphics draw={desenharTanqueAquario} />
       {PEIXES.map((peixe, indice) => (
         <pixiGraphics
           key={indice}
-          draw={(g) => desenharPeixinho(g, peixe.corCorpo)}
+          draw={desenharPeixesMemo[indice]}
           x={Math.sin(tempo * peixe.velocidade + peixe.fase) * peixe.amplitude}
           y={peixe.y}
           scale={{ x: Math.cos(tempo * peixe.velocidade + peixe.fase) >= 0 ? 1 : -1, y: 1 }}

@@ -1,6 +1,6 @@
 import { extend, useTick } from '@pixi/react'
 import { Container, Graphics, Text } from 'pixi.js'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   desenharAnelDestaque,
   desenharAnelProximidade,
@@ -75,6 +75,11 @@ export function AvatarPixi({
   offline?: boolean
 }) {
   const corCorpoNumero = useMemo(() => hexParaNumero(corCorpo), [corCorpo])
+  // Este componente re-renderiza a cada tick (o bob de espera - `setBobY` logo abaixo - roda sempre,
+  // parado ou não), então uma closure `(g) => desenharCorpoAvatar(g, corCorpoNumero)` recriada
+  // inline redesenharia todo o corpo (agora com sombreamento em 2 tons, Fase 6) a 60fps à toa. Só
+  // precisa redesenhar quando a cor de fato muda (troca de status), daí o `useCallback`.
+  const desenharCorpoMemo = useCallback((g: import('pixi.js').Graphics) => desenharCorpoAvatar(g, corCorpoNumero), [corCorpoNumero])
 
   const alvoRef = useRef<PosicaoTile>({ x: tileX, y: tileY })
   const inicioGlideRef = useRef<PosicaoTile>({ x: tileX, y: tileY })
@@ -152,7 +157,7 @@ export function AvatarPixi({
           y={PIVO_PERNA_DIREITA.y}
           rotation={-anguloPerna}
         />
-        <pixiGraphics draw={(g) => desenharCorpoAvatar(g, corCorpoNumero)} />
+        <pixiGraphics draw={desenharCorpoMemo} />
       </pixiContainer>
 
       <pixiText

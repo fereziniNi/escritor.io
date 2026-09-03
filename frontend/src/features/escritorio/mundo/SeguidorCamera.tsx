@@ -5,6 +5,14 @@ import type { TransformCamera } from './camera'
 /** Fator de suavização por tick - quanto maior, mais "grudada" no jogador (menos atraso visual). */
 const FATOR_SUAVIZACAO = 0.15
 
+/** Abaixo disso a câmera já convergiu pro alvo (visualmente idêntico) - sem essa checagem,
+ * `aoAtualizar` era chamado a cada tick pra sempre (mesmo parado), o que re-renderiza `CamadaMundo`
+ * a 60fps o tempo todo e foi a causa real do sistema "travando" depois da Fase 6 (piso/móveis
+ * ficaram mais pesados de redesenhar - ver `CamadaMundo.tsx`). Parar de chamar `aoAtualizar` quando
+ * já convergiu é o que faz esse custo cair a zero na maior parte do tempo (ninguém andando/dando
+ * zoom o tempo inteiro). */
+const EPSILON_CONVERGENCIA = 0.01
+
 /**
  * Componente sem saída visual (`return null`) cuja única função é chamar `useTick` a cada frame
  * do Pixi `Ticker` - existe como componente próprio (em vez de um hook comum chamado direto de
@@ -44,7 +52,15 @@ export function SeguidorCamera({
       alturaViewportPx,
       zoom,
     })
-    aoAtualizar(suavizarCamera(transformAtual, alvo, FATOR_SUAVIZACAO))
+    const proximo = suavizarCamera(transformAtual, alvo, FATOR_SUAVIZACAO)
+    const jaConvergiu =
+      Math.abs(proximo.x - transformAtual.x) < EPSILON_CONVERGENCIA &&
+      Math.abs(proximo.y - transformAtual.y) < EPSILON_CONVERGENCIA &&
+      Math.abs(proximo.scale - transformAtual.scale) < EPSILON_CONVERGENCIA
+    if (jaConvergiu) {
+      return
+    }
+    aoAtualizar(proximo)
   })
 
   return null

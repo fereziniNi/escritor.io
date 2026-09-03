@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { WheelEvent as ReactWheelEvent } from 'react'
 import { COR_STATUS } from '../icones'
 import type { EstadoPresencaUsuario, Zona } from '../types'
@@ -102,6 +102,16 @@ export function CamadaMundo({
   const alvoX = eu ? eu.x * TILE_PX + TILE_PX / 2 : larguraMundoPx / 2
   const alvoY = eu ? eu.y * TILE_PX + TILE_PX / 2 : alturaMundoPx / 2
 
+  // `transform` muda a cada tick (câmera seguindo o jogador, ver `SeguidorCamera`), o que
+  // re-renderiza este componente ~60x/s - sem memoizar essas 3 funções `draw`, o `@pixi/react`
+  // redesenharia piso+zonas+móveis (dezenas de itens, cada um com sombra/destaque desde a Fase 6)
+  // do zero a cada tick, mesmo esses itens nunca mudando. Causa real do "sistema travando" reportado
+  // depois da Fase 6 - o piso/mobília não precisam ser redesenhados, só a `pixiContainer` pai
+  // precisa mover (isso continua barato, é só um transform).
+  const desenharPisoMemo = useCallback((g: import('pixi.js').Graphics) => desenharPiso(g, larguraTiles, alturaTiles), [larguraTiles, alturaTiles])
+  const desenharPisoZonasMemo = useCallback((g: import('pixi.js').Graphics) => desenharPisoZonas(g, zonas), [zonas])
+  const desenharMobiliaMemo = useCallback((g: import('pixi.js').Graphics) => desenharMobilia(g, MOBILIA_ESTATICA), [])
+
   return (
     <div
       ref={hostRef}
@@ -122,9 +132,9 @@ export function CamadaMundo({
           aoAtualizar={setTransform}
         />
         <pixiContainer x={transform.x} y={transform.y} scale={transform.scale}>
-          <pixiGraphics draw={(g) => desenharPiso(g, larguraTiles, alturaTiles)} />
-          <pixiGraphics draw={(g) => desenharPisoZonas(g, zonas)} />
-          <pixiGraphics draw={(g) => desenharMobilia(g, MOBILIA_ESTATICA)} />
+          <pixiGraphics draw={desenharPisoMemo} />
+          <pixiGraphics draw={desenharPisoZonasMemo} />
+          <pixiGraphics draw={desenharMobiliaMemo} />
           {ITENS_AQUARIO.map((item, indice) => (
             <AquarioAnimado key={`aquario-${indice}`} tileX={item.x} tileY={item.y} />
           ))}

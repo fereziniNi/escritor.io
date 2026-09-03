@@ -1,6 +1,6 @@
 import { extend, useTick } from '@pixi/react'
 import { Container, Graphics } from 'pixi.js'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { desenharPlanta } from './spriteFactory'
 import { TILE_PX } from './constantes'
 
@@ -21,6 +21,11 @@ export function PlantaAnimada({ tileX, tileY }: { tileX: number; tileY: number }
     setTempo((atual) => atual + ticker.deltaMS)
   })
 
+  // `setTempo` acima roda a cada tick, então uma closure `(g) => desenharPlanta(g, 0, 0)` inline
+  // redesenharia o vaso/folhas do zero a 60fps - o desenho em si nunca muda (só a `rotation` do
+  // container pai, que é barata), daí memoizar com `useCallback` de deps vazio.
+  const desenharPlantaMemo = useCallback((g: import('pixi.js').Graphics) => desenharPlanta(g, 0, 0), [])
+
   const cx = tileX * TILE_PX + TILE_PX / 2
   const cy = tileY * TILE_PX + TILE_PX / 2
   const angulo = Math.sin(tempo * VELOCIDADE_BALANCO) * AMPLITUDE_BALANCO_RAD
@@ -31,7 +36,7 @@ export function PlantaAnimada({ tileX, tileY }: { tileX: number; tileY: number }
 
   return (
     <pixiContainer x={cx} y={cy + baseVasoY} pivot={{ x: 0, y: baseVasoY }} rotation={angulo}>
-      <pixiGraphics draw={(g) => desenharPlanta(g, 0, 0)} />
+      <pixiGraphics draw={desenharPlantaMemo} />
     </pixiContainer>
   )
 }
