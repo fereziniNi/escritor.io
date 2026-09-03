@@ -31,6 +31,15 @@ export function desenharPerna(g: PixiGraphics): void {
   g.stroke({ width: 1, color: COR_CONTORNO })
 }
 
+/** Sombra sob o avatar (Fase 6, pedido "tudo muito chapado/sem sombra") - elipse escura no chão,
+ * desenhada num `Graphics` próprio, primeiro filho de `AvatarPixi` (antes das pernas/corpo), pra
+ * ficar visualmente "atrás" do personagem mesmo sem ordenação de profundidade de verdade. */
+export function desenharSombraAvatar(g: PixiGraphics): void {
+  g.clear()
+  g.ellipse(12, 27, 8, 3.2)
+  g.fill({ color: 0x000000, alpha: 0.22 })
+}
+
 export function desenharCorpoAvatar(g: PixiGraphics, corCorpo: number): void {
   g.clear()
 
@@ -44,16 +53,25 @@ export function desenharCorpoAvatar(g: PixiGraphics, corCorpo: number): void {
   g.roundRect(4.5, 11, 15, 10, 4)
   g.fill({ color: corCorpo })
   g.stroke({ width: 1.2, color: COR_CONTORNO })
+  // destaque claro (2º tom) no peito - mesmo princípio de sombreamento em 2 tons usado nos móveis
+  // (`spriteFactory.ts`), pra o avatar não ficar mais "chapado" que o resto do mundo.
+  g.roundRect(6.5, 12.5, 8, 3.5, 2)
+  g.fill({ color: 0xffffff, alpha: 0.18 })
 
   // cabeça
   g.roundRect(6.5, 1.5, 11, 10, 4)
   g.fill({ color: COR_PELE })
   g.stroke({ width: 1.2, color: COR_CONTORNO })
+  // bochecha/destaque sutil
+  g.circle(9.5, 7.2, 1.1)
+  g.fill({ color: 0xffffff, alpha: 0.25 })
 
   // cabelo
   g.roundRect(5.8, 0.5, 12.4, 4.2, 2.4)
   g.fill({ color: COR_CABELO })
   g.stroke({ width: 1, color: COR_CONTORNO })
+  g.roundRect(6.6, 0.8, 5.5, 1.6, 1)
+  g.fill({ color: 0xffffff, alpha: 0.12 })
 
   // olhos
   g.roundRect(9.2, 6.6, 1.6, 1.8, 0.4)

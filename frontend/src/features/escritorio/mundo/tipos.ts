@@ -5,7 +5,21 @@
  * (gerarParedesDeZona/construirGradeColisao) existiam antes e foram removidos por completo, não
  * só desativados.
  */
-export type TipoMovel = 'mesa' | 'cadeira' | 'planta' | 'estante' | 'balcao' | 'tapete' | 'sofa' | 'mesaJogos' | 'aquario'
+export type TipoMovel =
+  | 'mesa'
+  | 'cadeira'
+  | 'planta'
+  | 'estante'
+  | 'balcao'
+  | 'tapete'
+  | 'sofa'
+  | 'mesaJogos'
+  | 'aquario'
+  | 'quadro'
+  | 'bebedouro'
+  | 'armario'
+  | 'puf'
+  | 'cafeteira'
 
 export interface ItemMobilia {
   tipo: TipoMovel

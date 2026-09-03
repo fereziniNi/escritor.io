@@ -32,16 +32,6 @@ export const COR_STATUS: Record<StatusAvatar, string> = {
   OFFLINE: '#c7c7d1',
 }
 
-/** Tingimento do piso por tipo de zona (Fase 3 - "identidade espacial" de cada sala), translúcido
- * sobre o piso do mundo Pixi. REUNIAO ficou um pouco mais saturada que a paleta original (mapa em
- * DOM) porque o piso agora tem um tom azulado por baixo (tema claro pedido pelo usuário) - um azul
- * pastel igualmente claro somia contra o piso; um pouco mais forte volta a se distinguir. */
-export const COR_ZONA: Record<TipoZona, string> = {
-  FOCO: '#bfe3c4',
-  REUNIAO: '#a6cdf0',
-  CAFE: '#eccfa8',
-  ATENDIMENTO: '#eac1c8',
-  // lavanda em vez do verde pastel original - LIVRE agora é "Fora do trabalho" (lounge), precisa
-  // se distinguir da Área de trabalho (FOCO), que também é esverdeada
-  LIVRE: '#d9c8ea',
-}
+// A cor de piso por zona (antes um tingimento translúcido fraco sobre um piso universal, Fase 3)
+// virou material/textura de verdade por sala - ver `MATERIAL_POR_ZONA` em `mundo/spriteFactory.ts`
+// (Fase 6), única fonte de cor de piso agora.

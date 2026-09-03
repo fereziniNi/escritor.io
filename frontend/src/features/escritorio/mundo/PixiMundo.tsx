@@ -16,6 +16,13 @@ extend({ Container, Graphics, Text })
  * `resizeTo` aponta pro `<div>` hospedeiro (não pra `window`) - o canvas preenche exatamente o
  * espaço que o layout HUD deixar pro mundo, do mesmo jeito que `.escritorio-coluna-mapa` fazia
  * antes com o mapa em DOM.
+ *
+ * `resolution`/`autoDensity` (Fase 6, pedido "deixe tudo em full hd 4k"): sem isso o canvas
+ * renderiza 1 px de backing store por 1 px CSS e fica borrado em qualquer tela retina/alta
+ * densidade (a maioria dos monitores/notebooks hoje) - o navegador precisa esticar uma imagem
+ * menor pra caber no espaço maior. Com `resolution = devicePixelRatio`, o Pixi desenha na
+ * densidade real da tela; `antialias` continua `false` de propósito (bordas nítidas de pixel art -
+ * o borrado que motivou o pedido era escala de DPI, não falta de suavização de borda).
  */
 export function PixiMundo({ children }: { children: ReactNode }) {
   const hostRef = useRef<HTMLDivElement>(null)
@@ -25,7 +32,13 @@ export function PixiMundo({ children }: { children: ReactNode }) {
       {/* Fundo azul-claro sólido (em vez de transparente pro creme da página) - dá uma
       ambientação de "escritório" coesa mesmo na margem fora do tabuleiro de tiles, quando o
       mundo não preenche 100% da viewport num zoom/proporção específico. */}
-      <Application resizeTo={hostRef} background="#dbe6ef" antialias={false}>
+      <Application
+        resizeTo={hostRef}
+        background="#dbe6ef"
+        antialias={false}
+        resolution={typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1}
+        autoDensity
+      >
         {children}
       </Application>
     </div>

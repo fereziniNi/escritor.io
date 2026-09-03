@@ -1,7 +1,15 @@
 import { extend, useTick } from '@pixi/react'
 import { Container, Graphics, Text } from 'pixi.js'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { desenharAnelDestaque, desenharAnelProximidade, desenharCorpoAvatar, desenharPerna, PIVO_PERNA_DIREITA, PIVO_PERNA_ESQUERDA } from './avatarFactory'
+import {
+  desenharAnelDestaque,
+  desenharAnelProximidade,
+  desenharCorpoAvatar,
+  desenharPerna,
+  desenharSombraAvatar,
+  PIVO_PERNA_DIREITA,
+  PIVO_PERNA_ESQUERDA,
+} from './avatarFactory'
 import { TILE_PX } from './constantes'
 import { DURACAO_GLIDE_MS, interpolarPosicao } from './glide'
 import type { PosicaoTile } from './movimento'
@@ -129,6 +137,7 @@ export function AvatarPixi({
         y={bobY}
         scale={{ x: direcao === 'esquerda' ? -ESCALA_AVATAR : ESCALA_AVATAR, y: ESCALA_AVATAR }}
       >
+        <pixiGraphics draw={desenharSombraAvatar} />
         {destaque && <pixiGraphics draw={desenharAnelDestaque} />}
         {proximo && <pixiGraphics draw={desenharAnelProximidade} alpha={pulsoProximidade} />}
         <pixiGraphics

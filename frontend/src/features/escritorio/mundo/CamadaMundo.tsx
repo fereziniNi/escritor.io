@@ -2,16 +2,28 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { WheelEvent as ReactWheelEvent } from 'react'
 import { COR_STATUS } from '../icones'
 import type { EstadoPresencaUsuario, Zona } from '../types'
+import { AquarioAnimado } from './AquarioAnimado'
 import { AvatarPixi } from './AvatarPixi'
 import { calcularTransformCamera } from './camera'
 import type { TransformCamera } from './camera'
 import { PROXIMIDADE_RAIO_TILES, TILE_PX, ZOOM_MAXIMO, ZOOM_MINIMO, ZOOM_PADRAO } from './constantes'
 import { MOBILIA_MUNDO } from './dadosMundo'
 import { PixiMundo } from './PixiMundo'
+import { PlantaAnimada } from './PlantaAnimada'
 import { calcularParesProximos, usuariosProximosDeAlguem } from './proximidade'
 import { RotuloZona } from './RotuloZona'
 import { SeguidorCamera } from './SeguidorCamera'
-import { desenharMobilia, desenharPiso, desenharZonas } from './spriteFactory'
+import { desenharMobilia, desenharPiso, desenharPisoZonas } from './spriteFactory'
+import { VaporAnimado } from './VaporAnimado'
+
+/** Fase 6: `aquario`/`planta` viraram componentes animados próprios (nadam/balançam de verdade via
+ * `useTick`) e saíram do lote estático que `desenharMobilia` desenha num `Graphics` só. */
+const MOBILIA_ESTATICA = MOBILIA_MUNDO.filter((item) => item.tipo !== 'aquario' && item.tipo !== 'planta')
+const ITENS_AQUARIO = MOBILIA_MUNDO.filter((item) => item.tipo === 'aquario')
+const ITENS_PLANTA = MOBILIA_MUNDO.filter((item) => item.tipo === 'planta')
+/** Vapor sobe só por cima da cafeteira (não do balcão genérico - "balcao" aparece em salas sem
+ * relação com café também, ex. recepção futura). */
+const ITENS_CAFETEIRA = MOBILIA_MUNDO.filter((item) => item.tipo === 'cafeteira')
 
 /** Valor de fallback determinístico quando não há `ResizeObserver` de verdade disponível (mesmo
  * espírito do fallback que `useDimensaoTileResponsiva` usava no mapa em DOM). */
@@ -43,8 +55,8 @@ function useTamanhoViewport(containerRef: React.RefObject<HTMLDivElement | null>
  * Compõe o mundo Pixi: piso + móveis + avatares, com uma câmera que segue o próprio jogador
  * (suavizada por `SeguidorCamera`) - roda do mouse ainda ajusta o zoom. Sem paredes de propósito
  * (pedido do usuário: "remover as paredes, deixar o mapa mais vivo") - as 4 salas continuam
- * distinguíveis pelo tingimento de piso (`desenharZonas`) e pela densidade de móveis de cada uma,
- * sem barreira física nem colisão entre elas.
+ * distinguíveis por terem material/cor de piso própria (`desenharPisoZonas`, Fase 6) e pela
+ * densidade de móveis de cada uma, sem barreira física nem colisão entre elas.
  */
 export function CamadaMundo({
   larguraTiles,
@@ -111,8 +123,17 @@ export function CamadaMundo({
         />
         <pixiContainer x={transform.x} y={transform.y} scale={transform.scale}>
           <pixiGraphics draw={(g) => desenharPiso(g, larguraTiles, alturaTiles)} />
-          <pixiGraphics draw={(g) => desenharZonas(g, zonas)} />
-          <pixiGraphics draw={(g) => desenharMobilia(g, MOBILIA_MUNDO)} />
+          <pixiGraphics draw={(g) => desenharPisoZonas(g, zonas)} />
+          <pixiGraphics draw={(g) => desenharMobilia(g, MOBILIA_ESTATICA)} />
+          {ITENS_AQUARIO.map((item, indice) => (
+            <AquarioAnimado key={`aquario-${indice}`} tileX={item.x} tileY={item.y} />
+          ))}
+          {ITENS_PLANTA.map((item, indice) => (
+            <PlantaAnimada key={`planta-${indice}`} tileX={item.x} tileY={item.y} />
+          ))}
+          {ITENS_CAFETEIRA.map((item, indice) => (
+            <VaporAnimado key={`vapor-${indice}`} tileX={item.x} tileY={item.y} />
+          ))}
           {zonas.map((zona) => (
             <RotuloZona key={zona.id} zona={zona} />
           ))}
