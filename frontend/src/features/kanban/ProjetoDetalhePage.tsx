@@ -18,7 +18,7 @@ import { CampoPessoa } from '../../shared/CampoPessoa'
 import { encontrarPessoaPorNome, existeSugestaoPara, type PessoaBasica } from '../../shared/encontrarPessoaPorNome'
 import { formatarDataHoraBr } from '../../shared/formatarData'
 import { adicionarMembroAoProjeto, buscarProjeto, criarColuna, listarPessoas } from '../organizacao/api'
-import type { ProjetoDetalhe } from '../organizacao/types'
+import { ROTULO_STATUS_PROJETO, type ProjetoDetalhe } from '../organizacao/types'
 import {
   criarApontamentoManual,
   criarCard,
@@ -40,18 +40,19 @@ import type { Apontamento, Card, ColunaComCards } from './types'
 import { useProjetoWebSocket } from './useProjetoWebSocket'
 import './Kanban.css'
 
-function ComentariosDoCard({ cardId }: { cardId: number }) {
+/**
+ * Pedido do usuário: "está muito complexo... facilite o front" - antes cada card tinha 3 botões
+ * de expandir separados (Apontamentos/Comentários/Histórico), cada um com sua própria lista/
+ * formulário sempre "espalhados" no board. Agora os três só existem dentro de `DetalhesDoCard`
+ * (um único toggle), então nenhum deles busca/renderiza nada por conta própria - montar já é o
+ * gatilho de "está aberto" (mesmo espírito do lazy-fetch de antes, só que a fonte da verdade
+ * agora é o pai, não um `aberto` próprio de cada um).
+ */
+function ComentariosSecao({ cardId }: { cardId: number }) {
   const queryClient = useQueryClient()
-  const [aberto, setAberto] = useState(false)
   const [texto, setTexto] = useState('')
 
-  // Só busca quando expandido - evitar um GET por card só de renderizar o projeto, mesmo espírito
-  // do N+1 já assumido em ProjetoService.paraColunaComCards (S3.14).
-  const comentariosQuery = useQuery({
-    queryKey: ['cards', cardId, 'comentarios'],
-    queryFn: () => listarComentarios(cardId),
-    enabled: aberto,
-  })
+  const comentariosQuery = useQuery({ queryKey: ['cards', cardId, 'comentarios'], queryFn: () => listarComentarios(cardId) })
 
   const criarComentarioMutation = useMutation({
     mutationFn: criarComentario,
@@ -63,45 +64,39 @@ function ComentariosDoCard({ cardId }: { cardId: number }) {
 
   return (
     <div className="kanban-subsecao">
-      <button type="button" className="botao-secundario botao-pequeno" onClick={() => setAberto((atual) => !atual)}>
-        💬 Comentários
-      </button>
-      {aberto && (
-        <div className="kanban-subsecao-corpo">
-          {comentariosQuery.isError && <p className="mensagem-erro">Não foi possível carregar os comentários.</p>}
-          {comentariosQuery.data && comentariosQuery.data.length > 0 && (
-            <ul className="kanban-subsecao-lista">
-              {comentariosQuery.data.map((comentario) => (
-                <li key={comentario.id} className="kanban-subsecao-item">
-                  {comentario.texto}
-                </li>
-              ))}
-            </ul>
-          )}
-          <form
-            className="kanban-card-form"
-            onSubmit={(evento) => {
-              evento.preventDefault()
-              criarComentarioMutation.mutate({ cardId, texto })
-            }}
-          >
-            <label htmlFor={`novo-comentario-${cardId}`} className="sr-only">
-              Novo comentário
-            </label>
-            <textarea
-              id={`novo-comentario-${cardId}`}
-              value={texto}
-              onChange={(evento) => setTexto(evento.target.value)}
-              placeholder="Novo comentário"
-              required
-            />
-            <button type="submit" className="botao-pequeno" disabled={criarComentarioMutation.isPending}>
-              Comentar
-            </button>
-          </form>
-          {criarComentarioMutation.isError && <p className="mensagem-erro">Não foi possível comentar.</p>}
-        </div>
+      <h3 className="kanban-subsecao-titulo">💬 Comentários</h3>
+      {comentariosQuery.isError && <p className="mensagem-erro">Não foi possível carregar os comentários.</p>}
+      {comentariosQuery.data && comentariosQuery.data.length > 0 && (
+        <ul className="kanban-subsecao-lista">
+          {comentariosQuery.data.map((comentario) => (
+            <li key={comentario.id} className="kanban-subsecao-item">
+              {comentario.texto}
+            </li>
+          ))}
+        </ul>
       )}
+      <form
+        className="kanban-card-form"
+        onSubmit={(evento) => {
+          evento.preventDefault()
+          criarComentarioMutation.mutate({ cardId, texto })
+        }}
+      >
+        <label htmlFor={`novo-comentario-${cardId}`} className="sr-only">
+          Novo comentário
+        </label>
+        <textarea
+          id={`novo-comentario-${cardId}`}
+          value={texto}
+          onChange={(evento) => setTexto(evento.target.value)}
+          placeholder="Novo comentário"
+          required
+        />
+        <button type="submit" className="botao-pequeno" disabled={criarComentarioMutation.isPending}>
+          Comentar
+        </button>
+      </form>
+      {criarComentarioMutation.isError && <p className="mensagem-erro">Não foi possível comentar.</p>}
     </div>
   )
 }
@@ -112,46 +107,27 @@ function ComentariosDoCard({ cardId }: { cardId: number }) {
  * só os eventos de ciclo de vida do card (`EventoCard`), nunca o tempo apontado. Agora mescla
  * eventos com apontamentos (`mesclarHistorico`) numa única linha do tempo, com dia/hora
  * (`formatarDataHoraBr`) na frente de cada item. Reaproveita a MESMA queryKey de
- * `ApontamentosDoCard` (`['cards', cardId, 'apontamentos']`) de propósito - é o cache
+ * `ApontamentosSecao` (`['cards', cardId, 'apontamentos']`) de propósito - é o cache
  * compartilhado do TanStack Query que faz o Histórico se atualizar sozinho quando `TimerDoCard`
  * inicia/para um timer, sem duplicar a busca nem inventar um canal de sincronização novo.
  */
-function HistoricoDoCard({ cardId }: { cardId: number }) {
-  const [aberto, setAberto] = useState(false)
-
-  // Mesma lógica de lazy-fetch de ComentariosDoCard: só busca quando o painel está aberto.
-  const eventosQuery = useQuery({
-    queryKey: ['cards', cardId, 'eventos'],
-    queryFn: () => listarEventos(cardId),
-    enabled: aberto,
-  })
-  const apontamentosQuery = useQuery({
-    queryKey: ['cards', cardId, 'apontamentos'],
-    queryFn: () => listarApontamentos(cardId),
-    enabled: aberto,
-  })
+function HistoricoSecao({ cardId }: { cardId: number }) {
+  const eventosQuery = useQuery({ queryKey: ['cards', cardId, 'eventos'], queryFn: () => listarEventos(cardId) })
+  const apontamentosQuery = useQuery({ queryKey: ['cards', cardId, 'apontamentos'], queryFn: () => listarApontamentos(cardId) })
 
   const linhas = mesclarHistorico(eventosQuery.data ?? [], apontamentosQuery.data ?? [])
 
   return (
     <div className="kanban-subsecao">
-      <button type="button" className="botao-secundario botao-pequeno" onClick={() => setAberto((atual) => !atual)}>
-        🕘 Histórico
-      </button>
-      {aberto && (
-        <div className="kanban-subsecao-corpo">
-          {(eventosQuery.isError || apontamentosQuery.isError) && (
-            <p className="mensagem-erro">Não foi possível carregar o histórico.</p>
-          )}
-          <ul aria-label="Histórico do card" className="kanban-subsecao-lista">
-            {linhas.map((linha) => (
-              <li key={linha.chave} className="kanban-subsecao-item">
-                <span className="kanban-historico-quando">{formatarDataHoraBr(linha.quando)}</span> — {linha.rotulo}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <h3 className="kanban-subsecao-titulo">🕘 Histórico</h3>
+      {(eventosQuery.isError || apontamentosQuery.isError) && <p className="mensagem-erro">Não foi possível carregar o histórico.</p>}
+      <ul aria-label="Histórico do card" className="kanban-subsecao-lista">
+        {linhas.map((linha) => (
+          <li key={linha.chave} className="kanban-subsecao-item">
+            <span className="kanban-historico-quando">{formatarDataHoraBr(linha.quando)}</span> — {linha.rotulo}
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
@@ -302,19 +278,13 @@ function LinhaApontamento({
   )
 }
 
-function ApontamentosDoCard({ cardId }: { cardId: number }) {
+function ApontamentosSecao({ cardId }: { cardId: number }) {
   const queryClient = useQueryClient()
-  const [aberto, setAberto] = useState(false)
   const [editandoId, setEditandoId] = useState<number | null>(null)
   const [minutosManual, setMinutosManual] = useState('')
   const [descricaoManual, setDescricaoManual] = useState('')
 
-  // Mesma lógica de lazy-fetch de ComentariosDoCard/HistoricoDoCard.
-  const apontamentosQuery = useQuery({
-    queryKey: ['cards', cardId, 'apontamentos'],
-    queryFn: () => listarApontamentos(cardId),
-    enabled: aberto,
-  })
+  const apontamentosQuery = useQuery({ queryKey: ['cards', cardId, 'apontamentos'], queryFn: () => listarApontamentos(cardId) })
 
   const criarManualMutation = useMutation({
     mutationFn: criarApontamentoManual,
@@ -342,70 +312,89 @@ function ApontamentosDoCard({ cardId }: { cardId: number }) {
 
   return (
     <div className="kanban-subsecao">
-      <button type="button" className="botao-secundario botao-pequeno" onClick={() => setAberto((atual) => !atual)}>
-        🧾 Apontamentos
+      <h3 className="kanban-subsecao-titulo">🧾 Apontamentos</h3>
+      {apontamentosQuery.isError && <p className="mensagem-erro">Não foi possível carregar os apontamentos.</p>}
+      <ul aria-label="Apontamentos do card" className="kanban-subsecao-lista">
+        {apontamentosQuery.data?.map((apontamento) => (
+          <LinhaApontamento
+            key={apontamento.id}
+            apontamento={apontamento}
+            emEdicao={editandoId === apontamento.id}
+            onIniciarEdicao={() => setEditandoId(apontamento.id)}
+            onCancelarEdicao={() => setEditandoId(null)}
+            salvandoEdicao={editarMutation.isPending}
+            onSalvarEdicao={(minutos, descricao) => {
+              const novosMinutos = Number(minutos)
+              const novoFim =
+                apontamento.fim !== null
+                  ? new Date(new Date(apontamento.inicio).getTime() + novosMinutos * 60_000).toISOString()
+                  : null
+              editarMutation.mutate({ apontamentoId: apontamento.id, inicio: null, fim: novoFim, descricao: descricao || null })
+            }}
+            onExcluir={() => excluirMutation.mutate(apontamento.id)}
+          />
+        ))}
+      </ul>
+      {editarMutation.isError && <p className="mensagem-erro">Não foi possível editar o apontamento.</p>}
+      {excluirMutation.isError && <p className="mensagem-erro">Não foi possível excluir o apontamento.</p>}
+
+      <form
+        className="formulario"
+        onSubmit={(evento) => {
+          evento.preventDefault()
+          criarManualMutation.mutate({
+            cardId,
+            inicio: null,
+            fim: null,
+            minutos: Number(minutosManual),
+            descricao: descricaoManual || null,
+          })
+        }}
+      >
+        <div className="campo">
+          <label htmlFor={`minutos-manual-${cardId}`}>Minutos trabalhados</label>
+          <input
+            id={`minutos-manual-${cardId}`}
+            type="number"
+            value={minutosManual}
+            onChange={(evento) => setMinutosManual(evento.target.value)}
+            required
+          />
+        </div>
+        <div className="campo">
+          <label htmlFor={`descricao-manual-${cardId}`}>Descrição</label>
+          <input id={`descricao-manual-${cardId}`} value={descricaoManual} onChange={(evento) => setDescricaoManual(evento.target.value)} />
+        </div>
+        <div className="campo-acoes">
+          <button type="submit" className="botao-pequeno" disabled={criarManualMutation.isPending}>
+            Lançar
+          </button>
+          {criarManualMutation.isError && <p className="mensagem-erro">Não foi possível lançar o apontamento.</p>}
+        </div>
+      </form>
+    </div>
+  )
+}
+
+/**
+ * Pedido do usuário: "está muito complexo... facilite o front" - um único toggle no lugar dos três
+ * que existiam antes (Apontamentos/Comentários/Histórico cada um com seu próprio botão). O timer
+ * continua fora daqui, sempre visível no card (é a ação mais comum - escondê-lo atrás de um clique
+ * a mais iria contra "facilitar o uso", não a favor).
+ */
+function DetalhesDoCard({ cardId }: { cardId: number }) {
+  const [aberto, setAberto] = useState(false)
+
+  return (
+    <div className="kanban-detalhes">
+      <button type="button" className="botao-secundario botao-pequeno kanban-detalhes-botao" onClick={() => setAberto((atual) => !atual)}>
+        {aberto ? '🔼 Ocultar detalhes' : '🔽 Detalhes'}
       </button>
       {aberto && (
-        <div className="kanban-subsecao-corpo">
-          {apontamentosQuery.isError && <p className="mensagem-erro">Não foi possível carregar os apontamentos.</p>}
-          <ul aria-label="Apontamentos do card" className="kanban-subsecao-lista">
-            {apontamentosQuery.data?.map((apontamento) => (
-              <LinhaApontamento
-                key={apontamento.id}
-                apontamento={apontamento}
-                emEdicao={editandoId === apontamento.id}
-                onIniciarEdicao={() => setEditandoId(apontamento.id)}
-                onCancelarEdicao={() => setEditandoId(null)}
-                salvandoEdicao={editarMutation.isPending}
-                onSalvarEdicao={(minutos, descricao) => {
-                  const novosMinutos = Number(minutos)
-                  const novoFim =
-                    apontamento.fim !== null
-                      ? new Date(new Date(apontamento.inicio).getTime() + novosMinutos * 60_000).toISOString()
-                      : null
-                  editarMutation.mutate({ apontamentoId: apontamento.id, inicio: null, fim: novoFim, descricao: descricao || null })
-                }}
-                onExcluir={() => excluirMutation.mutate(apontamento.id)}
-              />
-            ))}
-          </ul>
-          {editarMutation.isError && <p className="mensagem-erro">Não foi possível editar o apontamento.</p>}
-          {excluirMutation.isError && <p className="mensagem-erro">Não foi possível excluir o apontamento.</p>}
-
-          <form
-            className="formulario"
-            onSubmit={(evento) => {
-              evento.preventDefault()
-              criarManualMutation.mutate({
-                cardId,
-                inicio: null,
-                fim: null,
-                minutos: Number(minutosManual),
-                descricao: descricaoManual || null,
-              })
-            }}
-          >
-            <div className="campo">
-              <label htmlFor={`minutos-manual-${cardId}`}>Minutos trabalhados</label>
-              <input
-                id={`minutos-manual-${cardId}`}
-                type="number"
-                value={minutosManual}
-                onChange={(evento) => setMinutosManual(evento.target.value)}
-                required
-              />
-            </div>
-            <div className="campo">
-              <label htmlFor={`descricao-manual-${cardId}`}>Descrição</label>
-              <input id={`descricao-manual-${cardId}`} value={descricaoManual} onChange={(evento) => setDescricaoManual(evento.target.value)} />
-            </div>
-            <div className="campo-acoes">
-              <button type="submit" className="botao-pequeno" disabled={criarManualMutation.isPending}>
-                Lançar
-              </button>
-              {criarManualMutation.isError && <p className="mensagem-erro">Não foi possível lançar o apontamento.</p>}
-            </div>
-          </form>
+        <div className="kanban-detalhes-corpo">
+          <ApontamentosSecao cardId={cardId} />
+          <ComentariosSecao cardId={cardId} />
+          <HistoricoSecao cardId={cardId} />
         </div>
       )}
     </div>
@@ -436,14 +425,12 @@ function CardArrastavel({ card, nomeDoResponsavel }: { card: Card; nomeDoRespons
       </span>
       {(nomeDoResponsavel || card.estimativaMinutos !== null) && (
         <p className="kanban-card-meta">
-          {nomeDoResponsavel && <span>👤 {nomeDoResponsavel}</span>}
-          {card.estimativaMinutos !== null && <span>⏱️ {card.estimativaMinutos} min</span>}
+          {nomeDoResponsavel && <span className="badge badge-neutro">👤 {nomeDoResponsavel}</span>}
+          {card.estimativaMinutos !== null && <span className="badge badge-neutro">⏱️ {card.estimativaMinutos} min</span>}
         </p>
       )}
       <TimerDoCard cardId={card.id} />
-      <ApontamentosDoCard cardId={card.id} />
-      <ComentariosDoCard cardId={card.id} />
-      <HistoricoDoCard cardId={card.id} />
+      <DetalhesDoCard cardId={card.id} />
     </li>
   )
 }
@@ -482,6 +469,16 @@ function ColunaComDrop({
           </span>
         )}
       </h2>
+      {/* Barra decorativa só - o badge de texto acima continua sendo a fonte confiável (leitor de
+      tela/teste), isto aqui é só o toque "gameficado" pedido (barra de progresso tipo WIP). */}
+      {coluna.limiteWip !== null && (
+        <div className="kanban-coluna-progresso" aria-hidden="true">
+          <div
+            className="kanban-coluna-progresso-preenchido"
+            style={{ width: `${Math.min(100, (coluna.cards.length / coluna.limiteWip) * 100)}%` }}
+          />
+        </div>
+      )}
       <SortableContext items={coluna.cards.map((card) => card.id)} strategy={verticalListSortingStrategy}>
         <ul className="kanban-cards">
           {coluna.cards.map((card) => (
@@ -578,9 +575,9 @@ function MembrosDoProjeto({
       <h2 className="secao-titulo">👥 Membros do projeto</h2>
       {membros.length === 0 && <p className="mensagem-vazia">Nenhum membro ainda.</p>}
       {membros.length > 0 && (
-        <ul className="lista-cartoes">
+        <ul className="kanban-membros-lista">
           {membros.map((membro) => (
-            <li key={membro.usuarioId} className="cartao-item">
+            <li key={membro.usuarioId} className="badge">
               {membro.usuarioNome}
             </li>
           ))}
@@ -794,6 +791,7 @@ export function ProjetoDetalhePage({ projetoIdProp }: { projetoIdProp?: number }
   // card enquanto `pessoasQuery` ainda não terminou de carregar.
   const nomePorUsuarioId = new Map<number, string>(projeto.membros.map((membro) => [membro.usuarioId, membro.usuarioNome]))
   pessoas.forEach((pessoa) => nomePorUsuarioId.set(pessoa.id, pessoa.nome))
+  const totalTarefas = projeto.colunas.reduce((total, coluna) => total + coluna.cards.length, 0)
 
   return (
     <main className="pagina" style={{ maxWidth: 'none' }}>
@@ -802,6 +800,25 @@ export function ProjetoDetalhePage({ projetoIdProp }: { projetoIdProp?: number }
           📋
         </span>
         <h1>{projeto.nome}</h1>
+        <span className="badge">{ROTULO_STATUS_PROJETO[projeto.status]}</span>
+      </div>
+
+      {/* Pedido do usuário: "deixe mais técnico" - números do projeto à vista, sem precisar contar
+      card por coluna. Reaproveita `.grade-stats`/`.stat-cartao`, já usado em Jornada de hoje
+      (ponto), pra manter a mesma linguagem visual em vez de inventar uma nova. */}
+      <div className="grade-stats kanban-projeto-stats">
+        <div className="stat-cartao">
+          <div className="stat-cartao-rotulo">Cliente</div>
+          <div className="stat-cartao-valor kanban-projeto-stat-texto">{projeto.cliente}</div>
+        </div>
+        <div className="stat-cartao">
+          <div className="stat-cartao-rotulo">Tarefas</div>
+          <div className="stat-cartao-valor">{totalTarefas}</div>
+        </div>
+        <div className="stat-cartao">
+          <div className="stat-cartao-rotulo">Membros</div>
+          <div className="stat-cartao-valor">{projeto.membros.length}</div>
+        </div>
       </div>
 
       <MembrosDoProjeto projetoId={projetoId} membros={projeto.membros} pessoas={pessoas} podeGerenciar={podeGerenciarProjeto} />

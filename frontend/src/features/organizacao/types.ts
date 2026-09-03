@@ -14,6 +14,10 @@ export interface Colaborador {
 
 export type StatusProjeto = 'ATIVO' | 'PAUSADO' | 'CONCLUIDO'
 
+/** Extraído de `ProjetosPage` pra ser reaproveitado também no cabeçalho de `ProjetoDetalhePage`
+ * (redesign pedido pelo usuário: "mais técnico" - mostrar o status do projeto ali também). */
+export const ROTULO_STATUS_PROJETO: Record<StatusProjeto, string> = { ATIVO: 'Ativo', PAUSADO: 'Pausado', CONCLUIDO: 'Concluído' }
+
 export interface Projeto {
   id: number
   nome: string

@@ -11,7 +11,7 @@
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.9rem;
 }
 
 .kanban-projeto-icone {
@@ -21,6 +21,23 @@
 
 .kanban-projeto-cabecalho h1 {
   margin: 0;
+}
+
+/* Pedido do usuário: "facilite o front... deixe mais técnico" - status do projeto (antes só
+   visível na lista de projetos) também à vista aqui, sem precisar voltar. */
+.kanban-projeto-cabecalho .badge {
+  margin-left: auto;
+}
+
+.kanban-projeto-stats {
+  margin-bottom: 1.25rem;
+}
+
+/* "Cliente" é texto, não um número - não repete o tamanho/peso grande de `.stat-cartao-valor`
+   usado pelas contagens ao lado (Tarefas/Membros). */
+.kanban-projeto-stat-texto {
+  font-size: 0.95rem;
+  font-weight: 700;
 }
 
 .kanban-board {
@@ -78,6 +95,23 @@
   margin-left: auto;
 }
 
+/* Pedido do usuário: "deixe mais... gameficado" - barra de WIP no estilo barra de progresso/vida
+   de jogo, ao lado do badge de texto "3/5" que já existe (esse continua sendo o dado confiável
+   pra leitor de tela/teste - a barra aqui é só decoração, por isso `aria-hidden`). */
+.kanban-coluna-progresso {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--cor-borda);
+  overflow: hidden;
+}
+
+.kanban-coluna-progresso-preenchido {
+  height: 100%;
+  background: var(--cor-acento);
+  border-radius: inherit;
+  transition: width 160ms ease-out;
+}
+
 .kanban-cards {
   list-style: none;
   margin: 0;
@@ -91,6 +125,9 @@
 .kanban-card {
   background: var(--cor-superficie);
   border: 1px solid var(--cor-borda);
+  /* Toque "gameficado" pedido - lasca de cor à esquerda, como um item de jogo, sem exagerar no
+     resto do cartão (continua com a mesma paleta/fonte de todo o app). */
+  border-left: 3px solid var(--cor-acento);
   border-radius: 10px;
   padding: 0.7rem 0.8rem;
   box-shadow: 0 1px 0 var(--cor-borda);
@@ -133,17 +170,52 @@
   margin-top: 0.55rem;
 }
 
-.kanban-subsecao {
+/* Pedido do usuário: "está muito complexo... facilite o front" - membros do projeto viram
+   pílulas compactas lado a lado (mesma classe `.badge` usada em todo o app), no lugar da lista de
+   cartões empilhados de antes que ocupava bem mais altura de tela. */
+.kanban-membros-lista {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+/* Pedido do usuário: "está muito complexo" - Apontamentos/Comentários/Histórico agora vivem
+   dentro de um único toggle (`DetalhesDoCard`) em vez de três botões separados no card. */
+.kanban-detalhes {
   margin-top: 0.5rem;
   padding-top: 0.5rem;
   border-top: 1px dashed var(--cor-borda);
 }
 
-.kanban-subsecao-corpo {
+.kanban-detalhes-botao {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+.kanban-detalhes-corpo {
   margin-top: 0.5rem;
   display: flex;
   flex-direction: column;
+  gap: 0.7rem;
+}
+
+.kanban-subsecao {
+  display: flex;
+  flex-direction: column;
   gap: 0.4rem;
+}
+
+.kanban-subsecao-titulo {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--cor-texto-suave);
 }
 
 .kanban-subsecao-lista {

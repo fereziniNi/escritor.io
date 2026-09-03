@@ -18,13 +18,16 @@ const PESSOAS_CADASTRADAS = [
   { id: 2, nome: 'Beto Lima' },
 ]
 
-// `HistoricoDoCard` agora busca apontamentos além de eventos (mescla os dois - pedido do usuário:
-// "no historico deve estar o dia hora e quanto tempo foi feita") - handler padrão de lista vazia
-// pro card fixo desta suíte (id 7), restaurado a cada teste por `resetHandlers`; testes que
-// precisam de apontamentos de verdade sobrescrevem com `server.use(...)`.
+// Pedido do usuário: "está muito complexo... facilite o front" - Apontamentos/Comentários/
+// Histórico agora vivem juntos atrás de um único toggle ("Detalhes"), então abrir o card sempre
+// dispara os três GETs de uma vez (antes cada um só disparava com seu próprio toggle). Handlers
+// padrão de lista vazia pro card fixo desta suíte (id 7), restaurados a cada teste por
+// `resetHandlers`; testes que precisam de dado de verdade sobrescrevem com `server.use(...)`.
 const server = setupServer(
   http.get('/usuarios/basico', () => HttpResponse.json(PESSOAS_CADASTRADAS)),
   http.get('/cards/7/apontamentos', () => HttpResponse.json([])),
+  http.get('/cards/7/comentarios', () => HttpResponse.json([])),
+  http.get('/cards/7/eventos', () => HttpResponse.json([])),
 )
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
@@ -93,6 +96,20 @@ describe('ProjetoDetalhePage', () => {
     expect(await screen.findByRole('heading', { name: 'Backlog' })).toBeInTheDocument()
     expect(screen.getByText('A fazer')).toBeInTheDocument()
     expect(screen.getByText('Corrigir bug')).toBeInTheDocument()
+  })
+
+  it('mostra status, cliente, total de tarefas e de membros no cabeçalho (pedido: "mais técnico")', async () => {
+    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
+
+    renderPagina()
+
+    await screen.findByRole('heading', { name: 'Backlog' })
+    expect(screen.getByText('Ativo')).toBeInTheDocument()
+    expect(screen.getByText('Cliente Teste')).toBeInTheDocument()
+    // "1" aparece duas vezes (1 tarefa E 1 membro) - escopado por card de estatística pra não dar
+    // "múltiplos elementos encontrados".
+    const cartaoTarefas = screen.getByText('Tarefas').closest('.stat-cartao')
+    expect(within(cartaoTarefas as HTMLElement).getByText('1')).toBeInTheDocument()
   })
 
   it('mostra os membros do projeto', async () => {
@@ -371,13 +388,28 @@ describe('ProjetoDetalhePage', () => {
     expect(screen.getByRole('button', { name: /nova seção/i })).toBeInTheDocument()
   })
 
-  it('não busca comentários antes do card ser expandido', async () => {
+  it('não busca comentários/histórico/apontamentos antes do card ser expandido (um único toggle "Detalhes")', async () => {
     server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
 
     renderPagina()
 
     await screen.findByText('Corrigir bug')
     expect(screen.queryByText('Já revisei')).not.toBeInTheDocument()
+    expect(screen.queryByText(/card criado em/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/pareamento/i)).not.toBeInTheDocument()
+  })
+
+  it('um clique em "Detalhes" mostra apontamentos, comentários E histórico juntos (pedido: "facilite o front")', async () => {
+    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.click(screen.getByRole('button', { name: /detalhes/i }))
+
+    expect(await screen.findByRole('heading', { name: /apontamentos/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /comentários/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /histórico/i })).toBeInTheDocument()
   })
 
   it('expande o card e mostra os comentários existentes', async () => {
@@ -391,7 +423,7 @@ describe('ProjetoDetalhePage', () => {
     renderPagina()
 
     await screen.findByText('Corrigir bug')
-    await user.click(screen.getByRole('button', { name: /comentários/i }))
+    await user.click(screen.getByRole('button', { name: /detalhes/i }))
 
     expect(await screen.findByText('Já revisei')).toBeInTheDocument()
   })
@@ -412,7 +444,7 @@ describe('ProjetoDetalhePage', () => {
     renderPagina()
 
     await screen.findByText('Corrigir bug')
-    await user.click(screen.getByRole('button', { name: /comentários/i }))
+    await user.click(screen.getByRole('button', { name: /detalhes/i }))
     await screen.findByLabelText(/novo comentário/i)
     await user.type(screen.getByLabelText(/novo comentário/i), 'Ficou ótimo')
     await user.click(screen.getByRole('button', { name: /^comentar$/i }))
@@ -429,18 +461,9 @@ describe('ProjetoDetalhePage', () => {
     renderPagina()
 
     await screen.findByText('Corrigir bug')
-    await user.click(screen.getByRole('button', { name: /comentários/i }))
+    await user.click(screen.getByRole('button', { name: /detalhes/i }))
 
     expect(await screen.findByText(/não foi possível carregar os comentários/i)).toBeInTheDocument()
-  })
-
-  it('não busca o histórico antes do card ser expandido', async () => {
-    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
-
-    renderPagina()
-
-    await screen.findByText('Corrigir bug')
-    expect(screen.queryByText(/card criado em/i)).not.toBeInTheDocument()
   })
 
   it('expande o histórico e mostra eventos e apontamentos mesclados, em ordem cronológica, com dia/hora', async () => {
@@ -483,7 +506,7 @@ describe('ProjetoDetalhePage', () => {
     renderPagina()
 
     await screen.findByText('Corrigir bug')
-    await user.click(screen.getByRole('button', { name: /histórico/i }))
+    await user.click(screen.getByRole('button', { name: /detalhes/i }))
 
     const lista = await screen.findByRole('list', { name: /histórico do card/i })
     const itens = within(lista).getAllByRole('listitem')
@@ -528,7 +551,7 @@ describe('ProjetoDetalhePage', () => {
 
     await screen.findByText('Corrigir bug')
     // Histórico aberto ANTES de iniciar o timer - é exatamente o cenário do relato do usuário.
-    await user.click(screen.getByRole('button', { name: /histórico/i }))
+    await user.click(screen.getByRole('button', { name: /detalhes/i }))
     await screen.findByRole('list', { name: /histórico do card/i })
     expect(screen.queryByText(/timer iniciado/i)).not.toBeInTheDocument()
 
@@ -546,7 +569,7 @@ describe('ProjetoDetalhePage', () => {
     renderPagina()
 
     await screen.findByText('Corrigir bug')
-    await user.click(screen.getByRole('button', { name: /histórico/i }))
+    await user.click(screen.getByRole('button', { name: /detalhes/i }))
 
     expect(await screen.findByText(/não foi possível carregar o histórico/i)).toBeInTheDocument()
   })
@@ -659,15 +682,6 @@ describe('ProjetoDetalhePage', () => {
     expect(await screen.findByRole('button', { name: /iniciar timer/i })).toBeInTheDocument()
   })
 
-  it('não busca apontamentos antes do card ser expandido', async () => {
-    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
-
-    renderPagina()
-
-    await screen.findByText('Corrigir bug')
-    expect(screen.queryByText(/pareamento/i)).not.toBeInTheDocument()
-  })
-
   it('expande e mostra os apontamentos existentes do card', async () => {
     server.use(
       http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)),
@@ -692,10 +706,14 @@ describe('ProjetoDetalhePage', () => {
     renderPagina()
 
     await screen.findByText('Corrigir bug')
-    await user.click(screen.getByRole('button', { name: /apontamentos/i }))
+    await user.click(screen.getByRole('button', { name: /detalhes/i }))
 
-    expect(await screen.findByText(/pareamento/i)).toBeInTheDocument()
-    expect(screen.getByText(/60 min/)).toBeInTheDocument()
+    // Escopado na lista de Apontamentos de propósito: com os três agora sempre juntos (pedido do
+    // usuário: "facilite o front"), o Histórico mostra a MESMA descrição do apontamento, e um
+    // `screen.findByText` sem escopo bate em duas ocorrências.
+    const listaApontamentos = await screen.findByRole('list', { name: /apontamentos do card/i })
+    expect(within(listaApontamentos).getByText(/pareamento/i)).toBeInTheDocument()
+    expect(within(listaApontamentos).getByText(/60 min/)).toBeInTheDocument()
   })
 
   it('lança um apontamento manual e ele aparece na lista sem reload manual', async () => {
@@ -725,14 +743,16 @@ describe('ProjetoDetalhePage', () => {
     renderPagina()
 
     await screen.findByText('Corrigir bug')
-    await user.click(screen.getByRole('button', { name: /apontamentos/i }))
+    await user.click(screen.getByRole('button', { name: /detalhes/i }))
     await screen.findByLabelText(/minutos trabalhados/i)
     await user.type(screen.getByLabelText(/minutos trabalhados/i), '120')
     await user.type(screen.getByLabelText(/^descrição$/i), 'Revisão de código')
     await user.click(screen.getByRole('button', { name: /^lançar$/i }))
 
-    expect(await screen.findByText(/revisão de código/i)).toBeInTheDocument()
-    expect(screen.getByText(/120 min/)).toBeInTheDocument()
+    // Escopado (mesmo motivo do teste anterior): Histórico mescla o mesmo apontamento.
+    const listaApontamentos = screen.getByRole('list', { name: /apontamentos do card/i })
+    expect(await within(listaApontamentos).findByText(/revisão de código/i)).toBeInTheDocument()
+    expect(within(listaApontamentos).getByText(/120 min/)).toBeInTheDocument()
   })
 
   it('edita a descrição e os minutos de um apontamento existente inline', async () => {
@@ -761,21 +781,23 @@ describe('ProjetoDetalhePage', () => {
     renderPagina()
 
     await screen.findByText('Corrigir bug')
-    await user.click(screen.getByRole('button', { name: /apontamentos/i }))
-    await screen.findByText(/original/i)
-    await user.click(screen.getByRole('button', { name: /^editar$/i }))
+    await user.click(screen.getByRole('button', { name: /detalhes/i }))
+    // Escopado (mesmo motivo dos testes anteriores): Histórico mescla o mesmo apontamento, então
+    // "Original"/"Corrigido" aparecem duas vezes na tela sem o escopo na lista de Apontamentos.
+    const listaApontamentos = await screen.findByRole('list', { name: /apontamentos do card/i })
+    await within(listaApontamentos).findByText(/original/i)
+    await user.click(within(listaApontamentos).getByRole('button', { name: /^editar$/i }))
 
-    const listaApontamentos = screen.getByRole('list', { name: /apontamentos do card/i })
     const campoMinutos = within(listaApontamentos).getByLabelText(/^minutos$/i)
     await user.clear(campoMinutos)
     await user.type(campoMinutos, '90')
     const campoDescricao = within(listaApontamentos).getByLabelText(/^descrição$/i)
     await user.clear(campoDescricao)
     await user.type(campoDescricao, 'Corrigido')
-    await user.click(screen.getByRole('button', { name: /^salvar$/i }))
+    await user.click(within(listaApontamentos).getByRole('button', { name: /^salvar$/i }))
 
-    expect(await screen.findByText(/corrigido/i)).toBeInTheDocument()
-    expect(screen.getByText(/90 min/)).toBeInTheDocument()
+    expect(await within(listaApontamentos).findByText(/corrigido/i)).toBeInTheDocument()
+    expect(within(listaApontamentos).getByText(/90 min/)).toBeInTheDocument()
   })
 
   it('exclui um apontamento e ele some da lista sem reload manual', async () => {
@@ -805,10 +827,12 @@ describe('ProjetoDetalhePage', () => {
     renderPagina()
 
     await screen.findByText('Corrigir bug')
-    await user.click(screen.getByRole('button', { name: /apontamentos/i }))
-    await screen.findByText(/pareamento/i)
+    await user.click(screen.getByRole('button', { name: /detalhes/i }))
+    // Escopado (mesmo motivo dos testes anteriores): Histórico mescla o mesmo apontamento.
+    const listaApontamentos = await screen.findByRole('list', { name: /apontamentos do card/i })
+    await within(listaApontamentos).findByText(/pareamento/i)
     await user.click(screen.getByRole('button', { name: /excluir apontamento 1/i }))
 
-    await waitFor(() => expect(screen.queryByText(/pareamento/i)).not.toBeInTheDocument())
+    await waitFor(() => expect(within(listaApontamentos).queryByText(/pareamento/i)).not.toBeInTheDocument())
   })
 })

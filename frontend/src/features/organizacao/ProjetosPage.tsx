@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { useAuthStore } from '../auth/authStore'
 import { criarProjeto, listarProjetos } from './api'
-import type { StatusProjeto } from './types'
+import { ROTULO_STATUS_PROJETO, type StatusProjeto } from './types'
 
 /**
  * `aoSelecionarProjeto` é opcional - só existe pro `PainelProjetos` (dock do Escritório, "uma
@@ -34,8 +34,6 @@ export function ProjetosPage({ aoSelecionarProjeto }: { aoSelecionarProjeto?: (i
       queryClient.invalidateQueries({ queryKey: ['projetos'] })
     },
   })
-
-  const RÓTULO_STATUS: Record<StatusProjeto, string> = { ATIVO: 'Ativo', PAUSADO: 'Pausado', CONCLUIDO: 'Concluído' }
 
   return (
     <main className="pagina">
@@ -116,7 +114,7 @@ export function ProjetosPage({ aoSelecionarProjeto }: { aoSelecionarProjeto?: (i
               >
                 <div className="cartao-item-cabecalho">
                   <span className="cartao-item-titulo">{projeto.nome}</span>
-                  <span className="badge">{RÓTULO_STATUS[projeto.status]}</span>
+                  <span className="badge">{ROTULO_STATUS_PROJETO[projeto.status]}</span>
                 </div>
                 <p className="cartao-item-meta">{projeto.cliente}</p>
               </button>
@@ -124,7 +122,7 @@ export function ProjetosPage({ aoSelecionarProjeto }: { aoSelecionarProjeto?: (i
               <Link to={`/projetos/${projeto.id}`}>
                 <div className="cartao-item-cabecalho">
                   <span className="cartao-item-titulo">{projeto.nome}</span>
-                  <span className="badge">{RÓTULO_STATUS[projeto.status]}</span>
+                  <span className="badge">{ROTULO_STATUS_PROJETO[projeto.status]}</span>
                 </div>
                 <p className="cartao-item-meta">{projeto.cliente}</p>
               </Link>
