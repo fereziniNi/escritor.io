@@ -10,12 +10,11 @@ import type { PosicaoTile } from './movimento'
 
 extend({ Container, Graphics, Sprite, Text })
 
-/** Tamanho do sprite exibido (nativo é 16×16, então isso é ~2.9× de ampliação - com escala
- * "nearest" pra manter o pixel art nítido, ver `precarregarSpritesPersonagens`). Usuário achou a
- * primeira versão (22px, menor que o próprio tile de 32px) "muito pequena" e pediu pra parecer
- * mais com as referências do Gather que ele mandou - lá o personagem claramente ultrapassa o tile
- * em altura, não fica contido nele. 46px = ~1.44× o tile (`TILE_PX`). */
-const TAMANHO_SPRITE_PX = 46
+/** Tamanho do sprite exibido (nativo é 16×16 - com escala "nearest" pra manter o pixel art nítido,
+ * ver `precarregarSpritesPersonagens`). Primeira versão era 22px (menor que o tile de 32px,
+ * usuário achou "muito pequeno"); foi pra 46px; usuário pediu "diminua cerca de 30%" - 46×0.7≈32,
+ * que cai bem no tamanho do próprio tile (`TILE_PX`). */
+const TAMANHO_SPRITE_PX = 32
 
 /** Troca a textura do sprite E reafirma o tamanho exibido a partir dela. `Texture.from(url)` só
  * resolve pra textura de verdade se a URL já estiver no `Cache` do Pixi (preenchido antecipadamente
