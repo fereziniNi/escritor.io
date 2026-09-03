@@ -1,6 +1,7 @@
 import { extend, useTick } from '@pixi/react'
+import type { Container as PixiContainer, Graphics as PixiGraphics } from 'pixi.js'
 import { Container, Graphics, Text } from 'pixi.js'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef } from 'react'
 import {
   desenharAnelDestaque,
   desenharAnelProximidade,
@@ -50,9 +51,18 @@ function hexParaNumero(cor: string): number {
  * Avatar no mundo Pixi - substitui `AvatarNoMapa`/`useAnimacaoPersonagem` (mapa em DOM). Só
  * recebe a posição em tile *confirmada* (inteira, vinda do servidor via `usePresencaWebSocket`);
  * toda a suavização visual (glide entre tiles, direção inferida do delta, balanço de perna
- * enquanto anda) é interna, dirigida por `useTick` - funciona porque este componente é um filho
- * de verdade dentro da árvore de `<Application>` (diferente de `CamadaMundo`, que RENDERIZA o
- * `<Application>` e por isso não pode chamar hooks de ticker diretamente, ver `SeguidorCamera`).
+ * enquanto anda, bob de espera, pulso de proximidade) é interna, dirigida por `useTick`.
+ *
+ * Perf (pedido do usuário depois da Fase 6: "o sistema está muito lento"): antes, cada uma dessas
+ * animações vivia em `useState` e chamava `setState` a cada tick (~60x/s) - até o bob de espera,
+ * que roda o tempo todo mesmo parado, forçando este componente (e um avatar existe por usuário
+ * online) a re-renderizar 60x/s pra sempre. A partir daqui, nada disso passa por `useState`: os
+ * objetos Pixi (`Container`/`Graphics`) são mutados direto via `ref` dentro do `useTick`, sem
+ * nenhum re-render do React envolvido - é o padrão correto pra animação contínua num loop de jogo
+ * (o React só entra em cena pra criar os objetos uma vez; a partir daí quem move é o próprio
+ * Pixi). `posicaoRenderizada`/`direcao`/`anguloPerna`/`pulsoProximidade`/`bobY` que existiam como
+ * estado saíram todos - viraram mutação direta de `raizRef`/`corpoContainerRef`/`pernaRef`s/
+ * `anelProximidadeRef`.
  */
 export function AvatarPixi({
   tileX,
@@ -75,37 +85,55 @@ export function AvatarPixi({
   offline?: boolean
 }) {
   const corCorpoNumero = useMemo(() => hexParaNumero(corCorpo), [corCorpo])
-  // Este componente re-renderiza a cada tick (o bob de espera - `setBobY` logo abaixo - roda sempre,
-  // parado ou não), então uma closure `(g) => desenharCorpoAvatar(g, corCorpoNumero)` recriada
-  // inline redesenharia todo o corpo (agora com sombreamento em 2 tons, Fase 6) a 60fps à toa. Só
-  // precisa redesenhar quando a cor de fato muda (troca de status), daí o `useCallback`.
-  const desenharCorpoMemo = useCallback((g: import('pixi.js').Graphics) => desenharCorpoAvatar(g, corCorpoNumero), [corCorpoNumero])
+  const desenharCorpoMemo = useCallback((g: PixiGraphics) => desenharCorpoAvatar(g, corCorpoNumero), [corCorpoNumero])
+
+  const raizRef = useRef<PixiContainer | null>(null)
+  const corpoContainerRef = useRef<PixiContainer | null>(null)
+  const pernaEsquerdaRef = useRef<PixiGraphics | null>(null)
+  const pernaDireitaRef = useRef<PixiGraphics | null>(null)
+  const anelProximidadeRef = useRef<PixiGraphics | null>(null)
 
   const alvoRef = useRef<PosicaoTile>({ x: tileX, y: tileY })
   const inicioGlideRef = useRef<PosicaoTile>({ x: tileX, y: tileY })
+  const posicaoAtualRef = useRef<PosicaoTile>({ x: tileX, y: tileY })
   const progressoRef = useRef(1)
   const tempoAnimadoRef = useRef(0)
   const tempoPulsoRef = useRef(0)
   const tempoBobRef = useRef(0)
+  const direcaoRef = useRef<'esquerda' | 'direita'>('direita')
 
-  const [posicaoRenderizada, setPosicaoRenderizada] = useState<PosicaoTile>({ x: tileX, y: tileY })
-  const [direcao, setDirecao] = useState<'esquerda' | 'direita'>('direita')
-  const [anguloPerna, setAnguloPerna] = useState(0)
-  const [pulsoProximidade, setPulsoProximidade] = useState(0.5)
-  const [bobY, setBobY] = useState(0)
+  // Posição/escala/pivô iniciais só precisam ser aplicados uma vez, na montagem - depois disso
+  // quem move é o `useTick` abaixo, direto nos objetos Pixi (nunca mais via prop reativa, pra não
+  // ter re-render nenhum disputando com a mutação imperativa).
+  useLayoutEffect(() => {
+    if (raizRef.current) {
+      raizRef.current.x = tileX * TILE_PX + TILE_PX / 2
+      raizRef.current.y = tileY * TILE_PX + TILE_PX
+    }
+    if (corpoContainerRef.current) {
+      corpoContainerRef.current.pivot.set(PIVO_BASE.x, PIVO_BASE.y)
+      corpoContainerRef.current.scale.set(ESCALA_AVATAR, ESCALA_AVATAR)
+    }
+    // roda só na montagem de propósito - tileX/tileY aqui são só o valor inicial; mudanças
+    // subsequentes são tratadas pelo efeito de glide logo abaixo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (alvoRef.current.x === tileX && alvoRef.current.y === tileY) {
       return
     }
-    const partida = posicaoRenderizada
+    const partida = posicaoAtualRef.current
     inicioGlideRef.current = partida
     alvoRef.current = { x: tileX, y: tileY }
     progressoRef.current = 0
     if (tileX !== partida.x) {
-      setDirecao(tileX < partida.x ? 'esquerda' : 'direita')
+      direcaoRef.current = tileX < partida.x ? 'esquerda' : 'direita'
+      if (corpoContainerRef.current) {
+        corpoContainerRef.current.scale.x = (direcaoRef.current === 'esquerda' ? -1 : 1) * ESCALA_AVATAR
+      }
     }
-    // posicaoRenderizada de propósito fora das deps: só nos importa o valor no momento em que
+    // posicaoAtualRef de propósito fora das deps: só nos importa o valor no momento em que
     // tileX/tileY mudam (início de um novo glide), não a cada tick que a atualiza.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tileX, tileY])
@@ -113,50 +141,40 @@ export function AvatarPixi({
   useTick((ticker) => {
     if (progressoRef.current < 1) {
       progressoRef.current = Math.min(1, progressoRef.current + ticker.deltaMS / DURACAO_GLIDE_MS)
-      setPosicaoRenderizada(interpolarPosicao(inicioGlideRef.current, alvoRef.current, progressoRef.current))
-    }
+      posicaoAtualRef.current = interpolarPosicao(inicioGlideRef.current, alvoRef.current, progressoRef.current)
+      if (raizRef.current) {
+        raizRef.current.x = posicaoAtualRef.current.x * TILE_PX + TILE_PX / 2
+        raizRef.current.y = posicaoAtualRef.current.y * TILE_PX + TILE_PX
+      }
 
-    if (progressoRef.current < 1) {
       tempoAnimadoRef.current += ticker.deltaMS
-      setAnguloPerna(Math.sin(tempoAnimadoRef.current * VELOCIDADE_PERNA) * AMPLITUDE_PERNA)
-    } else if (anguloPerna !== 0) {
-      setAnguloPerna(0)
+      const angulo = Math.sin(tempoAnimadoRef.current * VELOCIDADE_PERNA) * AMPLITUDE_PERNA
+      if (pernaEsquerdaRef.current) pernaEsquerdaRef.current.rotation = angulo
+      if (pernaDireitaRef.current) pernaDireitaRef.current.rotation = -angulo
+    } else {
+      if (pernaEsquerdaRef.current && pernaEsquerdaRef.current.rotation !== 0) pernaEsquerdaRef.current.rotation = 0
+      if (pernaDireitaRef.current && pernaDireitaRef.current.rotation !== 0) pernaDireitaRef.current.rotation = 0
     }
 
-    if (proximo) {
+    if (proximo && anelProximidadeRef.current) {
       tempoPulsoRef.current += ticker.deltaMS
-      setPulsoProximidade(0.5 + Math.sin(tempoPulsoRef.current * 0.004) * 0.3)
+      anelProximidadeRef.current.alpha = 0.5 + Math.sin(tempoPulsoRef.current * 0.004) * 0.3
     }
 
     tempoBobRef.current += ticker.deltaMS
-    setBobY(Math.sin(tempoBobRef.current * VELOCIDADE_BOB) * AMPLITUDE_BOB_PX)
+    if (corpoContainerRef.current) {
+      corpoContainerRef.current.y = Math.sin(tempoBobRef.current * VELOCIDADE_BOB) * AMPLITUDE_BOB_PX
+    }
   })
 
-  const worldX = posicaoRenderizada.x * TILE_PX + TILE_PX / 2
-  const worldY = posicaoRenderizada.y * TILE_PX + TILE_PX
-
   return (
-    <pixiContainer x={worldX} y={worldY} alpha={offline ? ALPHA_OFFLINE : 1}>
-      <pixiContainer
-        pivot={PIVO_BASE}
-        y={bobY}
-        scale={{ x: direcao === 'esquerda' ? -ESCALA_AVATAR : ESCALA_AVATAR, y: ESCALA_AVATAR }}
-      >
+    <pixiContainer ref={raizRef} alpha={offline ? ALPHA_OFFLINE : 1}>
+      <pixiContainer ref={corpoContainerRef}>
         <pixiGraphics draw={desenharSombraAvatar} />
         {destaque && <pixiGraphics draw={desenharAnelDestaque} />}
-        {proximo && <pixiGraphics draw={desenharAnelProximidade} alpha={pulsoProximidade} />}
-        <pixiGraphics
-          draw={desenharPerna}
-          x={PIVO_PERNA_ESQUERDA.x}
-          y={PIVO_PERNA_ESQUERDA.y}
-          rotation={anguloPerna}
-        />
-        <pixiGraphics
-          draw={desenharPerna}
-          x={PIVO_PERNA_DIREITA.x}
-          y={PIVO_PERNA_DIREITA.y}
-          rotation={-anguloPerna}
-        />
+        {proximo && <pixiGraphics ref={anelProximidadeRef} draw={desenharAnelProximidade} />}
+        <pixiGraphics draw={desenharPerna} ref={pernaEsquerdaRef} x={PIVO_PERNA_ESQUERDA.x} y={PIVO_PERNA_ESQUERDA.y} />
+        <pixiGraphics draw={desenharPerna} ref={pernaDireitaRef} x={PIVO_PERNA_DIREITA.x} y={PIVO_PERNA_DIREITA.y} />
         <pixiGraphics draw={desenharCorpoMemo} />
       </pixiContainer>
 
