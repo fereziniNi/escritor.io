@@ -1,12 +1,10 @@
 package io.escritor.presenca.identidade.service;
 
 import io.escritor.presenca.escritorio.ws.PresencaWebSocketHandler;
-import io.escritor.presenca.identidade.domain.AparenciaAvatar;
-import io.escritor.presenca.identidade.domain.PaletaAparenciaAvatar;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
-import io.escritor.presenca.identidade.web.AtualizarAparenciaRequest;
 import io.escritor.presenca.identidade.web.AtualizarCargaDiariaRequest;
+import io.escritor.presenca.identidade.web.AtualizarPersonagemRequest;
 import io.escritor.presenca.identidade.web.CriarUsuarioRequest;
 import io.escritor.presenca.identidade.web.UsuarioBasicoResponse;
 import io.escritor.presenca.identidade.web.UsuarioResponse;
@@ -80,27 +78,19 @@ public class UsuarioService {
     }
 
     /**
-     * Valida a paleta antes de tocar o banco (mesmo espírito de validação pura primeiro já usado
-     * em {@code ApontamentoService#criarManual}), aplica a mudança e notifica quem já está
-     * conectado no mundo (S6.x) - sem isso, colegas só veriam a roupa nova depois de reconectar
-     * (ver {@link PresencaWebSocketHandler#atualizarAparencia}).
+     * Pedido do usuário: "adicionar game-assets... sobre characteres" - troca o sistema de
+     * personalização por camadas por escolher entre os 6 personagens prontos (ver
+     * {@code Personagem}). Sem validação extra aqui (era {@code PaletaAparenciaAvatar#validar}
+     * na versão por camadas) - {@code AtualizarPersonagemRequest} já é um enum fechado, não tem
+     * combinação inválida possível de chegar até aqui. Notifica quem já está conectado no mundo
+     * assim que salva - sem isso, colegas só veriam o personagem novo depois de reconectar (ver
+     * {@link PresencaWebSocketHandler#atualizarPersonagem}).
      */
-    public UsuarioResponse atualizarMinhaAparencia(Usuario usuarioAutenticado, AtualizarAparenciaRequest request) {
-        PaletaAparenciaAvatar.validar(request.corPele(), request.corCabelo(), request.corRoupa());
-
-        AparenciaAvatar novaAparencia = new AparenciaAvatar(
-                request.corPele(),
-                request.estiloCabelo(),
-                request.corCabelo(),
-                request.estiloRoupa(),
-                request.corRoupa(),
-                request.oculos(),
-                request.chapeu());
-
-        usuarioAutenticado.alterarAparencia(novaAparencia);
+    public UsuarioResponse atualizarMeuPersonagem(Usuario usuarioAutenticado, AtualizarPersonagemRequest request) {
+        usuarioAutenticado.alterarPersonagem(request.personagem());
         Usuario salvo = usuarioRepository.save(usuarioAutenticado);
 
-        presencaWebSocketHandler.atualizarAparencia(salvo.getId(), novaAparencia);
+        presencaWebSocketHandler.atualizarPersonagem(salvo.getId(), request.personagem());
 
         return UsuarioResponse.de(salvo);
     }

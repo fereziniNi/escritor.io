@@ -4,7 +4,6 @@ import io.escritor.presenca.apontamento.domain.ApontamentoDeOutroUsuarioExceptio
 import io.escritor.presenca.apontamento.domain.FiltroRelatorioInvalidoException;
 import io.escritor.presenca.apontamento.domain.FimAntesDoInicioException;
 import io.escritor.presenca.apontamento.domain.LancamentoManualInvalidoException;
-import io.escritor.presenca.identidade.domain.AparenciaInvalidaException;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.AcessoNegadoException;
 import io.escritor.presenca.kanban.domain.EstimativaInvalidaException;
@@ -99,8 +98,4 @@ public class TratamentoErroGlobal {
         return ResponseEntity.badRequest().build();
     }
 
-    @ExceptionHandler(AparenciaInvalidaException.class)
-    ResponseEntity<Void> tratarAparenciaInvalida() {
-        return ResponseEntity.badRequest().build();
-    }
 }

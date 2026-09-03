@@ -6,7 +6,7 @@ import { IntegracaoWhatsAppPage } from '../integracoes/IntegracaoWhatsAppPage'
 import { ColaboradoresPage } from '../organizacao/ColaboradoresPage'
 import { RelatoriosPage } from '../relatorios/RelatoriosPage'
 import { buscarMapaAtivo } from './api'
-import { APARENCIA_PADRAO } from './avatar/aparenciaAvatar'
+import { PERSONAGEM_PADRAO, precarregarSpritesPersonagens } from './avatar/personagens'
 import { EditorAvatarPage } from './avatar/EditorAvatarPage'
 import './EscritorioPage.css'
 import './ui/hud.css'
@@ -47,6 +47,10 @@ const TITULO_PAINEL: Record<PainelId, string> = {
  */
 export function EscritorioPage() {
   const mapaQuery = useQuery({ queryKey: ['mapas', 'ativo'], queryFn: buscarMapaAtivo })
+  // pré-carrega os 72 quadros de sprite dos personagens no Cache do Pixi antes de montar qualquer
+  // avatar - sem isso `Texture.from()` (usado em `AvatarPixi`) fica preso num placeholder 1×1 (ver
+  // `precarregarSpritesPersonagens`).
+  const spritesQuery = useQuery({ queryKey: ['personagens', 'sprites-precarregados'], queryFn: precarregarSpritesPersonagens })
   const { usuarios, meuUsuarioId, mover, definirStatus } = usePresencaWebSocket()
   const papel = useAuthStore((estado) => estado.papel)
   const [painelAberto, setPainelAberto] = useState<PainelId | null>(null)
@@ -93,12 +97,16 @@ export function EscritorioPage() {
     paresNotificadosRef.current = chaves
   }, [pares, meuUsuarioId, usuarios, notificar])
 
-  if (mapaQuery.isPending) {
+  if (mapaQuery.isPending || spritesQuery.isPending) {
     return <p>Carregando…</p>
   }
 
   if (mapaQuery.isError) {
     return <p>Não foi possível carregar o mapa.</p>
+  }
+
+  if (spritesQuery.isError) {
+    return <p>Não foi possível carregar os personagens.</p>
   }
 
   const mapa = mapaQuery.data
@@ -122,7 +130,7 @@ export function EscritorioPage() {
 
       <BarraFerramentas
         nome={eu?.nome ?? 'Você'}
-        meuAparencia={eu?.aparencia ?? APARENCIA_PADRAO}
+        meuPersonagem={eu?.personagem ?? PERSONAGEM_PADRAO}
         meuStatus={meuStatus}
         aoMudarStatus={aoMudarStatus}
         papel={papel}

@@ -1,10 +1,7 @@
 package io.escritor.presenca.identidade.web;
 
-import io.escritor.presenca.identidade.domain.EstiloCabelo;
-import io.escritor.presenca.identidade.domain.EstiloRoupa;
 import io.escritor.presenca.identidade.domain.Papel;
-import io.escritor.presenca.identidade.domain.TipoChapeu;
-import io.escritor.presenca.identidade.domain.TipoOculos;
+import io.escritor.presenca.identidade.domain.Personagem;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
@@ -38,9 +35,6 @@ class UsuarioControllerTest {
             {"nome":"Ana Souza","email":"ana@escritor.io","papel":"COLABORADOR","cargaDiariaMinutos":360}
             """;
 
-    private static final AparenciaAvatarResponse APARENCIA_PADRAO =
-            new AparenciaAvatarResponse("#f2c9a0", EstiloCabelo.CURTO, "#4a3728", EstiloRoupa.CAMISETA, "#6b7280", TipoOculos.NENHUM, TipoChapeu.NENHUM);
-
     @Autowired
     private MockMvc mockMvc;
 
@@ -71,7 +65,7 @@ class UsuarioControllerTest {
     @WithMockUser(roles = "ADMIN")
     void permiteCriacaoParaAdmin() throws Exception {
         when(usuarioService.criar(any()))
-                .thenReturn(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 360, true, APARENCIA_PADRAO));
+                .thenReturn(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 360, true, Personagem.PERSONAGEM_VERDE));
 
         mockMvc.perform(post("/usuarios")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -105,7 +99,7 @@ class UsuarioControllerTest {
     @WithMockUser(roles = "ADMIN")
     void listaUsuariosParaAdmin() throws Exception {
         when(usuarioService.listar())
-                .thenReturn(java.util.List.of(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 360, true, APARENCIA_PADRAO)));
+                .thenReturn(java.util.List.of(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 360, true, Personagem.PERSONAGEM_VERDE)));
 
         mockMvc.perform(get("/usuarios"))
                 .andExpect(status().isOk())
@@ -154,7 +148,7 @@ class UsuarioControllerTest {
     @WithMockUser(roles = "ADMIN")
     void permiteAtualizarCargaDiariaParaAdmin() throws Exception {
         when(usuarioService.atualizarCargaDiaria(eq(1L), any()))
-                .thenReturn(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 420, true, APARENCIA_PADRAO));
+                .thenReturn(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 420, true, Personagem.PERSONAGEM_VERDE));
 
         mockMvc.perform(patch("/usuarios/1/carga-diaria")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -207,12 +201,12 @@ class UsuarioControllerTest {
         Usuario eu = usuarioAutenticadoFalso();
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(eu);
         when(usuarioService.buscarMeuUsuario(eu))
-                .thenReturn(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480, true, APARENCIA_PADRAO));
+                .thenReturn(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480, true, Personagem.PERSONAGEM_VERDE));
 
         mockMvc.perform(get("/usuarios/me"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nome").value("Ana Souza"))
-                .andExpect(jsonPath("$.aparencia.estiloCabelo").value("CURTO"));
+                .andExpect(jsonPath("$.personagem").value("PERSONAGEM_VERDE"));
     }
 
     @Test
@@ -225,47 +219,38 @@ class UsuarioControllerTest {
 
     @Test
     @WithMockUser
-    void qualquerUsuarioAutenticadoAtualizaAPropriaAparencia() throws Exception {
+    void qualquerUsuarioAutenticadoAtualizaOProprioPersonagem() throws Exception {
         Usuario eu = usuarioAutenticadoFalso();
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(eu);
-        var novaAparencia = new AparenciaAvatarResponse("#8a5a34", EstiloCabelo.LONGO, "#c9a24a", EstiloRoupa.JAQUETA, "#4472c4", TipoOculos.QUADRADO, TipoChapeu.GORRO);
-        when(usuarioService.atualizarMinhaAparencia(eq(eu), any()))
-                .thenReturn(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480, true, novaAparencia));
+        when(usuarioService.atualizarMeuPersonagem(eq(eu), any()))
+                .thenReturn(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480, true, Personagem.PERSONAGEM_BANDANA));
 
         mockMvc.perform(patch("/usuarios/me/aparencia")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"corPele":"#8a5a34","estiloCabelo":"LONGO","corCabelo":"#c9a24a","estiloRoupa":"JAQUETA","corRoupa":"#4472c4","oculos":"QUADRADO","chapeu":"GORRO"}
+                                {"personagem":"PERSONAGEM_BANDANA"}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.aparencia.estiloRoupa").value("JAQUETA"))
-                .andExpect(jsonPath("$.aparencia.chapeu").value("GORRO"));
+                .andExpect(jsonPath("$.personagem").value("PERSONAGEM_BANDANA"));
     }
 
     @Test
     @WithMockUser
-    void atualizarMinhaAparenciaComEstiloInvalidoRetorna400() throws Exception {
+    void atualizarPersonagemInvalidoRetorna400() throws Exception {
         mockMvc.perform(patch("/usuarios/me/aparencia")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"corPele":"#8a5a34","estiloCabelo":"MOICANO","corCabelo":"#c9a24a","estiloRoupa":"JAQUETA","corRoupa":"#4472c4","oculos":"QUADRADO","chapeu":"GORRO"}
+                                {"personagem":"NAO_EXISTE"}
                                 """))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     @WithMockUser
-    void atualizarMinhaAparenciaComCorForaDaPaletaRetorna400() throws Exception {
-        Usuario eu = usuarioAutenticadoFalso();
-        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(eu);
-        when(usuarioService.atualizarMinhaAparencia(eq(eu), any()))
-                .thenThrow(new io.escritor.presenca.identidade.domain.AparenciaInvalidaException("Cor de pele fora da paleta"));
-
+    void atualizarPersonagemSemInformarNenhumRetorna400() throws Exception {
         mockMvc.perform(patch("/usuarios/me/aparencia")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"corPele":"#000000","estiloCabelo":"LONGO","corCabelo":"#c9a24a","estiloRoupa":"JAQUETA","corRoupa":"#4472c4","oculos":"QUADRADO","chapeu":"GORRO"}
-                                """))
+                        .content("{}"))
                 .andExpect(status().isBadRequest());
     }
 }

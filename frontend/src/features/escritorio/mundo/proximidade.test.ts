@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { calcularParesProximos, usuariosProximosDeAlguem } from './proximidade'
-import { APARENCIA_PADRAO } from '../avatar/aparenciaAvatar'
+import { PERSONAGEM_PADRAO } from '../avatar/personagens'
 import type { EstadoPresencaUsuario, StatusAvatar } from '../types'
 
 function usuario(usuarioId: number, x: number, y: number, status: StatusAvatar = 'DISPONIVEL'): EstadoPresencaUsuario {
-  return { usuarioId, nome: `Usuário ${usuarioId}`, x, y, status, aparencia: APARENCIA_PADRAO }
+  return { usuarioId, nome: `Usuário ${usuarioId}`, x, y, status, personagem: PERSONAGEM_PADRAO }
 }
 
 describe('calcularParesProximos', () => {

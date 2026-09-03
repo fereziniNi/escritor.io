@@ -1,16 +1,12 @@
 package io.escritor.presenca.identidade.service;
 
 import io.escritor.presenca.escritorio.ws.PresencaWebSocketHandler;
-import io.escritor.presenca.identidade.domain.AparenciaInvalidaException;
-import io.escritor.presenca.identidade.domain.EstiloCabelo;
-import io.escritor.presenca.identidade.domain.EstiloRoupa;
 import io.escritor.presenca.identidade.domain.Papel;
-import io.escritor.presenca.identidade.domain.TipoChapeu;
-import io.escritor.presenca.identidade.domain.TipoOculos;
+import io.escritor.presenca.identidade.domain.Personagem;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
-import io.escritor.presenca.identidade.web.AtualizarAparenciaRequest;
 import io.escritor.presenca.identidade.web.AtualizarCargaDiariaRequest;
+import io.escritor.presenca.identidade.web.AtualizarPersonagemRequest;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,7 +20,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -103,35 +98,14 @@ class UsuarioServiceTest {
         assertThat(resposta.nome()).isEqualTo("Ana Souza");
     }
 
-    private static AtualizarAparenciaRequest requestAparenciaValida() {
-        return new AtualizarAparenciaRequest("#f2c9a0", EstiloCabelo.LONGO, "#c9a24a", EstiloRoupa.MOLETOM, "#e0546f", TipoOculos.REDONDO, TipoChapeu.BONE);
-    }
-
     @Test
-    void atualizaAPropriaAparenciaENotificaQuemJaEstaConectado() {
+    void atualizaOProprioPersonagemENotificaQuemJaEstaConectado() {
         Usuario ana = comId(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480), 1L);
         when(usuarioRepository.save(any(Usuario.class))).thenAnswer(chamada -> chamada.getArgument(0));
 
-        var resposta = usuarioService.atualizarMinhaAparencia(ana, requestAparenciaValida());
+        var resposta = usuarioService.atualizarMeuPersonagem(ana, new AtualizarPersonagemRequest(Personagem.PERSONAGEM_ROXO));
 
-        assertThat(resposta.aparencia().estiloCabelo()).isEqualTo(EstiloCabelo.LONGO);
-        assertThat(resposta.aparencia().estiloRoupa()).isEqualTo(EstiloRoupa.MOLETOM);
-        assertThat(resposta.aparencia().corRoupa()).isEqualTo("#e0546f");
-        assertThat(resposta.aparencia().oculos()).isEqualTo(TipoOculos.REDONDO);
-        assertThat(resposta.aparencia().chapeu()).isEqualTo(TipoChapeu.BONE);
-        verify(presencaWebSocketHandler).atualizarAparencia(eq(1L), any());
-    }
-
-    @Test
-    void atualizarAparenciaComCorForaDaPaletaLancaExcecaoSemSalvar() {
-        Usuario ana = comId(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480), 1L);
-        var requestInvalido =
-                new AtualizarAparenciaRequest("#000000", EstiloCabelo.LONGO, "#c9a24a", EstiloRoupa.MOLETOM, "#e0546f", TipoOculos.REDONDO, TipoChapeu.BONE);
-
-        assertThatThrownBy(() -> usuarioService.atualizarMinhaAparencia(ana, requestInvalido))
-                .isInstanceOf(AparenciaInvalidaException.class);
-
-        verify(usuarioRepository, never()).save(any());
-        verify(presencaWebSocketHandler, never()).atualizarAparencia(any(), any());
+        assertThat(resposta.personagem()).isEqualTo(Personagem.PERSONAGEM_ROXO);
+        verify(presencaWebSocketHandler).atualizarPersonagem(eq(1L), eq(Personagem.PERSONAGEM_ROXO));
     }
 }

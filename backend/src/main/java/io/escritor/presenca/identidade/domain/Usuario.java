@@ -1,7 +1,6 @@
 package io.escritor.presenca.identidade.domain;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -35,8 +34,9 @@ public class Usuario {
     @Column(nullable = false)
     private boolean ativo;
 
-    @Embedded
-    private AparenciaAvatar aparencia;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Personagem personagem;
 
     @Column(name = "criado_em", nullable = false, updatable = false)
     private Instant criadoEm;
@@ -51,7 +51,7 @@ public class Usuario {
         this.papel = papel;
         this.cargaDiariaMinutos = cargaDiariaMinutos;
         this.ativo = true;
-        this.aparencia = AparenciaAvatar.padrao();
+        this.personagem = Personagem.PERSONAGEM_VERDE;
         this.criadoEm = Instant.now();
     }
 
@@ -87,17 +87,18 @@ public class Usuario {
         return ativo;
     }
 
-    public AparenciaAvatar getAparencia() {
-        return aparencia;
+    public Personagem getPersonagem() {
+        return personagem;
     }
 
     /** Pedido do usuário: "a opção para todos detalhar da melhor maneira possível o avatar" -
-     * self-service (qualquer usuário edita a própria aparência, ver {@code PATCH
-     * /usuarios/me/aparencia}), diferente de {@link #alterarCargaDiaria} (ADMIN-only). Validação
-     * de paleta de cor fica na camada de serviço ({@link PaletaAparenciaAvatar#validar}), mesmo
-     * padrão de validação fora da entidade já usado em {@code AtualizarCargaDiariaRequest}. */
-    public void alterarAparencia(AparenciaAvatar novaAparencia) {
-        this.aparencia = novaAparencia;
+     * self-service (qualquer usuário troca o próprio personagem, ver {@code PATCH
+     * /usuarios/me/aparencia}), diferente de {@link #alterarCargaDiaria} (ADMIN-only). Sem
+     * validação extra aqui - {@link Personagem} já é um enum fechado nos 6 sprites disponíveis
+     * (ver `frontend/public/personagens/`), o Jackson rejeita qualquer outro valor antes de
+     * chegar aqui. */
+    public void alterarPersonagem(Personagem novoPersonagem) {
+        this.personagem = novoPersonagem;
     }
 
     public Instant getCriadoEm() {

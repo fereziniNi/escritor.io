@@ -1,0 +1,14 @@
+ALTER TABLE usuario
+    DROP COLUMN cor_pele,
+    DROP COLUMN estilo_cabelo,
+    DROP COLUMN cor_cabelo,
+    DROP COLUMN estilo_roupa,
+    DROP COLUMN cor_roupa,
+    DROP COLUMN oculos,
+    DROP COLUMN chapeu;
+
+ALTER TABLE usuario ADD COLUMN personagem VARCHAR(20) NOT NULL DEFAULT 'PERSONAGEM_VERDE';
+
+ALTER TABLE usuario ADD CONSTRAINT ck_usuario_personagem CHECK (personagem IN (
+    'PERSONAGEM_VERDE', 'PERSONAGEM_VERMELHO', 'PERSONAGEM_ROXO', 'PERSONAGEM_CHAPEU', 'PERSONAGEM_CINZA', 'PERSONAGEM_BANDANA'
+));

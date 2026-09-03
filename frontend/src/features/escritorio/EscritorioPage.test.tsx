@@ -20,6 +20,14 @@ vi.mock('./mundo/CamadaMundo', () => ({
   CamadaMundo: () => <div data-testid="mundo-canvas-host" />,
 }))
 
+/** `precarregarSpritesPersonagens` usa `Assets.load` do Pixi de verdade - sem contexto de
+ * renderização em jsdom (mesmo motivo do mock de `CamadaMundo` acima), essa promise nunca
+ * resolveria aqui e a página ficaria presa em "Carregando…" pra sempre. */
+vi.mock('./avatar/personagens', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./avatar/personagens')>()),
+  precarregarSpritesPersonagens: () => Promise.resolve(true as const),
+}))
+
 /** `CronometroTrabalho` (canto superior direito) bate em `/ponto/estado-atual` em toda
  * renderização da página, não só quando o painel de Ponto está aberto - por isso esse handler entra
  * em praticamente todo teste, mesmo os que não mexem com ponto. */

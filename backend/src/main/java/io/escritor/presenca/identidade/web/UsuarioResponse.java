@@ -1,6 +1,7 @@
 package io.escritor.presenca.identidade.web;
 
 import io.escritor.presenca.identidade.domain.Papel;
+import io.escritor.presenca.identidade.domain.Personagem;
 import io.escritor.presenca.identidade.domain.Usuario;
 
 public record UsuarioResponse(
@@ -10,7 +11,7 @@ public record UsuarioResponse(
         Papel papel,
         Integer cargaDiariaMinutos,
         boolean ativo,
-        AparenciaAvatarResponse aparencia) {
+        Personagem personagem) {
 
     public static UsuarioResponse de(Usuario usuario) {
         return new UsuarioResponse(
@@ -20,6 +21,6 @@ public record UsuarioResponse(
                 usuario.getPapel(),
                 usuario.getCargaDiariaMinutos(),
                 usuario.isAtivo(),
-                AparenciaAvatarResponse.de(usuario.getAparencia()));
+                usuario.getPersonagem());
     }
 }
