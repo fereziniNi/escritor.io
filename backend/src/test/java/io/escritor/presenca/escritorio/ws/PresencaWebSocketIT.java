@@ -2,7 +2,12 @@ package io.escritor.presenca.escritorio.ws;
 
 import io.escritor.presenca.escritorio.domain.EventoPresenca;
 import io.escritor.presenca.escritorio.repository.EventoPresencaRepository;
+import io.escritor.presenca.identidade.domain.AparenciaAvatar;
+import io.escritor.presenca.identidade.domain.EstiloCabelo;
+import io.escritor.presenca.identidade.domain.EstiloRoupa;
 import io.escritor.presenca.identidade.domain.Papel;
+import io.escritor.presenca.identidade.domain.TipoChapeu;
+import io.escritor.presenca.identidade.domain.TipoOculos;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.seguranca.JwtService;
@@ -240,6 +245,75 @@ class PresencaWebSocketIT {
                 String snapshot = mensagensBeto.poll(5, TimeUnit.SECONDS);
 
                 assertThat(snapshot).isNotNull().doesNotContain("\"status\":\"NAO_EXISTE\"").contains("\"status\":\"DISPONIVEL\"");
+            } finally {
+                sessaoBeto.close();
+            }
+        } finally {
+            sessaoAna.close();
+        }
+    }
+
+    /**
+     * A aparência do snapshot vem de verdade do banco (`usuario.getAparencia()`, carregado no
+     * handshake) - não é hardcoded no handler. `AparenciaAvatar.padrao()` (ver `Usuario.java`) é o
+     * valor de quem nunca personalizou nada, então isso também prova que `Usuario` nasce com uma
+     * aparência válida sem precisar de nenhum passo extra.
+     */
+    @Test
+    void snapshotInicialTrazAAparenciaCadastradaDoUsuario() throws Exception {
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-aparencia-snapshot@escritor.io", Papel.COLABORADOR, 480));
+        String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
+        BlockingQueue<String> mensagensAna = new LinkedBlockingQueue<>();
+
+        WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
+        try {
+            String recebido = mensagensAna.poll(5, TimeUnit.SECONDS);
+
+            assertThat(recebido)
+                    .isNotNull()
+                    .contains("\"corPele\":\"#f2c9a0\"")
+                    .contains("\"estiloCabelo\":\"CURTO\"")
+                    .contains("\"estiloRoupa\":\"CAMISETA\"")
+                    .contains("\"oculos\":\"NENHUM\"")
+                    .contains("\"chapeu\":\"NENHUM\"");
+        } finally {
+            sessaoAna.close();
+        }
+    }
+
+    /**
+     * Pedido do usuário: "a opção para todos detalhar da melhor maneira possível o avatar" - prova
+     * que {@link PresencaWebSocketHandler#atualizarAparencia} (chamado por {@code
+     * UsuarioService#atualizarMinhaAparencia} depois de um `PATCH /usuarios/me/aparencia` de
+     * verdade) chega pra quem já está conectado no mapa, sem precisar reconectar.
+     */
+    @Test
+    void atualizarAparenciaEnquantoConectadoRebroadcastParaOsDemaisSemPrecisarReconectar() throws Exception {
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-aparencia-live@escritor.io", Papel.COLABORADOR, 480));
+        Usuario beto = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-aparencia-live@escritor.io", Papel.COLABORADOR, 480));
+        String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
+        String tokenBeto = jwtService.gerarAccessToken(beto.getId(), Papel.COLABORADOR);
+
+        WebSocketSession sessaoAna = conectar(tokenAna, new LinkedBlockingQueue<>());
+        try {
+            BlockingQueue<String> mensagensBeto = new LinkedBlockingQueue<>();
+            WebSocketSession sessaoBeto = conectar(tokenBeto, mensagensBeto);
+            try {
+                mensagensBeto.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
+
+                AparenciaAvatar novaAparencia =
+                        new AparenciaAvatar("#8a5a34", EstiloCabelo.LONGO, "#c9a24a", EstiloRoupa.JAQUETA, "#4472c4", TipoOculos.QUADRADO, TipoChapeu.GORRO);
+                presencaWebSocketHandler.atualizarAparencia(ana.getId(), novaAparencia);
+
+                String recebido = mensagensBeto.poll(5, TimeUnit.SECONDS);
+                assertThat(recebido)
+                        .isNotNull()
+                        .contains("\"usuarioId\":" + ana.getId())
+                        .contains("\"estiloCabelo\":\"LONGO\"")
+                        .contains("\"estiloRoupa\":\"JAQUETA\"")
+                        .contains("\"corRoupa\":\"#4472c4\"")
+                        .contains("\"oculos\":\"QUADRADO\"")
+                        .contains("\"chapeu\":\"GORRO\"");
             } finally {
                 sessaoBeto.close();
             }

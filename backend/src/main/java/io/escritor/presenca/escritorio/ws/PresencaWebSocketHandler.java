@@ -6,6 +6,7 @@ import io.escritor.presenca.escritorio.domain.Zona;
 import io.escritor.presenca.escritorio.service.LocalizadorZona;
 import io.escritor.presenca.escritorio.service.RegistroEventoPresencaService;
 import io.escritor.presenca.escritorio.service.ValidadorPosicaoMapa;
+import io.escritor.presenca.identidade.domain.AparenciaAvatar;
 import tools.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.time.Clock;
@@ -99,8 +100,9 @@ public class PresencaWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionEstablished(WebSocketSession session) {
         Long usuarioId = usuarioId(session);
         String nome = (String) session.getAttributes().get(PresencaHandshakeInterceptor.ATRIBUTO_NOME);
+        AparenciaAvatar aparencia = (AparenciaAvatar) session.getAttributes().get(PresencaHandshakeInterceptor.ATRIBUTO_APARENCIA);
 
-        estadoPorUsuario.put(usuarioId, new EstadoPresencaUsuario(usuarioId, nome, 0, 0, StatusAvatar.DISPONIVEL));
+        estadoPorUsuario.put(usuarioId, new EstadoPresencaUsuario(usuarioId, nome, 0, 0, StatusAvatar.DISPONIVEL, aparencia));
         sessoesPorUsuario.put(usuarioId, session);
         ultimaAtividadePorUsuario.put(usuarioId, Instant.now(clock));
 
@@ -140,7 +142,7 @@ public class PresencaWebSocketHandler extends TextWebSocketHandler {
         Optional<Zona> zonaForaDoTrabalho = localizadorZona.zonaPorTipo(TipoZona.LIVRE);
         int x = zonaForaDoTrabalho.map(zona -> zona.getX() + zona.getLargura() / 2).orElse(atual.x());
         int y = zonaForaDoTrabalho.map(zona -> zona.getY() + zona.getAltura() / 2).orElse(atual.y());
-        EstadoPresencaUsuario offline = new EstadoPresencaUsuario(atual.usuarioId(), atual.nome(), x, y, StatusAvatar.OFFLINE);
+        EstadoPresencaUsuario offline = new EstadoPresencaUsuario(atual.usuarioId(), atual.nome(), x, y, StatusAvatar.OFFLINE, atual.aparencia());
         estadoPorUsuario.put(usuarioId, offline);
         broadcast(new PresencaEventoWs("STATUS", List.of(offline)));
     }
@@ -170,8 +172,8 @@ public class PresencaWebSocketHandler extends TextWebSocketHandler {
                 return;
             }
 
-            EstadoPresencaUsuario atualizado =
-                    new EstadoPresencaUsuario(estadoAtual.usuarioId(), estadoAtual.nome(), estadoAtual.x(), estadoAtual.y(), StatusAvatar.AUSENTE);
+            EstadoPresencaUsuario atualizado = new EstadoPresencaUsuario(
+                    estadoAtual.usuarioId(), estadoAtual.nome(), estadoAtual.x(), estadoAtual.y(), StatusAvatar.AUSENTE, estadoAtual.aparencia());
             estadoPorUsuario.put(usuarioId, atualizado);
             ausenteAutomaticoUsuarios.add(usuarioId);
             // zera o rastreio de zona: se a pessoa acordar sem sair do lugar, precisa ser tratado
@@ -223,7 +225,8 @@ public class PresencaWebSocketHandler extends TextWebSocketHandler {
         if (atual == null || atual.status() != StatusAvatar.AUSENTE) {
             return;
         }
-        EstadoPresencaUsuario atualizado = new EstadoPresencaUsuario(atual.usuarioId(), atual.nome(), atual.x(), atual.y(), StatusAvatar.DISPONIVEL);
+        EstadoPresencaUsuario atualizado =
+                new EstadoPresencaUsuario(atual.usuarioId(), atual.nome(), atual.x(), atual.y(), StatusAvatar.DISPONIVEL, atual.aparencia());
         estadoPorUsuario.put(usuarioId, atualizado);
         broadcast(new PresencaEventoWs("STATUS", List.of(atualizado)));
     }
@@ -234,9 +237,9 @@ public class PresencaWebSocketHandler extends TextWebSocketHandler {
         }
 
         Long usuarioId = usuarioId(session);
-        atualizarEstado(session, atual -> {
+        atualizarEstado(usuarioId, atual -> {
             StatusAvatar novoStatus = resolverStatusAposMover(usuarioId, atual.status(), comando.x(), comando.y());
-            return new EstadoPresencaUsuario(atual.usuarioId(), atual.nome(), comando.x(), comando.y(), novoStatus);
+            return new EstadoPresencaUsuario(atual.usuarioId(), atual.nome(), comando.x(), comando.y(), novoStatus, atual.aparencia());
         }).ifPresent(atualizado -> {
             broadcast(new PresencaEventoWs("POSICAO", List.of(atualizado)));
             // sempre depois do broadcast acima - a resposta em tempo real pros clientes conectados
@@ -305,7 +308,7 @@ public class PresencaWebSocketHandler extends TextWebSocketHandler {
         }
 
         Long usuarioId = usuarioId(session);
-        atualizarEstado(session, atual -> new EstadoPresencaUsuario(atual.usuarioId(), atual.nome(), atual.x(), atual.y(), novoStatus))
+        atualizarEstado(usuarioId, atual -> new EstadoPresencaUsuario(atual.usuarioId(), atual.nome(), atual.x(), atual.y(), novoStatus, atual.aparencia()))
                 .ifPresent(atualizado -> {
                     // troca manual dentro de uma zona rastreada invalida o "restaurar ao sair" (S6.7) -
                     // a escolha agora é do usuário, não mais um efeito automático da zona
@@ -314,8 +317,21 @@ public class PresencaWebSocketHandler extends TextWebSocketHandler {
                 });
     }
 
-    private Optional<EstadoPresencaUsuario> atualizarEstado(WebSocketSession session, UnaryOperator<EstadoPresencaUsuario> atualizar) {
-        Long usuarioId = usuarioId(session);
+    /**
+     * Pedido do usuário: "a opção para todos detalhar da melhor maneira possível o avatar" -
+     * chamado por {@code UsuarioService#atualizarMinhaAparencia} (fora do fluxo de WebSocket, via
+     * REST) depois de salvar no banco, pra quem já está conectado no mapa ver a roupa/cabelo novo
+     * do colega sem precisar reconectar. Sem efeito (silencioso) se o usuário não está conectado
+     * agora - a aparência já foi salva de qualquer forma, só não há ninguém no mapa pra avisar.
+     */
+    public void atualizarAparencia(Long usuarioId, AparenciaAvatar novaAparencia) {
+        atualizarEstado(
+                        usuarioId,
+                        atual -> new EstadoPresencaUsuario(atual.usuarioId(), atual.nome(), atual.x(), atual.y(), atual.status(), novaAparencia))
+                .ifPresent(atualizado -> broadcast(new PresencaEventoWs("APARENCIA", List.of(atualizado))));
+    }
+
+    private Optional<EstadoPresencaUsuario> atualizarEstado(Long usuarioId, UnaryOperator<EstadoPresencaUsuario> atualizar) {
         EstadoPresencaUsuario atual = estadoPorUsuario.get(usuarioId);
         if (atual == null) {
             return Optional.empty();

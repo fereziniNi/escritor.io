@@ -90,9 +90,13 @@
   padding: 0.2rem 0.4rem 0.2rem 0.2rem;
 }
 
+/* Vira um <button> (pedido do usuário: "a opção para todos detalhar da melhor maneira possível o
+   avatar" - clicar no próprio personagem abre o editor) - reset de botão nativo + affordance de
+   clique, sem perder a aparência de "bolha" que já tinha como <span>. */
 .escritorio-menu-usuario-avatar {
   width: 40px;
   height: 40px;
+  border: none;
   border-radius: 50%;
   background: #3c3c50;
   display: flex;
@@ -100,6 +104,14 @@
   justify-content: center;
   overflow: hidden;
   flex: none;
+  padding: 0;
+  cursor: pointer;
+  transition: background-color 120ms ease-out;
+}
+
+.escritorio-menu-usuario-avatar:hover,
+.escritorio-menu-usuario-avatar:focus-visible {
+  background: #4a4a62;
 }
 
 .escritorio-menu-usuario-avatar svg {

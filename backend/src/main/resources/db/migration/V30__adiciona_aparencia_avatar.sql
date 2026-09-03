@@ -1,0 +1,13 @@
+ALTER TABLE usuario
+    ADD COLUMN cor_pele VARCHAR(7) NOT NULL DEFAULT '#f2c9a0',
+    ADD COLUMN estilo_cabelo VARCHAR(20) NOT NULL DEFAULT 'CURTO',
+    ADD COLUMN cor_cabelo VARCHAR(7) NOT NULL DEFAULT '#4a3728',
+    ADD COLUMN estilo_roupa VARCHAR(20) NOT NULL DEFAULT 'CAMISETA',
+    ADD COLUMN cor_roupa VARCHAR(7) NOT NULL DEFAULT '#6b7280',
+    ADD COLUMN oculos VARCHAR(20) NOT NULL DEFAULT 'NENHUM',
+    ADD COLUMN chapeu VARCHAR(20) NOT NULL DEFAULT 'NENHUM';
+
+ALTER TABLE usuario ADD CONSTRAINT ck_usuario_estilo_cabelo CHECK (estilo_cabelo IN ('CARECA', 'CURTO', 'MEDIO', 'LONGO'));
+ALTER TABLE usuario ADD CONSTRAINT ck_usuario_estilo_roupa CHECK (estilo_roupa IN ('CAMISETA', 'MOLETOM', 'JAQUETA', 'REGATA'));
+ALTER TABLE usuario ADD CONSTRAINT ck_usuario_oculos CHECK (oculos IN ('NENHUM', 'REDONDO', 'QUADRADO'));
+ALTER TABLE usuario ADD CONSTRAINT ck_usuario_chapeu CHECK (chapeu IN ('NENHUM', 'BONE', 'GORRO'));

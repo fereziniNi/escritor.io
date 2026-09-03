@@ -2,11 +2,17 @@ import { extend, useTick } from '@pixi/react'
 import type { Container as PixiContainer, Graphics as PixiGraphics } from 'pixi.js'
 import { Container, Graphics, Text } from 'pixi.js'
 import { useCallback, useLayoutEffect, useMemo, useRef } from 'react'
+import type { AparenciaAvatar } from '../avatar/aparenciaAvatar'
 import {
   desenharAnelDestaque,
   desenharAnelProximidade,
-  desenharCorpoAvatar,
+  desenharCabelo,
+  desenharChapeu,
+  desenharCorpoBase,
+  desenharIndicadorStatus,
+  desenharOculos,
   desenharPerna,
+  desenharRoupa,
   desenharSombraAvatar,
   PIVO_PERNA_DIREITA,
   PIVO_PERNA_ESQUERDA,
@@ -53,22 +59,23 @@ function hexParaNumero(cor: string): number {
  * toda a suavização visual (glide entre tiles, direção inferida do delta, balanço de perna
  * enquanto anda, bob de espera, pulso de proximidade) é interna, dirigida por `useTick`.
  *
- * Perf (pedido do usuário depois da Fase 6: "o sistema está muito lento"): antes, cada uma dessas
- * animações vivia em `useState` e chamava `setState` a cada tick (~60x/s) - até o bob de espera,
- * que roda o tempo todo mesmo parado, forçando este componente (e um avatar existe por usuário
- * online) a re-renderizar 60x/s pra sempre. A partir daqui, nada disso passa por `useState`: os
- * objetos Pixi (`Container`/`Graphics`) são mutados direto via `ref` dentro do `useTick`, sem
- * nenhum re-render do React envolvido - é o padrão correto pra animação contínua num loop de jogo
- * (o React só entra em cena pra criar os objetos uma vez; a partir daí quem move é o próprio
- * Pixi). `posicaoRenderizada`/`direcao`/`anguloPerna`/`pulsoProximidade`/`bobY` que existiam como
- * estado saíram todos - viraram mutação direta de `raizRef`/`corpoContainerRef`/`pernaRef`s/
- * `anelProximidadeRef`.
+ * Personalização de avatar: recebe `aparencia` (pele/cabelo/roupa/acessórios, escolhida pela
+ * própria pessoa - ver `avatar/EditorAvatarPage.tsx`) em vez de uma única `corCorpo`. Como a roupa
+ * não é mais o sinal de status (ela virou escolha livre da pessoa), `status` some sozinho como
+ * prop e vira o pontinho de `desenharIndicadorStatus`.
+ *
+ * Perf (pedido do usuário depois da Fase 6: "o sistema está muito lento"): nada aqui passa por
+ * `useState` - os objetos Pixi (`Container`/`Graphics`) são mutados direto via `ref` dentro do
+ * `useTick`, o padrão correto pra animação contínua num loop de jogo. Cada camada da aparência
+ * (`desenharRoupaMemo`/`desenharCabeloMemo`/etc.) é memoizada só na sua própria dependência - trocar
+ * o chapéu não redesenha o cabelo, por exemplo.
  */
 export function AvatarPixi({
   tileX,
   tileY,
   nome,
-  corCorpo,
+  aparencia,
+  status,
   destaque,
   proximo = false,
   offline = false,
@@ -76,7 +83,10 @@ export function AvatarPixi({
   tileX: number
   tileY: number
   nome: string
-  corCorpo: string
+  aparencia: AparenciaAvatar
+  /** Cor do status (`COR_STATUS[status]`) - só usada pro pontinho indicador, não mais pra
+   * colorir a roupa. */
+  status: string
   destaque: boolean
   /** Fase 3 - alguém está dentro do raio de proximidade deste avatar (`proximidade.ts`). */
   proximo?: boolean
@@ -84,8 +94,20 @@ export function AvatarPixi({
    * avatar renderiza apagado + nome com sufixo, pra não parecer alguém realmente presente. */
   offline?: boolean
 }) {
-  const corCorpoNumero = useMemo(() => hexParaNumero(corCorpo), [corCorpo])
-  const desenharCorpoMemo = useCallback((g: PixiGraphics) => desenharCorpoAvatar(g, corCorpoNumero), [corCorpoNumero])
+  const corPeleNumero = useMemo(() => hexParaNumero(aparencia.corPele), [aparencia.corPele])
+  const corCabeloNumero = useMemo(() => hexParaNumero(aparencia.corCabelo), [aparencia.corCabelo])
+  const corRoupaNumero = useMemo(() => hexParaNumero(aparencia.corRoupa), [aparencia.corRoupa])
+  const corStatusNumero = useMemo(() => hexParaNumero(status), [status])
+
+  // Este componente re-renderiza a cada tick (o bob de espera - ver `useTick` abaixo - roda
+  // sempre, parado ou não), então cada camada precisa da própria closure memoizada na própria
+  // dependência - sem isso, todo mundo redesenharia a 60fps à toa (mesma lição da Fase 6/perf).
+  const desenharRoupaMemo = useCallback((g: PixiGraphics) => desenharRoupa(g, aparencia.estiloRoupa, corRoupaNumero), [aparencia.estiloRoupa, corRoupaNumero])
+  const desenharCorpoMemo = useCallback((g: PixiGraphics) => desenharCorpoBase(g, corPeleNumero), [corPeleNumero])
+  const desenharCabeloMemo = useCallback((g: PixiGraphics) => desenharCabelo(g, aparencia.estiloCabelo, corCabeloNumero), [aparencia.estiloCabelo, corCabeloNumero])
+  const desenharOculosMemo = useCallback((g: PixiGraphics) => desenharOculos(g, aparencia.oculos), [aparencia.oculos])
+  const desenharChapeuMemo = useCallback((g: PixiGraphics) => desenharChapeu(g, aparencia.chapeu), [aparencia.chapeu])
+  const desenharIndicadorMemo = useCallback((g: PixiGraphics) => desenharIndicadorStatus(g, corStatusNumero), [corStatusNumero])
 
   const raizRef = useRef<PixiContainer | null>(null)
   const corpoContainerRef = useRef<PixiContainer | null>(null)
@@ -175,7 +197,12 @@ export function AvatarPixi({
         {proximo && <pixiGraphics ref={anelProximidadeRef} draw={desenharAnelProximidade} />}
         <pixiGraphics draw={desenharPerna} ref={pernaEsquerdaRef} x={PIVO_PERNA_ESQUERDA.x} y={PIVO_PERNA_ESQUERDA.y} />
         <pixiGraphics draw={desenharPerna} ref={pernaDireitaRef} x={PIVO_PERNA_DIREITA.x} y={PIVO_PERNA_DIREITA.y} />
+        <pixiGraphics draw={desenharRoupaMemo} />
         <pixiGraphics draw={desenharCorpoMemo} />
+        <pixiGraphics draw={desenharCabeloMemo} />
+        <pixiGraphics draw={desenharOculosMemo} />
+        <pixiGraphics draw={desenharChapeuMemo} />
+        <pixiGraphics draw={desenharIndicadorMemo} />
       </pixiContainer>
 
       <pixiText

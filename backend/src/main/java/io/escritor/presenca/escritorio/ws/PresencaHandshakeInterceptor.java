@@ -28,6 +28,7 @@ public class PresencaHandshakeInterceptor implements HandshakeInterceptor {
 
     static final String ATRIBUTO_USUARIO_ID = "usuarioId";
     static final String ATRIBUTO_NOME = "nome";
+    static final String ATRIBUTO_APARENCIA = "aparencia";
 
     private final JwtService jwtService;
     private final UsuarioRepository usuarioRepository;
@@ -48,6 +49,10 @@ public class PresencaHandshakeInterceptor implements HandshakeInterceptor {
 
         attributes.put(ATRIBUTO_USUARIO_ID, usuario.get().getId());
         attributes.put(ATRIBUTO_NOME, usuario.get().getNome());
+        // aparência carregada uma única vez aqui (valor "de agora") - se a pessoa personalizar o
+        // avatar enquanto já está conectada, quem já está no mapa é avisado por
+        // PresencaWebSocketHandler#atualizarAparencia, não por este handshake de novo.
+        attributes.put(ATRIBUTO_APARENCIA, usuario.get().getAparencia());
         return true;
     }
 

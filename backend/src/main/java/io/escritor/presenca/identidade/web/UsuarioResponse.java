@@ -9,7 +9,8 @@ public record UsuarioResponse(
         String email,
         Papel papel,
         Integer cargaDiariaMinutos,
-        boolean ativo) {
+        boolean ativo,
+        AparenciaAvatarResponse aparencia) {
 
     public static UsuarioResponse de(Usuario usuario) {
         return new UsuarioResponse(
@@ -18,6 +19,7 @@ public record UsuarioResponse(
                 usuario.getEmail(),
                 usuario.getPapel(),
                 usuario.getCargaDiariaMinutos(),
-                usuario.isAtivo());
+                usuario.isAtivo(),
+                AparenciaAvatarResponse.de(usuario.getAparencia()));
     }
 }

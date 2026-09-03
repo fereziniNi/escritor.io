@@ -1,3 +1,5 @@
+import type { AparenciaAvatar } from './avatar/aparenciaAvatar'
+
 export type TipoZona = 'FOCO' | 'REUNIAO' | 'CAFE' | 'ATENDIMENTO' | 'LIVRE'
 
 /** OFFLINE é automático (backend marca quem desconecta, nunca escolhido manualmente - não aparece
@@ -29,4 +31,5 @@ export interface EstadoPresencaUsuario {
   x: number
   y: number
   status: StatusAvatar
+  aparencia: AparenciaAvatar
 }

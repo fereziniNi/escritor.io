@@ -1,7 +1,11 @@
 package io.escritor.presenca.identidade.service;
 
+import io.escritor.presenca.escritorio.ws.PresencaWebSocketHandler;
+import io.escritor.presenca.identidade.domain.AparenciaAvatar;
+import io.escritor.presenca.identidade.domain.PaletaAparenciaAvatar;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
+import io.escritor.presenca.identidade.web.AtualizarAparenciaRequest;
 import io.escritor.presenca.identidade.web.AtualizarCargaDiariaRequest;
 import io.escritor.presenca.identidade.web.CriarUsuarioRequest;
 import io.escritor.presenca.identidade.web.UsuarioBasicoResponse;
@@ -13,9 +17,11 @@ import org.springframework.stereotype.Service;
 public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
+    private final PresencaWebSocketHandler presencaWebSocketHandler;
 
-    public UsuarioService(UsuarioRepository usuarioRepository) {
+    public UsuarioService(UsuarioRepository usuarioRepository, PresencaWebSocketHandler presencaWebSocketHandler) {
         this.usuarioRepository = usuarioRepository;
+        this.presencaWebSocketHandler = presencaWebSocketHandler;
     }
 
     public UsuarioResponse criar(CriarUsuarioRequest request) {
@@ -58,6 +64,43 @@ public class UsuarioService {
 
         usuario.alterarCargaDiaria(request.cargaDiariaMinutos());
         Usuario salvo = usuarioRepository.save(usuario);
+
+        return UsuarioResponse.de(salvo);
+    }
+
+    /**
+     * Pedido do usuário: "a opção para todos detalhar da melhor maneira possível o avatar" -
+     * self-service, diferente de {@link #atualizarCargaDiaria} (ADMIN-only): {@code
+     * usuarioAutenticado} já vem resolvido de {@code ContextoUsuarioAutenticado.usuarioAtual()},
+     * então não existe "editar a aparência de outra pessoa" pra checar aqui, mesma garantia
+     * estrutural que {@code ApontamentoController}/PATCH de apontamento já usa em outro contexto.
+     */
+    public UsuarioResponse buscarMeuUsuario(Usuario usuarioAutenticado) {
+        return UsuarioResponse.de(usuarioAutenticado);
+    }
+
+    /**
+     * Valida a paleta antes de tocar o banco (mesmo espírito de validação pura primeiro já usado
+     * em {@code ApontamentoService#criarManual}), aplica a mudança e notifica quem já está
+     * conectado no mundo (S6.x) - sem isso, colegas só veriam a roupa nova depois de reconectar
+     * (ver {@link PresencaWebSocketHandler#atualizarAparencia}).
+     */
+    public UsuarioResponse atualizarMinhaAparencia(Usuario usuarioAutenticado, AtualizarAparenciaRequest request) {
+        PaletaAparenciaAvatar.validar(request.corPele(), request.corCabelo(), request.corRoupa());
+
+        AparenciaAvatar novaAparencia = new AparenciaAvatar(
+                request.corPele(),
+                request.estiloCabelo(),
+                request.corCabelo(),
+                request.estiloRoupa(),
+                request.corRoupa(),
+                request.oculos(),
+                request.chapeu());
+
+        usuarioAutenticado.alterarAparencia(novaAparencia);
+        Usuario salvo = usuarioRepository.save(usuarioAutenticado);
+
+        presencaWebSocketHandler.atualizarAparencia(salvo.getId(), novaAparencia);
 
         return UsuarioResponse.de(salvo);
     }

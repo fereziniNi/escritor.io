@@ -1,8 +1,9 @@
+import type { AparenciaAvatar } from '../avatar/aparenciaAvatar'
 import { ControlesAudioVideo } from './ControlesAudioVideo'
 import { MenuUsuario } from './MenuUsuario'
 import type { StatusAvatar } from '../types'
 
-export type PainelId = 'ponto' | 'relatorios' | 'projetos' | 'colaboradores' | 'whatsapp'
+export type PainelId = 'ponto' | 'relatorios' | 'projetos' | 'colaboradores' | 'whatsapp' | 'avatar'
 
 /**
  * Toolbar inferior - substitui o `.escritorio-dock` antigo (botões com texto+emoji lado a lado)
@@ -12,6 +13,7 @@ export type PainelId = 'ponto' | 'relatorios' | 'projetos' | 'colaboradores' | '
  */
 export function BarraFerramentas({
   nome,
+  meuAparencia,
   meuStatus,
   aoMudarStatus,
   papel,
@@ -21,6 +23,7 @@ export function BarraFerramentas({
   aoAlternarParticipantes,
 }: {
   nome: string
+  meuAparencia: AparenciaAvatar
   meuStatus: StatusAvatar
   aoMudarStatus: (status: StatusAvatar) => void
   papel: string | null
@@ -31,7 +34,13 @@ export function BarraFerramentas({
 }) {
   return (
     <div className="escritorio-toolbar">
-      <MenuUsuario nome={nome} status={meuStatus} aoMudarStatus={aoMudarStatus} />
+      <MenuUsuario
+        nome={nome}
+        aparencia={meuAparencia}
+        status={meuStatus}
+        aoMudarStatus={aoMudarStatus}
+        aoAbrirEditorAvatar={() => aoAbrirPainel('avatar')}
+      />
 
       <span className="escritorio-toolbar-separador" />
 

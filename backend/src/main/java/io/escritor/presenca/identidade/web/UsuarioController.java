@@ -1,5 +1,6 @@
 package io.escritor.presenca.identidade.web;
 
+import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
 import io.escritor.presenca.identidade.service.UsuarioService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -19,15 +20,20 @@ import org.springframework.web.bind.annotation.RestController;
  * deve definir [a carga diária] pros outros funcionários"). {@link #listarBasico} é a exceção
  * deliberada: id+nome só, aberto a qualquer autenticado, pra alimentar autocomplete de "escolher
  * uma pessoa" em qualquer lugar do sistema (pedido do cliente: nome em vez de id, com sugestão
- * das pessoas cadastradas). */
+ * das pessoas cadastradas). {@link #meuUsuario}/{@link #atualizarMinhaAparencia} são a outra
+ * exceção: self-service, qualquer autenticado só sobre o próprio usuário (via {@code
+ * ContextoUsuarioAutenticado}, não `{id}`), pedido do usuário "a opção para todos detalhar da
+ * melhor maneira possível o avatar". */
 @RestController
 @RequestMapping("/usuarios")
 public class UsuarioController {
 
     private final UsuarioService usuarioService;
+    private final ContextoUsuarioAutenticado contextoUsuarioAutenticado;
 
-    public UsuarioController(UsuarioService usuarioService) {
+    public UsuarioController(UsuarioService usuarioService, ContextoUsuarioAutenticado contextoUsuarioAutenticado) {
         this.usuarioService = usuarioService;
+        this.contextoUsuarioAutenticado = contextoUsuarioAutenticado;
     }
 
     @PostMapping
@@ -52,5 +58,15 @@ public class UsuarioController {
     @PreAuthorize("hasRole('ADMIN')")
     public UsuarioResponse atualizarCargaDiaria(@PathVariable Long id, @Valid @RequestBody AtualizarCargaDiariaRequest request) {
         return usuarioService.atualizarCargaDiaria(id, request);
+    }
+
+    @GetMapping("/me")
+    public UsuarioResponse meuUsuario() {
+        return usuarioService.buscarMeuUsuario(contextoUsuarioAutenticado.usuarioAtual());
+    }
+
+    @PatchMapping("/me/aparencia")
+    public UsuarioResponse atualizarMinhaAparencia(@Valid @RequestBody AtualizarAparenciaRequest request) {
+        return usuarioService.atualizarMinhaAparencia(contextoUsuarioAutenticado.usuarioAtual(), request);
     }
 }

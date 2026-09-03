@@ -11,7 +11,7 @@ const ATRASO_RECONEXAO_MAXIMO_MS = 30_000
 const ATRASO_ENVIO_POSICAO_MS = 100
 
 interface EventoPresencaWs {
-  tipo: 'SNAPSHOT' | 'POSICAO' | 'STATUS'
+  tipo: 'SNAPSHOT' | 'POSICAO' | 'STATUS' | 'APARENCIA'
   usuarios: EstadoPresencaUsuario[]
 }
 
@@ -28,6 +28,13 @@ interface EventoPresencaWs {
  * um `SNAPSHOT` de novo (mesmo em toda conexão nova, S6.3) - `usuarios` é *substituído* inteiro
  * nesse caso (não mesclado), então a ressincronização já vem de graça da lógica de `onmessage`
  * que já existia, sem nada especial pra escrever aqui.
+ *
+ * Personalização de avatar: mudar a aparência (`avatar/EditorAvatarPage.tsx`) NÃO passa por aqui -
+ * é um `PATCH /usuarios/me/aparencia` via REST (não um comando `POSICAO`/`STATUS` pela própria
+ * conexão), porque precisa validar a paleta de cor e persistir no banco. O `onmessage` acima já
+ * trata `tipo: "APARENCIA"` genericamente (merge no `usuarios` igual `POSICAO`/`STATUS`), então o
+ * próprio usuário vê a mudança refletida sozinho assim que o servidor rebroadcasta pra sessão dele
+ * mesma (nenhum código extra necessário aqui pra isso).
  */
 export function usePresencaWebSocket() {
   const accessToken = useAuthStore((state) => state.accessToken)

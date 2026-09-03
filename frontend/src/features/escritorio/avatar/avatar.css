@@ -1,0 +1,95 @@
+/**
+ * Editor de personagem (`EditorAvatarPage.tsx`) - abas + grade de swatches de cor + grade de
+ * miniaturas de estilo, mesma composição dos prints de referência do Gather que motivaram o
+ * pedido. Reaproveita `.botao-secundario`/`.botao-pequeno` já existentes pro resto (abas/opções de
+ * estilo), só os swatches de cor (círculos) e o card de prévia são classes novas.
+ */
+
+.editor-avatar {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+}
+
+.editor-avatar-previa {
+  background: var(--cor-primaria-clara, #eef2f6);
+  border: 1px solid var(--cor-borda, #d8dde3);
+  border-radius: var(--raio-borda, 12px);
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+.editor-avatar-previa svg {
+  width: 64px;
+  height: auto;
+}
+
+.editor-avatar-abas {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.editor-avatar-aba-ativa {
+  background: var(--cor-primaria, #4f9f6f);
+  color: #fff;
+  border-color: transparent;
+}
+
+.editor-avatar-secao {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.editor-avatar-subtitulo {
+  margin: 0.4rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--cor-texto-suave, #666);
+}
+
+.editor-avatar-opcoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.editor-avatar-opcao-selecionada {
+  background: var(--cor-primaria, #4f9f6f);
+  color: #fff;
+  border-color: transparent;
+}
+
+.editor-avatar-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.editor-avatar-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--cor-borda, #d8dde3);
+  cursor: pointer;
+  padding: 0;
+}
+
+.editor-avatar-swatch-selecionado {
+  border-color: var(--cor-primaria-escura, #2f6f45);
+  box-shadow: 0 0 0 2px var(--cor-primaria, #4f9f6f);
+}
+
+.editor-avatar-rodape {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}

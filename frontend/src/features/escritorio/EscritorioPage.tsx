@@ -6,6 +6,8 @@ import { IntegracaoWhatsAppPage } from '../integracoes/IntegracaoWhatsAppPage'
 import { ColaboradoresPage } from '../organizacao/ColaboradoresPage'
 import { RelatoriosPage } from '../relatorios/RelatoriosPage'
 import { buscarMapaAtivo } from './api'
+import { APARENCIA_PADRAO } from './avatar/aparenciaAvatar'
+import { EditorAvatarPage } from './avatar/EditorAvatarPage'
 import './EscritorioPage.css'
 import './ui/hud.css'
 import { CronometroTrabalho } from './CronometroTrabalho'
@@ -31,6 +33,7 @@ const TITULO_PAINEL: Record<PainelId, string> = {
   projetos: '📁 Projetos',
   colaboradores: '🧑‍💼 Colaboradores',
   whatsapp: '📱 WhatsApp',
+  avatar: '🧑‍🎨 Editar avatar',
 }
 
 /**
@@ -119,6 +122,7 @@ export function EscritorioPage() {
 
       <BarraFerramentas
         nome={eu?.nome ?? 'Você'}
+        meuAparencia={eu?.aparencia ?? APARENCIA_PADRAO}
         meuStatus={meuStatus}
         aoMudarStatus={aoMudarStatus}
         papel={papel}
@@ -139,6 +143,7 @@ export function EscritorioPage() {
           {painelAberto === 'projetos' && <PainelProjetos />}
           {painelAberto === 'colaboradores' && <ColaboradoresPage />}
           {painelAberto === 'whatsapp' && <IntegracaoWhatsAppPage />}
+          {painelAberto === 'avatar' && <EditorAvatarPage />}
         </PainelFlutuante>
       )}
 

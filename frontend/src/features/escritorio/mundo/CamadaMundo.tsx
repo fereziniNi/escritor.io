@@ -153,7 +153,8 @@ export function CamadaMundo({
               tileX={usuario.x}
               tileY={usuario.y}
               nome={usuario.nome}
-              corCorpo={COR_STATUS[usuario.status]}
+              aparencia={usuario.aparencia}
+              status={COR_STATUS[usuario.status]}
               destaque={usuario.usuarioId === meuUsuarioId}
               proximo={proximos.has(usuario.usuarioId)}
               offline={usuario.status === 'OFFLINE'}
