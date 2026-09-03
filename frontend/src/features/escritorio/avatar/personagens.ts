@@ -11,7 +11,14 @@
  * mesmos nomes, sem tradução na borda.
  */
 
-import { Assets } from 'pixi.js'
+import { Assets, TextureSource } from 'pixi.js'
+
+// Sprite nativo é 16×16 e é exibido bem ampliado (`TAMANHO_SPRITE_PX` em `AvatarPixi.tsx`, ~2.9×) -
+// sem isso o Pixi usa filtragem 'linear' por padrão, que borra o pixel art ao ampliar (mesma lição
+// já aplicada à `<Application antialias={false}>` em `PixiMundo.tsx`, agora pro lado da textura).
+// Efeito colateral do módulo, de propósito - precisa rodar antes de QUALQUER textura carregar, e
+// como só existe um lugar no app que carrega texturas (os personagens), aqui já é cedo o bastante.
+TextureSource.defaultOptions.scaleMode = 'nearest'
 
 export type Personagem = 'PERSONAGEM_VERDE' | 'PERSONAGEM_VERMELHO' | 'PERSONAGEM_ROXO' | 'PERSONAGEM_CHAPEU' | 'PERSONAGEM_CINZA' | 'PERSONAGEM_BANDANA'
 

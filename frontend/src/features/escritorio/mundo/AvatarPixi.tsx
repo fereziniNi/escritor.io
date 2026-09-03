@@ -10,10 +10,12 @@ import type { PosicaoTile } from './movimento'
 
 extend({ Container, Graphics, Sprite, Text })
 
-/** Tamanho do sprite exibido (nativo é 16×16) - um pouco maior que o tile (32px), mesmo espírito
- * de `ESCALA_AVATAR` da versão desenhada à mão anterior (avatar levemente maior que o chão embaixo
- * dele, pra não ficar minúsculo). */
-const TAMANHO_SPRITE_PX = 22
+/** Tamanho do sprite exibido (nativo é 16×16, então isso é ~2.9× de ampliação - com escala
+ * "nearest" pra manter o pixel art nítido, ver `precarregarSpritesPersonagens`). Usuário achou a
+ * primeira versão (22px, menor que o próprio tile de 32px) "muito pequena" e pediu pra parecer
+ * mais com as referências do Gather que ele mandou - lá o personagem claramente ultrapassa o tile
+ * em altura, não fica contido nele. 46px = ~1.44× o tile (`TILE_PX`). */
+const TAMANHO_SPRITE_PX = 46
 
 /** Troca a textura do sprite E reafirma o tamanho exibido a partir dela. `Texture.from(url)` só
  * resolve pra textura de verdade se a URL já estiver no `Cache` do Pixi (preenchido antecipadamente
@@ -29,9 +31,13 @@ function aplicarQuadro(sprite: PixiSprite, personagem: Personagem, quadro: numbe
   sprite.height = TAMANHO_SPRITE_PX
 }
 
-/** (x,y) local do ponto que fica ancorado na posição-mundo do avatar - mesma "grade virtual" 24×30
- * que a versão desenhada à mão usava (ver `avatarFactory.ts`), só a base dos pés muda de menos
- * pixels pro sprite pronto (16×16) caber puxado pro chão em vez de flutuar. */
+/** Ponto "no chão" (pés) ancorado na posição-mundo do avatar - é ao mesmo tempo o `pivot` de
+ * `corpoContainerRef` e o `x`/`y` do próprio sprite (âncora dele é `{x:0.5,y:1}`, ou seja, o
+ * centro-base da textura), então os dois se cancelam: o sprite sempre renderiza com os pés
+ * exatamente em (0,0) de `raizRef`, crescendo pra cima conforme `TAMANHO_SPRITE_PX` - mudar o
+ * tamanho do sprite não desloca os pés. Sombra/indicador (`avatarFactory.ts`) usam esse mesmo
+ * `y` (`CHAO_Y` lá, igual a este `PIVO_BASE.y`) pelo mesmo motivo: ficar grudado no chão
+ * independente da altura do personagem em cima. */
 const PIVO_BASE = { x: 12, y: 27 }
 
 const COR_TEXTO_NOME = 0xffffff
@@ -88,6 +94,11 @@ export function AvatarPixi({
 }) {
   const corStatusNumero = useMemo(() => Number(status.replace('#', '0x')), [status])
   const desenharIndicadorMemo = useMemo(() => (g: PixiGraphics) => desenharIndicadorStatus(g, corStatusNumero), [corStatusNumero])
+  // Os anéis precisam saber o tamanho do sprite pra envolver o corpo inteiro (não só os pés) -
+  // `TAMANHO_SPRITE_PX` é uma constante do módulo, então a closure é estável, mas ainda memoiza
+  // (mesmo padrão do indicador acima) pra manter a mesma referência de função entre renders.
+  const desenharDestaqueMemo = useMemo(() => (g: PixiGraphics) => desenharAnelDestaque(g, TAMANHO_SPRITE_PX), [])
+  const desenharProximidadeMemo = useMemo(() => (g: PixiGraphics) => desenharAnelProximidade(g, TAMANHO_SPRITE_PX), [])
 
   const raizRef = useRef<PixiContainer | null>(null)
   const corpoContainerRef = useRef<PixiContainer | null>(null)
@@ -193,8 +204,8 @@ export function AvatarPixi({
     <pixiContainer ref={raizRef} alpha={offline ? ALPHA_OFFLINE : 1}>
       <pixiContainer ref={corpoContainerRef}>
         <pixiGraphics draw={desenharSombraAvatar} />
-        {destaque && <pixiGraphics draw={desenharAnelDestaque} />}
-        {proximo && <pixiGraphics ref={anelProximidadeRef} draw={desenharAnelProximidade} />}
+        {destaque && <pixiGraphics draw={desenharDestaqueMemo} />}
+        {proximo && <pixiGraphics ref={anelProximidadeRef} draw={desenharProximidadeMemo} />}
         <pixiSprite
           ref={spriteRef}
           anchor={{ x: 0.5, y: 1 }}
@@ -209,7 +220,7 @@ export function AvatarPixi({
       <pixiText
         text={offline ? `${nome} (offline)` : nome}
         anchor={{ x: 0.5, y: 1 }}
-        y={-PIVO_BASE.y - 6}
+        y={-TAMANHO_SPRITE_PX - 6}
         style={{ fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: '800', fill: COR_TEXTO_NOME, stroke: { color: 0x2b2b3a, width: 3 } }}
       />
     </pixiContainer>
