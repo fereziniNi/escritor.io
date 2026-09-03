@@ -1,7 +1,11 @@
 package io.escritor.presenca.identidade.web;
 
+import io.escritor.presenca.identidade.domain.EstiloBottom;
 import io.escritor.presenca.identidade.domain.EstiloCabelo;
-import io.escritor.presenca.identidade.domain.EstiloRoupa;
+import io.escritor.presenca.identidade.domain.EstiloJaqueta;
+import io.escritor.presenca.identidade.domain.EstiloOutro;
+import io.escritor.presenca.identidade.domain.EstiloSapato;
+import io.escritor.presenca.identidade.domain.EstiloTop;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.TipoBarba;
 import io.escritor.presenca.identidade.domain.TipoChapeu;
@@ -40,11 +44,17 @@ class UsuarioControllerTest {
             """;
 
     private static final AparenciaAvatarResponse APARENCIA_PADRAO = new AparenciaAvatarResponse(
-            "#f2c9a0", EstiloCabelo.CURTO, "#4a3728", EstiloRoupa.CAMISETA, "#6b7280", TipoOculos.NENHUM, TipoChapeu.NENHUM, TipoBarba.NENHUM);
+            "#f2c9a0", EstiloCabelo.CURTO, "#4a3728", TipoBarba.NENHUM,
+            EstiloTop.CAMISETA, "#6b7280", EstiloJaqueta.NENHUMA, "#6b7280",
+            EstiloBottom.CALCA, "#2b2b3a", EstiloSapato.TENIS, "#1c1a28",
+            TipoChapeu.NENHUM, "#6b7280", TipoOculos.NENHUM, "#6b7280", EstiloOutro.NENHUM, "#6b7280");
 
     private static final String CORPO_APARENCIA_VALIDA = """
-            {"corPele":"#f2c9a0","estiloCabelo":"CURTO","corCabelo":"#4a3728","estiloRoupa":"CAMISETA",
-             "corRoupa":"#6b7280","oculos":"NENHUM","chapeu":"NENHUM","tipoBarba":"BIGODE"}
+            {"corPele":"#f2c9a0","estiloCabelo":"CURTO","corCabelo":"#4a3728","tipoBarba":"BIGODE_FINO",
+             "estiloTop":"CAMISETA","corTop":"#6b7280","estiloJaqueta":"NENHUMA","corJaqueta":"#6b7280",
+             "estiloBottom":"CALCA","corBottom":"#2b2b3a","estiloSapato":"TENIS","corSapato":"#1c1a28",
+             "chapeu":"NENHUM","corChapeu":"#6b7280","oculos":"NENHUM","corOculos":"#6b7280",
+             "estiloOutro":"NENHUM","corOutro":"#6b7280"}
             """;
 
     @Autowired
@@ -234,7 +244,10 @@ class UsuarioControllerTest {
     void qualquerUsuarioAutenticadoAtualizaAPropriaAparencia() throws Exception {
         Usuario eu = usuarioAutenticadoFalso();
         AparenciaAvatarResponse aparenciaNova = new AparenciaAvatarResponse(
-                "#f2c9a0", EstiloCabelo.CURTO, "#4a3728", EstiloRoupa.CAMISETA, "#6b7280", TipoOculos.NENHUM, TipoChapeu.NENHUM, TipoBarba.BIGODE);
+                "#f2c9a0", EstiloCabelo.CURTO, "#4a3728", TipoBarba.BIGODE_FINO,
+                EstiloTop.CAMISETA, "#6b7280", EstiloJaqueta.NENHUMA, "#6b7280",
+                EstiloBottom.CALCA, "#2b2b3a", EstiloSapato.TENIS, "#1c1a28",
+                TipoChapeu.NENHUM, "#6b7280", TipoOculos.NENHUM, "#6b7280", EstiloOutro.NENHUM, "#6b7280");
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(eu);
         when(usuarioService.atualizarMinhaAparencia(eq(eu), any()))
                 .thenReturn(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480, true, aparenciaNova));
@@ -243,7 +256,7 @@ class UsuarioControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(CORPO_APARENCIA_VALIDA))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.aparencia.tipoBarba").value("BIGODE"));
+                .andExpect(jsonPath("$.aparencia.tipoBarba").value("BIGODE_FINO"));
     }
 
     @Test
@@ -252,8 +265,11 @@ class UsuarioControllerTest {
         mockMvc.perform(patch("/usuarios/me/aparencia")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"corPele":"#f2c9a0","estiloCabelo":"NAO_EXISTE","corCabelo":"#4a3728","estiloRoupa":"CAMISETA",
-                                 "corRoupa":"#6b7280","oculos":"NENHUM","chapeu":"NENHUM","tipoBarba":"NENHUM"}
+                                {"corPele":"#f2c9a0","estiloCabelo":"NAO_EXISTE","corCabelo":"#4a3728","tipoBarba":"NENHUM",
+                                 "estiloTop":"CAMISETA","corTop":"#6b7280","estiloJaqueta":"NENHUMA","corJaqueta":"#6b7280",
+                                 "estiloBottom":"CALCA","corBottom":"#2b2b3a","estiloSapato":"TENIS","corSapato":"#1c1a28",
+                                 "chapeu":"NENHUM","corChapeu":"#6b7280","oculos":"NENHUM","corOculos":"#6b7280",
+                                 "estiloOutro":"NENHUM","corOutro":"#6b7280"}
                                 """))
                 .andExpect(status().isBadRequest());
     }

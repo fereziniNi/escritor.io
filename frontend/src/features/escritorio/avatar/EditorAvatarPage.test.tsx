@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
@@ -35,53 +35,67 @@ describe('EditorAvatarPage', () => {
     expect(await screen.findByText(/não foi possível carregar seu avatar/i)).toBeInTheDocument()
   })
 
-  it('abre na aba Base, com Pele/Cabelo/Barba', async () => {
+  it('abre com as 10 categorias na nav, começando em Skin', async () => {
     renderPagina()
 
-    expect(await screen.findByRole('tab', { name: 'Base' })).toHaveAttribute('aria-selected', 'true')
+    const nav = await screen.findByRole('navigation', { name: /categorias de personalização/i })
+    for (const rotulo of ['Skin', 'Hair', 'Facial hair', 'Top', 'Jacket', 'Bottom', 'Shoes', 'Hat', 'Glasses', 'Other']) {
+      expect(within(nav).getByRole('button', { name: rotulo })).toBeInTheDocument()
+    }
+    expect(within(nav).getByRole('button', { name: 'Skin' })).toHaveAttribute('aria-current', 'true')
     expect(screen.getByRole('group', { name: /cor de pele/i })).toBeInTheDocument()
-    expect(screen.getByRole('group', { name: /estilo de cabelo/i })).toBeInTheDocument()
-    expect(screen.getByRole('group', { name: 'Barba' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Nenhuma' })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('troca pra aba Roupas e depois Acessórios', async () => {
+  it('categoria Hair mostra grade de estilo com bem mais de 4 opções + paleta de cor', async () => {
     const user = userEvent.setup()
     renderPagina()
-    await screen.findByRole('tab', { name: 'Base' })
+    await screen.findByRole('navigation', { name: /categorias de personalização/i })
 
-    await user.click(screen.getByRole('tab', { name: 'Roupas' }))
-    expect(screen.getByRole('group', { name: /estilo de roupa/i })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Hair' }))
 
-    await user.click(screen.getByRole('tab', { name: 'Acessórios' }))
-    expect(screen.getByRole('group', { name: 'Óculos' })).toBeInTheDocument()
-    expect(screen.getByRole('group', { name: 'Chapéu' })).toBeInTheDocument()
+    const grade = screen.getByRole('group', { name: 'Estilo' })
+    expect(within(grade).getAllByRole('button').length).toBeGreaterThanOrEqual(10)
+    expect(screen.getByRole('group', { name: /cor de cabelo/i })).toBeInTheDocument()
   })
 
-  it('escolher uma barba marca ela como selecionada', async () => {
+  it('categoria Facial hair não mostra paleta de cor própria', async () => {
     const user = userEvent.setup()
     renderPagina()
-    await screen.findByRole('tab', { name: 'Base' })
+    await screen.findByRole('navigation', { name: /categorias de personalização/i })
 
-    await user.click(screen.getByRole('button', { name: 'Cavanhaque' }))
+    await user.click(screen.getByRole('button', { name: 'Facial hair' }))
 
-    expect(screen.getByRole('button', { name: 'Cavanhaque' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'Nenhuma' })).toHaveAttribute('aria-pressed', 'false')
+    const grade = screen.getByRole('group', { name: 'Estilo' })
+    expect(within(grade).getAllByRole('button').length).toBeGreaterThanOrEqual(8)
+    expect(screen.queryByRole('group', { name: /cor de/i })).not.toBeInTheDocument()
+  })
+
+  it('escolher uma opção na grade marca ela como selecionada', async () => {
+    const user = userEvent.setup()
+    renderPagina()
+    await screen.findByRole('navigation', { name: /categorias de personalização/i })
+    await user.click(screen.getByRole('button', { name: 'Top' }))
+
+    const opcaoPolo = screen.getByRole('button', { name: /polo/i })
+    await user.click(opcaoPolo)
+
+    expect(opcaoPolo).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('finalizar salva a aparência escolhida', async () => {
     server.use(
       http.patch('/usuarios/me/aparencia', async ({ request }) => {
-        const corpo = (await request.json()) as { tipoBarba: string }
-        expect(corpo.tipoBarba).toBe('BARBA_CHEIA')
-        return HttpResponse.json({ id: 1, nome: 'Ana Souza', aparencia: { ...APARENCIA_PADRAO, tipoBarba: 'BARBA_CHEIA' } })
+        const corpo = (await request.json()) as { estiloTop: string }
+        expect(corpo.estiloTop).toBe('POLO')
+        return HttpResponse.json({ id: 1, nome: 'Ana Souza', aparencia: { ...APARENCIA_PADRAO, estiloTop: 'POLO' } })
       }),
     )
     const user = userEvent.setup()
     renderPagina()
-    await screen.findByRole('tab', { name: 'Base' })
+    await screen.findByRole('navigation', { name: /categorias de personalização/i })
 
-    await user.click(screen.getByRole('button', { name: 'Barba cheia' }))
+    await user.click(screen.getByRole('button', { name: 'Top' }))
+    await user.click(screen.getByRole('button', { name: /polo/i }))
     await user.click(screen.getByRole('button', { name: /finalizar/i }))
 
     expect(await screen.findByText(/aparência salva/i)).toBeInTheDocument()
@@ -91,7 +105,7 @@ describe('EditorAvatarPage', () => {
     server.use(http.patch('/usuarios/me/aparencia', () => new HttpResponse(null, { status: 400 })))
     const user = userEvent.setup()
     renderPagina()
-    await screen.findByRole('tab', { name: 'Base' })
+    await screen.findByRole('navigation', { name: /categorias de personalização/i })
 
     await user.click(screen.getByRole('button', { name: /finalizar/i }))
 

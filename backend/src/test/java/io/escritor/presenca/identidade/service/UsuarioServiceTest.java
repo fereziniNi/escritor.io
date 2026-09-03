@@ -3,8 +3,12 @@ package io.escritor.presenca.identidade.service;
 import io.escritor.presenca.escritorio.ws.PresencaWebSocketHandler;
 import io.escritor.presenca.identidade.domain.AparenciaAvatar;
 import io.escritor.presenca.identidade.domain.AparenciaInvalidaException;
+import io.escritor.presenca.identidade.domain.EstiloBottom;
 import io.escritor.presenca.identidade.domain.EstiloCabelo;
-import io.escritor.presenca.identidade.domain.EstiloRoupa;
+import io.escritor.presenca.identidade.domain.EstiloJaqueta;
+import io.escritor.presenca.identidade.domain.EstiloOutro;
+import io.escritor.presenca.identidade.domain.EstiloSapato;
+import io.escritor.presenca.identidade.domain.EstiloTop;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.TipoBarba;
 import io.escritor.presenca.identidade.domain.TipoChapeu;
@@ -106,7 +110,10 @@ class UsuarioServiceTest {
 
     private static AtualizarAparenciaRequest requisicaoAparenciaValida(TipoBarba tipoBarba) {
         return new AtualizarAparenciaRequest(
-                "#f2c9a0", EstiloCabelo.LONGO, "#4a3728", EstiloRoupa.JAQUETA, "#4472c4", TipoOculos.REDONDO, TipoChapeu.BONE, tipoBarba);
+                "#f2c9a0", EstiloCabelo.LONGO, "#4a3728", tipoBarba,
+                EstiloTop.POLO, "#4472c4", EstiloJaqueta.BOMBER, "#1c1a28",
+                EstiloBottom.JEANS, "#2b2b3a", EstiloSapato.BOTA, "#1c1a28",
+                TipoChapeu.BONE, "#c0392b", TipoOculos.REDONDO, "#1c1a28", EstiloOutro.COLAR, "#c9a24a");
     }
 
     @Test
@@ -116,7 +123,8 @@ class UsuarioServiceTest {
 
         var resposta = usuarioService.atualizarMinhaAparencia(ana, requisicaoAparenciaValida(TipoBarba.CAVANHAQUE));
 
-        assertThat(resposta.aparencia().estiloRoupa()).isEqualTo(EstiloRoupa.JAQUETA);
+        assertThat(resposta.aparencia().estiloTop()).isEqualTo(EstiloTop.POLO);
+        assertThat(resposta.aparencia().estiloJaqueta()).isEqualTo(EstiloJaqueta.BOMBER);
         assertThat(resposta.aparencia().tipoBarba()).isEqualTo(TipoBarba.CAVANHAQUE);
         verify(presencaWebSocketHandler).atualizarAparencia(eq(1L), any(AparenciaAvatar.class));
     }
@@ -125,7 +133,10 @@ class UsuarioServiceTest {
     void atualizarAparenciaComCorForaDaPaletaLancaAparenciaInvalida() {
         Usuario ana = comId(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480), 1L);
         var requisicaoComCorInvalida = new AtualizarAparenciaRequest(
-                "#123456", EstiloCabelo.CURTO, "#4a3728", EstiloRoupa.CAMISETA, "#6b7280", TipoOculos.NENHUM, TipoChapeu.NENHUM, TipoBarba.NENHUM);
+                "#123456", EstiloCabelo.CURTO, "#4a3728", TipoBarba.NENHUM,
+                EstiloTop.CAMISETA, "#6b7280", EstiloJaqueta.NENHUMA, "#6b7280",
+                EstiloBottom.CALCA, "#2b2b3a", EstiloSapato.TENIS, "#1c1a28",
+                TipoChapeu.NENHUM, "#6b7280", TipoOculos.NENHUM, "#6b7280", EstiloOutro.NENHUM, "#6b7280");
 
         assertThatThrownBy(() -> usuarioService.atualizarMinhaAparencia(ana, requisicaoComCorInvalida))
                 .isInstanceOf(AparenciaInvalidaException.class);

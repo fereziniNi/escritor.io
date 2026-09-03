@@ -4,7 +4,6 @@ import { Container, Graphics, Text } from 'pixi.js'
 import { useCallback, useLayoutEffect, useMemo, useRef } from 'react'
 import type { AparenciaAvatar } from '../avatar/aparenciaAvatar'
 import {
-  corCalcaParaRoupa,
   desenharAnelDestaque,
   desenharAnelProximidade,
   desenharBarba,
@@ -12,10 +11,12 @@ import {
   desenharChapeu,
   desenharCorpoBase,
   desenharIndicadorStatus,
+  desenharJaqueta,
   desenharOculos,
+  desenharOutro,
   desenharPerna,
-  desenharRoupa,
   desenharSombraAvatar,
+  desenharTop,
   PIVO_PERNA_DIREITA,
   PIVO_PERNA_ESQUERDA,
 } from './avatarFactory'
@@ -26,10 +27,8 @@ import type { PosicaoTile } from './movimento'
 extend({ Container, Graphics, Text })
 
 /** Escala aplicada por cima das coordenadas nativas de `PixelCharacterSvg` (viewBox 24×30) - dá um
- * personagem de ~31×39px. Maior que a primeira versão desenhada à mão (`ea212ee`, 1.1) - o usuário
- * já deixou claro em 2 rodadas com os sprites Kenney que "muito pequeno" é um problema recorrente,
- * melhor começar generoso e ajustar depois via feedback (mesmo padrão iterativo já usado 2x nesta
- * sessão pro tamanho do sprite). */
+ * personagem de ~31×39px. Usuário já deixou claro em rodadas anteriores que "muito pequeno" é um
+ * problema recorrente - melhor começar generoso e ajustar depois via feedback. */
 const ESCALA_AVATAR = 1.3
 
 /** (x,y) local do ponto que fica ancorado na posição-mundo do avatar: base da caixa 24×30, um
@@ -56,18 +55,17 @@ function hexParaNumero(cor: string): number {
 }
 
 /**
- * Avatar no mundo Pixi - volta a ser desenhado em camadas via `PIXI.Graphics` depois de uma
- * passagem por sprites prontos (Kenney): o usuário mandou um print do editor de personagem do
- * próprio Gather como referência e pediu "voltar ao sistema desenhado à mão, bem mais detalhado"
- * (ver `avatarFactory.ts` pro detalhe visual em si). Só recebe a posição em tile *confirmada*
- * (inteira, vinda do servidor via `usePresencaWebSocket`); toda a suavização visual (glide entre
- * tiles, direção inferida do delta, balanço de perna enquanto anda, bob de espera, pulso de
- * proximidade) é interna, dirigida por `useTick`.
+ * Avatar no mundo Pixi - 10 camadas desenhadas via `PIXI.Graphics` (ver `avatarFactory.ts`), 9
+ * delas personalizáveis (Skin/Hair/Facial hair/Top/Jacket/Bottom/Shoes/Hat/Glasses/Other - Skin é
+ * só cor, entra na camada de corpo). Só recebe a posição em tile *confirmada* (inteira, vinda do
+ * servidor via `usePresencaWebSocket`); toda a suavização visual (glide entre tiles, direção
+ * inferida do delta, balanço de perna enquanto anda, bob de espera, pulso de proximidade) é
+ * interna, dirigida por `useTick`.
  *
  * Perf (lição das duas rodadas de correção desta sessão): nada aqui passa por `useState` - os
  * objetos Pixi (`Container`/`Graphics`) são mutados direto via `ref` dentro do `useTick`. Cada
- * camada da aparência (`desenharRoupaMemo`/`desenharCabeloMemo`/etc.) é memoizada só na própria
- * dependência - trocar o chapéu não redesenha o cabelo, por exemplo.
+ * camada da aparência é memoizada só na própria dependência - trocar o chapéu não redesenha o
+ * cabelo, por exemplo.
  */
 export function AvatarPixi({
   tileX,
@@ -83,8 +81,7 @@ export function AvatarPixi({
   tileY: number
   nome: string
   aparencia: AparenciaAvatar
-  /** Cor do status (`COR_STATUS[status]`) - só usada pro pontinho indicador, não mais pra colorir
-   * a roupa. */
+  /** Cor do status (`COR_STATUS[status]`) - só usada pro pontinho indicador. */
   status: string
   destaque: boolean
   /** Fase 3 - alguém está dentro do raio de proximidade deste avatar (`proximidade.ts`). */
@@ -95,26 +92,45 @@ export function AvatarPixi({
 }) {
   const corPeleNumero = useMemo(() => hexParaNumero(aparencia.corPele), [aparencia.corPele])
   const corCabeloNumero = useMemo(() => hexParaNumero(aparencia.corCabelo), [aparencia.corCabelo])
-  const corRoupaNumero = useMemo(() => hexParaNumero(aparencia.corRoupa), [aparencia.corRoupa])
-  const corCalcaNumero = useMemo(() => corCalcaParaRoupa(corRoupaNumero), [corRoupaNumero])
+  const corTopNumero = useMemo(() => hexParaNumero(aparencia.corTop), [aparencia.corTop])
+  const corJaquetaNumero = useMemo(() => hexParaNumero(aparencia.corJaqueta), [aparencia.corJaqueta])
+  const corBottomNumero = useMemo(() => hexParaNumero(aparencia.corBottom), [aparencia.corBottom])
+  const corSapatoNumero = useMemo(() => hexParaNumero(aparencia.corSapato), [aparencia.corSapato])
+  const corChapeuNumero = useMemo(() => hexParaNumero(aparencia.corChapeu), [aparencia.corChapeu])
+  const corOculosNumero = useMemo(() => hexParaNumero(aparencia.corOculos), [aparencia.corOculos])
+  const corOutroNumero = useMemo(() => hexParaNumero(aparencia.corOutro), [aparencia.corOutro])
   const corStatusNumero = useMemo(() => hexParaNumero(status), [status])
 
   // Este componente re-renderiza a cada tick (o bob de espera - ver `useTick` abaixo - roda
   // sempre, parado ou não), então cada camada precisa da própria closure memoizada na própria
   // dependência - sem isso, todo mundo redesenharia a 60fps à toa.
-  const desenharPernaMemo = useCallback((g: PixiGraphics) => desenharPerna(g, corCalcaNumero), [corCalcaNumero])
-  const desenharRoupaMemo = useCallback(
-    (g: PixiGraphics) => desenharRoupa(g, aparencia.estiloRoupa, corRoupaNumero, corPeleNumero),
-    [aparencia.estiloRoupa, corRoupaNumero, corPeleNumero],
+  const desenharPernaMemo = useCallback(
+    (g: PixiGraphics) => desenharPerna(g, aparencia.estiloBottom, corBottomNumero, aparencia.estiloSapato, corSapatoNumero),
+    [aparencia.estiloBottom, corBottomNumero, aparencia.estiloSapato, corSapatoNumero],
+  )
+  const desenharTopMemo = useCallback(
+    (g: PixiGraphics) => desenharTop(g, aparencia.estiloTop, corTopNumero, corPeleNumero),
+    [aparencia.estiloTop, corTopNumero, corPeleNumero],
+  )
+  const desenharJaquetaMemo = useCallback(
+    (g: PixiGraphics) => desenharJaqueta(g, aparencia.estiloJaqueta, corJaquetaNumero),
+    [aparencia.estiloJaqueta, corJaquetaNumero],
   )
   const desenharCorpoMemo = useCallback((g: PixiGraphics) => desenharCorpoBase(g, corPeleNumero), [corPeleNumero])
   const desenharBarbaMemo = useCallback(
     (g: PixiGraphics) => desenharBarba(g, aparencia.tipoBarba, corCabeloNumero),
     [aparencia.tipoBarba, corCabeloNumero],
   )
-  const desenharCabeloMemo = useCallback((g: PixiGraphics) => desenharCabelo(g, aparencia.estiloCabelo, corCabeloNumero), [aparencia.estiloCabelo, corCabeloNumero])
-  const desenharOculosMemo = useCallback((g: PixiGraphics) => desenharOculos(g, aparencia.oculos), [aparencia.oculos])
-  const desenharChapeuMemo = useCallback((g: PixiGraphics) => desenharChapeu(g, aparencia.chapeu), [aparencia.chapeu])
+  const desenharCabeloMemo = useCallback(
+    (g: PixiGraphics) => desenharCabelo(g, aparencia.estiloCabelo, corCabeloNumero),
+    [aparencia.estiloCabelo, corCabeloNumero],
+  )
+  const desenharChapeuMemo = useCallback((g: PixiGraphics) => desenharChapeu(g, aparencia.chapeu, corChapeuNumero), [aparencia.chapeu, corChapeuNumero])
+  const desenharOculosMemo = useCallback((g: PixiGraphics) => desenharOculos(g, aparencia.oculos, corOculosNumero), [aparencia.oculos, corOculosNumero])
+  const desenharOutroMemo = useCallback(
+    (g: PixiGraphics) => desenharOutro(g, aparencia.estiloOutro, corOutroNumero),
+    [aparencia.estiloOutro, corOutroNumero],
+  )
   const desenharIndicadorMemo = useCallback((g: PixiGraphics) => desenharIndicadorStatus(g, corStatusNumero), [corStatusNumero])
 
   const raizRef = useRef<PixiContainer | null>(null)
@@ -205,12 +221,14 @@ export function AvatarPixi({
         {proximo && <pixiGraphics ref={anelProximidadeRef} draw={desenharAnelProximidade} />}
         <pixiGraphics draw={desenharPernaMemo} ref={pernaEsquerdaRef} x={PIVO_PERNA_ESQUERDA.x} y={PIVO_PERNA_ESQUERDA.y} />
         <pixiGraphics draw={desenharPernaMemo} ref={pernaDireitaRef} x={PIVO_PERNA_DIREITA.x} y={PIVO_PERNA_DIREITA.y} />
-        <pixiGraphics draw={desenharRoupaMemo} />
+        <pixiGraphics draw={desenharTopMemo} />
+        <pixiGraphics draw={desenharJaquetaMemo} />
         <pixiGraphics draw={desenharCorpoMemo} />
         <pixiGraphics draw={desenharBarbaMemo} />
         <pixiGraphics draw={desenharCabeloMemo} />
-        <pixiGraphics draw={desenharOculosMemo} />
         <pixiGraphics draw={desenharChapeuMemo} />
+        <pixiGraphics draw={desenharOculosMemo} />
+        <pixiGraphics draw={desenharOutroMemo} />
         <pixiGraphics draw={desenharIndicadorMemo} />
       </pixiContainer>
 

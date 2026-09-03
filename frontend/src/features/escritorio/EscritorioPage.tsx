@@ -136,7 +136,7 @@ export function EscritorioPage() {
         <PainelFlutuante
           titulo={TITULO_PAINEL[painelAberto]}
           aoFechar={() => setPainelAberto(null)}
-          largo={painelAberto === 'projetos'}
+          largo={painelAberto === 'projetos' || painelAberto === 'avatar'}
         >
           {painelAberto === 'ponto' && <PainelPonto />}
           {painelAberto === 'relatorios' && <RelatoriosPage />}

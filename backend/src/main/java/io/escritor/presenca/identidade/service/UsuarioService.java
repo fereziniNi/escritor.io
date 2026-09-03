@@ -90,17 +90,36 @@ public class UsuarioService {
      * {@link PresencaWebSocketHandler#atualizarAparencia}).
      */
     public UsuarioResponse atualizarMinhaAparencia(Usuario usuarioAutenticado, AtualizarAparenciaRequest request) {
-        PaletaAparenciaAvatar.validar(request.corPele(), request.corCabelo(), request.corRoupa());
+        PaletaAparenciaAvatar.validar(
+                request.corPele(),
+                request.corCabelo(),
+                request.corTop(),
+                request.corJaqueta(),
+                request.corBottom(),
+                request.corSapato(),
+                request.corChapeu(),
+                request.corOculos(),
+                request.corOutro());
 
         AparenciaAvatar novaAparencia = new AparenciaAvatar(
                 request.corPele(),
                 request.estiloCabelo(),
                 request.corCabelo(),
-                request.estiloRoupa(),
-                request.corRoupa(),
-                request.oculos(),
+                request.tipoBarba(),
+                request.estiloTop(),
+                request.corTop(),
+                request.estiloJaqueta(),
+                request.corJaqueta(),
+                request.estiloBottom(),
+                request.corBottom(),
+                request.estiloSapato(),
+                request.corSapato(),
                 request.chapeu(),
-                request.tipoBarba());
+                request.corChapeu(),
+                request.oculos(),
+                request.corOculos(),
+                request.estiloOutro(),
+                request.corOutro());
         usuarioAutenticado.alterarAparencia(novaAparencia);
         Usuario salvo = usuarioRepository.save(usuarioAutenticado);
 

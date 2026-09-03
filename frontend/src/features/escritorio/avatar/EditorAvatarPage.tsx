@@ -4,16 +4,24 @@ import { PixelCharacterSvg } from '../PixelCharacterSvg'
 import {
   APARENCIA_PADRAO,
   CORES_CABELO,
+  CORES_GERAL,
   CORES_PELE,
-  CORES_ROUPA,
   OPCOES_CHAPEU,
+  OPCOES_ESTILO_BOTTOM,
   OPCOES_ESTILO_CABELO,
-  OPCOES_ESTILO_ROUPA,
+  OPCOES_ESTILO_JAQUETA,
+  OPCOES_ESTILO_OUTRO,
+  OPCOES_ESTILO_SAPATO,
+  OPCOES_ESTILO_TOP,
   OPCOES_OCULOS,
   OPCOES_TIPO_BARBA,
   ROTULO_CHAPEU,
+  ROTULO_ESTILO_BOTTOM,
   ROTULO_ESTILO_CABELO,
-  ROTULO_ESTILO_ROUPA,
+  ROTULO_ESTILO_JAQUETA,
+  ROTULO_ESTILO_OUTRO,
+  ROTULO_ESTILO_SAPATO,
+  ROTULO_ESTILO_TOP,
   ROTULO_OCULOS,
   ROTULO_TIPO_BARBA,
 } from './aparenciaAvatar'
@@ -21,25 +29,38 @@ import type { AparenciaAvatar } from './aparenciaAvatar'
 import { atualizarMinhaAparencia, buscarMeuUsuario } from './api'
 import './avatar.css'
 
-type Aba = 'base' | 'roupas' | 'acessorios'
+type Categoria = 'skin' | 'hair' | 'facialHair' | 'top' | 'jacket' | 'bottom' | 'shoes' | 'hat' | 'glasses' | 'other'
+
+const CATEGORIAS: { id: Categoria; rotulo: string }[] = [
+  { id: 'skin', rotulo: 'Skin' },
+  { id: 'hair', rotulo: 'Hair' },
+  { id: 'facialHair', rotulo: 'Facial hair' },
+  { id: 'top', rotulo: 'Top' },
+  { id: 'jacket', rotulo: 'Jacket' },
+  { id: 'bottom', rotulo: 'Bottom' },
+  { id: 'shoes', rotulo: 'Shoes' },
+  { id: 'hat', rotulo: 'Hat' },
+  { id: 'glasses', rotulo: 'Glasses' },
+  { id: 'other', rotulo: 'Other' },
+]
 
 /**
- * Editor de personagem - volta a existir depois de uma passagem por sprites prontos (Kenney). O
- * usuário mandou um print do editor de personagem do próprio Gather como referência de composição
- * (abas por categoria, grade de swatches de cor, prévia ao vivo, "Finalizar" salvando no fim) e
- * pediu "voltar ao sistema desenhado à mão, bem mais detalhado". Base ganhou uma 3ª sub-seção
- * (Barba) que não existia na primeira versão - espelha a sub-aba "Facial Hair" da referência.
- * Aberto pela bolha do próprio avatar em `MenuUsuario` (mesmo painel flutuante que todo o resto do
- * dock já usa - `EscritorioPage`/`BarraFerramentas`).
+ * Editor de personagem - estrutura e quantidade de categorias espelham o editor do Gather (mandado
+ * como referência pelo usuário: "faça exatamente igual... todas as opções de partes devem possuir
+ * mais do que a tela esta mostrando"), arte 100% original ("nada de arte roubada/baixada do
+ * Gather", regra já estabelecida nesta sessão). Layout de 3 colunas igual à referência: nav
+ * vertical com as 10 categorias, grade de miniaturas + paleta de cor no meio, prévia grande à
+ * direita. Cada miniatura mostra o personagem inteiro com aquela opção aplicada (não só a peça
+ * isolada) - simplificação deliberada, o "clique pra ver o efeito de verdade no personagem" já
+ * cumpre o mesmo papel sem precisar de um segundo conjunto de componentes de desenho só pra ícone.
  *
  * O rascunho (`rascunho`) só é aplicado no mundo/nos outros usuários quando "Finalizar" salva de
- * verdade (`PATCH /usuarios/me/aparencia`) - até lá é só local, pra poder experimentar cor/estilo
- * sem afetar ninguém.
+ * verdade (`PATCH /usuarios/me/aparencia`) - até lá é só local.
  */
 export function EditorAvatarPage() {
   const queryClient = useQueryClient()
   const meuUsuarioQuery = useQuery({ queryKey: ['usuarios', 'me'], queryFn: buscarMeuUsuario })
-  const [aba, setAba] = useState<Aba>('base')
+  const [categoria, setCategoria] = useState<Categoria>('skin')
   const [rascunho, setRascunho] = useState<AparenciaAvatar>(APARENCIA_PADRAO)
   const [rascunhoInicializado, setRascunhoInicializado] = useState(false)
 
@@ -71,103 +92,142 @@ export function EditorAvatarPage() {
 
   return (
     <div className="editor-avatar">
-      <div className="editor-avatar-previa" aria-hidden="true">
-        <PixelCharacterSvg aparencia={rascunho} direcao="direita" andando={false} destaque={false} />
-      </div>
+      <nav className="editor-avatar-nav" aria-label="Categorias de personalização">
+        {CATEGORIAS.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            className={`editor-avatar-nav-item${categoria === c.id ? ' editor-avatar-nav-item-ativo' : ''}`}
+            aria-current={categoria === c.id}
+            onClick={() => setCategoria(c.id)}
+          >
+            {c.rotulo}
+          </button>
+        ))}
+      </nav>
 
-      <div className="editor-avatar-abas" role="tablist" aria-label="Categorias de personalização">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={aba === 'base'}
-          className={`botao-secundario botao-pequeno${aba === 'base' ? ' editor-avatar-aba-ativa' : ''}`}
-          onClick={() => setAba('base')}
-        >
-          Base
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={aba === 'roupas'}
-          className={`botao-secundario botao-pequeno${aba === 'roupas' ? ' editor-avatar-aba-ativa' : ''}`}
-          onClick={() => setAba('roupas')}
-        >
-          Roupas
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={aba === 'acessorios'}
-          className={`botao-secundario botao-pequeno${aba === 'acessorios' ? ' editor-avatar-aba-ativa' : ''}`}
-          onClick={() => setAba('acessorios')}
-        >
-          Acessórios
-        </button>
-      </div>
+      <div className="editor-avatar-conteudo">
+        {categoria === 'skin' && <SeletorDeCor cores={CORES_PELE} valor={rascunho.corPele} aoEscolher={(cor) => atualizarCampo('corPele', cor)} rotulo="pele" />}
 
-      {aba === 'base' && (
-        <div className="editor-avatar-secao">
-          <h3 className="editor-avatar-subtitulo">Pele</h3>
-          <SeletorDeCor cores={CORES_PELE} valor={rascunho.corPele} aoEscolher={(cor) => atualizarCampo('corPele', cor)} rotulo="pele" />
+        {categoria === 'hair' && (
+          <>
+            <GradeDeEstilo
+              opcoes={OPCOES_ESTILO_CABELO}
+              rotulos={ROTULO_ESTILO_CABELO}
+              valor={rascunho.estiloCabelo}
+              aoEscolher={(v) => atualizarCampo('estiloCabelo', v)}
+              montarPreview={(v) => ({ ...rascunho, estiloCabelo: v })}
+            />
+            <SeletorDeCor cores={CORES_CABELO} valor={rascunho.corCabelo} aoEscolher={(cor) => atualizarCampo('corCabelo', cor)} rotulo="cabelo" />
+          </>
+        )}
 
-          <h3 className="editor-avatar-subtitulo">Cabelo</h3>
-          <SeletorDeEstilo
-            opcoes={OPCOES_ESTILO_CABELO}
-            rotulos={ROTULO_ESTILO_CABELO}
-            valor={rascunho.estiloCabelo}
-            aoEscolher={(valor) => atualizarCampo('estiloCabelo', valor)}
-            rotuloGrupo="Estilo de cabelo"
-          />
-          <SeletorDeCor cores={CORES_CABELO} valor={rascunho.corCabelo} aoEscolher={(cor) => atualizarCampo('corCabelo', cor)} rotulo="cabelo" />
-
-          <h3 className="editor-avatar-subtitulo">Barba</h3>
-          <SeletorDeEstilo
+        {categoria === 'facialHair' && (
+          <GradeDeEstilo
             opcoes={OPCOES_TIPO_BARBA}
             rotulos={ROTULO_TIPO_BARBA}
             valor={rascunho.tipoBarba}
-            aoEscolher={(valor) => atualizarCampo('tipoBarba', valor)}
-            rotuloGrupo="Barba"
+            aoEscolher={(v) => atualizarCampo('tipoBarba', v)}
+            montarPreview={(v) => ({ ...rascunho, tipoBarba: v })}
           />
-        </div>
-      )}
+        )}
 
-      {aba === 'roupas' && (
-        <div className="editor-avatar-secao">
-          <h3 className="editor-avatar-subtitulo">Estilo</h3>
-          <SeletorDeEstilo
-            opcoes={OPCOES_ESTILO_ROUPA}
-            rotulos={ROTULO_ESTILO_ROUPA}
-            valor={rascunho.estiloRoupa}
-            aoEscolher={(valor) => atualizarCampo('estiloRoupa', valor)}
-            rotuloGrupo="Estilo de roupa"
-          />
-          <h3 className="editor-avatar-subtitulo">Cor</h3>
-          <SeletorDeCor cores={CORES_ROUPA} valor={rascunho.corRoupa} aoEscolher={(cor) => atualizarCampo('corRoupa', cor)} rotulo="roupa" />
-        </div>
-      )}
+        {categoria === 'top' && (
+          <>
+            <GradeDeEstilo
+              opcoes={OPCOES_ESTILO_TOP}
+              rotulos={ROTULO_ESTILO_TOP}
+              valor={rascunho.estiloTop}
+              aoEscolher={(v) => atualizarCampo('estiloTop', v)}
+              montarPreview={(v) => ({ ...rascunho, estiloTop: v })}
+            />
+            <SeletorDeCor cores={CORES_GERAL} valor={rascunho.corTop} aoEscolher={(cor) => atualizarCampo('corTop', cor)} rotulo="top" />
+          </>
+        )}
 
-      {aba === 'acessorios' && (
-        <div className="editor-avatar-secao">
-          <h3 className="editor-avatar-subtitulo">Óculos</h3>
-          <SeletorDeEstilo
-            opcoes={OPCOES_OCULOS}
-            rotulos={ROTULO_OCULOS}
-            valor={rascunho.oculos}
-            aoEscolher={(valor) => atualizarCampo('oculos', valor)}
-            rotuloGrupo="Óculos"
-          />
-          <h3 className="editor-avatar-subtitulo">Chapéu</h3>
-          <SeletorDeEstilo
-            opcoes={OPCOES_CHAPEU}
-            rotulos={ROTULO_CHAPEU}
-            valor={rascunho.chapeu}
-            aoEscolher={(valor) => atualizarCampo('chapeu', valor)}
-            rotuloGrupo="Chapéu"
-          />
-        </div>
-      )}
+        {categoria === 'jacket' && (
+          <>
+            <GradeDeEstilo
+              opcoes={OPCOES_ESTILO_JAQUETA}
+              rotulos={ROTULO_ESTILO_JAQUETA}
+              valor={rascunho.estiloJaqueta}
+              aoEscolher={(v) => atualizarCampo('estiloJaqueta', v)}
+              montarPreview={(v) => ({ ...rascunho, estiloJaqueta: v })}
+            />
+            <SeletorDeCor cores={CORES_GERAL} valor={rascunho.corJaqueta} aoEscolher={(cor) => atualizarCampo('corJaqueta', cor)} rotulo="jaqueta" />
+          </>
+        )}
 
-      <div className="editor-avatar-rodape">
+        {categoria === 'bottom' && (
+          <>
+            <GradeDeEstilo
+              opcoes={OPCOES_ESTILO_BOTTOM}
+              rotulos={ROTULO_ESTILO_BOTTOM}
+              valor={rascunho.estiloBottom}
+              aoEscolher={(v) => atualizarCampo('estiloBottom', v)}
+              montarPreview={(v) => ({ ...rascunho, estiloBottom: v })}
+            />
+            <SeletorDeCor cores={CORES_GERAL} valor={rascunho.corBottom} aoEscolher={(cor) => atualizarCampo('corBottom', cor)} rotulo="bottom" />
+          </>
+        )}
+
+        {categoria === 'shoes' && (
+          <>
+            <GradeDeEstilo
+              opcoes={OPCOES_ESTILO_SAPATO}
+              rotulos={ROTULO_ESTILO_SAPATO}
+              valor={rascunho.estiloSapato}
+              aoEscolher={(v) => atualizarCampo('estiloSapato', v)}
+              montarPreview={(v) => ({ ...rascunho, estiloSapato: v })}
+            />
+            <SeletorDeCor cores={CORES_GERAL} valor={rascunho.corSapato} aoEscolher={(cor) => atualizarCampo('corSapato', cor)} rotulo="sapato" />
+          </>
+        )}
+
+        {categoria === 'hat' && (
+          <>
+            <GradeDeEstilo
+              opcoes={OPCOES_CHAPEU}
+              rotulos={ROTULO_CHAPEU}
+              valor={rascunho.chapeu}
+              aoEscolher={(v) => atualizarCampo('chapeu', v)}
+              montarPreview={(v) => ({ ...rascunho, chapeu: v })}
+            />
+            <SeletorDeCor cores={CORES_GERAL} valor={rascunho.corChapeu} aoEscolher={(cor) => atualizarCampo('corChapeu', cor)} rotulo="chapéu" />
+          </>
+        )}
+
+        {categoria === 'glasses' && (
+          <>
+            <GradeDeEstilo
+              opcoes={OPCOES_OCULOS}
+              rotulos={ROTULO_OCULOS}
+              valor={rascunho.oculos}
+              aoEscolher={(v) => atualizarCampo('oculos', v)}
+              montarPreview={(v) => ({ ...rascunho, oculos: v })}
+            />
+            <SeletorDeCor cores={CORES_GERAL} valor={rascunho.corOculos} aoEscolher={(cor) => atualizarCampo('corOculos', cor)} rotulo="óculos" />
+          </>
+        )}
+
+        {categoria === 'other' && (
+          <>
+            <GradeDeEstilo
+              opcoes={OPCOES_ESTILO_OUTRO}
+              rotulos={ROTULO_ESTILO_OUTRO}
+              valor={rascunho.estiloOutro}
+              aoEscolher={(v) => atualizarCampo('estiloOutro', v)}
+              montarPreview={(v) => ({ ...rascunho, estiloOutro: v })}
+            />
+            <SeletorDeCor cores={CORES_GERAL} valor={rascunho.corOutro} aoEscolher={(cor) => atualizarCampo('corOutro', cor)} rotulo="outro" />
+          </>
+        )}
+      </div>
+
+      <div className="editor-avatar-previa-coluna">
+        <div className="editor-avatar-previa" aria-hidden="true">
+          <PixelCharacterSvg aparencia={rascunho} direcao="direita" andando={false} destaque={false} />
+        </div>
         <button type="button" className="botao-pequeno" disabled={salvarMutation.isPending} onClick={() => salvarMutation.mutate()}>
           {salvarMutation.isPending ? 'Salvando…' : 'Finalizar'}
         </button>
@@ -206,30 +266,32 @@ function SeletorDeCor({
   )
 }
 
-function SeletorDeEstilo<T extends string>({
+function GradeDeEstilo<T extends string>({
   opcoes,
   rotulos,
   valor,
   aoEscolher,
-  rotuloGrupo,
+  montarPreview,
 }: {
   opcoes: T[]
   rotulos: Record<T, string>
   valor: T
   aoEscolher: (opcao: T) => void
-  rotuloGrupo: string
+  montarPreview: (opcao: T) => AparenciaAvatar
 }) {
   return (
-    <div className="editor-avatar-opcoes" role="group" aria-label={rotuloGrupo}>
+    <div className="editor-avatar-grade" role="group" aria-label="Estilo">
       {opcoes.map((opcao) => (
         <button
           key={opcao}
           type="button"
-          className={`botao-secundario botao-pequeno${opcao === valor ? ' editor-avatar-opcao-selecionada' : ''}`}
+          className={`editor-avatar-opcao${opcao === valor ? ' editor-avatar-opcao-selecionada' : ''}`}
           aria-pressed={opcao === valor}
           onClick={() => aoEscolher(opcao)}
+          title={rotulos[opcao]}
         >
-          {rotulos[opcao]}
+          <PixelCharacterSvg aparencia={montarPreview(opcao)} direcao="direita" andando={false} destaque={false} />
+          <span>{rotulos[opcao]}</span>
         </button>
       ))}
     </div>

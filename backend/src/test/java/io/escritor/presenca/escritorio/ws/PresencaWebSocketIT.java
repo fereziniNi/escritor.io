@@ -3,8 +3,12 @@ package io.escritor.presenca.escritorio.ws;
 import io.escritor.presenca.escritorio.domain.EventoPresenca;
 import io.escritor.presenca.escritorio.repository.EventoPresencaRepository;
 import io.escritor.presenca.identidade.domain.AparenciaAvatar;
+import io.escritor.presenca.identidade.domain.EstiloBottom;
 import io.escritor.presenca.identidade.domain.EstiloCabelo;
-import io.escritor.presenca.identidade.domain.EstiloRoupa;
+import io.escritor.presenca.identidade.domain.EstiloJaqueta;
+import io.escritor.presenca.identidade.domain.EstiloOutro;
+import io.escritor.presenca.identidade.domain.EstiloSapato;
+import io.escritor.presenca.identidade.domain.EstiloTop;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.TipoBarba;
 import io.escritor.presenca.identidade.domain.TipoChapeu;
@@ -297,7 +301,10 @@ class PresencaWebSocketIT {
                 mensagensBeto.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
 
                 AparenciaAvatar aparenciaNova = new AparenciaAvatar(
-                        "#8a5a34", EstiloCabelo.LONGO, "#1c1a28", EstiloRoupa.JAQUETA, "#e0546f", TipoOculos.QUADRADO, TipoChapeu.GORRO, TipoBarba.BARBA_CHEIA);
+                        "#8a5a34", EstiloCabelo.LONGO, "#1c1a28", TipoBarba.BARBA_CHEIA,
+                        EstiloTop.SUETER, "#e0546f", EstiloJaqueta.CASACO_LONGO, "#1c1a28",
+                        EstiloBottom.SAIA, "#e0546f", EstiloSapato.BOTA_CANO_ALTO, "#1c1a28",
+                        TipoChapeu.GORRO, "#c0392b", TipoOculos.QUADRADO, "#1c1a28", EstiloOutro.LENCO, "#e874c4");
                 presencaWebSocketHandler.atualizarAparencia(ana.getId(), aparenciaNova);
 
                 String recebido = mensagensBeto.poll(5, TimeUnit.SECONDS);
