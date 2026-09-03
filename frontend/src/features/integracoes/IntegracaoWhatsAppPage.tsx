@@ -1,5 +1,81 @@
-import { useQuery } from '@tanstack/react-query'
-import { buscarEstadoWhatsApp } from './api'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { atualizarConfiguracaoRelatorioDiario, buscarConfiguracaoRelatorioDiario, buscarEstadoWhatsApp } from './api'
+
+/**
+ * Pedido do cliente: "o admin pode escolher a hora do dia para receber um documento sobre o que
+ * foi feito no dia pelos funcionarios... todo dia na mesma hora". `<input type="time">` já
+ * devolve "HH:mm" - completa com ":00" pro backend (`java.time.LocalTime` espera "HH:mm:ss") e
+ * corta de volta pra "HH:mm" ao carregar (`horarioEnvio` vem "HH:mm:ss" do backend).
+ */
+function ResumoDiarioConfig() {
+  const queryClient = useQueryClient()
+  const configQuery = useQuery({ queryKey: ['whatsapp', 'relatorio-diario'], queryFn: buscarConfiguracaoRelatorioDiario })
+  const [horario, setHorario] = useState('')
+  const [habilitado, setHabilitado] = useState(true)
+
+  useEffect(() => {
+    if (configQuery.data?.configurado && configQuery.data.horarioEnvio) {
+      setHorario(configQuery.data.horarioEnvio.slice(0, 5))
+      setHabilitado(configQuery.data.habilitado)
+    }
+  }, [configQuery.data])
+
+  const salvarMutation = useMutation({
+    mutationFn: () => atualizarConfiguracaoRelatorioDiario({ horarioEnvio: `${horario}:00`, habilitado }),
+    onSuccess: (dados) => queryClient.setQueryData(['whatsapp', 'relatorio-diario'], dados),
+  })
+
+  return (
+    <section className="secao cartao">
+      <h2 className="secao-titulo">📋 Resumo diário</h2>
+      <p className="mensagem-vazia">
+        Todo dia, no horário escolhido, o chefe recebe no WhatsApp um resumo do que cada funcionário fez (ponto + tarefas).
+      </p>
+
+      {configQuery.isPending && <p className="mensagem-carregando">Carregando…</p>}
+      {configQuery.isError && <p className="mensagem-erro">Não foi possível consultar a configuração.</p>}
+
+      {!configQuery.isPending && !configQuery.isError && (
+        <form
+          className="formulario"
+          onSubmit={(evento) => {
+            evento.preventDefault()
+            salvarMutation.mutate()
+          }}
+        >
+          <div className="campo">
+            <label htmlFor="horario-relatorio-diario">Horário de envio</label>
+            <input
+              id="horario-relatorio-diario"
+              type="time"
+              value={horario}
+              onChange={(evento) => setHorario(evento.target.value)}
+              required
+            />
+          </div>
+          <div className="campo-acoes">
+            <label htmlFor="habilitado-relatorio-diario">
+              <input
+                id="habilitado-relatorio-diario"
+                type="checkbox"
+                checked={habilitado}
+                onChange={(evento) => setHabilitado(evento.target.checked)}
+              />{' '}
+              Habilitado
+            </label>
+            <button type="submit" className="botao-pequeno" disabled={salvarMutation.isPending || !horario}>
+              Salvar
+            </button>
+          </div>
+        </form>
+      )}
+
+      {salvarMutation.isSuccess && <p className="mensagem-sucesso">✅ Horário salvo.</p>}
+      {salvarMutation.isError && <p className="mensagem-erro">Não foi possível salvar o horário.</p>}
+    </section>
+  )
+}
 
 /**
  * Pedido do cliente: "o codigo QR code poderia ficar na plataforma que voce programou??" - antes
@@ -51,6 +127,8 @@ export function IntegracaoWhatsAppPage() {
           <p className="mensagem-erro">{estadoQuery.data.mensagem ?? 'Integração indisponível.'}</p>
         )}
       </section>
+
+      <ResumoDiarioConfig />
     </main>
   )
 }
