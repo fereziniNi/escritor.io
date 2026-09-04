@@ -9,10 +9,11 @@ import jakarta.persistence.Enumerated;
  * Personalização do avatar - estrutura e quantidade de categorias espelham o editor de personagem
  * do Gather (mandado como referência pelo usuário: "faça exatamente igual... todas as opções de
  * partes devem possuir mais do que a tela esta mostrando"), mas a arte é 100% original ("nada de
- * arte roubada/baixada do Gather", regra já estabelecida nesta sessão - cada silhueta é desenhada
- * do zero em `avatarFactory.ts`/`PixelCharacterSvg.tsx`, não traçada de nenhum print). 10
- * categorias (Skin/Hair/Facial hair/Top/Jacket/Bottom/Shoes/Hat/Glasses/Other), cada uma com ~8-11
- * opções - bem mais do que a v1 (`ea212ee`, 4 categorias com 3-4 opções cada).
+ * arte roubada/baixada do Gather", regra já estabelecida nesta sessão). A arte virou pixel art
+ * real (LPC) numa virada posterior - ver `frontend/.../mundo/spriteAvatar.ts`. 11 categorias
+ * (Skin/Face/Hair/Facial hair/Top/Jacket/Bottom/Shoes/Hat/Glasses/Other), cada uma com ~8-11
+ * opções - bem mais do que a v1 (`ea212ee`, 4 categorias com 3-4 opções cada). "Face" (formato do
+ * rosto/cabeça) não existe no Gather - específica daqui, porque o LPC separa cabeça de corpo.
  *
  * <p>As cores são validadas contra {@link PaletaAparenciaAvatar} - `corPele`/`corCabelo` têm
  * paleta própria, as demais 7 categorias (Top/Jacket/Bottom/Shoes/Hat/Glasses/Other) compartilham
@@ -24,6 +25,10 @@ public class AparenciaAvatar {
 
     @Column(name = "cor_pele", nullable = false)
     private String corPele;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_rosto", nullable = false)
+    private TipoRosto tipoRosto;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "estilo_cabelo", nullable = false)
@@ -91,6 +96,7 @@ public class AparenciaAvatar {
 
     public AparenciaAvatar(
             String corPele,
+            TipoRosto tipoRosto,
             EstiloCabelo estiloCabelo,
             String corCabelo,
             TipoBarba tipoBarba,
@@ -109,6 +115,7 @@ public class AparenciaAvatar {
             EstiloOutro estiloOutro,
             String corOutro) {
         this.corPele = corPele;
+        this.tipoRosto = tipoRosto;
         this.estiloCabelo = estiloCabelo;
         this.corCabelo = corCabelo;
         this.tipoBarba = tipoBarba;
@@ -129,11 +136,12 @@ public class AparenciaAvatar {
     }
 
     /** Aparência de quem ainda não personalizou nada - mesmos valores do `DEFAULT` das colunas em
-     * banco (ver `V33__expande_aparencia_avatar_categorias_gather.sql`), então usuários criados
-     * antes desta versão já nascem com uma aparência válida sem precisar de backfill manual. */
+     * banco (ver `V34__adiciona_tipo_rosto.sql`), então usuários criados antes desta versão já
+     * nascem com uma aparência válida sem precisar de backfill manual. */
     public static AparenciaAvatar padrao() {
         return new AparenciaAvatar(
                 "#f2c9a0",
+                TipoRosto.PADRAO,
                 EstiloCabelo.CURTO,
                 "#4a3728",
                 TipoBarba.NENHUM,
@@ -155,6 +163,10 @@ public class AparenciaAvatar {
 
     public String getCorPele() {
         return corPele;
+    }
+
+    public TipoRosto getTipoRosto() {
+        return tipoRosto;
     }
 
     public EstiloCabelo getEstiloCabelo() {

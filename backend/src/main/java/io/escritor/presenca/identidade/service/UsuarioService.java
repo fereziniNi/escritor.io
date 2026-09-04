@@ -103,6 +103,7 @@ public class UsuarioService {
 
         AparenciaAvatar novaAparencia = new AparenciaAvatar(
                 request.corPele(),
+                request.tipoRosto(),
                 request.estiloCabelo(),
                 request.corCabelo(),
                 request.tipoBarba(),

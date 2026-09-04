@@ -13,6 +13,7 @@ import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.TipoBarba;
 import io.escritor.presenca.identidade.domain.TipoChapeu;
 import io.escritor.presenca.identidade.domain.TipoOculos;
+import io.escritor.presenca.identidade.domain.TipoRosto;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.identidade.web.AtualizarAparenciaRequest;
@@ -110,7 +111,7 @@ class UsuarioServiceTest {
 
     private static AtualizarAparenciaRequest requisicaoAparenciaValida(TipoBarba tipoBarba) {
         return new AtualizarAparenciaRequest(
-                "#f2c9a0", EstiloCabelo.LONGO, "#4a3728", tipoBarba,
+                "#f2c9a0", TipoRosto.OVAL, EstiloCabelo.LONGO, "#4a3728", tipoBarba,
                 EstiloTop.POLO, "#4472c4", EstiloJaqueta.BOMBER, "#1c1a28",
                 EstiloBottom.JEANS, "#2b2b3a", EstiloSapato.BOTA, "#1c1a28",
                 TipoChapeu.BONE, "#c0392b", TipoOculos.REDONDO, "#1c1a28", EstiloOutro.COLAR, "#c9a24a");
@@ -133,7 +134,7 @@ class UsuarioServiceTest {
     void atualizarAparenciaComCorForaDaPaletaLancaAparenciaInvalida() {
         Usuario ana = comId(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480), 1L);
         var requisicaoComCorInvalida = new AtualizarAparenciaRequest(
-                "#123456", EstiloCabelo.CURTO, "#4a3728", TipoBarba.NENHUM,
+                "#123456", TipoRosto.PADRAO, EstiloCabelo.CURTO, "#4a3728", TipoBarba.NENHUM,
                 EstiloTop.CAMISETA, "#6b7280", EstiloJaqueta.NENHUMA, "#6b7280",
                 EstiloBottom.CALCA, "#2b2b3a", EstiloSapato.TENIS, "#1c1a28",
                 TipoChapeu.NENHUM, "#6b7280", TipoOculos.NENHUM, "#6b7280", EstiloOutro.NENHUM, "#6b7280");

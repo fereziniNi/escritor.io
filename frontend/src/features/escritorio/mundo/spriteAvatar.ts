@@ -9,6 +9,7 @@ import type {
   TipoBarba,
   TipoChapeu,
   TipoOculos,
+  TipoRosto,
 } from '../avatar/aparenciaAvatar'
 import { COR_OLHO_PADRAO, type EspecificacaoRecolor, type MaterialClasse } from './paletteRecolor'
 
@@ -76,15 +77,27 @@ export const Z_POS = {
  * "1 gênero de base pro avatar, silhueta neutra"), só a cor (`corPele`) muda via recolor. */
 export const CAMADA_PELE: CamadaRecolor = recolor(`${BASE}/skin/base.png`, 'pele')
 
-/** Cabeça/rosto - camada separada do corpo no próprio LPC (`spritesheets/head/heads/human/male`),
+/** Cabeça/rosto - camada separada do corpo no próprio LPC (`spritesheets/head/heads/human/*`),
  * achada só depois do usuário reportar "meu personagem está sem o rosto": o `skin/base.png`
  * (`body/bodies/male`) é só torso+pernas, sem cabeça nenhuma - o LPC deixa a cabeça numa hierarquia
- * à parte de propósito (dá pra trocar o formato da cabeça sem trocar o corpo). Também não é uma
- * escolha de enum - sempre esta 1 cabeça, igual ao corpo. A MESMA imagem já vem com pele E olho
- * pintados em 2 rampas de referência diferentes (`heads_human_male.json`: `color_1` = pele,
- * `color_2` = olho) - por isso usa `especificacoesCabeca` (2 specs) em vez do helper `recolor` de
- * 1 spec só. */
-export const CAMADA_HEAD_URL = `${BASE}/head/base.png`
+ * à parte de propósito (dá pra trocar o formato da cabeça sem trocar o corpo). Isso também é o que
+ * permite a categoria "Face" (pedido seguinte do usuário: "quero poder escolher qual face irei
+ * utilizar... quero poder trocar o rosto") - 8 formatos de cabeça diferentes do próprio LPC. Sem
+ * paleta de cor própria (usa `corPele`, mesmo padrão de `tipoBarba`/`corCabelo`). Toda imagem já
+ * vem com pele E olho pintados em 2 rampas de referência diferentes na MESMA textura
+ * (`heads_human_*.json`: `color_1` = pele, `color_2` = olho) - por isso usa `especificacoesCabeca`
+ * (2 specs) em vez do helper `recolor` de 1 spec só. */
+export const CAMADA_HEAD: Record<TipoRosto, string> = {
+  PADRAO: `${BASE}/head/PADRAO.png`,
+  OVAL: `${BASE}/head/OVAL.png`,
+  ENVELHECIDA: `${BASE}/head/ENVELHECIDA.png`,
+  OVAL_ENVELHECIDA: `${BASE}/head/OVAL_ENVELHECIDA.png`,
+  MAGRA: `${BASE}/head/MAGRA.png`,
+  ROBUSTA: `${BASE}/head/ROBUSTA.png`,
+  PEQUENA: `${BASE}/head/PEQUENA.png`,
+  OVAL_PEQUENA: `${BASE}/head/OVAL_PEQUENA.png`,
+}
+
 export function especificacoesCabeca(corPele: string): EspecificacaoRecolor[] {
   return [
     { material: 'pele', corAlvo: corPele },
@@ -256,8 +269,7 @@ export function resolverPrebaked(camada: CamadaPrebaked, corHex: string): string
   return camada.porCor[corHex] ?? Object.values(camada.porCor)[0]
 }
 
-/** As 11 camadas (10 categorias do editor + `head`, que não é uma escolha de enum - ver
- * `CAMADA_HEAD_URL`), mesma ordem de `Z_POS`, crescente = desenhada por cima. */
+/** As 11 categorias do editor, mesma ordem de `Z_POS`, crescente = desenhada por cima. */
 export const CHAVES_CAMADA = ['skin', 'bottom', 'shoes', 'top', 'jacket', 'other', 'head', 'facialHair', 'glasses', 'hair', 'hat'] as const
 export type ChaveCamada = (typeof CHAVES_CAMADA)[number]
 
@@ -286,7 +298,7 @@ export function montarCamadas(aparencia: AparenciaAvatar): Record<ChaveCamada, C
 
   return {
     skin: { url: CAMADA_PELE.url, especificacoes: [{ material: CAMADA_PELE.material, corAlvo: aparencia.corPele }] },
-    head: { url: CAMADA_HEAD_URL, especificacoes: especificacoesCabeca(aparencia.corPele) },
+    head: { url: CAMADA_HEAD[aparencia.tipoRosto], especificacoes: especificacoesCabeca(aparencia.corPele) },
     hair: deRecolor(CAMADA_HAIR[aparencia.estiloCabelo], aparencia.corCabelo),
     facialHair: deRecolor(CAMADA_FACIAL_HAIR[aparencia.tipoBarba], aparencia.corCabelo),
     top: deRecolor(CAMADA_TOP[aparencia.estiloTop], aparencia.corTop),

@@ -22,15 +22,52 @@ pro texto completo da OGA-BY 3.0.
   - Fonte: https://opengameart.org/content/liberated-pixel-cup-lpc-base-assets-sprites-map-tiles
   - Notas do autor: see details at https://opengameart.org/content/lpc-character-bases; 'Thick' Male Revised Run/Climb by JaidynReiman (based on ElizaWy's LPC Revised)
 
-## Cabeça (rosto)
+## Face (formato do rosto/cabeça)
 
-- **base** (`head/heads/human/male`) - camada separada do corpo (corrigido depois do usuário
-  reportar "meu personagem está sem o rosto" - o `body/bodies/male` é só torso+pernas, a cabeça é
-  uma hierarquia à parte no próprio LPC).
+Camada separada do corpo (corrigido depois do usuário reportar "meu personagem está sem o rosto" -
+o `body/bodies/male` é só torso+pernas, a cabeça é uma hierarquia à parte no próprio LPC). Categoria
+adicionada a pedido do usuário ("quero poder escolher qual face irei utilizar") - 8 formatos.
+
+- **PADRAO** (`head/heads/human/male`)
   - Autoria: bluecarrot16, Benjamin K. Smith (BenCreating), Stephen Challener (Redshrike)
   - Licença usada: OGA-BY 3.0
   - Fonte: https://opengameart.org/content/liberated-pixel-cup-lpc-base-assets-sprites-map-tiles
   - Notas do autor: original head by Redshrike, tweaks by BenCreating, modular version by bluecarrot16
+- **OVAL** (`head/heads/human/female`)
+  - Autoria: bluecarrot16, Benjamin K. Smith (BenCreating), Stephen Challener (Redshrike)
+  - Licença usada: OGA-BY 3.0
+  - Fonte: https://opengameart.org/content/liberated-pixel-cup-lpc-base-assets-sprites-map-tiles
+  - Notas do autor: original head by Redshrike, tweaks by BenCreating, modular version by bluecarrot16
+- **ENVELHECIDA** (`head/heads/human/male_elderly`)
+  - Autoria: Benjamin K. Smith (BenCreating), Eliza Wyatt (ElizaWy), Stephen Challener (Redshrike)
+  - Licença usada: OGA-BY 3.0
+  - Fonte: https://opengameart.org/content/liberated-pixel-cup-lpc-base-assets-sprites-map-tiles, https://opengameart.org/content/lpc-revised-elders
+- **OVAL_ENVELHECIDA** (`head/heads/human/female_elderly`)
+  - Autoria: Benjamin K. Smith (BenCreating), Eliza Wyatt (ElizaWy), Stephen Challener (Redshrike)
+  - Licença usada: OGA-BY 3.0
+  - Fonte: https://opengameart.org/content/liberated-pixel-cup-lpc-base-assets-sprites-map-tiles, https://opengameart.org/content/lpc-revised-elders
+- **MAGRA** (`head/heads/human/male_gaunt`)
+  - Autoria: Stephen Challener (Redshrike), bluecarrot16
+  - Licença usada: OGA-BY 3.0
+  - Fonte: https://opengameart.org/content/liberated-pixel-cup-lpc-base-assets-sprites-map-tiles, https://opengameart.org/content/lpc-folk
+  - Notas do autor: original head by Redshrike, gaunt version by bluecarrot16
+- **ROBUSTA** (`head/heads/human/male_plump`)
+  - Autoria: Stephen Challener (Redshrike); segundo autor não identificado pelo próprio projeto LPC
+    (registrado como "??" no CREDITS.csv oficial - reproduzido aqui como está, não é omissão nossa)
+  - Licença usada: CC-BY-SA 3.0 (OGA-BY 3.0 não estava disponível pra este arquivo - GPL 3.0 era a
+    outra opção, evitada por copyleft)
+  - Fonte: https://opengameart.org/content/liberated-pixel-cup-lpc-base-assets-sprites-map-tiles, https://opengameart.org/content/lpc-folk
+  - Notas do autor: original head by Redshrike, plump version by ??
+- **PEQUENA** (`head/heads/human/male_small`)
+  - Autoria: Eliza Wyatt (ElizaWy), Stephen Challener (Redshrike)
+  - Licença usada: OGA-BY 3.0
+  - Fonte: https://opengameart.org/content/liberated-pixel-cup-lpc-base-assets-sprites-map-tiles
+  - Notas do autor: original head by Redshrike, reduced size head by ElizaWy
+- **OVAL_PEQUENA** (`head/heads/human/female_small`)
+  - Autoria: Eliza Wyatt (ElizaWy), Stephen Challener (Redshrike)
+  - Licença usada: OGA-BY 3.0
+  - Fonte: https://opengameart.org/content/liberated-pixel-cup-lpc-base-assets-sprites-map-tiles
+  - Notas do autor: original head by Redshrike, reduced size head by ElizaWy
 
 ## Cabelo
 

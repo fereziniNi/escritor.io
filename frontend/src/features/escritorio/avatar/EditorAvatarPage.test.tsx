@@ -35,15 +35,27 @@ describe('EditorAvatarPage', () => {
     expect(await screen.findByText(/não foi possível carregar seu avatar/i)).toBeInTheDocument()
   })
 
-  it('abre com as 10 categorias na nav, começando em Skin', async () => {
+  it('abre com as 11 categorias na nav, começando em Skin', async () => {
     renderPagina()
 
     const nav = await screen.findByRole('navigation', { name: /categorias de personalização/i })
-    for (const rotulo of ['Skin', 'Hair', 'Facial hair', 'Top', 'Jacket', 'Bottom', 'Shoes', 'Hat', 'Glasses', 'Other']) {
+    for (const rotulo of ['Skin', 'Face', 'Hair', 'Facial hair', 'Top', 'Jacket', 'Bottom', 'Shoes', 'Hat', 'Glasses', 'Other']) {
       expect(within(nav).getByRole('button', { name: rotulo })).toBeInTheDocument()
     }
     expect(within(nav).getByRole('button', { name: 'Skin' })).toHaveAttribute('aria-current', 'true')
     expect(screen.getByRole('group', { name: /cor de pele/i })).toBeInTheDocument()
+  })
+
+  it('categoria Face mostra grade de estilo (formato do rosto) sem paleta de cor própria', async () => {
+    const user = userEvent.setup()
+    renderPagina()
+    await screen.findByRole('navigation', { name: /categorias de personalização/i })
+
+    await user.click(screen.getByRole('button', { name: 'Face' }))
+
+    const grade = screen.getByRole('group', { name: 'Estilo' })
+    expect(within(grade).getAllByRole('button').length).toBeGreaterThanOrEqual(8)
+    expect(screen.queryByRole('group', { name: /cor de/i })).not.toBeInTheDocument()
   })
 
   it('categoria Hair mostra grade de estilo com bem mais de 4 opções + paleta de cor', async () => {

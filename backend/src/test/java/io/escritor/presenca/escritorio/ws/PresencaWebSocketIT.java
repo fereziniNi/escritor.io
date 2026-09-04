@@ -13,6 +13,7 @@ import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.TipoBarba;
 import io.escritor.presenca.identidade.domain.TipoChapeu;
 import io.escritor.presenca.identidade.domain.TipoOculos;
+import io.escritor.presenca.identidade.domain.TipoRosto;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.seguranca.JwtService;
@@ -301,7 +302,7 @@ class PresencaWebSocketIT {
                 mensagensBeto.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
 
                 AparenciaAvatar aparenciaNova = new AparenciaAvatar(
-                        "#8a5a34", EstiloCabelo.LONGO, "#1c1a28", TipoBarba.BARBA_CHEIA,
+                        "#8a5a34", TipoRosto.MAGRA, EstiloCabelo.LONGO, "#1c1a28", TipoBarba.BARBA_CHEIA,
                         EstiloTop.SUETER, "#e0546f", EstiloJaqueta.CASACO_LONGO, "#1c1a28",
                         EstiloBottom.SAIA, "#e0546f", EstiloSapato.BOTA_CANO_ALTO, "#1c1a28",
                         TipoChapeu.GORRO, "#c0392b", TipoOculos.QUADRADO, "#1c1a28", EstiloOutro.LENCO, "#e874c4");

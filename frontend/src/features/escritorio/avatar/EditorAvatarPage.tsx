@@ -15,6 +15,7 @@ import {
   OPCOES_ESTILO_TOP,
   OPCOES_OCULOS,
   OPCOES_TIPO_BARBA,
+  OPCOES_TIPO_ROSTO,
   ROTULO_CHAPEU,
   ROTULO_ESTILO_BOTTOM,
   ROTULO_ESTILO_CABELO,
@@ -24,15 +25,17 @@ import {
   ROTULO_ESTILO_TOP,
   ROTULO_OCULOS,
   ROTULO_TIPO_BARBA,
+  ROTULO_TIPO_ROSTO,
 } from './aparenciaAvatar'
 import type { AparenciaAvatar } from './aparenciaAvatar'
 import { atualizarMinhaAparencia, buscarMeuUsuario } from './api'
 import './avatar.css'
 
-type Categoria = 'skin' | 'hair' | 'facialHair' | 'top' | 'jacket' | 'bottom' | 'shoes' | 'hat' | 'glasses' | 'other'
+type Categoria = 'skin' | 'face' | 'hair' | 'facialHair' | 'top' | 'jacket' | 'bottom' | 'shoes' | 'hat' | 'glasses' | 'other'
 
 const CATEGORIAS: { id: Categoria; rotulo: string }[] = [
   { id: 'skin', rotulo: 'Skin' },
+  { id: 'face', rotulo: 'Face' },
   { id: 'hair', rotulo: 'Hair' },
   { id: 'facialHair', rotulo: 'Facial hair' },
   { id: 'top', rotulo: 'Top' },
@@ -49,10 +52,13 @@ const CATEGORIAS: { id: Categoria; rotulo: string }[] = [
  * como referência pelo usuário: "faça exatamente igual... todas as opções de partes devem possuir
  * mais do que a tela esta mostrando"), arte 100% original ("nada de arte roubada/baixada do
  * Gather", regra já estabelecida nesta sessão). Layout de 3 colunas igual à referência: nav
- * vertical com as 10 categorias, grade de miniaturas + paleta de cor no meio, prévia grande à
+ * vertical com as 11 categorias, grade de miniaturas + paleta de cor no meio, prévia grande à
  * direita. Cada miniatura mostra o personagem inteiro com aquela opção aplicada (não só a peça
  * isolada) - simplificação deliberada, o "clique pra ver o efeito de verdade no personagem" já
  * cumpre o mesmo papel sem precisar de um segundo conjunto de componentes de desenho só pra ícone.
+ * "Face" (formato do rosto/cabeça) não existe no Gather - pedido do usuário depois da virada pra
+ * pixel art real (LPC): "quero poder escolher qual face irei utilizar". Sem paleta de cor própria
+ * (reaproveita `corPele`, mesmo padrão de "Facial hair" com `corCabelo`).
  *
  * O rascunho (`rascunho`) só é aplicado no mundo/nos outros usuários quando "Finalizar" salva de
  * verdade (`PATCH /usuarios/me/aparencia`) - até lá é só local.
@@ -108,6 +114,16 @@ export function EditorAvatarPage() {
 
       <div className="editor-avatar-conteudo">
         {categoria === 'skin' && <SeletorDeCor cores={CORES_PELE} valor={rascunho.corPele} aoEscolher={(cor) => atualizarCampo('corPele', cor)} rotulo="pele" />}
+
+        {categoria === 'face' && (
+          <GradeDeEstilo
+            opcoes={OPCOES_TIPO_ROSTO}
+            rotulos={ROTULO_TIPO_ROSTO}
+            valor={rascunho.tipoRosto}
+            aoEscolher={(v) => atualizarCampo('tipoRosto', v)}
+            montarPreview={(v) => ({ ...rascunho, tipoRosto: v })}
+          />
+        )}
 
         {categoria === 'hair' && (
           <>
