@@ -2,13 +2,16 @@
  * Editor de personagem (`EditorAvatarPage.tsx`) - layout de 3 colunas igual ao editor do Gather
  * usado como referência: nav vertical com as 11 categorias | grade de miniaturas + paleta de cor |
  * prévia grande. Painel NÃO é `largo` (`EscritorioPage.tsx`) - o usuário pediu pra diminuir a
- * largura ("diminua a largura dessa div"): com o painel padrão (760px) e nav/prévia mais
- * enxutas, a grade central sobra menos espaço vazio e as opções podem ser bem maiores.
+ * largura ("diminua a largura dessa div"): com o painel padrão (760px) e nav mais enxuta, a grade
+ * central sobra menos espaço vazio e as opções podem ser bem maiores. Coluna da prévia (230px)
+ * ficou mais larga que a inicial (150px) a pedido do usuário ("aumente o tamanho da visualização
+ * do personagem... para visualizar e ver ele melhor") - o sprite dentro dela foi de 96px pra
+ * 190px, a maior mudança de tamanho de todas.
  */
 
 .editor-avatar {
   display: grid;
-  grid-template-columns: 108px 1fr 150px;
+  grid-template-columns: 108px 1fr 230px;
   gap: 1rem;
   align-items: start;
   min-height: 420px;
@@ -124,14 +127,14 @@
   background: var(--cor-primaria-clara, #eef2f6);
   border: 1px solid var(--cor-borda, #d8dde3);
   border-radius: var(--raio-borda, 12px);
-  padding: 1.2rem 0.5rem;
+  padding: 1.4rem 0.5rem;
   display: flex;
   justify-content: center;
 }
 
 .editor-avatar-previa .personagem-preview {
-  width: 96px;
-  height: 96px;
+  width: 190px;
+  height: 190px;
 }
 
 /* Crédito da arte (LPC, licença OGA-BY 3.0) - precisa ficar visível dentro do próprio app, não só
