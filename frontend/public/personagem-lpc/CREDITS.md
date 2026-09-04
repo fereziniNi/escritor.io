@@ -26,11 +26,14 @@ pro texto completo da OGA-BY 3.0.
 
 Camada separada do corpo (corrigido depois do usuário reportar "meu personagem está sem o rosto" -
 o `body/bodies/male` é só torso+pernas, a cabeça é uma hierarquia à parte no próprio LPC). Categoria
-adicionada a pedido do usuário ("quero poder escolher qual face irei utilizar") - 16 formatos (dobrou
-de 8 depois do usuário reclamar que as opções originais, só variação sutil de formato humano,
-"trazem poucas diferenças" - as 8 novas incluem 7 criaturas bem mais distintas entre si). As 9
-primeiras (variações humanas) usam a cor de pele escolhida no editor; as 7 seguintes (criaturas) têm
-cor própria fixa e não respondem a ela.
+adicionada a pedido do usuário ("quero poder escolher qual face irei utilizar") - 22 formatos (foi
+de 8 pra 16 depois do usuário reclamar que as opções originais, só variação sutil de formato
+humano, "trazem poucas diferenças" - as 8 novas incluem 7 criaturas bem mais distintas entre si; e
+de 16 pra 22 quando o usuário pediu mais rostos especificamente HUMANOS - as 6 novas são as mesmas
+4 cabeças-base humanas compostas com nariz+sobrancelha, overlays do próprio LPC pré-compostos numa
+imagem só, já que o LPC não tem mais formatos de cabeça humana disponíveis). As 15 primeiras
+(variações humanas) usam a cor de pele escolhida no editor; as 7 últimas (criaturas) têm cor própria
+fixa e não respondem a ela.
 
 - **PADRAO** (`head/heads/human/male`)
   - Autoria: bluecarrot16, Benjamin K. Smith (BenCreating), Stephen Challener (Redshrike)
@@ -77,6 +80,36 @@ cor própria fixa e não respondem a ela.
   - Licença usada: OGA-BY 3.0
   - Fonte: https://opengameart.org/content/liberated-pixel-cup-lpc-base-assets-sprites-map-tiles
   - Notas do autor: original head by Redshrike, elderly & reduced size head by ElizaWy
+- **PADRAO_MARCANTE** (`head/heads/human/male` + `head/nose/big/adult` + `eyes/eyebrows/thick/adult`,
+  compostos numa imagem só - ver `scratchpad/lpc/compor-rostos.py`)
+  - Autoria: bluecarrot16, Benjamin K. Smith (BenCreating), Stephen Challener (Redshrike) (cabeça);
+    Thane Brimhall (pennomi), laetissima, Matthew Krohn (makrohn) (nariz); Eliza Wyatt (ElizaWy) (sobrancelha)
+  - Licença usada: CC-BY-SA 3.0 (o nariz "big" não tem OGA-BY 3.0 disponível - GPL 3.0 era a outra
+    opção, evitada por copyleft)
+  - Fonte: https://opengameart.org/content/lpc-base-character-expressions
+- **PADRAO_DELICADO** (`head/heads/human/male` + `head/nose/button/adult` + `eyes/eyebrows/thin/adult`)
+  - Autoria: bluecarrot16, Benjamin K. Smith (BenCreating), Stephen Challener (Redshrike) (cabeça);
+    Thane Brimhall (pennomi), laetissima, Matthew Krohn (makrohn) (nariz); Eliza Wyatt (ElizaWy) (sobrancelha)
+  - Licença usada: CC-BY-SA 3.0 (o nariz "button" não tem OGA-BY 3.0 disponível)
+  - Fonte: https://opengameart.org/content/lpc-base-character-expressions
+- **OVAL_MARCANTE** (`head/heads/human/female` + `head/nose/large/adult` + `eyes/eyebrows/thick/adult`)
+  - Autoria: bluecarrot16, Benjamin K. Smith (BenCreating), Stephen Challener (Redshrike) (cabeça);
+    Eliza Wyatt (ElizaWy) (nariz e sobrancelha)
+  - Licença usada: OGA-BY 3.0
+  - Fonte: https://github.com/ElizaWy/LPC/tree/main/Characters/Head/Head%20Overlay%2001%20-%20Large%20Nose
+- **OVAL_DELICADO** (`head/heads/human/female` + `head/nose/button/adult` + `eyes/eyebrows/thin/adult`)
+  - Autoria: bluecarrot16, Benjamin K. Smith (BenCreating), Stephen Challener (Redshrike) (cabeça);
+    Thane Brimhall (pennomi), laetissima, Matthew Krohn (makrohn) (nariz); Eliza Wyatt (ElizaWy) (sobrancelha)
+  - Licença usada: CC-BY-SA 3.0 (o nariz "button" não tem OGA-BY 3.0 disponível)
+  - Fonte: https://opengameart.org/content/lpc-base-character-expressions
+- **ENVELHECIDA_MARCANTE** (`head/heads/human/male_elderly` + `head/nose/elderly/adult` + `eyes/eyebrows/thick/adult`)
+  - Autoria: Benjamin K. Smith (BenCreating), Eliza Wyatt (ElizaWy), Stephen Challener (Redshrike)
+  - Licença usada: OGA-BY 3.0
+  - Fonte: https://opengameart.org/content/lpc-revised-elders
+- **OVAL_ENVELHECIDA_MARCANTE** (`head/heads/human/female_elderly` + `head/nose/elderly/adult` + `eyes/eyebrows/thin/adult`)
+  - Autoria: Benjamin K. Smith (BenCreating), Eliza Wyatt (ElizaWy), Stephen Challener (Redshrike)
+  - Licença usada: OGA-BY 3.0
+  - Fonte: https://opengameart.org/content/lpc-revised-elders
 - **ALIENIGENA** (`head/heads/alien/adult`) - cor própria fixa
   - Autoria: bluecarrot16, Benjamin K. Smith (BenCreating), Nila122
   - Licença usada: OGA-BY 3.0

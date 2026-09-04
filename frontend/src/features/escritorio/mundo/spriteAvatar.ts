@@ -84,14 +84,18 @@ export const CAMADA_PELE: CamadaRecolor = recolor(`${BASE}/skin/base.png`, 'pele
  * permite a categoria "Face" (pedido seguinte do usuário: "quero poder escolher qual face irei
  * utilizar... quero poder trocar o rosto").
  *
- * 16 formatos de cabeça (dobrou de 8 depois do usuário reclamar que as opções originais "trazem
- * poucas diferenças" - eram só variação sutil de formato humano). As 9 humanas (`recolorir: true`)
+ * 22 formatos de cabeça (dobrou de 8 pra 16 depois do usuário reclamar que as opções originais
+ * "trazem poucas diferenças" - eram só variação sutil de formato humano; depois foi de 16 pra 22
+ * porque o usuário pediu mais rostos especificamente HUMANOS). As 15 humanas (`recolorir: true`)
  * usam `corPele` - a imagem já vem com pele E olho pintados em 2 rampas de referência diferentes
  * na MESMA textura (`heads_human_*.json`: `color_1` = pele, `color_2` = olho), daí
- * `especificacoesCabeca` devolver 2 specs em vez do helper `recolor` de 1 spec só. As 7 seguintes
- * são criaturas do próprio LPC (goblin/vampiro/lobo/etc., `recolorir: false`) - cor própria fixa
- * (verde do goblin, marrom do lobo...), NÃO respondem à cor de pele escolhida - forçar a rampa de
- * pele humana nelas ficaria estranho (e olho já vem pintado na própria arte de cada uma). */
+ * `especificacoesCabeca` devolver 2 specs em vez do helper `recolor` de 1 spec só. As 6 opções
+ * `_MARCANTE`/`_DELICADO` são as mesmas 4 cabeças-base compostas com nariz+sobrancelha (overlays
+ * do próprio LPC, pré-compostos numa imagem só - o LPC não tem mais formatos de cabeça humana
+ * disponíveis, só esses 4 restavam pra combinar). As 7 últimas são criaturas do próprio LPC
+ * (goblin/vampiro/lobo/etc., `recolorir: false`) - cor própria fixa (verde do goblin, marrom do
+ * lobo...), NÃO respondem à cor de pele escolhida - forçar a rampa de pele humana nelas ficaria
+ * estranho (e olho já vem pintado na própria arte de cada uma). */
 interface CamadaHead {
   url: string
   recolorir: boolean
@@ -111,6 +115,14 @@ export const CAMADA_HEAD: Record<TipoRosto, CamadaHead> = {
   PEQUENA: camadaHead('PEQUENA', true),
   OVAL_PEQUENA: camadaHead('OVAL_PEQUENA', true),
   IDOSA_PEQUENA: camadaHead('IDOSA_PEQUENA', true),
+  // _MARCANTE/_DELICADO: mesmas cabeças-base humanas, compostas com nariz+sobrancelha em build
+  // time (scratchpad/lpc/compor-rostos.py) - ainda recolorem com corPele normalmente.
+  PADRAO_MARCANTE: camadaHead('PADRAO_MARCANTE', true),
+  PADRAO_DELICADO: camadaHead('PADRAO_DELICADO', true),
+  OVAL_MARCANTE: camadaHead('OVAL_MARCANTE', true),
+  OVAL_DELICADO: camadaHead('OVAL_DELICADO', true),
+  ENVELHECIDA_MARCANTE: camadaHead('ENVELHECIDA_MARCANTE', true),
+  OVAL_ENVELHECIDA_MARCANTE: camadaHead('OVAL_ENVELHECIDA_MARCANTE', true),
   ALIENIGENA: camadaHead('ALIENIGENA', false),
   GOBLIN: camadaHead('GOBLIN', false),
   VAMPIRO: camadaHead('VAMPIRO', false),

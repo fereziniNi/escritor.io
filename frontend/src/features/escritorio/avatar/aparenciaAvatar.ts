@@ -10,7 +10,10 @@
  * cabeça de corpo em hierarquias diferentes. As 8 opções humanas iniciais de Face receberam mais 8
  * (1 humana + 7 criatura) depois do usuário reclamar que traziam "poucas diferenças" - só as 9
  * primeiras usam `corPele` (as criaturas têm cor própria fixa, ver `CAMADA_HEAD` no
- * `spriteAvatar.ts`).
+ * `spriteAvatar.ts`). Depois o usuário pediu especificamente mais rostos HUMANOS (não criatura) -
+ * como o LPC só tem 10 formatos de cabeça humana (9 já usados), as 6 opções `_MARCANTE`/
+ * `_DELICADO` são as cabeças-base compostas com nariz+sobrancelha (pré-compostas em build time,
+ * ver `scratchpad/lpc/compor-rostos.py`), não formato de cabeça novo - o LPC não tem mais desses.
  *
  * Os valores dos tipos union espelham EXATAMENTE os enums Java (`identidade/domain/`) - mesmos
  * nomes, sem tradução na borda. As paletas de cor espelham EXATAMENTE `PaletaAparenciaAvatar.java`
@@ -29,6 +32,12 @@ export type TipoRosto =
   | 'PEQUENA'
   | 'OVAL_PEQUENA'
   | 'IDOSA_PEQUENA'
+  | 'PADRAO_MARCANTE'
+  | 'PADRAO_DELICADO'
+  | 'OVAL_MARCANTE'
+  | 'OVAL_DELICADO'
+  | 'ENVELHECIDA_MARCANTE'
+  | 'OVAL_ENVELHECIDA_MARCANTE'
   | 'ALIENIGENA'
   | 'GOBLIN'
   | 'VAMPIRO'
@@ -104,6 +113,7 @@ export const CORES_GERAL = [
 
 export const OPCOES_TIPO_ROSTO: TipoRosto[] = [
   'PADRAO', 'OVAL', 'ENVELHECIDA', 'OVAL_ENVELHECIDA', 'MAGRA', 'ROBUSTA', 'PEQUENA', 'OVAL_PEQUENA', 'IDOSA_PEQUENA',
+  'PADRAO_MARCANTE', 'PADRAO_DELICADO', 'OVAL_MARCANTE', 'OVAL_DELICADO', 'ENVELHECIDA_MARCANTE', 'OVAL_ENVELHECIDA_MARCANTE',
   'ALIENIGENA', 'GOBLIN', 'VAMPIRO', 'LOBO', 'COELHO', 'ORC', 'MINOTAURO',
 ]
 export const OPCOES_ESTILO_CABELO: EstiloCabelo[] = ['CARECA', 'RASPADO', 'CURTO', 'REPARTIDO', 'CACHEADO', 'MOICANO', 'RABO_DE_CAVALO', 'CHIQUINHAS', 'LONGO', 'COQUE', 'ESPETADO']
@@ -119,6 +129,8 @@ export const OPCOES_ESTILO_OUTRO: EstiloOutro[] = ['NENHUM', 'BRINCO', 'COLAR', 
 export const ROTULO_TIPO_ROSTO: Record<TipoRosto, string> = {
   PADRAO: 'Padrão', OVAL: 'Oval', ENVELHECIDA: 'Envelhecida', OVAL_ENVELHECIDA: 'Oval envelhecida',
   MAGRA: 'Magra', ROBUSTA: 'Robusta', PEQUENA: 'Pequena', OVAL_PEQUENA: 'Oval pequena', IDOSA_PEQUENA: 'Idosa pequena',
+  PADRAO_MARCANTE: 'Marcante', PADRAO_DELICADO: 'Delicado', OVAL_MARCANTE: 'Oval marcante', OVAL_DELICADO: 'Oval delicado',
+  ENVELHECIDA_MARCANTE: 'Envelhecida marcante', OVAL_ENVELHECIDA_MARCANTE: 'Oval envelhecida marcante',
   ALIENIGENA: 'Alienígena', GOBLIN: 'Goblin', VAMPIRO: 'Vampiro', LOBO: 'Lobo', COELHO: 'Coelho', ORC: 'Orc', MINOTAURO: 'Minotauro',
 }
 
