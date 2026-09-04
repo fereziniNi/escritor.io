@@ -1,14 +1,15 @@
 /**
  * Editor de personagem (`EditorAvatarPage.tsx`) - layout de 3 colunas igual ao editor do Gather
- * usado como referência: nav vertical com as 10 categorias | grade de miniaturas + paleta de cor |
- * prévia grande. Painel marcado `largo` em `EscritorioPage.tsx` (mesmo prop que `Projetos` usa) -
- * a largura padrão do painel flutuante é estreita demais pras 3 colunas.
+ * usado como referência: nav vertical com as 11 categorias | grade de miniaturas + paleta de cor |
+ * prévia grande. Painel NÃO é `largo` (`EscritorioPage.tsx`) - o usuário pediu pra diminuir a
+ * largura ("diminua a largura dessa div"): com o painel padrão (760px) e nav/prévia mais
+ * enxutas, a grade central sobra menos espaço vazio e as opções podem ser bem maiores.
  */
 
 .editor-avatar {
   display: grid;
-  grid-template-columns: 140px 1fr 200px;
-  gap: 1.2rem;
+  grid-template-columns: 108px 1fr 150px;
+  gap: 1rem;
   align-items: start;
   min-height: 420px;
 }
@@ -23,13 +24,14 @@
 
 .editor-avatar-nav-item {
   text-align: left;
-  padding: 0.5rem 0.7rem;
+  padding: 0.45rem 0.5rem;
   border: none;
   border-radius: var(--raio-borda, 8px);
   background: transparent;
   cursor: pointer;
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
+  line-height: 1.2;
   color: var(--cor-texto-suave, #555);
 }
 
@@ -51,8 +53,8 @@
 
 .editor-avatar-grade {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
-  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 0.6rem;
   max-height: 320px;
   overflow-y: auto;
   padding: 0.2rem;
@@ -62,8 +64,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.2rem;
-  padding: 0.4rem 0.2rem;
+  gap: 0.3rem;
+  padding: 0.6rem 0.3rem;
   background: var(--cor-superficie, #fff);
   border: 2px solid var(--cor-borda, #d8dde3);
   border-radius: var(--raio-borda, 8px);
@@ -71,15 +73,15 @@
 }
 
 .editor-avatar-opcao .personagem-preview {
-  width: 26px;
-  height: 26px;
+  width: 44px;
+  height: 44px;
 }
 
 .editor-avatar-opcao span {
-  font-size: 0.62rem;
+  font-size: 0.72rem;
   font-weight: 700;
   text-align: center;
-  line-height: 1.1;
+  line-height: 1.15;
   color: var(--cor-texto-suave, #666);
 }
 
@@ -91,12 +93,12 @@
 .editor-avatar-swatches {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.6rem;
 }
 
 .editor-avatar-swatch {
-  width: 26px;
-  height: 26px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   border: 2px solid var(--cor-borda, #d8dde3);
   cursor: pointer;
@@ -128,8 +130,8 @@
 }
 
 .editor-avatar-previa .personagem-preview {
-  width: 72px;
-  height: 72px;
+  width: 96px;
+  height: 96px;
 }
 
 /* Crédito da arte (LPC, licença OGA-BY 3.0) - precisa ficar visível dentro do próprio app, não só
