@@ -1,0 +1,16 @@
+OGA-BY 3.0 - resumo dos termos (licença escolhida para a arte de personagem em personagem-lpc/)
+
+Texto completo e oficial: https://static.opengameart.org/OGA-BY-3.0.txt
+
+Resumo (não substitui o texto oficial acima):
+- Atribuição obrigatória: manter os avisos de autoria, indicar autor(es), título da obra e URL de
+  origem quando informada; para adaptações (recolorir, redimensionar, recombinar), indicar que
+  houve modificação.
+- SEM compartilhamento-igual (share-alike) e SEM copyleft: pode redistribuir adaptações sob outros
+  termos.
+- Uso comercial permitido, sem necessidade de pedir permissão.
+- Equivalente, na prática, à Creative Commons Attribution 3.0 (CC-BY 3.0) - a própria OGA-BY 3.0
+  permite redistribuir a obra sob CC-BY 3.0 (seção 8g).
+
+Ver CREDITS.md nesta mesma pasta para a lista completa de autores/fontes por arquivo usado, e o
+link "Créditos" dentro do editor de avatar no app.

@@ -70,9 +70,9 @@
   cursor: pointer;
 }
 
-.editor-avatar-opcao svg {
+.editor-avatar-opcao .personagem-preview {
   width: 26px;
-  height: auto;
+  height: 26px;
 }
 
 .editor-avatar-opcao span {
@@ -127,7 +127,16 @@
   justify-content: center;
 }
 
-.editor-avatar-previa svg {
+.editor-avatar-previa .personagem-preview {
   width: 72px;
-  height: auto;
+  height: 72px;
+}
+
+/* Crédito da arte (LPC, licença OGA-BY 3.0) - precisa ficar visível dentro do próprio app, não só
+   documentado no repositório (ver comentário em EditorAvatarPage.tsx). */
+.editor-avatar-creditos {
+  font-size: 0.68rem;
+  color: var(--cor-texto-suave, #666);
+  text-decoration: underline;
+  text-align: center;
 }

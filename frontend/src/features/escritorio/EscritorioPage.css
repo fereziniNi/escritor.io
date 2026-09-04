@@ -201,8 +201,8 @@
 }
 
 /* Fase 3 (redesign Gather) - destaque de proximidade: mesmo azul-ciano do anel que aparece no
-mundo Pixi por cima do avatar (`avatarFactory.ts`, COR_PROXIMIDADE), pra a lista lateral e o mundo
-contarem a mesma história de "quem está perto de quem agora". */
+mundo Pixi por cima do avatar (`AvatarPixi.tsx`, desenharAnelProximidade), pra a lista lateral e o
+mundo contarem a mesma história de "quem está perto de quem agora". */
 .escritorio-lista-item--proximo {
   outline: 2px solid #4fc3f2;
   outline-offset: -1px;

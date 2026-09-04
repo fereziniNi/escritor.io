@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { PixelCharacterSvg } from '../PixelCharacterSvg'
+import { PersonagemPreview } from './PersonagemPreview'
 import {
   APARENCIA_PADRAO,
   CORES_CABELO,
@@ -226,13 +226,19 @@ export function EditorAvatarPage() {
 
       <div className="editor-avatar-previa-coluna">
         <div className="editor-avatar-previa" aria-hidden="true">
-          <PixelCharacterSvg aparencia={rascunho} direcao="direita" andando={false} destaque={false} />
+          <PersonagemPreview aparencia={rascunho} direcao="direita" andando={false} destaque={false} />
         </div>
         <button type="button" className="botao-pequeno" disabled={salvarMutation.isPending} onClick={() => salvarMutation.mutate()}>
           {salvarMutation.isPending ? 'Salvando…' : 'Finalizar'}
         </button>
         {salvarMutation.isError && <p className="mensagem-erro">Não foi possível salvar a aparência.</p>}
         {salvarMutation.isSuccess && <p className="mensagem-sucesso">Aparência salva!</p>}
+        {/* Pixel art do personagem vem do projeto LPC (licença OGA-BY 3.0 - só exige crédito
+            "razoavelmente descobrível", ver frontend/public/personagem-lpc/CREDITS.md) - este link
+            é esse crédito dentro do próprio app, não só um arquivo perdido no repositório. */}
+        <a className="editor-avatar-creditos" href="/personagem-lpc/CREDITS.md" target="_blank" rel="noreferrer">
+          Créditos da arte do personagem
+        </a>
       </div>
     </div>
   )
@@ -290,7 +296,7 @@ function GradeDeEstilo<T extends string>({
           onClick={() => aoEscolher(opcao)}
           title={rotulos[opcao]}
         >
-          <PixelCharacterSvg aparencia={montarPreview(opcao)} direcao="direita" andando={false} destaque={false} />
+          <PersonagemPreview aparencia={montarPreview(opcao)} direcao="direita" andando={false} destaque={false} />
           <span>{rotulos[opcao]}</span>
         </button>
       ))}

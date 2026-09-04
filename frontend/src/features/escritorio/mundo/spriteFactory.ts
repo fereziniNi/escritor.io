@@ -4,11 +4,10 @@ import { TILE_PX } from './constantes'
 import type { ItemMobilia } from './tipos'
 
 /**
- * "Fábrica" de desenho procedural do mundo - continua o precedente já estabelecido no projeto
- * (`PixelCharacterSvg` é só `<rect>`s com contorno preto; o piso de madeira do mapa antigo era um
- * `repeating-linear-gradient` puro, sem nenhuma imagem) - agora via `PIXI.Graphics` em vez de
- * SVG/CSS. Nenhum asset de imagem é usado em lugar nenhum do mundo: tudo é forma geométrica
- * simples com contorno, na mesma linguagem "pixel art via primitivas".
+ * "Fábrica" de desenho procedural do mundo - móveis/piso continuam 100% `PIXI.Graphics` (forma
+ * geométrica simples com contorno), diferente do personagem (`AvatarPixi.tsx`/
+ * `PersonagemPreview.tsx`), que passou a usar pixel art real (LPC, ver `spriteAvatar.ts`) depois
+ * do pedido do usuário "não faça mais o personagem com svg... mude a estrutura dele".
  *
  * Fase 6 (pedido "mais vivo, mais parecido com o Gather", com prints reais como referência):
  * comparado ao Gather de verdade, o que faltava aqui não era falta de móvel, era tudo ser um

@@ -114,9 +114,9 @@
   background: #4a4a62;
 }
 
-.escritorio-menu-usuario-avatar svg {
+.escritorio-menu-usuario-avatar .personagem-preview {
   width: 26px;
-  height: auto;
+  height: 26px;
   transform: translateY(3px);
 }
 
