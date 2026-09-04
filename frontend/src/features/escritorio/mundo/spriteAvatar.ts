@@ -10,7 +10,7 @@ import type {
   TipoChapeu,
   TipoOculos,
 } from '../avatar/aparenciaAvatar'
-import type { MaterialClasse } from './paletteRecolor'
+import { COR_OLHO_PADRAO, type EspecificacaoRecolor, type MaterialClasse } from './paletteRecolor'
 
 /**
  * Mapa enum -> asset de pixel art real (Liberated Pixel Cup / Universal LPC Spritesheet Character
@@ -56,14 +56,16 @@ function recolor(url: string, material: MaterialClasse): CamadaRecolor {
 
 /** z-order entre categorias (não entre quadros/direções) - dos `zPos` reais do LPC
  * (`sheet_definitions/**\/*.json`), não inventado: corpo(10) < calça(20) < sapato(25) < top(35) <
- * jaqueta(55) < colar/outro(~100) < barba(110) < óculos(115) < cabelo(120) < chapéu(130+). */
+ * jaqueta(55) < colar/outro(~90) < cabeça(100) < barba(110) < óculos(115) < cabelo(120) <
+ * chapéu(130+). */
 export const Z_POS = {
   skin: 10,
   bottom: 20,
   shoes: 25,
   top: 35,
   jacket: 55,
-  other: 100,
+  other: 90,
+  head: 100,
   facialHair: 110,
   glasses: 115,
   hair: 120,
@@ -73,6 +75,22 @@ export const Z_POS = {
 /** Corpo base - não é uma escolha de enum, é sempre esta 1 silhueta (decisão da curadoria:
  * "1 gênero de base pro avatar, silhueta neutra"), só a cor (`corPele`) muda via recolor. */
 export const CAMADA_PELE: CamadaRecolor = recolor(`${BASE}/skin/base.png`, 'pele')
+
+/** Cabeça/rosto - camada separada do corpo no próprio LPC (`spritesheets/head/heads/human/male`),
+ * achada só depois do usuário reportar "meu personagem está sem o rosto": o `skin/base.png`
+ * (`body/bodies/male`) é só torso+pernas, sem cabeça nenhuma - o LPC deixa a cabeça numa hierarquia
+ * à parte de propósito (dá pra trocar o formato da cabeça sem trocar o corpo). Também não é uma
+ * escolha de enum - sempre esta 1 cabeça, igual ao corpo. A MESMA imagem já vem com pele E olho
+ * pintados em 2 rampas de referência diferentes (`heads_human_male.json`: `color_1` = pele,
+ * `color_2` = olho) - por isso usa `especificacoesCabeca` (2 specs) em vez do helper `recolor` de
+ * 1 spec só. */
+export const CAMADA_HEAD_URL = `${BASE}/head/base.png`
+export function especificacoesCabeca(corPele: string): EspecificacaoRecolor[] {
+  return [
+    { material: 'pele', corAlvo: corPele },
+    { material: 'olho', corAlvo: COR_OLHO_PADRAO },
+  ]
+}
 
 export const CAMADA_HAIR: Partial<Record<EstiloCabelo, CamadaRecolor>> = {
   RASPADO: recolor(`${BASE}/hair/RASPADO.png`, 'cabelo'),
@@ -238,23 +256,23 @@ export function resolverPrebaked(camada: CamadaPrebaked, corHex: string): string
   return camada.porCor[corHex] ?? Object.values(camada.porCor)[0]
 }
 
-/** As 10 categorias do editor (mesma ordem de `Z_POS`, crescente = desenhada por cima). */
-export const CHAVES_CAMADA = ['skin', 'bottom', 'shoes', 'top', 'jacket', 'other', 'facialHair', 'glasses', 'hair', 'hat'] as const
+/** As 11 camadas (10 categorias do editor + `head`, que não é uma escolha de enum - ver
+ * `CAMADA_HEAD_URL`), mesma ordem de `Z_POS`, crescente = desenhada por cima. */
+export const CHAVES_CAMADA = ['skin', 'bottom', 'shoes', 'top', 'jacket', 'other', 'head', 'facialHair', 'glasses', 'hair', 'hat'] as const
 export type ChaveCamada = (typeof CHAVES_CAMADA)[number]
 
 export interface CamadaResolvida {
   url: string
-  /** `null` = já é a imagem final (camada `prebaked`), não passa pelo canvas de recolorir. */
-  material: MaterialClasse | null
-  corAlvo: string | null
+  /** Lista vazia = já é a imagem final (camada `prebaked`), não passa pelo canvas de recolorir. */
+  especificacoes: EspecificacaoRecolor[]
 }
 
-/** Junta os 10 mapas de cima num só - a função que `AvatarPixi`/`PersonagemPreview` realmente
- * chamam pra saber "o que desenhar" a partir de uma `AparenciaAvatar`. `null` numa categoria = sem
- * sprite ali agora (CARECA, NENHUM, NENHUMA, DESCALCO, MICROFONE). */
+/** Junta os mapas de cima num só - a função que `AvatarPixi`/`PersonagemPreview` realmente chamam
+ * pra saber "o que desenhar" a partir de uma `AparenciaAvatar`. `null` numa categoria = sem sprite
+ * ali agora (CARECA, NENHUM, NENHUMA, DESCALCO, MICROFONE). */
 export function montarCamadas(aparencia: AparenciaAvatar): Record<ChaveCamada, CamadaResolvida | null> {
   function deRecolor(camada: CamadaRecolor | undefined, corAlvo: string): CamadaResolvida | null {
-    return camada ? { url: camada.url, material: camada.material, corAlvo } : null
+    return camada ? { url: camada.url, especificacoes: [{ material: camada.material, corAlvo }] } : null
   }
 
   const jaqueta = CAMADA_JACKET[aparencia.estiloJaqueta]
@@ -262,12 +280,13 @@ export function montarCamadas(aparencia: AparenciaAvatar): Record<ChaveCamada, C
   if (jaqueta) {
     camadaJaqueta =
       jaqueta.tipo === 'recolor'
-        ? { url: jaqueta.url, material: jaqueta.material, corAlvo: aparencia.corJaqueta }
-        : { url: resolverPrebaked(jaqueta, aparencia.corJaqueta), material: null, corAlvo: null }
+        ? { url: jaqueta.url, especificacoes: [{ material: jaqueta.material, corAlvo: aparencia.corJaqueta }] }
+        : { url: resolverPrebaked(jaqueta, aparencia.corJaqueta), especificacoes: [] }
   }
 
   return {
-    skin: { url: CAMADA_PELE.url, material: CAMADA_PELE.material, corAlvo: aparencia.corPele },
+    skin: { url: CAMADA_PELE.url, especificacoes: [{ material: CAMADA_PELE.material, corAlvo: aparencia.corPele }] },
+    head: { url: CAMADA_HEAD_URL, especificacoes: especificacoesCabeca(aparencia.corPele) },
     hair: deRecolor(CAMADA_HAIR[aparencia.estiloCabelo], aparencia.corCabelo),
     facialHair: deRecolor(CAMADA_FACIAL_HAIR[aparencia.tipoBarba], aparencia.corCabelo),
     top: deRecolor(CAMADA_TOP[aparencia.estiloTop], aparencia.corTop),

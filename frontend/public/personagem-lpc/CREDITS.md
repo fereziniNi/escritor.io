@@ -22,6 +22,16 @@ pro texto completo da OGA-BY 3.0.
   - Fonte: https://opengameart.org/content/liberated-pixel-cup-lpc-base-assets-sprites-map-tiles
   - Notas do autor: see details at https://opengameart.org/content/lpc-character-bases; 'Thick' Male Revised Run/Climb by JaidynReiman (based on ElizaWy's LPC Revised)
 
+## Cabeça (rosto)
+
+- **base** (`head/heads/human/male`) - camada separada do corpo (corrigido depois do usuário
+  reportar "meu personagem está sem o rosto" - o `body/bodies/male` é só torso+pernas, a cabeça é
+  uma hierarquia à parte no próprio LPC).
+  - Autoria: bluecarrot16, Benjamin K. Smith (BenCreating), Stephen Challener (Redshrike)
+  - Licença usada: OGA-BY 3.0
+  - Fonte: https://opengameart.org/content/liberated-pixel-cup-lpc-base-assets-sprites-map-tiles
+  - Notas do autor: original head by Redshrike, tweaks by BenCreating, modular version by bluecarrot16
+
 ## Cabelo
 
 - **CACHEADO** (`hair/curly_short/adult`)

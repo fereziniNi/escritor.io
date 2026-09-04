@@ -41,6 +41,13 @@ function hexParaNumero(cor: string): number {
   return Number(cor.replace('#', '0x'))
 }
 
+/** Chave estável (por conteúdo) das especificações de recolorir de uma camada - usada como
+ * dependência de efeito no lugar do array `especificacoes` em si (identidade nova a cada
+ * `montarCamadas`, mesmo quando o conteúdo não mudou). */
+function chaveCamada(camada: CamadaResolvida): string {
+  return camada.especificacoes.map((e) => `${e.material}:${e.corAlvo}`).join(',')
+}
+
 function desenharSombraAvatar(g: PixiGraphics): void {
   g.clear()
   g.ellipse(PIVO_BASE.x, PIVO_BASE.y + 2, 15, 5)
@@ -93,7 +100,7 @@ function CamadaSprite({
     quadrosRef.current = null
     if (spriteRef.current) spriteRef.current.visible = false
 
-    obterTexturaCamada(camada.url, camada.material, camada.corAlvo).then((folha) => {
+    obterTexturaCamada(camada.url, camada.especificacoes).then((folha) => {
       if (cancelado) return
       quadrosRef.current = obterQuadrosDaFolha(folha)
       if (spriteRef.current) {
@@ -105,7 +112,10 @@ function CamadaSprite({
     return () => {
       cancelado = true
     }
-  }, [camada.url, camada.material, camada.corAlvo])
+    // dependência pelo conteúdo (não pela identidade do array `especificacoes`, que muda toda
+    // renderização) - `chaveCamada` é estável enquanto url/material/cor não mudam de verdade.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [camada.url, chaveCamada(camada)])
 
   useTick(() => {
     const quadros = quadrosRef.current

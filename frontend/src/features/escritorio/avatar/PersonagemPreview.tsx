@@ -72,7 +72,7 @@ export function PersonagemPreview({
     Promise.all(
       CAMADAS_EM_ORDEM.map((chave) => {
         const camada = camadas[chave]
-        return camada ? obterCanvasCamada(camada.url, camada.material, camada.corAlvo) : Promise.resolve(null)
+        return camada ? obterCanvasCamada(camada.url, camada.especificacoes) : Promise.resolve(null)
       }),
     ).then((folhas) => {
       if (cancelado) return

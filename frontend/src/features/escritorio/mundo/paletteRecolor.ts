@@ -17,7 +17,7 @@ import { Rectangle, Texture } from 'pixi.js'
  * lugares (`useTick` sem `useState`).
  */
 
-export type MaterialClasse = 'pele' | 'cabelo' | 'tecido'
+export type MaterialClasse = 'pele' | 'cabelo' | 'tecido' | 'olho'
 
 /** Frame nativo de cada sprite LPC: 576×256px = 9 colunas (quadros de animação) × 4 linhas
  * (direção). Confirmado no código-fonte do gerador (`sources/custom-animations.ts`), não suposto:
@@ -29,14 +29,21 @@ export const LINHAS_DIRECAO = 4
 export type Direcao = 'norte' | 'oeste' | 'sul' | 'leste'
 export const LINHA_DA_DIRECAO: Record<Direcao, number> = { norte: 0, oeste: 1, sul: 2, leste: 3 }
 
-/** Rampa de referência (6 tons, escuro -> claro) de cada material - hex exatos tirados de
- * `palette_definitions/{body,hair,cloth}/*_ulpc.json` do LPC (entradas `light`/`orange`/`white`,
- * o "base" de cada classe de material segundo `meta_*.json`). */
+/** Rampa de referência (escuro -> claro) de cada material - hex exatos tirados de
+ * `palette_definitions/{body,hair,cloth,eye}/*_ulpc.json` do LPC (entradas `light`/`orange`/
+ * `white`/`blue`, o "base" de cada classe de material segundo `meta_*.json`). Pele/cabelo/tecido
+ * têm 6 tons; olho tem só 3 (a própria paleta de referência do LPC pros olhos é assim, mais curta -
+ * ver `palette_definitions/eye/meta_eye.json`). */
 const RAMPAS_REFERENCIA: Record<MaterialClasse, string[]> = {
   pele: ['#271920', '#99423c', '#cc8665', '#e4a47c', '#f9d5ba', '#faece7'],
   cabelo: ['#260d14', '#6a1108', '#a42600', '#bf4000', '#e55600', '#ff8a00'],
   tecido: ['#281820', '#4d4a5d', '#958080', '#c4b59f', '#e5e6c7', '#ffffff'],
+  olho: ['#2a3c49', '#5686ae', '#57cee4'],
 }
+
+/** Cor de olho fixa (não existe campo `corOlho` no modelo - o problema aqui era só "cadê o rosto",
+ * não "deixar o olho editável"). Um castanho neutro, a cor de olho mais comum. */
+export const COR_OLHO_PADRAO = '#4a3728'
 
 function hexParaRgb(hex: string): [number, number, number] {
   const h = hex.replace('#', '')
@@ -92,7 +99,7 @@ function gerarRampaAlvo(material: MaterialClasse, hexAlvo: string): [number, num
 
 const TOLERANCIA_POR_CANAL = 10
 
-function indiceMaisProximo(r: number, g: number, b: number, referencia: [number, number, number][]): number {
+function indiceEDistanciaMaisProxima(r: number, g: number, b: number, referencia: [number, number, number][]): [number, number] {
   let melhor = -1
   let melhorDist = Infinity
   for (let i = 0; i < referencia.length; i++) {
@@ -103,7 +110,7 @@ function indiceMaisProximo(r: number, g: number, b: number, referencia: [number,
       melhor = i
     }
   }
-  return melhorDist <= TOLERANCIA_POR_CANAL ** 2 * 3 ? melhor : -1
+  return melhorDist <= TOLERANCIA_POR_CANAL ** 2 * 3 ? [melhor, melhorDist] : [-1, Infinity]
 }
 
 function carregarImagem(url: string): Promise<HTMLImageElement> {
@@ -115,7 +122,17 @@ function carregarImagem(url: string): Promise<HTMLImageElement> {
   })
 }
 
-async function construirCanvas(url: string, material: MaterialClasse | null, hexAlvo: string | null): Promise<HTMLCanvasElement> {
+export interface EspecificacaoRecolor {
+  material: MaterialClasse
+  corAlvo: string
+}
+
+/** A maioria das camadas troca 1 rampa só (pele OU cabelo OU tecido). A camada de cabeça (`head`
+ * em `spriteAvatar.ts`) é a exceção: o próprio LPC pinta pele e olho na MESMA imagem
+ * (`heads_human_male.json` tem `color_1` = pele, `color_2` = olho) - por isso aceita uma LISTA de
+ * especificações aplicadas no mesmo passe por pixel (cada pixel só pode bater com a rampa de 1
+ * delas, nunca as duas). */
+async function construirCanvas(url: string, especificacoes: EspecificacaoRecolor[]): Promise<HTMLCanvasElement> {
   const img = await carregarImagem(url)
   const canvas = document.createElement('canvas')
   canvas.width = img.naturalWidth
@@ -123,18 +140,32 @@ async function construirCanvas(url: string, material: MaterialClasse | null, hex
   const ctx = canvas.getContext('2d')
   if (!ctx) return canvas
   ctx.drawImage(img, 0, 0)
-  if (!material || !hexAlvo) {
+  if (especificacoes.length === 0) {
     return canvas // camada "pré-colorida" (ver spriteAvatar.ts) - usada como está, sem recolorir
   }
   const dados = ctx.getImageData(0, 0, canvas.width, canvas.height)
-  const referenciaRgb = RAMPAS_REFERENCIA[material].map((hex) => hexParaRgb(hex)) as [number, number, number][]
-  const alvoRgb = gerarRampaAlvo(material, hexAlvo)
+  const grupos = especificacoes.map(({ material, corAlvo }) => ({
+    referencia: RAMPAS_REFERENCIA[material].map((hex) => hexParaRgb(hex)) as [number, number, number][],
+    alvo: gerarRampaAlvo(material, corAlvo),
+  }))
   const px = dados.data
   for (let i = 0; i < px.length; i += 4) {
     if (px[i + 3] === 0) continue
-    const idx = indiceMaisProximo(px[i], px[i + 1], px[i + 2], referenciaRgb)
-    if (idx >= 0) {
-      const [r, g, b] = alvoRgb[idx]
+    // acha o melhor casamento entre TODOS os grupos (não só o 1º) - cada pixel só deve bater com
+    // a rampa de referência que ele realmente pertence.
+    let melhorGrupo = -1
+    let melhorIdx = -1
+    let melhorDist = Infinity
+    for (let g = 0; g < grupos.length; g++) {
+      const [idx, dist] = indiceEDistanciaMaisProxima(px[i], px[i + 1], px[i + 2], grupos[g].referencia)
+      if (idx >= 0 && dist < melhorDist) {
+        melhorDist = dist
+        melhorGrupo = g
+        melhorIdx = idx
+      }
+    }
+    if (melhorGrupo >= 0) {
+      const [r, g, b] = grupos[melhorGrupo].alvo[melhorIdx]
       px[i] = r
       px[i + 1] = g
       px[i + 2] = b
@@ -144,25 +175,29 @@ async function construirCanvas(url: string, material: MaterialClasse | null, hex
   return canvas
 }
 
-/** Cache por (url, material, cor-alvo) - `material`/`hexAlvo` nulos = imagem usada como está (caso
- * das camadas "pré-coloridas", ver `spriteAvatar.ts`), sem passar pelo canvas de recolorir. Nível
- * mais baixo (canvas puro) compartilhado por `obterTexturaCamada` (mundo Pixi) e
+function chaveEspecificacoes(especificacoes: EspecificacaoRecolor[]): string {
+  return especificacoes.map((e) => `${e.material}:${e.corAlvo}`).join(',')
+}
+
+/** Cache por (url, especificações de recolorir) - lista vazia = imagem usada como está (caso das
+ * camadas "pré-coloridas", ver `spriteAvatar.ts`), sem passar pelo canvas de recolorir. Nível mais
+ * baixo (canvas puro) compartilhado por `obterTexturaCamada` (mundo Pixi) e
  * `avatar/PersonagemPreview.tsx` (canvas 2D simples, sem Pixi) - a mesma folha recolorida uma vez
  * só, os dois só desenham ela de formas diferentes. */
 const cacheCanvas = new Map<string, Promise<HTMLCanvasElement>>()
 
-export function obterCanvasCamada(url: string, material: MaterialClasse | null, hexAlvo: string | null): Promise<HTMLCanvasElement> {
-  const chave = material && hexAlvo ? `${url}|${material}|${hexAlvo}` : url
+export function obterCanvasCamada(url: string, especificacoes: EspecificacaoRecolor[]): Promise<HTMLCanvasElement> {
+  const chave = especificacoes.length ? `${url}|${chaveEspecificacoes(especificacoes)}` : url
   let promessa = cacheCanvas.get(chave)
   if (!promessa) {
-    promessa = construirCanvas(url, material, hexAlvo)
+    promessa = construirCanvas(url, especificacoes)
     cacheCanvas.set(chave, promessa)
   }
   return promessa
 }
 
-export async function obterTexturaCamada(url: string, material: MaterialClasse | null, hexAlvo: string | null): Promise<Texture> {
-  const canvas = await obterCanvasCamada(url, material, hexAlvo)
+export async function obterTexturaCamada(url: string, especificacoes: EspecificacaoRecolor[]): Promise<Texture> {
+  const canvas = await obterCanvasCamada(url, especificacoes)
   return Texture.from(canvas)
 }
 
