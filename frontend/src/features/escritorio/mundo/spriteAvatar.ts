@@ -77,25 +77,47 @@ export const Z_POS = {
  * "1 gênero de base pro avatar, silhueta neutra"), só a cor (`corPele`) muda via recolor. */
 export const CAMADA_PELE: CamadaRecolor = recolor(`${BASE}/skin/base.png`, 'pele')
 
-/** Cabeça/rosto - camada separada do corpo no próprio LPC (`spritesheets/head/heads/human/*`),
- * achada só depois do usuário reportar "meu personagem está sem o rosto": o `skin/base.png`
+/** Cabeça/rosto - camada separada do corpo no próprio LPC (`spritesheets/head/heads/*`), achada
+ * só depois do usuário reportar "meu personagem está sem o rosto": o `skin/base.png`
  * (`body/bodies/male`) é só torso+pernas, sem cabeça nenhuma - o LPC deixa a cabeça numa hierarquia
  * à parte de propósito (dá pra trocar o formato da cabeça sem trocar o corpo). Isso também é o que
  * permite a categoria "Face" (pedido seguinte do usuário: "quero poder escolher qual face irei
- * utilizar... quero poder trocar o rosto") - 8 formatos de cabeça diferentes do próprio LPC. Sem
- * paleta de cor própria (usa `corPele`, mesmo padrão de `tipoBarba`/`corCabelo`). Toda imagem já
- * vem com pele E olho pintados em 2 rampas de referência diferentes na MESMA textura
- * (`heads_human_*.json`: `color_1` = pele, `color_2` = olho) - por isso usa `especificacoesCabeca`
- * (2 specs) em vez do helper `recolor` de 1 spec só. */
-export const CAMADA_HEAD: Record<TipoRosto, string> = {
-  PADRAO: `${BASE}/head/PADRAO.png`,
-  OVAL: `${BASE}/head/OVAL.png`,
-  ENVELHECIDA: `${BASE}/head/ENVELHECIDA.png`,
-  OVAL_ENVELHECIDA: `${BASE}/head/OVAL_ENVELHECIDA.png`,
-  MAGRA: `${BASE}/head/MAGRA.png`,
-  ROBUSTA: `${BASE}/head/ROBUSTA.png`,
-  PEQUENA: `${BASE}/head/PEQUENA.png`,
-  OVAL_PEQUENA: `${BASE}/head/OVAL_PEQUENA.png`,
+ * utilizar... quero poder trocar o rosto").
+ *
+ * 16 formatos de cabeça (dobrou de 8 depois do usuário reclamar que as opções originais "trazem
+ * poucas diferenças" - eram só variação sutil de formato humano). As 9 humanas (`recolorir: true`)
+ * usam `corPele` - a imagem já vem com pele E olho pintados em 2 rampas de referência diferentes
+ * na MESMA textura (`heads_human_*.json`: `color_1` = pele, `color_2` = olho), daí
+ * `especificacoesCabeca` devolver 2 specs em vez do helper `recolor` de 1 spec só. As 7 seguintes
+ * são criaturas do próprio LPC (goblin/vampiro/lobo/etc., `recolorir: false`) - cor própria fixa
+ * (verde do goblin, marrom do lobo...), NÃO respondem à cor de pele escolhida - forçar a rampa de
+ * pele humana nelas ficaria estranho (e olho já vem pintado na própria arte de cada uma). */
+interface CamadaHead {
+  url: string
+  recolorir: boolean
+}
+
+function camadaHead(arquivo: string, recolorir: boolean): CamadaHead {
+  return { url: `${BASE}/head/${arquivo}.png`, recolorir }
+}
+
+export const CAMADA_HEAD: Record<TipoRosto, CamadaHead> = {
+  PADRAO: camadaHead('PADRAO', true),
+  OVAL: camadaHead('OVAL', true),
+  ENVELHECIDA: camadaHead('ENVELHECIDA', true),
+  OVAL_ENVELHECIDA: camadaHead('OVAL_ENVELHECIDA', true),
+  MAGRA: camadaHead('MAGRA', true),
+  ROBUSTA: camadaHead('ROBUSTA', true),
+  PEQUENA: camadaHead('PEQUENA', true),
+  OVAL_PEQUENA: camadaHead('OVAL_PEQUENA', true),
+  IDOSA_PEQUENA: camadaHead('IDOSA_PEQUENA', true),
+  ALIENIGENA: camadaHead('ALIENIGENA', false),
+  GOBLIN: camadaHead('GOBLIN', false),
+  VAMPIRO: camadaHead('VAMPIRO', false),
+  LOBO: camadaHead('LOBO', false),
+  COELHO: camadaHead('COELHO', false),
+  ORC: camadaHead('ORC', false),
+  MINOTAURO: camadaHead('MINOTAURO', false),
 }
 
 export function especificacoesCabeca(corPele: string): EspecificacaoRecolor[] {
@@ -298,7 +320,10 @@ export function montarCamadas(aparencia: AparenciaAvatar): Record<ChaveCamada, C
 
   return {
     skin: { url: CAMADA_PELE.url, especificacoes: [{ material: CAMADA_PELE.material, corAlvo: aparencia.corPele }] },
-    head: { url: CAMADA_HEAD[aparencia.tipoRosto], especificacoes: especificacoesCabeca(aparencia.corPele) },
+    head: (() => {
+      const cabeca = CAMADA_HEAD[aparencia.tipoRosto]
+      return { url: cabeca.url, especificacoes: cabeca.recolorir ? especificacoesCabeca(aparencia.corPele) : [] }
+    })(),
     hair: deRecolor(CAMADA_HAIR[aparencia.estiloCabelo], aparencia.corCabelo),
     facialHair: deRecolor(CAMADA_FACIAL_HAIR[aparencia.tipoBarba], aparencia.corCabelo),
     top: deRecolor(CAMADA_TOP[aparencia.estiloTop], aparencia.corTop),

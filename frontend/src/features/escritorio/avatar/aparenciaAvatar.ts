@@ -4,10 +4,13 @@
  * partes devem possuir mais do que a tela esta mostrando"), mas a arte é 100% original ("nada de
  * arte roubada/baixada do Gather", regra já estabelecida nesta sessão) - até a virada pra pixel
  * art real (LPC, ver `mundo/spriteAvatar.ts`). 11 categorias (Skin/Face/Hair/Facial hair/Top/
- * Jacket/Bottom/Shoes/Hat/Glasses/Other), cada uma com ~8-11 opções. "Face" (formato do rosto/
+ * Jacket/Bottom/Shoes/Hat/Glasses/Other), cada uma com ~8-16 opções. "Face" (formato do rosto/
  * cabeça) não existe no Gather - pedido do usuário depois da virada pra LPC ("quero poder escolher
  * qual face irei utilizar... quero poder trocar o rosto"), possível porque o próprio LPC separa
- * cabeça de corpo em hierarquias diferentes.
+ * cabeça de corpo em hierarquias diferentes. As 8 opções humanas iniciais de Face receberam mais 8
+ * (1 humana + 7 criatura) depois do usuário reclamar que traziam "poucas diferenças" - só as 9
+ * primeiras usam `corPele` (as criaturas têm cor própria fixa, ver `CAMADA_HEAD` no
+ * `spriteAvatar.ts`).
  *
  * Os valores dos tipos union espelham EXATAMENTE os enums Java (`identidade/domain/`) - mesmos
  * nomes, sem tradução na borda. As paletas de cor espelham EXATAMENTE `PaletaAparenciaAvatar.java`
@@ -16,7 +19,23 @@
  * repetida em quase toda categoria nos prints de referência do Gather).
  */
 
-export type TipoRosto = 'PADRAO' | 'OVAL' | 'ENVELHECIDA' | 'OVAL_ENVELHECIDA' | 'MAGRA' | 'ROBUSTA' | 'PEQUENA' | 'OVAL_PEQUENA'
+export type TipoRosto =
+  | 'PADRAO'
+  | 'OVAL'
+  | 'ENVELHECIDA'
+  | 'OVAL_ENVELHECIDA'
+  | 'MAGRA'
+  | 'ROBUSTA'
+  | 'PEQUENA'
+  | 'OVAL_PEQUENA'
+  | 'IDOSA_PEQUENA'
+  | 'ALIENIGENA'
+  | 'GOBLIN'
+  | 'VAMPIRO'
+  | 'LOBO'
+  | 'COELHO'
+  | 'ORC'
+  | 'MINOTAURO'
 export type EstiloCabelo = 'CARECA' | 'RASPADO' | 'CURTO' | 'REPARTIDO' | 'CACHEADO' | 'MOICANO' | 'RABO_DE_CAVALO' | 'CHIQUINHAS' | 'LONGO' | 'COQUE' | 'ESPETADO'
 export type TipoBarba = 'NENHUM' | 'BIGODE_FINO' | 'BIGODE_GROSSO' | 'CAVANHAQUE' | 'SUICAS' | 'BARBA_CURTA' | 'BARBA_CHEIA' | 'CAVANHAQUE_BIGODE'
 export type EstiloTop = 'CAMISETA' | 'REGATA' | 'POLO' | 'CAMISA' | 'SUETER' | 'LISTRADA' | 'GOLA_V' | 'GOLA_ALTA' | 'MOLETOM_LEVE'
@@ -83,7 +102,10 @@ export const CORES_GERAL = [
   '#8a4fd6', '#4472c4', '#4fa8d6', '#4f9f6f', '#2f6f45', '#c0392b', '#f2f2f2', '#ffffff',
 ]
 
-export const OPCOES_TIPO_ROSTO: TipoRosto[] = ['PADRAO', 'OVAL', 'ENVELHECIDA', 'OVAL_ENVELHECIDA', 'MAGRA', 'ROBUSTA', 'PEQUENA', 'OVAL_PEQUENA']
+export const OPCOES_TIPO_ROSTO: TipoRosto[] = [
+  'PADRAO', 'OVAL', 'ENVELHECIDA', 'OVAL_ENVELHECIDA', 'MAGRA', 'ROBUSTA', 'PEQUENA', 'OVAL_PEQUENA', 'IDOSA_PEQUENA',
+  'ALIENIGENA', 'GOBLIN', 'VAMPIRO', 'LOBO', 'COELHO', 'ORC', 'MINOTAURO',
+]
 export const OPCOES_ESTILO_CABELO: EstiloCabelo[] = ['CARECA', 'RASPADO', 'CURTO', 'REPARTIDO', 'CACHEADO', 'MOICANO', 'RABO_DE_CAVALO', 'CHIQUINHAS', 'LONGO', 'COQUE', 'ESPETADO']
 export const OPCOES_TIPO_BARBA: TipoBarba[] = ['NENHUM', 'BIGODE_FINO', 'BIGODE_GROSSO', 'CAVANHAQUE', 'SUICAS', 'BARBA_CURTA', 'BARBA_CHEIA', 'CAVANHAQUE_BIGODE']
 export const OPCOES_ESTILO_TOP: EstiloTop[] = ['CAMISETA', 'REGATA', 'POLO', 'CAMISA', 'SUETER', 'LISTRADA', 'GOLA_V', 'GOLA_ALTA', 'MOLETOM_LEVE']
@@ -96,7 +118,8 @@ export const OPCOES_ESTILO_OUTRO: EstiloOutro[] = ['NENHUM', 'BRINCO', 'COLAR', 
 
 export const ROTULO_TIPO_ROSTO: Record<TipoRosto, string> = {
   PADRAO: 'Padrão', OVAL: 'Oval', ENVELHECIDA: 'Envelhecida', OVAL_ENVELHECIDA: 'Oval envelhecida',
-  MAGRA: 'Magra', ROBUSTA: 'Robusta', PEQUENA: 'Pequena', OVAL_PEQUENA: 'Oval pequena',
+  MAGRA: 'Magra', ROBUSTA: 'Robusta', PEQUENA: 'Pequena', OVAL_PEQUENA: 'Oval pequena', IDOSA_PEQUENA: 'Idosa pequena',
+  ALIENIGENA: 'Alienígena', GOBLIN: 'Goblin', VAMPIRO: 'Vampiro', LOBO: 'Lobo', COELHO: 'Coelho', ORC: 'Orc', MINOTAURO: 'Minotauro',
 }
 
 export const ROTULO_ESTILO_CABELO: Record<EstiloCabelo, string> = {

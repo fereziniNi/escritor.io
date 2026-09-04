@@ -76,8 +76,11 @@
 }
 
 .editor-avatar-opcao .personagem-preview {
-  width: 44px;
-  height: 44px;
+  /* 48px = 0,75× o quadro nativo do sprite (64px) - múltiplo "limpo" da escala, evita blocos de
+     pixel de tamanho desigual (múltiplo torto tipo 44px "amassa" o pixel art, lê como baixa
+     qualidade mesmo sem trocar a imagem em si). */
+  width: 48px;
+  height: 48px;
 }
 
 .editor-avatar-opcao span {
@@ -133,8 +136,11 @@
 }
 
 .editor-avatar-previa .personagem-preview {
-  width: 190px;
-  height: 190px;
+  /* 192px = 3× o quadro nativo (64px) - múltiplo inteiro, pixel "quadradinho" limpo em vez de
+     distorcido (era 190px, ~2,97×: alguns pixels da fonte viravam bloco de 3px na tela, outros só
+     2px, o que lê como "qualidade ruim" mesmo sendo a mesma imagem). */
+  width: 192px;
+  height: 192px;
 }
 
 /* Crédito da arte (LPC, licença OGA-BY 3.0) - precisa ficar visível dentro do próprio app, não só

@@ -198,7 +198,11 @@ export function obterCanvasCamada(url: string, especificacoes: EspecificacaoReco
 
 export async function obterTexturaCamada(url: string, especificacoes: EspecificacaoRecolor[]): Promise<Texture> {
   const canvas = await obterCanvasCamada(url, especificacoes)
-  return Texture.from(canvas)
+  // `scaleMode: 'nearest'` explícito - sem isso o Pixi usa 'linear' (suaviza/borra) por padrão,
+  // o que borra pixel art escalada pra cima (o avatar no mundo já é ampliado, `ESCALA_AVATAR` em
+  // AvatarPixi.tsx) - mesmo motivo do `imageRendering: pixelated` já usado no canvas 2D da prévia
+  // (PersonagemPreview.tsx), só que pro lado do WebGL/Pixi.
+  return Texture.from({ resource: canvas, scaleMode: 'nearest' })
 }
 
 /** Recorta a folha completa (576×256) nos 36 quadros (9 colunas × 4 linhas) - view sobre a mesma

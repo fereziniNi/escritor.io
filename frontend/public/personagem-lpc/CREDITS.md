@@ -26,7 +26,11 @@ pro texto completo da OGA-BY 3.0.
 
 Camada separada do corpo (corrigido depois do usuário reportar "meu personagem está sem o rosto" -
 o `body/bodies/male` é só torso+pernas, a cabeça é uma hierarquia à parte no próprio LPC). Categoria
-adicionada a pedido do usuário ("quero poder escolher qual face irei utilizar") - 8 formatos.
+adicionada a pedido do usuário ("quero poder escolher qual face irei utilizar") - 16 formatos (dobrou
+de 8 depois do usuário reclamar que as opções originais, só variação sutil de formato humano,
+"trazem poucas diferenças" - as 8 novas incluem 7 criaturas bem mais distintas entre si). As 9
+primeiras (variações humanas) usam a cor de pele escolhida no editor; as 7 seguintes (criaturas) têm
+cor própria fixa e não respondem a ela.
 
 - **PADRAO** (`head/heads/human/male`)
   - Autoria: bluecarrot16, Benjamin K. Smith (BenCreating), Stephen Challener (Redshrike)
@@ -68,6 +72,48 @@ adicionada a pedido do usuário ("quero poder escolher qual face irei utilizar")
   - Licença usada: OGA-BY 3.0
   - Fonte: https://opengameart.org/content/liberated-pixel-cup-lpc-base-assets-sprites-map-tiles
   - Notas do autor: original head by Redshrike, reduced size head by ElizaWy
+- **IDOSA_PEQUENA** (`head/heads/human/elderly_small`)
+  - Autoria: Eliza Wyatt (ElizaWy), Stephen Challener (Redshrike)
+  - Licença usada: OGA-BY 3.0
+  - Fonte: https://opengameart.org/content/liberated-pixel-cup-lpc-base-assets-sprites-map-tiles
+  - Notas do autor: original head by Redshrike, elderly & reduced size head by ElizaWy
+- **ALIENIGENA** (`head/heads/alien/adult`) - cor própria fixa
+  - Autoria: bluecarrot16, Benjamin K. Smith (BenCreating), Nila122
+  - Licença usada: OGA-BY 3.0
+  - Fonte: https://opengameart.org/content/drakes-and-lizardfolk, https://opengameart.org/content/lpc-character-bases
+  - Notas do autor: based on lizard originally by Nila122, modified by BenCreating, further edited by bluecarrot16
+- **GOBLIN** (`head/heads/goblin/adult`) - cor própria fixa
+  - Autoria: bluecarrot16, Stephen Challener (Redshrike), William.Thomsponj
+  - Licença usada: OGA-BY 3.0
+  - Fonte: https://opengameart.org/content/lpc-goblin, https://opengameart.org/content/lpc-folk
+  - Notas do autor: original goblin by Redshrike, commisioned by William.Thomsponj; modular head extracted and enlarged by bluecarrot16
+- **VAMPIRO** (`head/heads/vampire/adult`)
+  - Autoria: Stephen Challener (Redshrike), bluecarrot16
+  - Licença usada: OGA-BY 3.0
+  - Fonte: https://opengameart.org/content/liberated-pixel-cup-lpc-base-assets-sprites-map-tiles, https://opengameart.org/content/lpc-folk
+  - Notas do autor: original head by Redshrike, gaunt version by bluecarrot16, vampire fangs by bluecarrot16
+- **LOBO** (`head/heads/wolf/male`) - cor própria fixa
+  - Autoria: bluecarrot16, Sander Frenken (castelonia), Benjamin K. Smith (BenCreating), William.Thompsonj, Stephen Challener (Redshrike)
+  - Licença usada: CC-BY-SA 3.0 (OGA-BY 3.0 não estava disponível pra este arquivo - GPL 3.0 era a
+    outra opção, evitada por copyleft)
+  - Fonte: https://opengameart.org/content/liberated-pixel-cup-lpc-base-assets-sprites-map-tiles, https://opengameart.org/content/lpc-wolf-animation, https://opengameart.org/content/lpc-wolfman
+  - Notas do autor: original wolf animation by Redshrike, commissioned by William.Thompsonj; wolfman sprite by BenCreating, commissioned by castelonia; tweaks and headless version by bluecarrot16
+- **COELHO** (`head/heads/rabbit/adult`) - cor própria fixa
+  - Autoria: bluecarrot16, Stephen Challener (Redshrike), Napsio (Vitruvian Studio), JaidynReiman
+  - Licença usada: OGA-BY 3.0
+  - Fonte: https://opengameart.org/content/bunny-rabbit-lpc-style-for-pixelfarm, https://opengameart.org/content/lpc-folk
+  - Notas do autor: original rabbit by Redshrike, adapted to modular head by bluecarrot16, color reduction by napsio (Vitruvian Studio) and JaidynReiman
+- **ORC** (`head/heads/orc/male`) - cor própria fixa
+  - Autoria: bluecarrot16, Matthew Krohn (makrohn), Stephen Challener (Redshrike), Zi Ye
+  - Licença usada: OGA-BY 3.0
+  - Fonte: https://opengameart.org/content/four-characters-my-lpc-entries, https://opengameart.org/content/sinbad-the-ogre, https://opengameart.org/content/lpc-male-sheets
+  - Notas do autor: Sinbad the ogre design by Zi Ye, original 4-direction sprite by Redshrike, additional hurt/cast animations by makrohn, headless version by bluecarrot16
+- **MINOTAURO** (`head/heads/minotaur/male`) - cor própria fixa
+  - Autoria: Evert, Nila122, Daniel Eddeland (daneeklu)
+  - Licença usada: CC-BY-SA 3.0 (OGA-BY 3.0 não estava disponível pra este arquivo - GPL 3.0 era a
+    outra opção, evitada por copyleft)
+  - Fonte: https://opengameart.org/content/lpc-style-farm-animals, https://opengameart.org/content/lpc-lizard-headgear, https://opengameart.org/content/lpc-faun-and-minotaur
+  - Notas do autor: original cow by daneeklu, combined with horns by Nila122 and adapted to minotaur by Evert
 
 ## Cabelo
 
