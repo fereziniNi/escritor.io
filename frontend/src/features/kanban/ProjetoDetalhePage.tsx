@@ -317,8 +317,11 @@ function DetalhesDoCard({ cardId }: { cardId: number }) {
 
   return (
     <div className="kanban-detalhes">
-      <button type="button" className="botao-secundario botao-pequeno kanban-detalhes-botao" onClick={() => setAberto((atual) => !atual)}>
-        {aberto ? '🔼 Ocultar detalhes' : '🔽 Detalhes'}
+      <button type="button" className="kanban-detalhes-botao" onClick={() => setAberto((atual) => !atual)}>
+        <span className={`kanban-detalhes-seta${aberto ? ' kanban-detalhes-seta-aberta' : ''}`} aria-hidden="true">
+          ▸
+        </span>
+        {aberto ? 'Ocultar detalhes' : 'Detalhes'}
       </button>
       {aberto && (
         <div className="kanban-detalhes-corpo">
@@ -389,25 +392,27 @@ function ColunaComDrop({
 
   return (
     <section ref={setNodeRef} className="kanban-coluna">
-      <h2 className="kanban-coluna-titulo">
-        {coluna.nome}
+      <div className="kanban-coluna-cabecalho">
+        <h2 className="kanban-coluna-titulo">
+          {coluna.nome}
+          {coluna.limiteWip !== null && (
+            <span className="badge">
+              {' '}
+              {coluna.cards.length}/{coluna.limiteWip}
+            </span>
+          )}
+        </h2>
+        {/* Barra decorativa só - o badge de texto acima continua sendo a fonte confiável (leitor
+        de tela/teste), isto aqui é só o toque "gameficado" pedido (barra de progresso tipo WIP). */}
         {coluna.limiteWip !== null && (
-          <span className="badge">
-            {' '}
-            {coluna.cards.length}/{coluna.limiteWip}
-          </span>
+          <div className="kanban-coluna-progresso" aria-hidden="true">
+            <div
+              className="kanban-coluna-progresso-preenchido"
+              style={{ width: `${Math.min(100, (coluna.cards.length / coluna.limiteWip) * 100)}%` }}
+            />
+          </div>
         )}
-      </h2>
-      {/* Barra decorativa só - o badge de texto acima continua sendo a fonte confiável (leitor de
-      tela/teste), isto aqui é só o toque "gameficado" pedido (barra de progresso tipo WIP). */}
-      {coluna.limiteWip !== null && (
-        <div className="kanban-coluna-progresso" aria-hidden="true">
-          <div
-            className="kanban-coluna-progresso-preenchido"
-            style={{ width: `${Math.min(100, (coluna.cards.length / coluna.limiteWip) * 100)}%` }}
-          />
-        </div>
-      )}
+      </div>
       <SortableContext items={coluna.cards.map((card) => card.id)} strategy={verticalListSortingStrategy}>
         <ul className="kanban-cards">
           {coluna.cards.map((card) => (
@@ -421,7 +426,7 @@ function ColunaComDrop({
       </SortableContext>
 
       <form
-        className="kanban-card-form"
+        className="kanban-nova-tarefa-form"
         onSubmit={(evento) => {
           evento.preventDefault()
           onCriarCard()
@@ -432,34 +437,38 @@ function ColunaComDrop({
         </label>
         <input
           id={`titulo-card-${coluna.id}`}
+          className="kanban-card-form-titulo"
           value={novoCard.titulo}
           onChange={(evento) => onNovoCardChange({ ...novoCard, titulo: evento.target.value })}
           placeholder="+ Nova tarefa"
           required
         />
-        <CampoPessoa
-          id={`responsavel-card-${coluna.id}`}
-          label="Nome do responsável (opcional)"
-          labelSrOnly
-          valor={novoCard.responsavelNome}
-          aoMudarValor={(texto) => onNovoCardChange({ ...novoCard, responsavelNome: texto })}
-          pessoas={pessoas}
-          placeholder="Nome do responsável"
-        />
+        <div className="kanban-card-form-linha">
+          <CampoPessoa
+            id={`responsavel-card-${coluna.id}`}
+            label="Nome do responsável (opcional)"
+            labelSrOnly
+            valor={novoCard.responsavelNome}
+            aoMudarValor={(texto) => onNovoCardChange({ ...novoCard, responsavelNome: texto })}
+            pessoas={pessoas}
+            placeholder="Responsável"
+          />
+          <label htmlFor={`estimativa-card-${coluna.id}`} className="sr-only">
+            Tempo estimado em minutos (opcional)
+          </label>
+          <input
+            id={`estimativa-card-${coluna.id}`}
+            type="number"
+            className="kanban-card-form-estimativa"
+            value={novoCard.estimativaMinutos}
+            onChange={(evento) => onNovoCardChange({ ...novoCard, estimativaMinutos: evento.target.value })}
+            placeholder="Min."
+          />
+          <button type="submit" className="botao-pequeno" disabled={criandoCard}>
+            Adicionar tarefa
+          </button>
+        </div>
         {responsavelNaoEncontrado && <span className="mensagem-erro">Pessoa não encontrada</span>}
-        <label htmlFor={`estimativa-card-${coluna.id}`} className="sr-only">
-          Tempo estimado em minutos (opcional)
-        </label>
-        <input
-          id={`estimativa-card-${coluna.id}`}
-          type="number"
-          value={novoCard.estimativaMinutos}
-          onChange={(evento) => onNovoCardChange({ ...novoCard, estimativaMinutos: evento.target.value })}
-          placeholder="Tempo estimado (min)"
-        />
-        <button type="submit" className="botao-pequeno" disabled={criandoCard}>
-          Adicionar tarefa
-        </button>
       </form>
     </section>
   )

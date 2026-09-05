@@ -20,7 +20,7 @@ export function PainelProjetos() {
 
   return (
     <div>
-      <button type="button" onClick={() => setProjetoSelecionado(null)}>
+      <button type="button" className="kanban-voltar" onClick={() => setProjetoSelecionado(null)}>
         ← Voltar pros projetos
       </button>
       <ProjetoDetalhePage projetoIdProp={projetoSelecionado} />
