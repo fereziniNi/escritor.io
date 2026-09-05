@@ -31,6 +31,15 @@
   font-weight: 600;
 }
 
+/* Resumo de uma linha mostrado fora do modal (pedido do usuário: "eu quero que essa imagem vire
+ * um modal" - a lista dos 7 dias não fica mais sempre aberta, só esse resumo + o botão que abre
+ * o modal). */
+.escala-padrao-semanal-resumo {
+  margin: 0;
+  margin-right: auto;
+  color: var(--cor-texto-suave);
+}
+
 .escala-calendario-cabecalho {
   display: flex;
   align-items: center;

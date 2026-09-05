@@ -1,14 +1,14 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { EscalaExcecaoModal } from './EscalaExcecaoModal'
+import { EscalaModal } from './EscalaModal'
 
-describe('EscalaExcecaoModal', () => {
+describe('EscalaModal', () => {
   it('clicar no fundo (fora do cartão) fecha o modal', () => {
     const aoFechar = vi.fn()
     const { container } = render(
-      <EscalaExcecaoModal aoFechar={aoFechar}>
+      <EscalaModal titulo="Teste" aoFechar={aoFechar}>
         <p>Conteúdo do formulário</p>
-      </EscalaExcecaoModal>,
+      </EscalaModal>,
     )
 
     fireEvent.click(container.querySelector('.escala-excecao-modal-fundo')!)
@@ -19,13 +19,23 @@ describe('EscalaExcecaoModal', () => {
   it('clicar dentro do cartão não fecha o modal', () => {
     const aoFechar = vi.fn()
     render(
-      <EscalaExcecaoModal aoFechar={aoFechar}>
+      <EscalaModal titulo="Teste" aoFechar={aoFechar}>
         <p>Conteúdo do formulário</p>
-      </EscalaExcecaoModal>,
+      </EscalaModal>,
     )
 
     fireEvent.click(screen.getByText('Conteúdo do formulário'))
 
     expect(aoFechar).not.toHaveBeenCalled()
+  })
+
+  it('usa o título como aria-label do diálogo', () => {
+    render(
+      <EscalaModal titulo="Padrão semanal" aoFechar={vi.fn()}>
+        <p>Conteúdo</p>
+      </EscalaModal>,
+    )
+
+    expect(screen.getByRole('dialog', { name: 'Padrão semanal' })).toBeInTheDocument()
   })
 })

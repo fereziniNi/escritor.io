@@ -7,7 +7,7 @@ import { CalendarioMes } from './CalendarioMes'
 import { CalendarioSemana } from './CalendarioSemana'
 import { construirGradeDoMes } from './construirGradeDoMes'
 import { anoDaData, dataDeHoje, diaDaData, mesDaData, nomeDoDiaDaSemana, segundaFeiraDaSemana, somarDias } from './datasEscala'
-import { EscalaExcecaoModal } from './EscalaExcecaoModal'
+import { EscalaModal } from './EscalaModal'
 import { FormularioExcecaoDoDia } from './FormularioExcecaoDoDia'
 import type { SalvarExcecaoInput } from './types'
 import './Escala.css'
@@ -220,7 +220,7 @@ export function EscalaCalendarioPainel() {
           )}
 
           {selecao && (
-            <EscalaExcecaoModal aoFechar={() => setSelecao(null)}>
+            <EscalaModal titulo={`Horário de ${formatarDataBr(selecao.data)}`} aoFechar={() => setSelecao(null)}>
               <FormularioExcecaoDoDia
                 data={selecao.data}
                 trabalhaInicial={selecao.horaInicioSugerida ? true : (efetivoSelecionado?.trabalha ?? false)}
@@ -237,7 +237,7 @@ export function EscalaCalendarioPainel() {
                 aoRemover={(id) => removerMutation.mutate(id)}
                 aoFechar={() => setSelecao(null)}
               />
-            </EscalaExcecaoModal>
+            </EscalaModal>
           )}
         </>
       )}
