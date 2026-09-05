@@ -46,3 +46,10 @@ export interface EscalaEquipe {
   usuarioNome: string
   dias: DiaEfetivo[]
 }
+
+/** `habilitado` = o backend tem credenciais da Google configuradas neste ambiente (independente de
+ * quem está logado); `conectado` = o usuário atual já autorizou a própria conta. */
+export interface EstadoGoogle {
+  habilitado: boolean
+  conectado: boolean
+}

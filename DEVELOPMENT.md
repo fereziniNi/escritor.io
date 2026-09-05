@@ -137,6 +137,64 @@ uma mensagem de texto no número configurado - envio assíncrono e best-effort (
 `NotificacaoPontoWhatsApp`): se o Evolution API estiver fora do ar, o registro de ponto continua
 sendo salvo normalmente, só o aviso que não sai (fica logado como aviso no backend).
 
+## Integração com Google Agenda
+
+Pedido do usuário: "algo muito parecido com o agenda do google. Poderia fazer isso?? Ou ate mesmo
+integrar?" - cada funcionário conecta a própria conta Google (OAuth2) e a escala dele (ver painel
+"🗓️ Minha escala") passa a ser publicada como eventos no Google Agenda dele mesmo (via de mão
+única - não lemos o Google Agenda de volta). Fica **indisponível por padrão** (o widget "Conectar
+Google Agenda" nem aparece) até você configurar um Client ID/Secret de verdade.
+
+### 1. Crie as credenciais no Google Cloud Console
+
+1. Crie ou selecione um projeto em [console.cloud.google.com](https://console.cloud.google.com).
+2. **APIs & Services → Library** → habilite **Google Calendar API**.
+3. **APIs & Services → OAuth consent screen**: tipo "External", preencha nome do app e e-mail de
+   suporte, adicione o escopo `.../auth/calendar.events`. Deixe o app em modo **"Testing"** (evita
+   precisar de verificação do Google) e adicione como **"Test users"** o e-mail de cada
+   colaborador que for testar a conexão (limite de 100 test users - refresh token funciona
+   normalmente pra eles).
+4. **APIs & Services → Credentials → Create Credentials → OAuth client ID**, tipo "Web
+   application". Em **Authorized redirect URIs**, adicione exatamente:
+   ```
+   http://127.0.0.1:5175/integracoes/google/callback
+   ```
+   (mesma porta do frontend documentada no Troubleshooting - se você remapeou `FRONTEND_PORT`,
+   ajuste aqui também).
+
+### 2. Configure e ligue no backend
+
+No `.env` da raiz:
+
+```
+GOOGLE_OAUTH_CLIENT_ID=seu-client-id.apps.googleusercontent.com
+GOOGLE_OAUTH_CLIENT_SECRET=seu-client-secret
+GOOGLE_OAUTH_REDIRECT_URI=http://127.0.0.1:5175/integracoes/google/callback
+GOOGLE_TOKEN_CHAVE_CRIPTO=<32 bytes em base64, gere com: openssl rand -base64 32>
+```
+
+- `GOOGLE_OAUTH_CLIENT_ID`/`GOOGLE_OAUTH_CLIENT_SECRET`: os dois valores do passo 1.4. Sem eles
+  (ou em branco), a integração fica desligada - `GET /integracoes/google/estado` devolve
+  `habilitado: false` e o widget não aparece pra ninguém, sem quebrar o resto do sistema.
+- `GOOGLE_OAUTH_REDIRECT_URI`: precisa bater **exatamente** com a URI cadastrada no passo 1.4.
+- `GOOGLE_TOKEN_CHAVE_CRIPTO`: chave AES-256 usada só pra criptografar o refresh token de cada
+  usuário em repouso (`ContaGoogleCalendar`/`CriptografiaTokenConverter`) - diferente do refresh
+  token da própria sessão (`TokenRenovacao`, só hash), esse precisa voltar em texto claro pra ser
+  reenviado à Google, então **nunca reuse a mesma chave de outro segredo** e nunca versione o
+  valor real. Trocar essa chave depois de já existir gente conectada invalida os tokens salvos
+  (seria preciso reconectar).
+
+Reinicie o backend pra pegar as novas variáveis.
+
+### 3. Conecte uma conta
+
+Qualquer papel (o widget é por usuário, não é ADMIN-only) - abra **🗓️ Minha escala** no Escritório
+e clique **Conectar Google Agenda** no topo do painel. Uma tela de consentimento real da Google
+abre; depois de autorizar, você volta pro Escritório com um aviso de sucesso e o próprio painel já
+aberto. A partir daí, toda vez que a escala (padrão semanal ou uma exceção) muda, ela é publicada
+de novo automaticamente (assíncrono - não trava a tela), e um job diário de madrugada mantém a
+janela de 60 dias sempre à frente mesmo sem mexer em nada.
+
 ## Ciclo de desenvolvimento (TDD)
 
 Ver [docs/testing-strategy.md](docs/testing-strategy.md) para o workflow completo. Resumo: teste de domínio no backend primeiro, depois web/repositório, depois componente no frontend, E2E só para os fluxos críticos listados lá.

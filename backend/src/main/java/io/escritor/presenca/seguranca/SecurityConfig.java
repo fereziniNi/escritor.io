@@ -33,7 +33,13 @@ public class SecurityConfig {
                         // path é feita à parte, via query param, por ProjetoHandshakeInterceptor - não por
                         // este filtro. Deixar authenticated() aqui derrubaria todo handshake com 401 antes
                         // do interceptor sequer rodar.
-                        .requestMatchers("/health", "/auth/**", "/error", "/ws/**").permitAll()
+                        // /integracoes/google/callback também é público: é a Google redirecionando o
+                        // navegador de volta (S. "algo muito parecido com o agenda do google... ou ate
+                        // mesmo integrar") - uma navegação de página inteira não carrega o header
+                        // Authorization. Quem autentica essa requisição específica é o nonce de uso único
+                        // (`state`), validado dentro de GoogleOAuthService#tratarCallback, não este filtro.
+                        .requestMatchers("/health", "/auth/**", "/error", "/ws/**", "/integracoes/google/callback")
+                        .permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(new JwtAuthenticationFilter(jwtService), UsernamePasswordAuthenticationFilter.class);
 

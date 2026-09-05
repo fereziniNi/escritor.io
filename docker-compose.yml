@@ -43,6 +43,14 @@ services:
       APP_EVOLUTION_INSTANCIA: ${EVOLUTION_INSTANCIA:-escritorio}
       APP_EVOLUTION_CHEFE_NUMERO: ${EVOLUTION_CHEFE_NUMERO:-}
       APP_EVOLUTION_HABILITADO: ${EVOLUTION_HABILITADO:-false}
+      # Integração com Google Agenda (pedido do usuário: "algo muito parecido com o agenda do
+      # google... ou ate mesmo integrar") - cada funcionário conecta a própria conta. Sem
+      # GOOGLE_OAUTH_CLIENT_ID/SECRET no .env, fica indisponível sem quebrar o resto do sistema.
+      # Ver DEVELOPMENT.md "Integração com Google Agenda".
+      APP_GOOGLE_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      APP_GOOGLE_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      APP_GOOGLE_REDIRECT_URI: ${GOOGLE_OAUTH_REDIRECT_URI:-http://127.0.0.1:5175/integracoes/google/callback}
+      APP_GOOGLE_CHAVE_CRIPTOGRAFIA: ${GOOGLE_TOKEN_CHAVE_CRIPTO:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
 

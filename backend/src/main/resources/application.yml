@@ -42,6 +42,26 @@ app:
     instancia: escritorio
     chefe-numero: ""
     habilitado: false
+  google:
+    # Pedido do usuário: "algo muito parecido com o agenda do google. Poderia fazer isso?? Ou ate
+    # mesmo integrar?" - cada funcionário conecta a própria conta Google (OAuth2) e a escala dele
+    # é publicada como eventos no Google Agenda dele mesmo (ver `GoogleCalendarSincronizacaoService`).
+    # Requer um projeto no Google Cloud Console com a Calendar API habilitada e um OAuth client ID
+    # tipo "Web application" - ver DEVELOPMENT.md "Integração com Google Agenda". Sem
+    # client-id/client-secret configurados (env `APP_GOOGLE_CLIENT_ID`/`APP_GOOGLE_CLIENT_SECRET`),
+    # a integração fica indisponível (endpoints retornam indicando desabilitado), sem quebrar o
+    # resto do sistema.
+    client-id: ""
+    client-secret: ""
+    redirect-uri: http://127.0.0.1:5175/integracoes/google/callback
+    # Chave AES-256 (32 bytes em base64) pra criptografar o refresh token em repouso - diferente
+    # de `TokenRenovacao.tokenHash` (SHA-256, só comparação), aqui o valor precisa voltar em texto
+    # claro pra ser reenviado pra Google. Gerar com `openssl rand -base64 32` em produção - NUNCA
+    # versionar o valor real, sobrescrever via APP_GOOGLE_CHAVE_CRIPTOGRAFIA.
+    chave-criptografia: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+    # O app ainda não guarda fuso horário por usuário (mesma limitação de sempre, ver ADR 0010
+    # citado em JornadaService) - os eventos vão pra Google com um fuso fixo.
+    fuso-horario: America/Sao_Paulo
 
 management:
   endpoints:

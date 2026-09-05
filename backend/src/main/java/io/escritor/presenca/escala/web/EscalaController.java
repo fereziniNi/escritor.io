@@ -1,6 +1,8 @@
 package io.escritor.presenca.escala.web;
 
 import io.escritor.presenca.escala.service.EscalaService;
+import io.escritor.presenca.googlecalendar.service.GoogleCalendarSincronizacaoService;
+import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
@@ -24,16 +26,27 @@ import org.springframework.web.bind.annotation.RestController;
  * de leitura/escrita da própria escala ({@code /semanal}, {@code /excecoes}, {@code /efetiva}) atua
  * sempre sobre o usuário autenticado, sem parâmetro {@code usuarioId} - ninguém edita a escala de
  * outra pessoa, nem ADMIN. Só {@code /equipe} é GESTOR/ADMIN, e é somente leitura.
+ *
+ * <p>Toda mutação também dispara {@link GoogleCalendarSincronizacaoService#sincronizarSeConectado}
+ * (assíncrono, não atrasa a resposta) - pedido do usuário: "algo muito parecido com o agenda do
+ * google... ou ate mesmo integrar". Fica aqui no controller, não dentro de {@code EscalaService},
+ * porque o serviço de sincronização já depende de {@code EscalaService} pra ler a escala efetiva -
+ * injetar de volta criaria uma dependência circular entre os dois.
  */
 @RestController
 @RequestMapping("/escala")
 public class EscalaController {
 
     private final EscalaService escalaService;
+    private final GoogleCalendarSincronizacaoService googleSincronizacaoService;
     private final ContextoUsuarioAutenticado contextoUsuarioAutenticado;
 
-    public EscalaController(EscalaService escalaService, ContextoUsuarioAutenticado contextoUsuarioAutenticado) {
+    public EscalaController(
+            EscalaService escalaService,
+            GoogleCalendarSincronizacaoService googleSincronizacaoService,
+            ContextoUsuarioAutenticado contextoUsuarioAutenticado) {
         this.escalaService = escalaService;
+        this.googleSincronizacaoService = googleSincronizacaoService;
         this.contextoUsuarioAutenticado = contextoUsuarioAutenticado;
     }
 
@@ -44,7 +57,10 @@ public class EscalaController {
 
     @PutMapping("/semanal")
     public List<EscalaSemanalResponse> definirSemanal(@Valid @RequestBody List<ItemEscalaSemanalRequest> itens) {
-        return escalaService.definirSemanal(contextoUsuarioAutenticado.usuarioAtual(), itens);
+        Usuario usuario = contextoUsuarioAutenticado.usuarioAtual();
+        List<EscalaSemanalResponse> resultado = escalaService.definirSemanal(usuario, itens);
+        googleSincronizacaoService.sincronizarSeConectado(usuario);
+        return resultado;
     }
 
     @GetMapping("/excecoes")
@@ -55,13 +71,18 @@ public class EscalaController {
     @PostMapping("/excecoes")
     @ResponseStatus(HttpStatus.CREATED)
     public EscalaExcecaoResponse salvarExcecao(@Valid @RequestBody SalvarExcecaoRequest request) {
-        return escalaService.salvarExcecao(contextoUsuarioAutenticado.usuarioAtual(), request);
+        Usuario usuario = contextoUsuarioAutenticado.usuarioAtual();
+        EscalaExcecaoResponse resultado = escalaService.salvarExcecao(usuario, request);
+        googleSincronizacaoService.sincronizarSeConectado(usuario);
+        return resultado;
     }
 
     @DeleteMapping("/excecoes/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removerExcecao(@PathVariable Long id) {
-        escalaService.removerExcecao(contextoUsuarioAutenticado.usuarioAtual(), id);
+        Usuario usuario = contextoUsuarioAutenticado.usuarioAtual();
+        escalaService.removerExcecao(usuario, id);
+        googleSincronizacaoService.sincronizarSeConectado(usuario);
     }
 
     @GetMapping("/efetiva")

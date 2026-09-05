@@ -1,6 +1,7 @@
 package io.escritor.presenca.escala.web;
 
 import io.escritor.presenca.escala.service.EscalaService;
+import io.escritor.presenca.googlecalendar.service.GoogleCalendarSincronizacaoService;
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
 import io.escritor.presenca.seguranca.JwtService;
 import io.escritor.presenca.seguranca.SecurityConfig;
@@ -41,6 +42,9 @@ class EscalaControllerTest {
 
     @MockitoBean
     private EscalaService escalaService;
+
+    @MockitoBean
+    private GoogleCalendarSincronizacaoService googleSincronizacaoService;
 
     @MockitoBean
     private ContextoUsuarioAutenticado contextoUsuarioAutenticado;

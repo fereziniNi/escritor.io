@@ -55,6 +55,27 @@ export function EscritorioPage() {
   const [participantesAberto, setParticipantesAberto] = useState(false)
   const { itens: notificacoes, notificar } = useNotificacoes()
 
+  // Pedido do usuário: "algo muito parecido com o agenda do google... ou ate mesmo integrar" - a
+  // Google redireciona o navegador de volta pra cá (`IntegracaoGoogleController#callback`, no
+  // backend, devolve `/?google=conectado|erro`) depois do usuário autorizar. Lê o parâmetro uma
+  // vez ao montar, mostra o toast, abre "Minha escala" (é lá que a conexão foi iniciada) e limpa a
+  // URL - sem isso o parâmetro reapareceria num F5 e notificaria de novo.
+  useEffect(() => {
+    const parametros = new URLSearchParams(window.location.search)
+    const google = parametros.get('google')
+    if (google === 'conectado') {
+      notificar('✅ Google Agenda conectado!')
+      setPainelAberto('escala')
+    } else if (google === 'erro') {
+      notificar('Não foi possível conectar ao Google Agenda.')
+      setPainelAberto('escala')
+    }
+    if (google !== null) {
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const eu = meuUsuarioId !== null ? usuarios[meuUsuarioId] : undefined
 
   useMovimentoTeclado({

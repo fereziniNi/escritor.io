@@ -1,5 +1,13 @@
 import { apiFetch } from '../../shared/api/http'
-import type { DiaEfetivo, EscalaEquipe, EscalaExcecao, EscalaSemanal, ItemEscalaSemanal, SalvarExcecaoInput } from './types'
+import type {
+  DiaEfetivo,
+  EscalaEquipe,
+  EscalaExcecao,
+  EscalaSemanal,
+  EstadoGoogle,
+  ItemEscalaSemanal,
+  SalvarExcecaoInput,
+} from './types'
 
 export async function listarEscalaSemanal(): Promise<EscalaSemanal[]> {
   const response = await apiFetch('/escala/semanal')
@@ -62,4 +70,31 @@ export async function buscarEscalaDaEquipe(inicio: string, fim: string): Promise
     throw new Error('Não foi possível carregar a escala da equipe')
   }
   return response.json()
+}
+
+export async function buscarEstadoGoogle(): Promise<EstadoGoogle> {
+  const response = await apiFetch('/integracoes/google/estado')
+  if (!response.ok) {
+    throw new Error('Não foi possível consultar a conexão com o Google Agenda')
+  }
+  return response.json()
+}
+
+/** Devolve a URL de autorização - quem chama precisa fazer `window.location.href = url` (uma
+ * navegação de página inteira de verdade, não dá pra ser só este fetch: a Google exige que o
+ * próprio navegador do usuário visite a tela de consentimento dela). */
+export async function iniciarConexaoGoogle(): Promise<string> {
+  const response = await apiFetch('/integracoes/google/iniciar')
+  if (!response.ok) {
+    throw new Error('Não foi possível iniciar a conexão com o Google Agenda')
+  }
+  const dados: { url: string } = await response.json()
+  return dados.url
+}
+
+export async function desconectarGoogle(): Promise<void> {
+  const response = await apiFetch('/integracoes/google', { method: 'DELETE' })
+  if (!response.ok) {
+    throw new Error('Não foi possível desconectar do Google Agenda')
+  }
 }

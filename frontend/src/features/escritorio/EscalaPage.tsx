@@ -1,4 +1,5 @@
 import { useAuthStore } from '../auth/authStore'
+import { ConectarGoogleAgenda } from '../escala/ConectarGoogleAgenda'
 import { EscalaCalendarioPainel } from '../escala/EscalaCalendarioPainel'
 import { EscalaEquipePainel } from '../escala/EscalaEquipePainel'
 import { PadraoSemanalForm } from '../escala/PadraoSemanalForm'
@@ -17,6 +18,7 @@ export function EscalaPage() {
 
   return (
     <div className="pagina">
+      <ConectarGoogleAgenda />
       <PadraoSemanalForm />
       <EscalaCalendarioPainel />
       {(papel === 'GESTOR' || papel === 'ADMIN') && <EscalaEquipePainel />}

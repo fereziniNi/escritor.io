@@ -11,6 +11,7 @@ const server = setupServer(
   http.get('/escala/efetiva', () => HttpResponse.json([])),
   http.get('/escala/excecoes', () => HttpResponse.json([])),
   http.get('/escala/equipe', () => HttpResponse.json([])),
+  http.get('/integracoes/google/estado', () => HttpResponse.json({ habilitado: false, conectado: false })),
 )
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))

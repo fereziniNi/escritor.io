@@ -233,6 +233,25 @@ describe('EscritorioPage', () => {
     expect(screen.getByTestId('presenca-zona-aberto')).not.toHaveTextContent('Ana')
   })
 
+  it('volta da Google com "?google=conectado" mostra o toast, abre "Minha escala" e limpa a URL', async () => {
+    server.use(
+      http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)),
+      handlerPontoAberto(),
+      handlerHealthOk(),
+      http.get('/escala/semanal', () => HttpResponse.json([])),
+      http.get('/escala/efetiva', () => HttpResponse.json([])),
+      http.get('/escala/excecoes', () => HttpResponse.json([])),
+      http.get('/integracoes/google/estado', () => HttpResponse.json({ habilitado: true, conectado: true })),
+    )
+    window.history.pushState({}, '', '/?google=conectado')
+
+    renderPagina()
+
+    expect(await screen.findByText(/google agenda conectado/i)).toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: /minha escala/i })).toBeInTheDocument()
+    expect(window.location.search).toBe('')
+  })
+
   it('abrir o painel de ponto pelo dock mostra o widget de ponto, sem sair da tela', async () => {
     server.use(
       http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)),
