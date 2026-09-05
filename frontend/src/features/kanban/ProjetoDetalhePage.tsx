@@ -558,6 +558,11 @@ function MembrosDoProjeto({
  * forma de acrescentar outras pelo frontend (o endpoint `POST /projetos/{id}/colunas` já existia
  * no backend, só faltava a tela). `ordem` é calculada aqui a partir das colunas já carregadas -
  * o backend rejeita duas colunas com a mesma ordem no mesmo projeto.
+ *
+ * Apesar do nome ("admin pode"), a permissão nunca foi restrita a ADMIN de fato - nasceu GESTOR/
+ * ADMIN e depois, a pedido do usuário ("Um funcionário pode adicionar seções e também adicionar
+ * novos projetos"), abriu pra qualquer autenticado - `ProjetoDetalhePage` não passa mais nenhuma
+ * prop de permissão pra este componente, ele sempre renderiza.
  */
 function NovaColuna({ projetoId, proximaOrdem }: { projetoId: number; proximaOrdem: number }) {
   const queryClient = useQueryClient()
@@ -635,9 +640,12 @@ export function ProjetoDetalhePage({ projetoIdProp }: { projetoIdProp?: number }
   const projetoId = projetoIdProp ?? Number(id)
   const queryClient = useQueryClient()
   const papel = useAuthStore((estado) => estado.papel)
-  // GESTOR/ADMIN: mesma permissão pra adicionar membro e pra adicionar seção (coluna) - ambas
-  // `@PreAuthorize("hasAnyRole('GESTOR', 'ADMIN')")` no backend (`ProjetoController`).
-  const podeGerenciarProjeto = papel === 'GESTOR' || papel === 'ADMIN'
+  // Pedido do usuário: "Um funcionário pode adicionar seções e também adicionar novos projetos" -
+  // adicionar seção deixou de ser GESTOR/ADMIN e virou qualquer autenticado (mesma mudança em
+  // `POST /projetos/{id}/colunas` no backend, `ProjetoController` - `@PreAuthorize` removido de
+  // lá). Adicionar MEMBRO não foi mencionado no pedido - continua GESTOR/ADMIN, então precisa
+  // continuar como uma permissão separada da de seção (as duas eram a mesma variável antes).
+  const podeAdicionarMembro = papel === 'GESTOR' || papel === 'ADMIN'
 
   const [novoCardPorColuna, setNovoCardPorColuna] = useState<Record<number, typeof NOVO_CARD_VAZIO>>({})
 
@@ -759,7 +767,7 @@ export function ProjetoDetalhePage({ projetoIdProp }: { projetoIdProp?: number }
         </div>
       </div>
 
-      <MembrosDoProjeto projetoId={projetoId} membros={projeto.membros} pessoas={pessoas} podeGerenciar={podeGerenciarProjeto} />
+      <MembrosDoProjeto projetoId={projetoId} membros={projeto.membros} pessoas={pessoas} podeGerenciar={podeAdicionarMembro} />
 
       {projeto.colunas.length === 0 && <p className="mensagem-vazia">Nenhuma coluna neste projeto ainda.</p>}
 
@@ -789,12 +797,12 @@ export function ProjetoDetalhePage({ projetoIdProp }: { projetoIdProp?: number }
             criandoCard={criarCardMutation.isPending}
           />
         ))}
-        {podeGerenciarProjeto && (
-          <NovaColuna
-            projetoId={projetoId}
-            proximaOrdem={projeto.colunas.reduce((maior, coluna) => Math.max(maior, coluna.ordem), -1) + 1}
-          />
-        )}
+        {/* Qualquer autenticado pode adicionar seção agora (pedido do usuário) - sem checagem de
+        papel aqui, diferente de `MembrosDoProjeto` acima. */}
+        <NovaColuna
+          projetoId={projetoId}
+          proximaOrdem={projeto.colunas.reduce((maior, coluna) => Math.max(maior, coluna.ordem), -1) + 1}
+        />
         </div>
       </DndContext>
     </main>

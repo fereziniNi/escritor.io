@@ -20,9 +20,16 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Pedido do cliente (via usuário): "remova essa parte de quadro, vamos trabalhar apenas com
  * projeto" - este controller absorve por completo o que era {@code QuadroController} (colunas,
- * membros), além de criar/listar projeto que já existia. Criar continua GESTOR/ADMIN (mesmo
- * papel que já criava quadro antes da fusão - só listar/ver detalhe é aberto a qualquer
- * autenticado, e mesmo assim filtrado por visibilidade em {@link ProjetoService#listarVisiveis}).
+ * membros), além de criar/listar projeto que já existia.
+ *
+ * <p>Criar projeto e criar coluna eram GESTOR/ADMIN só (mesmo papel que já criava quadro antes da
+ * fusão) - o usuário pediu pra abrir os dois pra qualquer funcionário ("Um funcionário pode
+ * adicionar seções e também adicionar novos projetos"), então {@code criar}/{@code criarColuna}
+ * não têm mais {@code @PreAuthorize} de papel (só a autenticação padrão do
+ * {@code SecurityConfig}, igual a qualquer outro endpoint). {@code adicionarMembro} não foi
+ * mencionado no pedido - continua
+ * GESTOR/ADMIN. Listar/ver detalhe já era aberto a qualquer autenticado, filtrado por
+ * visibilidade em {@link ProjetoService#listarVisiveis}.
  */
 @RestController
 @RequestMapping("/projetos")
@@ -41,7 +48,6 @@ public class ProjetoController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('GESTOR', 'ADMIN')")
     public ProjetoResponse criar(@Valid @RequestBody CriarProjetoRequest request) {
         return projetoService.criar(request, contextoUsuarioAutenticado.usuarioAtual());
     }
@@ -65,7 +71,6 @@ public class ProjetoController {
 
     @PostMapping("/{id}/colunas")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('GESTOR', 'ADMIN')")
     public ColunaResponse criarColuna(@PathVariable Long id, @Valid @RequestBody CriarColunaRequest request) {
         return colunaService.criar(id, request.nome(), request.ordem(), request.limiteWip());
     }

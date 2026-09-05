@@ -85,9 +85,16 @@ class ProjetoControllerTest {
 
     @Test
     @WithMockUser(roles = "COLABORADOR")
-    void colaboradorNaoCriaProjeto() throws Exception {
+    void colaboradorTambemCriaProjeto() throws Exception {
+        // Pedido do usuário: "Um funcionário pode adicionar seções e também adicionar novos
+        // projetos" - criar projeto deixou de ser GESTOR/ADMIN só.
+        Usuario criador = usuarioComId(10L);
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(criador);
+        when(projetoService.criar(any(), eq(criador)))
+                .thenReturn(new ProjetoResponse(1L, "Portal", "Acme", null, null, null));
+
         mockMvc.perform(post("/projetos").contentType(MediaType.APPLICATION_JSON).content(CORPO_PROJETO))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isCreated());
     }
 
     @Test
@@ -203,13 +210,20 @@ class ProjetoControllerTest {
 
     @Test
     @WithMockUser(roles = "COLABORADOR")
-    void criarColunaComPapelColaboradorRetorna403() throws Exception {
+    void criarColunaComPapelColaboradorRetorna201() throws Exception {
+        // Pedido do usuário: "Um funcionário pode adicionar seções e também adicionar novos
+        // projetos" - criar coluna (seção) deixou de ser GESTOR/ADMIN só.
+        when(colunaService.criar(1L, "A fazer", 0, null))
+                .thenReturn(new ColunaResponse(1L, 1L, "A fazer", 0, null));
+
         mockMvc.perform(post("/projetos/1/colunas")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"nome":"A fazer","ordem":0}
                                 """))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.nome").value("A fazer"))
+                .andExpect(jsonPath("$.projetoId").value(1));
     }
 
     @Test

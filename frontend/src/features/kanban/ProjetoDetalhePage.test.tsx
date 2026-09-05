@@ -338,13 +338,28 @@ describe('ProjetoDetalhePage', () => {
     expect(await screen.findByText(/nenhuma coluna/i)).toBeInTheDocument()
   })
 
-  it('colaborador não vê o botão de nova seção', async () => {
-    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
-
+  it('colaborador também cria uma nova seção (pedido do usuário: "um funcionário pode adicionar seções")', async () => {
+    // Papel padrão do describe já é COLABORADOR (ver beforeEach) - diferente de `adicionarMembro`
+    // (GESTOR/ADMIN só, inalterado), criar seção deixou de exigir papel nenhum.
+    let colunas: ColunaComCards[] = PROJETO_DETALHE.colunas
+    server.use(
+      http.get('/projetos/1', () => HttpResponse.json({ ...PROJETO_DETALHE, colunas })),
+      http.post('/projetos/1/colunas', async ({ request }) => {
+        const corpo = (await request.json()) as { nome: string; ordem: number; limiteWip: number | null }
+        const nova = { id: 99, nome: corpo.nome, ordem: corpo.ordem, limiteWip: null, cards: [] }
+        colunas = [...colunas, nova]
+        return HttpResponse.json({ id: 99, projetoId: 1, nome: corpo.nome, ordem: corpo.ordem, limiteWip: null }, { status: 201 })
+      }),
+    )
+    const user = userEvent.setup()
     renderPagina()
 
     await screen.findByText('A fazer')
-    expect(screen.queryByRole('button', { name: /nova seção/i })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /nova seção/i }))
+    await user.type(screen.getByLabelText(/nome da seção/i), 'Revisão')
+    await user.click(screen.getByRole('button', { name: /^adicionar$/i }))
+
+    expect(await screen.findByText('Revisão')).toBeInTheDocument()
   })
 
   it('gestor cria uma nova seção (coluna) e ela aparece no board sem reload manual', async () => {

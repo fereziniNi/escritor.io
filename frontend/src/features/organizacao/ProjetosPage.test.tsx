@@ -47,13 +47,33 @@ describe('ProjetosPage', () => {
       expect(screen.getByText('Acme')).toBeInTheDocument()
     })
 
-    it('não mostra o formulário de criar projeto', async () => {
-      server.use(http.get('/projetos', () => HttpResponse.json([])))
-
+    it('também cria um projeto (pedido do usuário: "um funcionário pode... adicionar novos projetos")', async () => {
+      let projetosCriados: Array<{
+        id: number
+        nome: string
+        cliente: string
+        status: string
+        inicio: string
+        fimPrevisto: string | null
+      }> = []
+      server.use(
+        http.get('/projetos', () => HttpResponse.json(projetosCriados)),
+        http.post('/projetos', async ({ request }) => {
+          const corpo = (await request.json()) as { nome: string; cliente: string; status: string; inicio: string }
+          const novo = { id: 1, ...corpo, fimPrevisto: null }
+          projetosCriados = [novo]
+          return HttpResponse.json(novo, { status: 201 })
+        }),
+      )
+      const user = userEvent.setup()
       renderProjetosPage()
 
-      await screen.findByText(/nenhum projeto/i)
-      expect(screen.queryByRole('button', { name: /criar projeto/i })).not.toBeInTheDocument()
+      await user.type(screen.getByLabelText(/^nome$/i), 'Portal')
+      await user.type(screen.getByLabelText(/cliente/i), 'Acme')
+      await user.type(screen.getByLabelText(/início/i), '2026-01-01')
+      await user.click(screen.getByRole('button', { name: /criar projeto/i }))
+
+      expect(await screen.findByText('Portal')).toBeInTheDocument()
     })
   })
 
