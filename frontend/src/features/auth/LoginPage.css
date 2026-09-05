@@ -1,48 +1,180 @@
 /**
- * Tela de login redesenhada (pedido "todos os menus/funções... elegante, bonito"): antes era um
- * <form> sem nenhum estilo próprio, plantado no topo da página. Agora ocupa a janela inteira,
- * centralizado, com a mesma identidade visual quente/game-adjacent do resto do app (fonte
- * Press Start 2P só na marca, Nunito no corpo) - primeira coisa que qualquer usuário vê, então é
- * onde a "cara" do produto mais aparece.
+ * Tela de login - 2ª remodelagem (usuário: "extremamente feio e não esta fácil de usar" sobre a
+ * versão anterior, que era só 1 cartão branco flutuando sozinho numa página quase vazia). Agora é
+ * split-screen: vitrine à esquerda mostra a identidade do produto de verdade (título grande,
+ * gancho de valor, 3 recursos) em vez de deixar a maior parte da tela em branco; formulário à
+ * direita ganha indicador de progresso (e-mail -> código), ícone dentro de cada campo, botão
+ * primário único e "trocar e-mail" como link discreto em vez de 2º botão. Abaixo de ~880px a
+ * vitrine sai (viraria só espaço vazio numa tela estreita) e um cabeçalho compacto com a marca
+ * entra no lugar dela.
  */
 .login-pagina {
   min-height: 100vh;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem 1.25rem;
-  background:
-    radial-gradient(circle at 15% 20%, rgba(79, 143, 111, 0.12), transparent 40%),
-    radial-gradient(circle at 85% 80%, rgba(242, 165, 65, 0.14), transparent 45%),
-    var(--cor-fundo);
 }
 
-.login-marca {
-  text-align: center;
+/* ---------- vitrine (metade esquerda, só telas largas) ---------- */
+
+.login-vitrine {
+  position: relative;
+  flex: 1 1 46%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  background: linear-gradient(155deg, var(--cor-primaria-escura) 0%, var(--cor-primaria) 55%, #2f6f45 100%);
+}
+
+.login-vitrine-padrao {
+  position: absolute;
+  inset: 0;
+  opacity: 0.15;
+  background-image:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.5) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.5) 75%),
+    linear-gradient(45deg, rgba(255, 255, 255, 0.5) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.5) 75%);
+  background-size: 48px 48px;
+  background-position:
+    0 0,
+    24px 24px;
+}
+
+.login-vitrine-conteudo {
+  position: relative;
+  z-index: 1;
+  padding: 3rem clamp(1.5rem, 6vw, 5rem);
+  color: #fff;
+  max-width: 30rem;
+}
+
+.login-vitrine .login-marca {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
   margin-bottom: 1.75rem;
 }
 
-.login-marca-icone {
-  font-size: 2.4rem;
+.login-vitrine .login-marca-icone {
+  font-size: 2.6rem;
   line-height: 1;
-  margin-bottom: 0.5rem;
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.15));
 }
 
-.login-marca h1 {
+.login-vitrine .login-marca h1 {
   font-family: var(--fonte-jogo);
-  font-size: 1rem;
+  font-size: 1.15rem;
+  line-height: 1.7;
+  color: #fff;
+  margin: 0;
+}
+
+.login-vitrine-tagline {
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.4;
+  margin: 0 0 2.25rem;
+  color: #fff;
+  text-wrap: balance;
+}
+
+.login-vitrine-recursos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.login-vitrine-recursos li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.login-vitrine-recursos li span {
+  flex: none;
+  font-size: 1.2rem;
+  line-height: 1.4;
+}
+
+/* ---------- coluna do formulário (metade direita, sempre visível) ---------- */
+
+.login-formulario-coluna {
+  flex: 1 1 54%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 2rem 1.25rem;
+  background: var(--cor-fundo);
+}
+
+.login-marca-compacta {
+  display: none;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.login-marca-compacta .login-marca-icone {
+  font-size: 1.8rem;
+}
+
+.login-marca-compacta h1 {
+  font-family: var(--fonte-jogo);
+  font-size: 0.85rem;
   line-height: 1.7;
   color: var(--cor-primaria-escura);
   margin: 0;
 }
 
 .login-cartao {
-  width: min(380px, 100%);
+  width: min(400px, 100%);
   background: var(--cor-superficie);
   border: 1px solid var(--cor-borda);
   border-radius: var(--raio-borda);
   box-shadow: var(--sombra-cartao);
-  padding: 1.75rem 1.75rem 2rem;
+  padding: 1.85rem 1.85rem 2.1rem;
+}
+
+/* ---------- indicador de progresso (e-mail -> código) ---------- */
+
+.login-passos {
+  display: flex;
+  align-items: center;
+  list-style: none;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  width: 100%;
+}
+
+.login-passo {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--cor-borda);
+}
+
+.login-passo-feita {
+  background: var(--cor-primaria);
+}
+
+.login-passo-linha {
+  flex: 1 1 auto;
+  height: 3px;
+  margin: 0 0.4rem;
+  background: var(--cor-borda);
+  border-radius: 999px;
+}
+
+.login-passo-linha-feita {
+  background: var(--cor-primaria);
 }
 
 .login-cartao h2 {
@@ -52,14 +184,14 @@
 .login-subtitulo {
   color: var(--cor-texto-suave);
   font-size: 0.9rem;
-  margin: 0 0 1.25rem;
+  margin: 0 0 1.5rem;
 }
 
 .login-campo {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.5rem;
 }
 
 .login-campo label {
@@ -70,9 +202,30 @@
   letter-spacing: 0.03em;
 }
 
-.login-campo input {
+.login-campo-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.login-campo-icone {
+  position: absolute;
+  left: 0.75em;
+  font-size: 1rem;
+  pointer-events: none;
+}
+
+.login-campo-input input {
+  width: 100%;
   font-size: 1.05rem;
-  padding: 0.65em 0.8em;
+  padding: 0.7em 0.8em 0.7em 2.4em;
+}
+
+.login-campo-codigo {
+  letter-spacing: 0.4em;
+  font-weight: 800;
+  text-align: center;
+  padding-left: 0.8em !important;
 }
 
 .login-acoes {
@@ -86,6 +239,40 @@
 }
 
 .login-rodape {
-  margin-top: 1.25rem;
+  margin-top: 1.4rem;
   text-align: center;
+}
+
+.login-link-voltar {
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0.2em;
+  color: var(--cor-texto-suave);
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.login-link-voltar:hover {
+  color: var(--cor-primaria-escura);
+  text-decoration: underline;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ---------- telas estreitas: vitrine sai, cabeçalho compacto entra ---------- */
+
+@media (max-width: 880px) {
+  .login-vitrine {
+    display: none;
+  }
+
+  .login-marca-compacta {
+    display: flex;
+  }
+
+  .login-formulario-coluna {
+    flex: 1 1 auto;
+  }
 }
