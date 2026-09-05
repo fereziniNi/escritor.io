@@ -25,7 +25,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 /**
- * Publica a escala efetiva do usuário (janela rolante de 60 dias a partir de hoje) como eventos no
+ * Publica a escala efetiva do usuário (janela rolante de 30 dias a partir de hoje) como eventos no
  * Google Agenda dele mesmo - pedido do usuário: "algo muito parecido com o agenda do google...
  * ou ate mesmo integrar". Via de mão única: só escrevemos, nunca lemos o Google Agenda de volta.
  *
@@ -34,14 +34,29 @@ import org.springframework.web.client.RestClient;
  * escala" - só recalculamos o id da mesma forma sempre. A Google aceita id customizado num evento
  * desde que bata com {@code [a-v0-9]{5,1024}} (base32hex minúsculo) - dígitos decimais e as letras
  * do prefixo "esc" cabem nessa faixa.
+ *
+ * <p>Cada dia da janela é uma requisição HTTP separada (sem tabela de mapeamento, não dá pra saber
+ * de antemão se é insert/update/no-op) - contra a API de verdade isso já disparou 403
+ * {@code rateLimitExceeded} num teste real desta sessão (30-60 requisições em sequência, sem
+ * intervalo nenhum, estoura o limite de rajada da Google mesmo sem chegar perto da cota diária).
+ * Por isso {@link #ATRASO_ENTRE_REQUISICOES_MS} entre cada dia e {@link #comRetentativa} com
+ * backoff exponencial especificamente pra esse erro (é transiente - a própria Google recomenda
+ * retentar com backoff, não é um erro de configuração pra desistir na primeira).
  */
 @Service
 public class GoogleCalendarSincronizacaoService {
 
     private static final Logger log = LoggerFactory.getLogger(GoogleCalendarSincronizacaoService.class);
-    private static final long DIAS_JANELA_SINCRONIZACAO = 60;
+    private static final long DIAS_JANELA_SINCRONIZACAO = 30;
     private static final String URL_TOKEN = "https://oauth2.googleapis.com/token";
     private static final String URL_EVENTOS_BASE = "https://www.googleapis.com/calendar/v3/calendars";
+    // `LocalTime.toString()` omite os segundos quando são ":00" (ex.: 12:00:00 vira "12:00") - a
+    // Google rejeita isso com 400 Bad Request, exige RFC3339 completo (HH:mm:ss). Formatter
+    // explícito em vez de `dia.horaInicio().toString()`/concatenação direta.
+    private static final DateTimeFormatter FORMATO_HORA_COM_SEGUNDOS = DateTimeFormatter.ofPattern("HH:mm:ss");
+    private static final long ATRASO_ENTRE_REQUISICOES_MS = 150;
+    private static final int MAXIMO_TENTATIVAS = 4;
+    private static final long ATRASO_BASE_RETENTATIVA_MS = 1000;
 
     private final ContaGoogleCalendarRepository contaRepository;
     private final EscalaService escalaService;
@@ -110,6 +125,7 @@ public class GoogleCalendarSincronizacaoService {
             } else {
                 removerEvento(conta, accessToken, eventId);
             }
+            dormir(ATRASO_ENTRE_REQUISICOES_MS);
         }
 
         conta.registrarSincronizacao(Instant.now(clock));
@@ -123,29 +139,62 @@ public class GoogleCalendarSincronizacaoService {
     private void upsertEvento(ContaGoogleCalendar conta, String accessToken, String eventId, DiaEfetivoResponse dia) {
         Map<String, Object> corpo = corpoDoEvento(eventId, dia);
         try {
-            restClient
+            comRetentativa(() -> restClient
                     .post()
                     .uri(URL_EVENTOS_BASE + "/{calendarioId}/events", conta.getCalendarioId())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(corpo)
                     .retrieve()
-                    .toBodilessEntity();
+                    .toBodilessEntity());
         } catch (HttpClientErrorException.Conflict jaExiste) {
-            restClient
+            comRetentativa(() -> restClient
                     .put()
                     .uri(URL_EVENTOS_BASE + "/{calendarioId}/events/{eventId}", conta.getCalendarioId(), eventId)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(corpo)
                     .retrieve()
-                    .toBodilessEntity();
+                    .toBodilessEntity());
+        }
+    }
+
+    /** {@code 403 rateLimitExceeded}/{@code userRateLimitExceeded} são erros transientes de rajada
+     * (não de cota diária nem de permissão) - a própria Google recomenda retentar com backoff
+     * exponencial em vez de desistir na primeira. Qualquer outro erro (incluindo outros 403, tipo
+     * permissão insuficiente) propaga direto, sem retentar - não adianta insistir num erro que não
+     * vai se resolver sozinho. */
+    private static void comRetentativa(Runnable acao) {
+        for (int tentativa = 1; tentativa <= MAXIMO_TENTATIVAS; tentativa++) {
+            try {
+                acao.run();
+                return;
+            } catch (HttpClientErrorException.Forbidden erro) {
+                if (tentativa == MAXIMO_TENTATIVAS || !ehLimiteDeTaxa(erro)) {
+                    throw erro;
+                }
+                dormir(ATRASO_BASE_RETENTATIVA_MS * (1L << (tentativa - 1)));
+            }
+        }
+    }
+
+    private static boolean ehLimiteDeTaxa(HttpClientErrorException.Forbidden erro) {
+        String corpo = erro.getResponseBodyAsString();
+        return corpo.contains("rateLimitExceeded") || corpo.contains("userRateLimitExceeded");
+    }
+
+    private static void dormir(long milissegundos) {
+        try {
+            Thread.sleep(milissegundos);
+        } catch (InterruptedException interrompido) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Sincronização com o Google Agenda interrompida", interrompido);
         }
     }
 
     private Map<String, Object> corpoDoEvento(String eventId, DiaEfetivoResponse dia) {
-        String inicio = dia.data() + "T" + dia.horaInicio();
-        String fim = dia.data() + "T" + dia.horaFim();
+        String inicio = dia.data() + "T" + dia.horaInicio().format(FORMATO_HORA_COM_SEGUNDOS);
+        String fim = dia.data() + "T" + dia.horaFim().format(FORMATO_HORA_COM_SEGUNDOS);
         return Map.of(
                 "id", eventId,
                 "summary", "Trabalho - escritor.io",
@@ -155,12 +204,12 @@ public class GoogleCalendarSincronizacaoService {
 
     private void removerEvento(ContaGoogleCalendar conta, String accessToken, String eventId) {
         try {
-            restClient
+            comRetentativa(() -> restClient
                     .delete()
                     .uri(URL_EVENTOS_BASE + "/{calendarioId}/events/{eventId}", conta.getCalendarioId(), eventId)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                     .retrieve()
-                    .toBodilessEntity();
+                    .toBodilessEntity());
         } catch (HttpClientErrorException.NotFound | HttpClientErrorException.Gone jaNaoExisteMais) {
             // não havia evento nesse dia (ou já tinha sido removido antes) - nada a fazer
         }

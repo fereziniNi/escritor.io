@@ -28,6 +28,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
@@ -87,13 +88,24 @@ class GoogleCalendarSincronizacaoServiceTest {
         Usuario usuario = usuarioComId(7L);
         ContaGoogleCalendar conta = new ContaGoogleCalendar(usuario, "refresh-abc", RELOGIO_FIXO.instant());
         when(ambiente.contaRepository().findByUsuario(usuario)).thenReturn(Optional.of(conta));
-        when(ambiente.escalaService().calcularEfetiva(eq(usuario), eq(HOJE), eq(HOJE.plusDays(60))))
+        when(ambiente.escalaService().calcularEfetiva(eq(usuario), eq(HOJE), eq(HOJE.plusDays(30))))
                 .thenReturn(List.of(new DiaEfetivoResponse(HOJE, true, LocalTime.of(9, 0), LocalTime.of(18, 0))));
         mockarAccessToken(ambiente.servidor());
         String idEsperado = "esc7" + HOJE.format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
         ambiente.servidor()
                 .expect(requestTo("https://www.googleapis.com/calendar/v3/calendars/primary/events"))
                 .andExpect(method(HttpMethod.POST))
+                // regressão: `dia.horaInicio() + ""` (via `LocalTime.toString()`) omite os segundos
+                // quando são ":00" ("12:00" em vez de "12:00:00") - a Google rejeitava isso com 400
+                // Bad Request (RFC3339 exige o componente de segundos). O corpo aqui precisa vir
+                // com ":00" explícito no fim de cada horário.
+                .andExpect(content().json(
+                        """
+                        {"id":"%s","summary":"Trabalho - escritor.io",
+                         "start":{"dateTime":"%sT09:00:00","timeZone":"America/Sao_Paulo"},
+                         "end":{"dateTime":"%sT18:00:00","timeZone":"America/Sao_Paulo"}}
+                        """
+                                .formatted(idEsperado, HOJE, HOJE)))
                 .andRespond(withStatus(HttpStatus.CREATED)
                         .contentType(MediaType.APPLICATION_JSON)
                         .body("{\"id\":\"" + idEsperado + "\"}"));
@@ -147,6 +159,65 @@ class GoogleCalendarSincronizacaoServiceTest {
         ambiente.servico().sincronizarSeConectado(usuario);
 
         ambiente.servidor().verify();
+    }
+
+    @Test
+    void retentaComBackoffQuandoALimitacaoDeTaxaEhTransientaEDaCertoNaSegundaTentativa() {
+        // pego contra a API de verdade nesta sessão: sincronizar vários dias em sequência sem
+        // pausa nenhuma disparou 403 rateLimitExceeded, mesmo longe da cota diária - é um erro
+        // transiente de rajada, a própria Google recomenda retentar com backoff.
+        Ambiente ambiente = montar();
+        Usuario usuario = usuarioComId(7L);
+        ContaGoogleCalendar conta = new ContaGoogleCalendar(usuario, "refresh-abc", RELOGIO_FIXO.instant());
+        when(ambiente.contaRepository().findByUsuario(usuario)).thenReturn(Optional.of(conta));
+        when(ambiente.escalaService().calcularEfetiva(any(), any(), any()))
+                .thenReturn(List.of(new DiaEfetivoResponse(HOJE, true, LocalTime.of(9, 0), LocalTime.of(18, 0))));
+        mockarAccessToken(ambiente.servidor());
+        ambiente.servidor()
+                .expect(requestTo("https://www.googleapis.com/calendar/v3/calendars/primary/events"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withStatus(HttpStatus.FORBIDDEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("""
+                                {"error":{"errors":[{"domain":"usageLimits","reason":"rateLimitExceeded"}],"code":403}}
+                                """));
+        ambiente.servidor()
+                .expect(requestTo("https://www.googleapis.com/calendar/v3/calendars/primary/events"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withStatus(HttpStatus.CREATED));
+
+        ambiente.servico().sincronizarSeConectado(usuario);
+
+        ambiente.servidor().verify();
+        // chegou até o fim (registrou a sincronização) - a segunda tentativa deu certo
+        verify(ambiente.contaRepository()).save(conta);
+    }
+
+    @Test
+    void naoRetentaUm403QueNaoEhLimiteDeTaxa() {
+        Ambiente ambiente = montar();
+        Usuario usuario = usuarioComId(7L);
+        ContaGoogleCalendar conta = new ContaGoogleCalendar(usuario, "refresh-abc", RELOGIO_FIXO.instant());
+        when(ambiente.contaRepository().findByUsuario(usuario)).thenReturn(Optional.of(conta));
+        when(ambiente.escalaService().calcularEfetiva(any(), any(), any()))
+                .thenReturn(List.of(new DiaEfetivoResponse(HOJE, true, LocalTime.of(9, 0), LocalTime.of(18, 0))));
+        mockarAccessToken(ambiente.servidor());
+        // só UMA expectativa registrada - se o código retentasse por engano, essa segunda chamada
+        // não teria nenhuma resposta programada e o teste falharia
+        ambiente.servidor()
+                .expect(requestTo("https://www.googleapis.com/calendar/v3/calendars/primary/events"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withStatus(HttpStatus.FORBIDDEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("""
+                                {"error":{"errors":[{"domain":"global","reason":"insufficientPermissions"}],"code":403}}
+                                """));
+
+        ambiente.servico().sincronizarSeConectado(usuario); // não deve lançar (erro é engolido e logado)
+
+        ambiente.servidor().verify();
+        // não chegou até o fim - a sincronização falhou de verdade, sem registrar sucesso
+        verify(ambiente.contaRepository(), never()).save(any());
     }
 
     @Test
