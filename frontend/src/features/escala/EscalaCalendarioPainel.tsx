@@ -60,9 +60,12 @@ function rotuloDoPeriodo(modo: Modo, dataReferencia: string, inicio: string, fim
 /**
  * Painel do calendário de escala - pedido do usuário: "algo muito parecido com o agenda do
  * google". Três visões (Mês/Semana/Dia, como o Google Agenda) sobre os mesmos dados/mutações -
- * `CalendarioMes` é a grade mensal (clique abre a exceção do dia); `CalendarioSemana`/
- * `CalendarioDia` são a grade de horário (clique ou arraste seleciona o intervalo). O estado de
- * consulta/mutação fica aqui, compartilhado pelas 3 - cada visão é só apresentação.
+ * `CalendarioMes` é a grade mensal (clique num dia troca pra visão de Dia, mostrando a agenda
+ * completa daquela data - pedido do usuário: "abrir a agenda dela do dia e ver todos os horarios
+ * dela disponivel, incluindo o que ela deixou salvo no padrão semanal"); `CalendarioSemana`/
+ * `CalendarioDia` são a grade de horário, onde o horário efetivo (padrão semanal + exceção
+ * mesclados) aparece como um bloco, e clique/arraste num horário livre cria/edita uma exceção. O
+ * estado de consulta/mutação fica aqui, compartilhado pelas 3 - cada visão é só apresentação.
  */
 export function EscalaCalendarioPainel() {
   const [modo, setModo] = useState<Modo>('mes')
@@ -153,7 +156,7 @@ export function EscalaCalendarioPainel() {
       <h2 className="secao-titulo">🗓️ Calendário</h2>
       <p className="mensagem-vazia">
         {modo === 'mes'
-          ? 'Clique num dia pra mudar o horário só daquela data, ou marcar como folga.'
+          ? 'Clique num dia pra ver a agenda completa dele, com os horários do padrão semanal e as exceções.'
           : 'Clique ou arraste num horário livre pra criar uma exceção; clique num bloco já trabalhado pra editá-lo.'}
       </p>
 
@@ -196,8 +199,18 @@ export function EscalaCalendarioPainel() {
               ano={anoDaData(dataReferencia)}
               mes={mesDaData(dataReferencia)}
               efetivoPorData={efetivoPorData}
-              diaSelecionado={selecao?.data ?? null}
-              aoSelecionarDia={(data) => setSelecao((atual) => (atual?.data === data ? null : { data }))}
+              diaSelecionado={dataReferencia}
+              aoSelecionarDia={(data) => {
+                // pedido do usuário: "caso a pessoa clica no dia deve abrir a agenda dela do dia e
+                // ver todos os horarios dela disponivel, incluindo o que ela deixou salvo no
+                // padrão semanal" - clicar num dia do mês leva pra visão de Dia (a agenda
+                // completa daquele dia), não direto pro formulário de exceção. `CalendarioDia` já
+                // mostra o horário efetivo (padrão semanal + exceção mesclados, ver
+                // `EscalaService#calcularEfetiva`) como um bloco na grade - editar continua sendo
+                // clicar/arrastar nela, mesmo mecanismo das visões Semana/Dia.
+                setDataReferencia(data)
+                setModo('dia')
+              }}
             />
           )}
           {modo === 'semana' && (

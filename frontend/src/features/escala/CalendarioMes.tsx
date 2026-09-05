@@ -11,9 +11,10 @@ function horaCurta(hora: string | null): string {
 
 /**
  * Grid mensal - estilo Google Agenda: número do dia de hoje num círculo preenchido, horário
- * trabalhado como um "chip" arredondado em vez de texto solto. Clicar num dia do mês atual abre o
- * formulário de exceção pra essa data; dias de outro mês (preenchimento da grade) não são
- * clicáveis - navegue com as setas do painel pai pra editar uma data de outro mês.
+ * trabalhado como um "chip" arredondado em vez de texto solto. Clicar num dia do mês atual chama
+ * `aoSelecionarDia` (o painel pai troca pra visão de Dia daquela data - pedido do usuário: "abrir
+ * a agenda dela do dia"); dias de outro mês (preenchimento da grade) não são clicáveis - navegue
+ * com as setas do painel pai pra ver um dia de outro mês.
  */
 export function CalendarioMes({
   ano,

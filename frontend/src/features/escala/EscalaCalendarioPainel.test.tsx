@@ -41,32 +41,39 @@ function renderPainel() {
 }
 
 describe('EscalaCalendarioPainel', () => {
-  it('abre no mês atual e permite criar uma exceção clicando num dia', async () => {
+  it('clicar num dia do mês abre a agenda completa daquele dia (visão de Dia), não direto o formulário', async () => {
+    // pedido do usuário: "caso a pessoa clica no dia deve abrir a agenda dela do dia e ver todos
+    // os horarios dela disponivel, incluindo o que ela deixou salvo no padrão semanal" - clicar
+    // no mês troca de visão em vez de abrir o modal de exceção direto.
     server.use(
       http.get('/escala/efetiva', () => HttpResponse.json([])),
       http.get('/escala/excecoes', () => HttpResponse.json([])),
-    )
-    let corpoEnviado: unknown = null
-    server.use(
-      http.post('/escala/excecoes', async ({ request }) => {
-        corpoEnviado = await request.json()
-        return HttpResponse.json(
-          { id: 1, data: HOJE, trabalha: false, horaInicio: null, horaFim: null, observacao: null },
-          { status: 201 },
-        )
-      }),
     )
     const user = userEvent.setup()
     renderPainel()
 
     expect(await screen.findByText(ROTULO_MES_ATUAL)).toBeInTheDocument()
     await user.click(await screen.findByRole('button', { name: formatarDataBr(HOJE) }))
-    await screen.findByText(formatarDataBr(HOJE))
-    // sem escala nenhuma hoje ainda, o formulário abre com "trabalho nesse dia" desmarcado -
-    // salvar assim registra uma exceção de folga explícita pra essa data
-    await user.click(screen.getByRole('button', { name: /salvar/i }))
 
-    expect(corpoEnviado).toMatchObject({ data: HOJE, trabalha: false })
+    expect(await screen.findByText(`${nomeDoDiaDaSemana(HOJE)}, ${formatarDataBr(HOJE)}`)).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Dia', selected: true })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('a agenda do dia (depois de clicar num dia do mês) já mostra o horário do padrão semanal', async () => {
+    server.use(
+      http.get('/escala/efetiva', () =>
+        HttpResponse.json([{ data: HOJE, trabalha: true, horaInicio: '09:00:00', horaFim: '18:00:00' }]),
+      ),
+      http.get('/escala/excecoes', () => HttpResponse.json([])),
+    )
+    const user = userEvent.setup()
+    renderPainel()
+
+    await screen.findByText(ROTULO_MES_ATUAL)
+    await user.click(await screen.findByRole('button', { name: formatarDataBr(HOJE) }))
+
+    expect(await screen.findByText('09:00–18:00')).toBeInTheDocument()
   })
 
   it('troca pra visão de semana e mostra o período da semana atual', async () => {
