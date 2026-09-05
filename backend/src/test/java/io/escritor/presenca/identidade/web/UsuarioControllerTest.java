@@ -9,6 +9,7 @@ import io.escritor.presenca.identidade.domain.EstiloTop;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.TipoBarba;
 import io.escritor.presenca.identidade.domain.TipoChapeu;
+import io.escritor.presenca.identidade.domain.TipoCorpo;
 import io.escritor.presenca.identidade.domain.TipoOculos;
 import io.escritor.presenca.identidade.domain.TipoRosto;
 import io.escritor.presenca.identidade.domain.Usuario;
@@ -45,13 +46,13 @@ class UsuarioControllerTest {
             """;
 
     private static final AparenciaAvatarResponse APARENCIA_PADRAO = new AparenciaAvatarResponse(
-            "#f2c9a0", TipoRosto.PADRAO, EstiloCabelo.CURTO, "#4a3728", TipoBarba.NENHUM,
+            "#f2c9a0", TipoCorpo.MASCULINO, TipoRosto.PADRAO, EstiloCabelo.CURTO, "#4a3728", TipoBarba.NENHUM,
             EstiloTop.CAMISETA, "#6b7280", EstiloJaqueta.NENHUMA, "#6b7280",
             EstiloBottom.CALCA, "#2b2b3a", EstiloSapato.TENIS, "#1c1a28",
             TipoChapeu.NENHUM, "#6b7280", TipoOculos.NENHUM, "#6b7280", EstiloOutro.NENHUM, "#6b7280");
 
     private static final String CORPO_APARENCIA_VALIDA = """
-            {"corPele":"#f2c9a0","tipoRosto":"PADRAO","estiloCabelo":"CURTO","corCabelo":"#4a3728","tipoBarba":"BIGODE_FINO",
+            {"corPele":"#f2c9a0","tipoCorpo":"MASCULINO","tipoRosto":"PADRAO","estiloCabelo":"CURTO","corCabelo":"#4a3728","tipoBarba":"BIGODE_FINO",
              "estiloTop":"CAMISETA","corTop":"#6b7280","estiloJaqueta":"NENHUMA","corJaqueta":"#6b7280",
              "estiloBottom":"CALCA","corBottom":"#2b2b3a","estiloSapato":"TENIS","corSapato":"#1c1a28",
              "chapeu":"NENHUM","corChapeu":"#6b7280","oculos":"NENHUM","corOculos":"#6b7280",
@@ -245,7 +246,7 @@ class UsuarioControllerTest {
     void qualquerUsuarioAutenticadoAtualizaAPropriaAparencia() throws Exception {
         Usuario eu = usuarioAutenticadoFalso();
         AparenciaAvatarResponse aparenciaNova = new AparenciaAvatarResponse(
-                "#f2c9a0", TipoRosto.PADRAO, EstiloCabelo.CURTO, "#4a3728", TipoBarba.BIGODE_FINO,
+                "#f2c9a0", TipoCorpo.MASCULINO, TipoRosto.PADRAO, EstiloCabelo.CURTO, "#4a3728", TipoBarba.BIGODE_FINO,
                 EstiloTop.CAMISETA, "#6b7280", EstiloJaqueta.NENHUMA, "#6b7280",
                 EstiloBottom.CALCA, "#2b2b3a", EstiloSapato.TENIS, "#1c1a28",
                 TipoChapeu.NENHUM, "#6b7280", TipoOculos.NENHUM, "#6b7280", EstiloOutro.NENHUM, "#6b7280");
@@ -266,7 +267,7 @@ class UsuarioControllerTest {
         mockMvc.perform(patch("/usuarios/me/aparencia")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"corPele":"#f2c9a0","tipoRosto":"PADRAO","estiloCabelo":"NAO_EXISTE","corCabelo":"#4a3728","tipoBarba":"NENHUM",
+                                {"corPele":"#f2c9a0","tipoCorpo":"MASCULINO","tipoRosto":"PADRAO","estiloCabelo":"NAO_EXISTE","corCabelo":"#4a3728","tipoBarba":"NENHUM",
                                  "estiloTop":"CAMISETA","corTop":"#6b7280","estiloJaqueta":"NENHUMA","corJaqueta":"#6b7280",
                                  "estiloBottom":"CALCA","corBottom":"#2b2b3a","estiloSapato":"TENIS","corSapato":"#1c1a28",
                                  "chapeu":"NENHUM","corChapeu":"#6b7280","oculos":"NENHUM","corOculos":"#6b7280",

@@ -15,6 +15,7 @@ import {
   OPCOES_ESTILO_TOP,
   OPCOES_OCULOS,
   OPCOES_TIPO_BARBA,
+  OPCOES_TIPO_CORPO,
   OPCOES_TIPO_ROSTO,
   ROTULO_CHAPEU,
   ROTULO_ESTILO_BOTTOM,
@@ -25,6 +26,7 @@ import {
   ROTULO_ESTILO_TOP,
   ROTULO_OCULOS,
   ROTULO_TIPO_BARBA,
+  ROTULO_TIPO_CORPO,
   ROTULO_TIPO_ROSTO,
 } from './aparenciaAvatar'
 import type { AparenciaAvatar } from './aparenciaAvatar'
@@ -58,7 +60,9 @@ const CATEGORIAS: { id: Categoria; rotulo: string }[] = [
  * cumpre o mesmo papel sem precisar de um segundo conjunto de componentes de desenho só pra ícone.
  * "Face" (formato do rosto/cabeça) não existe no Gather - pedido do usuário depois da virada pra
  * pixel art real (LPC): "quero poder escolher qual face irei utilizar". Sem paleta de cor própria
- * (reaproveita `corPele`, mesmo padrão de "Facial hair" com `corCabelo`).
+ * (reaproveita `corPele`, mesmo padrão de "Facial hair" com `corCabelo`). "Skin" ganhou um segundo
+ * seletor (formato do corpo, Masculino/Feminino) depois do usuário apontar "O personagem pode ser
+ * masculino ou feminino também!" - também sem paleta própria, mesmo padrão.
  *
  * O rascunho (`rascunho`) só é aplicado no mundo/nos outros usuários quando "Finalizar" salva de
  * verdade (`PATCH /usuarios/me/aparencia`) - até lá é só local.
@@ -113,7 +117,18 @@ export function EditorAvatarPage() {
       </nav>
 
       <div className="editor-avatar-conteudo">
-        {categoria === 'skin' && <SeletorDeCor cores={CORES_PELE} valor={rascunho.corPele} aoEscolher={(cor) => atualizarCampo('corPele', cor)} rotulo="pele" />}
+        {categoria === 'skin' && (
+          <>
+            <GradeDeEstilo
+              opcoes={OPCOES_TIPO_CORPO}
+              rotulos={ROTULO_TIPO_CORPO}
+              valor={rascunho.tipoCorpo}
+              aoEscolher={(v) => atualizarCampo('tipoCorpo', v)}
+              montarPreview={(v) => ({ ...rascunho, tipoCorpo: v })}
+            />
+            <SeletorDeCor cores={CORES_PELE} valor={rascunho.corPele} aoEscolher={(cor) => atualizarCampo('corPele', cor)} rotulo="pele" />
+          </>
+        )}
 
         {categoria === 'face' && (
           <GradeDeEstilo

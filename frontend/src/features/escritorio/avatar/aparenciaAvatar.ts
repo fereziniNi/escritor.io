@@ -14,6 +14,9 @@
  * como o LPC só tem 10 formatos de cabeça humana (9 já usados), as 6 opções `_MARCANTE`/
  * `_DELICADO` são as cabeças-base compostas com nariz+sobrancelha (pré-compostas em build time,
  * ver `scratchpad/lpc/compor-rostos.py`), não formato de cabeça novo - o LPC não tem mais desses.
+ * `tipoCorpo` (Masculino/Feminino) foi adicionado depois: "O personagem pode ser masculino ou
+ * feminino também!" - controla a silhueta do corpo (independente da Face, que só muda a cabeça).
+ * Sem paleta de cor própria (usa `corPele`, mesmo padrão de `tipoRosto`).
  *
  * Os valores dos tipos union espelham EXATAMENTE os enums Java (`identidade/domain/`) - mesmos
  * nomes, sem tradução na borda. As paletas de cor espelham EXATAMENTE `PaletaAparenciaAvatar.java`
@@ -22,6 +25,7 @@
  * repetida em quase toda categoria nos prints de referência do Gather).
  */
 
+export type TipoCorpo = 'MASCULINO' | 'FEMININO'
 export type TipoRosto =
   | 'PADRAO'
   | 'OVAL'
@@ -57,6 +61,7 @@ export type EstiloOutro = 'NENHUM' | 'BRINCO' | 'COLAR' | 'LENCO' | 'GRAVATA' | 
 
 export interface AparenciaAvatar {
   corPele: string
+  tipoCorpo: TipoCorpo
   tipoRosto: TipoRosto
   estiloCabelo: EstiloCabelo
   corCabelo: string
@@ -81,6 +86,7 @@ export interface AparenciaAvatar {
  * no backend, usado só como fallback local antes do `GET /usuarios/me` responder. */
 export const APARENCIA_PADRAO: AparenciaAvatar = {
   corPele: '#f2c9a0',
+  tipoCorpo: 'MASCULINO',
   tipoRosto: 'PADRAO',
   estiloCabelo: 'CURTO',
   corCabelo: '#4a3728',
@@ -111,6 +117,7 @@ export const CORES_GERAL = [
   '#8a4fd6', '#4472c4', '#4fa8d6', '#4f9f6f', '#2f6f45', '#c0392b', '#f2f2f2', '#ffffff',
 ]
 
+export const OPCOES_TIPO_CORPO: TipoCorpo[] = ['MASCULINO', 'FEMININO']
 export const OPCOES_TIPO_ROSTO: TipoRosto[] = [
   'PADRAO', 'OVAL', 'ENVELHECIDA', 'OVAL_ENVELHECIDA', 'MAGRA', 'ROBUSTA', 'PEQUENA', 'OVAL_PEQUENA', 'IDOSA_PEQUENA',
   'PADRAO_MARCANTE', 'PADRAO_DELICADO', 'OVAL_MARCANTE', 'OVAL_DELICADO', 'ENVELHECIDA_MARCANTE', 'OVAL_ENVELHECIDA_MARCANTE',
@@ -125,6 +132,10 @@ export const OPCOES_ESTILO_SAPATO: EstiloSapato[] = ['TENIS', 'SOCIAL', 'BOTA', 
 export const OPCOES_CHAPEU: TipoChapeu[] = ['NENHUM', 'BONE', 'BONE_LATERAL', 'GORRO', 'CHAPEU_PRAIA', 'BANDANA', 'FAIXA', 'CARTOLA', 'CAPACETE', 'TIARA']
 export const OPCOES_OCULOS: TipoOculos[] = ['NENHUM', 'REDONDO', 'QUADRADO', 'AVIADOR', 'ESCUROS', 'CORACAO', 'ESTRELA', 'MEIA_LUA', 'MASCARA_MERGULHO', 'TAPA_OLHO']
 export const OPCOES_ESTILO_OUTRO: EstiloOutro[] = ['NENHUM', 'BRINCO', 'COLAR', 'LENCO', 'GRAVATA', 'LACO', 'BROCHE', 'MICROFONE']
+
+export const ROTULO_TIPO_CORPO: Record<TipoCorpo, string> = {
+  MASCULINO: 'Masculino', FEMININO: 'Feminino',
+}
 
 export const ROTULO_TIPO_ROSTO: Record<TipoRosto, string> = {
   PADRAO: 'Padrão', OVAL: 'Oval', ENVELHECIDA: 'Envelhecida', OVAL_ENVELHECIDA: 'Oval envelhecida',

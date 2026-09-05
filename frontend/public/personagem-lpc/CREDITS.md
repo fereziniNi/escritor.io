@@ -16,11 +16,19 @@ pro texto completo da OGA-BY 3.0.
 
 ## Pele (corpo base)
 
-- **base** (`body/bodies/male`)
+Ganhou um segundo formato depois do usuário apontar "O personagem pode ser masculino ou feminino
+também!" - até então só existia a silhueta masculina.
+
+- **MASCULINO** (`body/bodies/male`)
   - Autoria: bluecarrot16, JaidynReiman, Benjamin K. Smith (BenCreating), Evert, Eliza Wyatt (ElizaWy), TheraHedwig, MuffinElZangano, Durrani, Johannes Sjölund (wulax), Stephen Challener (Redshrike)
   - Licença usada: OGA-BY 3.0
   - Fonte: https://opengameart.org/content/liberated-pixel-cup-lpc-base-assets-sprites-map-tiles
   - Notas do autor: see details at https://opengameart.org/content/lpc-character-bases; 'Thick' Male Revised Run/Climb by JaidynReiman (based on ElizaWy's LPC Revised)
+- **FEMININO** (`body/bodies/female`)
+  - Autoria: Benjamin K. Smith (BenCreating), bluecarrot16, TheraHedwig, Evert, MuffinElZangano, Durrani, Pierre Vigier (pvigier), Eliza Wyatt (ElizaWy), Matthew Krohn (makrohn), Johannes Sjölund (wulax), Stephen Challener (Redshrike)
+  - Licença usada: OGA-BY 3.0
+  - Fonte: https://opengameart.org/content/liberated-pixel-cup-lpc-base-assets-sprites-map-tiles, https://opengameart.org/content/lpc-ladies
+  - Notas do autor: see details at https://opengameart.org/content/lpc-character-bases
 
 ## Face (formato do rosto/cabeça)
 
@@ -230,6 +238,11 @@ fixa e não respondem a ela.
 
 ## Top
 
+7 das 9 opções (todas exceto GOLA_ALTA/LISTRADA) também têm um corte feminino (`.../female` em vez
+de `.../male`, mesma pasta-base) usado quando o corpo é Feminino - pedido do usuário "O personagem
+pode ser masculino ou feminino também!". Mesmo grupo de autoria do corte masculino documentado
+abaixo (o sheet_definition do LPC cobre os dois cortes juntos), sempre com OGA-BY 3.0 disponível.
+
 - **CAMISA** (`torso/clothes/longsleeve/longsleeve2_buttoned/male`)
   - Autoria: ElizaWy, JaidynReiman, Stephen Challener (Redshrike), Johannes Sjölund (wulax)
   - Licença usada: OGA-BY 3.0
@@ -276,6 +289,13 @@ fixa e não respondem a ela.
 
 ## Jaqueta
 
+Corte feminino só existe no LPC pra CARDIGA (mesma pasta de Top, `.../female`) e BOMBER
+(`torso/jacket/tabard/female` - autoria: JaidynReiman, Matthew Krohn (makrohn), Johannes Sjölund
+(wulax); licença OGA-BY 3.0; fonte https://opengameart.org/content/lpc-medieval-fantasy-character-sprites,
+https://opengameart.org/content/lpc-combat-armor-for-women). As outras 5 (JEANS/BLAZER/
+MOLETOM_CAPUZ/COLETE/CASACO_LONGO/COURO) usam o corte masculino também pro corpo Feminino - LPC não
+oferece alternativa, risco visual documentado (`CamadaRecolor.urlFeminino` no código).
+
 - **BLAZER** (`torso/jacket/frock/male/walk`)
   - Autoria: bluecarrot16
   - Licença usada: CC-BY-SA 3.0
@@ -312,6 +332,11 @@ fixa e não respondem a ela.
   - Fonte: https://opengameart.org/content/lpc-gentleman
 
 ## Calça/saia
+
+Todas as 9 têm corte feminino no LPC (variante `.../thin` em vez de `.../male` - convenção
+diferente de Top, que usa `.../female`) usado quando o corpo é Feminino, sempre com OGA-BY 3.0
+disponível. Mesmo grupo de autoria de cada corte masculino abaixo (créditos completos no
+CREDITS.csv do projeto, sob os mesmos arquivos `.../thin/walk.png`).
 
 - **BERMUDA** (`legs/shorts/shorts/male`)
   - Autoria: JaidynReiman, ElizaWy, Bluecarrot16, Johannes Sjölund (wulax), Stephen Challener (Redshrike)
@@ -360,6 +385,11 @@ fixa e não respondem a ela.
   - Notas do autor: Original bases by Redshrike, thrust/shoot bases by Wulax, original overalls and shorts by ElizaWy, base animations adapted from v3 overalls by bluecarrot16, shorts by JaidynReiman
 
 ## Sapato
+
+Todas as 7 têm corte feminino no LPC (variante `.../thin`) usado quando o corpo é Feminino. Só
+CHINELO (`feet/slippers/thin`) não tem OGA-BY 3.0 disponível pro corte fino - usa CC-BY-SA 3.0
+(autoria: bluecarrot16, JaidynReiman, Joe White, Luke Mehl); as outras 6 têm OGA-BY 3.0, mesmo
+grupo de autoria do corte masculino documentado abaixo.
 
 - **BOTA** (`feet/boots/basic/male`)
   - Autoria: JaidynReiman, bluecarrot16, Nila122

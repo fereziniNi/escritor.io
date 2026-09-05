@@ -9,11 +9,13 @@ import io.escritor.presenca.identidade.domain.EstiloSapato;
 import io.escritor.presenca.identidade.domain.EstiloTop;
 import io.escritor.presenca.identidade.domain.TipoBarba;
 import io.escritor.presenca.identidade.domain.TipoChapeu;
+import io.escritor.presenca.identidade.domain.TipoCorpo;
 import io.escritor.presenca.identidade.domain.TipoOculos;
 import io.escritor.presenca.identidade.domain.TipoRosto;
 
 public record AparenciaAvatarResponse(
         String corPele,
+        TipoCorpo tipoCorpo,
         TipoRosto tipoRosto,
         EstiloCabelo estiloCabelo,
         String corCabelo,
@@ -36,6 +38,7 @@ public record AparenciaAvatarResponse(
     public static AparenciaAvatarResponse de(AparenciaAvatar aparencia) {
         return new AparenciaAvatarResponse(
                 aparencia.getCorPele(),
+                aparencia.getTipoCorpo(),
                 aparencia.getTipoRosto(),
                 aparencia.getEstiloCabelo(),
                 aparencia.getCorCabelo(),

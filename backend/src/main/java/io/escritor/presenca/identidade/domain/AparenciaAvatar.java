@@ -27,6 +27,10 @@ public class AparenciaAvatar {
     private String corPele;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_corpo", nullable = false)
+    private TipoCorpo tipoCorpo;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "tipo_rosto", nullable = false)
     private TipoRosto tipoRosto;
 
@@ -96,6 +100,7 @@ public class AparenciaAvatar {
 
     public AparenciaAvatar(
             String corPele,
+            TipoCorpo tipoCorpo,
             TipoRosto tipoRosto,
             EstiloCabelo estiloCabelo,
             String corCabelo,
@@ -115,6 +120,7 @@ public class AparenciaAvatar {
             EstiloOutro estiloOutro,
             String corOutro) {
         this.corPele = corPele;
+        this.tipoCorpo = tipoCorpo;
         this.tipoRosto = tipoRosto;
         this.estiloCabelo = estiloCabelo;
         this.corCabelo = corCabelo;
@@ -136,11 +142,12 @@ public class AparenciaAvatar {
     }
 
     /** Aparência de quem ainda não personalizou nada - mesmos valores do `DEFAULT` das colunas em
-     * banco (ver `V34__adiciona_tipo_rosto.sql`), então usuários criados antes desta versão já
+     * banco (ver `V37__adiciona_tipo_corpo.sql`), então usuários criados antes desta versão já
      * nascem com uma aparência válida sem precisar de backfill manual. */
     public static AparenciaAvatar padrao() {
         return new AparenciaAvatar(
                 "#f2c9a0",
+                TipoCorpo.MASCULINO,
                 TipoRosto.PADRAO,
                 EstiloCabelo.CURTO,
                 "#4a3728",
@@ -163,6 +170,10 @@ public class AparenciaAvatar {
 
     public String getCorPele() {
         return corPele;
+    }
+
+    public TipoCorpo getTipoCorpo() {
+        return tipoCorpo;
     }
 
     public TipoRosto getTipoRosto() {

@@ -8,6 +8,7 @@ import type {
   EstiloTop,
   TipoBarba,
   TipoChapeu,
+  TipoCorpo,
   TipoOculos,
   TipoRosto,
 } from '../avatar/aparenciaAvatar'
@@ -40,6 +41,11 @@ export type MaterialPorCategoria = MaterialClasse
 export interface CamadaRecolor {
   tipo: 'recolor'
   url: string
+  /** Corte feminino (LPC "female"/"thin", dependendo da categoria) - quando existe, usado no
+   * lugar de `url` para `tipoCorpo === 'FEMININO'`. Ausente = o LPC não tem corte feminino desse
+   * item específico (a minoria - ver comentário de `CAMADA_TOP`/`CAMADA_JACKET`); o corte
+   * masculino é usado como aproximação nesse caso, risco visual documentado, não travado. */
+  urlFeminino?: string
   material: MaterialClasse
 }
 
@@ -47,12 +53,14 @@ export interface CamadaPrebaked {
   tipo: 'prebaked'
   /** chave = hex exato de `CORES_GERAL` (mesma paleta validada no backend) */
   porCor: Record<string, string>
+  /** mesma ideia de `CamadaRecolor.urlFeminino`, pra quem é pré-colorido. */
+  porCorFeminino?: Record<string, string>
 }
 
 export type Camada = CamadaRecolor | CamadaPrebaked
 
-function recolor(url: string, material: MaterialClasse): CamadaRecolor {
-  return { tipo: 'recolor', url, material }
+function recolor(url: string, material: MaterialClasse, urlFeminino?: string): CamadaRecolor {
+  return { tipo: 'recolor', url, material, urlFeminino }
 }
 
 /** z-order entre categorias (não entre quadros/direções) - dos `zPos` reais do LPC
@@ -73,9 +81,14 @@ export const Z_POS = {
   hat: 132,
 } as const
 
-/** Corpo base - não é uma escolha de enum, é sempre esta 1 silhueta (decisão da curadoria:
- * "1 gênero de base pro avatar, silhueta neutra"), só a cor (`corPele`) muda via recolor. */
-export const CAMADA_PELE: CamadaRecolor = recolor(`${BASE}/skin/base.png`, 'pele')
+/** Corpo base - até aqui era sempre a mesma silhueta masculina ("1 gênero de base pro avatar,
+ * silhueta neutra", decisão da curadoria original) até o usuário apontar "O personagem pode ser
+ * masculino ou feminino também!". Agora tem as 2 silhuetas do próprio LPC (`body/bodies/male` e
+ * `body/bodies/female`) - só a cor (`corPele`) continua mudando via recolor, igual antes. */
+export const CAMADA_PELE: Record<TipoCorpo, CamadaRecolor> = {
+  MASCULINO: recolor(`${BASE}/skin/MASCULINO.png`, 'pele'),
+  FEMININO: recolor(`${BASE}/skin/FEMININO.png`, 'pele'),
+}
 
 /** Cabeça/rosto - camada separada do corpo no próprio LPC (`spritesheets/head/heads/*`), achada
  * só depois do usuário reportar "meu personagem está sem o rosto": o `skin/base.png`
@@ -165,24 +178,31 @@ export const CAMADA_FACIAL_HAIR: Partial<Record<TipoBarba, CamadaRecolor>> = {
   CAVANHAQUE_BIGODE: recolor(`${BASE}/facial-hair/CAVANHAQUE_BIGODE.png`, 'cabelo'),
 }
 
+/** LISTRADA/GOLA_ALTA não têm corte feminino no LPC (só "male") - ficam com o masculino como
+ * aproximação pro corpo feminino, risco visual documentado no `urlFeminino` da interface. */
 export const CAMADA_TOP: Partial<Record<EstiloTop, CamadaRecolor>> = {
-  CAMISETA: recolor(`${BASE}/top/CAMISETA.png`, 'tecido'),
-  REGATA: recolor(`${BASE}/top/REGATA.png`, 'tecido'),
-  POLO: recolor(`${BASE}/top/POLO.png`, 'tecido'),
-  CAMISA: recolor(`${BASE}/top/CAMISA.png`, 'tecido'),
-  SUETER: recolor(`${BASE}/top/SUETER.png`, 'tecido'),
+  CAMISETA: recolor(`${BASE}/top/CAMISETA.png`, 'tecido', `${BASE}/top/CAMISETA_F.png`),
+  REGATA: recolor(`${BASE}/top/REGATA.png`, 'tecido', `${BASE}/top/REGATA_F.png`),
+  POLO: recolor(`${BASE}/top/POLO.png`, 'tecido', `${BASE}/top/POLO_F.png`),
+  CAMISA: recolor(`${BASE}/top/CAMISA.png`, 'tecido', `${BASE}/top/CAMISA_F.png`),
+  SUETER: recolor(`${BASE}/top/SUETER.png`, 'tecido', `${BASE}/top/SUETER_F.png`),
   LISTRADA: recolor(`${BASE}/top/LISTRADA.png`, 'tecido'),
-  GOLA_V: recolor(`${BASE}/top/GOLA_V.png`, 'tecido'),
+  GOLA_V: recolor(`${BASE}/top/GOLA_V.png`, 'tecido', `${BASE}/top/GOLA_V_F.png`),
   GOLA_ALTA: recolor(`${BASE}/top/GOLA_ALTA.png`, 'tecido'),
-  MOLETOM_LEVE: recolor(`${BASE}/top/MOLETOM_LEVE.png`, 'tecido'),
+  MOLETOM_LEVE: recolor(`${BASE}/top/MOLETOM_LEVE.png`, 'tecido', `${BASE}/top/MOLETOM_LEVE_F.png`),
 }
 
 /** As 16 cores de `CORES_GERAL` (aparenciaAvatar.ts) - chave exata usada em toda `CamadaPrebaked`
- * abaixo (é a mesma paleta compartilhada por Top/Jacket/Bottom/Shoes/Hat/Glasses/Other). */
-function prebakedJaqueta(pasta: string, porArquivo: Record<string, string>): CamadaPrebaked {
+ * abaixo (é a mesma paleta compartilhada por Top/Jacket/Bottom/Shoes/Hat/Glasses/Other).
+ * `pastaFeminina` opcional - só BOMBER (`tabard`) tem corte feminino pré-colorido no LPC entre as
+ * pré-coloridas; as outras 5 ficam sem, mesmo risco documentado de `CamadaRecolor.urlFeminino`. */
+function prebakedJaqueta(pasta: string, porArquivo: Record<string, string>, pastaFeminina?: string): CamadaPrebaked {
   const porCor: Record<string, string> = {}
   for (const [hex, arquivo] of Object.entries(porArquivo)) porCor[hex] = `${BASE}/jacket/${pasta}/${arquivo}`
-  return { tipo: 'prebaked', porCor }
+  if (!pastaFeminina) return { tipo: 'prebaked', porCor }
+  const porCorFeminino: Record<string, string> = {}
+  for (const [hex, arquivo] of Object.entries(porArquivo)) porCorFeminino[hex] = `${BASE}/jacket/${pastaFeminina}/${arquivo}`
+  return { tipo: 'prebaked', porCor, porCorFeminino }
 }
 
 const CORES_JAQUETA_MULTI = {
@@ -233,32 +253,37 @@ export const CAMADA_JACKET: Partial<Record<EstiloJaqueta, Camada>> = {
   MOLETOM_CAPUZ: prebakedJaqueta('MOLETOM_CAPUZ', CORES_MOLETOM_CAPUZ_UNICA),
   COLETE: prebakedJaqueta('COLETE', CORES_JAQUETA_MULTI),
   CASACO_LONGO: prebakedJaqueta('CASACO_LONGO', CORES_CASACO_LONGO),
-  BOMBER: prebakedJaqueta('BOMBER', CORES_JAQUETA_MULTI),
+  // única pré-colorida com corte feminino no LPC (tabard/female)
+  BOMBER: prebakedJaqueta('BOMBER', CORES_JAQUETA_MULTI, 'BOMBER_F'),
   // essas duas são arquivo único recolorável de verdade (mesma família do top/bottom/etc.)
-  CARDIGA: recolor(`${BASE}/jacket/CARDIGA.png`, 'tecido'),
+  CARDIGA: recolor(`${BASE}/jacket/CARDIGA.png`, 'tecido', `${BASE}/jacket/CARDIGA_F.png`),
+  // COURO não tem corte feminino no LPC (torso/jacket/santa só tem "male")
   COURO: recolor(`${BASE}/jacket/COURO.png`, 'tecido'),
 }
 
+/** Todas as 9 têm corte feminino no LPC (variante "thin") - cobertura completa aqui, diferente de
+ * Top/Jacket. */
 export const CAMADA_BOTTOM: Partial<Record<EstiloBottom, CamadaRecolor>> = {
-  CALCA: recolor(`${BASE}/bottom/CALCA.png`, 'tecido'),
-  JEANS: recolor(`${BASE}/bottom/JEANS.png`, 'tecido'),
-  LEGGING: recolor(`${BASE}/bottom/LEGGING.png`, 'tecido'),
-  SHORT: recolor(`${BASE}/bottom/SHORT.png`, 'tecido'),
-  BERMUDA: recolor(`${BASE}/bottom/BERMUDA.png`, 'tecido'),
-  SHORT_JEANS: recolor(`${BASE}/bottom/SHORT_JEANS.png`, 'tecido'),
-  SAIA: recolor(`${BASE}/bottom/SAIA.png`, 'tecido'),
-  SAIA_LONGA: recolor(`${BASE}/bottom/SAIA_LONGA.png`, 'tecido'),
-  CALCA_LISTRADA: recolor(`${BASE}/bottom/CALCA_LISTRADA.png`, 'tecido'),
+  CALCA: recolor(`${BASE}/bottom/CALCA.png`, 'tecido', `${BASE}/bottom/CALCA_F.png`),
+  JEANS: recolor(`${BASE}/bottom/JEANS.png`, 'tecido', `${BASE}/bottom/JEANS_F.png`),
+  LEGGING: recolor(`${BASE}/bottom/LEGGING.png`, 'tecido', `${BASE}/bottom/LEGGING_F.png`),
+  SHORT: recolor(`${BASE}/bottom/SHORT.png`, 'tecido', `${BASE}/bottom/SHORT_F.png`),
+  BERMUDA: recolor(`${BASE}/bottom/BERMUDA.png`, 'tecido', `${BASE}/bottom/BERMUDA_F.png`),
+  SHORT_JEANS: recolor(`${BASE}/bottom/SHORT_JEANS.png`, 'tecido', `${BASE}/bottom/SHORT_JEANS_F.png`),
+  SAIA: recolor(`${BASE}/bottom/SAIA.png`, 'tecido', `${BASE}/bottom/SAIA_F.png`),
+  SAIA_LONGA: recolor(`${BASE}/bottom/SAIA_LONGA.png`, 'tecido', `${BASE}/bottom/SAIA_LONGA_F.png`),
+  CALCA_LISTRADA: recolor(`${BASE}/bottom/CALCA_LISTRADA.png`, 'tecido', `${BASE}/bottom/CALCA_LISTRADA_F.png`),
 }
 
+/** Todas as 7 têm corte feminino no LPC (variante "thin") - cobertura completa aqui também. */
 export const CAMADA_SHOES: Partial<Record<EstiloSapato, CamadaRecolor>> = {
-  TENIS: recolor(`${BASE}/shoes/TENIS.png`, 'tecido'),
-  SOCIAL: recolor(`${BASE}/shoes/SOCIAL.png`, 'tecido'),
-  BOTA: recolor(`${BASE}/shoes/BOTA.png`, 'tecido'),
-  BOTA_CANO_ALTO: recolor(`${BASE}/shoes/BOTA_CANO_ALTO.png`, 'tecido'),
-  SANDALIA: recolor(`${BASE}/shoes/SANDALIA.png`, 'tecido'),
-  CHINELO: recolor(`${BASE}/shoes/CHINELO.png`, 'tecido'),
-  SALTO: recolor(`${BASE}/shoes/SALTO.png`, 'tecido'),
+  TENIS: recolor(`${BASE}/shoes/TENIS.png`, 'tecido', `${BASE}/shoes/TENIS_F.png`),
+  SOCIAL: recolor(`${BASE}/shoes/SOCIAL.png`, 'tecido', `${BASE}/shoes/SOCIAL_F.png`),
+  BOTA: recolor(`${BASE}/shoes/BOTA.png`, 'tecido', `${BASE}/shoes/BOTA_F.png`),
+  BOTA_CANO_ALTO: recolor(`${BASE}/shoes/BOTA_CANO_ALTO.png`, 'tecido', `${BASE}/shoes/BOTA_CANO_ALTO_F.png`),
+  SANDALIA: recolor(`${BASE}/shoes/SANDALIA.png`, 'tecido', `${BASE}/shoes/SANDALIA_F.png`),
+  CHINELO: recolor(`${BASE}/shoes/CHINELO.png`, 'tecido', `${BASE}/shoes/CHINELO_F.png`),
+  SALTO: recolor(`${BASE}/shoes/SALTO.png`, 'tecido', `${BASE}/shoes/SALTO_F.png`),
   // DESCALCO: sem sprite de propósito
 }
 
@@ -298,9 +323,11 @@ export const CAMADA_OTHER: Partial<Record<EstiloOutro, CamadaRecolor>> = {
 
 /** Resolve a camada final (URL + o que fazer com a cor escolhida) pra uma célula `CamadaPrebaked` -
  * a cor sempre bate exato com uma das 16 de `CORES_GERAL` (validada no backend), então é lookup
- * direto, sem distância. */
-export function resolverPrebaked(camada: CamadaPrebaked, corHex: string): string {
-  return camada.porCor[corHex] ?? Object.values(camada.porCor)[0]
+ * direto, sem distância. `porCorFeminino` só existe pra BOMBER - as outras pré-coloridas caem no
+ * masculino de qualquer jeito quando não tem versão feminina. */
+export function resolverPrebaked(camada: CamadaPrebaked, corHex: string, tipoCorpo: TipoCorpo): string {
+  const mapa = (tipoCorpo === 'FEMININO' && camada.porCorFeminino) || camada.porCor
+  return mapa[corHex] ?? Object.values(mapa)[0]
 }
 
 /** As 11 categorias do editor, mesma ordem de `Z_POS`, crescente = desenhada por cima. */
@@ -318,7 +345,9 @@ export interface CamadaResolvida {
  * ali agora (CARECA, NENHUM, NENHUMA, DESCALCO, MICROFONE). */
 export function montarCamadas(aparencia: AparenciaAvatar): Record<ChaveCamada, CamadaResolvida | null> {
   function deRecolor(camada: CamadaRecolor | undefined, corAlvo: string): CamadaResolvida | null {
-    return camada ? { url: camada.url, especificacoes: [{ material: camada.material, corAlvo }] } : null
+    if (!camada) return null
+    const url = aparencia.tipoCorpo === 'FEMININO' && camada.urlFeminino ? camada.urlFeminino : camada.url
+    return { url, especificacoes: [{ material: camada.material, corAlvo }] }
   }
 
   const jaqueta = CAMADA_JACKET[aparencia.estiloJaqueta]
@@ -326,12 +355,14 @@ export function montarCamadas(aparencia: AparenciaAvatar): Record<ChaveCamada, C
   if (jaqueta) {
     camadaJaqueta =
       jaqueta.tipo === 'recolor'
-        ? { url: jaqueta.url, especificacoes: [{ material: jaqueta.material, corAlvo: aparencia.corJaqueta }] }
-        : { url: resolverPrebaked(jaqueta, aparencia.corJaqueta), especificacoes: [] }
+        ? deRecolor(jaqueta, aparencia.corJaqueta)
+        : { url: resolverPrebaked(jaqueta, aparencia.corJaqueta, aparencia.tipoCorpo), especificacoes: [] }
   }
 
+  const pele = CAMADA_PELE[aparencia.tipoCorpo]
+
   return {
-    skin: { url: CAMADA_PELE.url, especificacoes: [{ material: CAMADA_PELE.material, corAlvo: aparencia.corPele }] },
+    skin: { url: pele.url, especificacoes: [{ material: pele.material, corAlvo: aparencia.corPele }] },
     head: (() => {
       const cabeca = CAMADA_HEAD[aparencia.tipoRosto]
       return { url: cabeca.url, especificacoes: cabeca.recolorir ? especificacoesCabeca(aparencia.corPele) : [] }
