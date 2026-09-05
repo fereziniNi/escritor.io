@@ -7,6 +7,7 @@ import { CalendarioMes } from './CalendarioMes'
 import { CalendarioSemana } from './CalendarioSemana'
 import { construirGradeDoMes } from './construirGradeDoMes'
 import { anoDaData, dataDeHoje, diaDaData, mesDaData, nomeDoDiaDaSemana, segundaFeiraDaSemana, somarDias } from './datasEscala'
+import { EscalaExcecaoModal } from './EscalaExcecaoModal'
 import { FormularioExcecaoDoDia } from './FormularioExcecaoDoDia'
 import type { SalvarExcecaoInput } from './types'
 import './Escala.css'
@@ -219,22 +220,24 @@ export function EscalaCalendarioPainel() {
           )}
 
           {selecao && (
-            <FormularioExcecaoDoDia
-              data={selecao.data}
-              trabalhaInicial={selecao.horaInicioSugerida ? true : (efetivoSelecionado?.trabalha ?? false)}
-              horaInicioInicial={efetivoSelecionado?.horaInicio ?? null}
-              horaFimInicial={efetivoSelecionado?.horaFim ?? null}
-              horaInicioSugerida={selecao.horaInicioSugerida}
-              horaFimSugerida={selecao.horaFimSugerida}
-              observacaoInicial={excecaoSelecionada?.observacao}
-              excecaoExistenteId={excecaoSelecionada?.id ?? null}
-              salvando={salvarMutation.isPending}
-              removendo={removerMutation.isPending}
-              erro={salvarMutation.isError || removerMutation.isError}
-              aoSalvar={(dados) => salvarMutation.mutate(dados)}
-              aoRemover={(id) => removerMutation.mutate(id)}
-              aoFechar={() => setSelecao(null)}
-            />
+            <EscalaExcecaoModal aoFechar={() => setSelecao(null)}>
+              <FormularioExcecaoDoDia
+                data={selecao.data}
+                trabalhaInicial={selecao.horaInicioSugerida ? true : (efetivoSelecionado?.trabalha ?? false)}
+                horaInicioInicial={efetivoSelecionado?.horaInicio ?? null}
+                horaFimInicial={efetivoSelecionado?.horaFim ?? null}
+                horaInicioSugerida={selecao.horaInicioSugerida}
+                horaFimSugerida={selecao.horaFimSugerida}
+                observacaoInicial={excecaoSelecionada?.observacao}
+                excecaoExistenteId={excecaoSelecionada?.id ?? null}
+                salvando={salvarMutation.isPending}
+                removendo={removerMutation.isPending}
+                erro={salvarMutation.isError || removerMutation.isError}
+                aoSalvar={(dados) => salvarMutation.mutate(dados)}
+                aoRemover={(id) => removerMutation.mutate(id)}
+                aoFechar={() => setSelecao(null)}
+              />
+            </EscalaExcecaoModal>
           )}
         </>
       )}

@@ -42,9 +42,11 @@ export function FormularioExcecaoDoDia({
   aoRemover: (id: number) => void
   aoFechar: () => void
 }) {
+  // `horaCurta` nunca devolve null/undefined (só string, às vezes vazia) - por isso o fallback
+  // pro horário padrão usa `||`, não `??`: `?? '09:00'` nunca dispararia com uma string vazia.
   const [trabalha, setTrabalha] = useState(horaInicioSugerida ? true : trabalhaInicial)
-  const [horaInicio, setHoraInicio] = useState(horaInicioSugerida ?? horaCurta(horaInicioInicial) ?? '09:00')
-  const [horaFim, setHoraFim] = useState(horaFimSugerida ?? horaCurta(horaFimInicial) ?? '18:00')
+  const [horaInicio, setHoraInicio] = useState(horaInicioSugerida ?? (horaCurta(horaInicioInicial) || '09:00'))
+  const [horaFim, setHoraFim] = useState(horaFimSugerida ?? (horaCurta(horaFimInicial) || '18:00'))
   const [observacao, setObservacao] = useState(observacaoInicial ?? '')
 
   const [ano, mesIndex, dia] = data.split('-')

@@ -166,18 +166,63 @@
   padding: 0.1em 0.55em;
 }
 
+/* Sem borda/fundo próprios de propósito - o cartão do modal (`.escala-excecao-modal`, abaixo) já
+ * dá o "box" visual; duplicar aqui deixaria uma caixa dentro da outra. */
 .escala-calendario-formulario {
-  margin-top: 1rem;
-  padding: 0.75rem;
-  border: 1px solid var(--cor-borda);
-  border-radius: var(--raio-borda);
-  background: var(--cor-superficie);
+  padding: 0;
 }
 
 .escala-calendario-formulario-horario {
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
+}
+
+/* "Modal dentro do modal" (pedido do usuário) - o formulário de horário do dia abre por cima de
+ * tudo, como um popup, em vez de inline embaixo do calendário. Fecha ao clicar fora ou pelos
+ * botões do próprio formulário - ver javadoc de `EscalaExcecaoModal.tsx` sobre por que não tem
+ * atalho de Esc aqui (conflitaria com o Esc do painel "Minha escala" por fora). */
+.escala-excecao-modal-fundo {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 18, 15, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 60;
+  animation: escala-excecao-modal-fundo-entrada 140ms ease-out;
+}
+
+.escala-excecao-modal {
+  background: var(--cor-fundo);
+  border-radius: var(--raio-borda);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  width: min(420px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 1.25rem;
+  animation: escala-excecao-modal-entrada 160ms ease-out;
+}
+
+@keyframes escala-excecao-modal-fundo-entrada {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes escala-excecao-modal-entrada {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .escala-equipe-tabela td,
