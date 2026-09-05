@@ -150,4 +150,43 @@ class VisibilidadeUsuarioServiceTest {
         assertThatThrownBy(() -> service.resolverAlvo(999L, admin, IllegalStateException::new))
                 .isInstanceOf(RecursoNaoEncontradoException.class);
     }
+
+    // Adicionado pro calendário de escala (pedido do usuário: "para que o admin/chefe conseguir
+    // ver os momentos em que os funcionários estarão trabalhando") - `listarUsuariosVisiveis`.
+
+    @Test
+    void adminListaTodosOsUsuariosAtivos() {
+        Usuario admin = usuarioComId(9L, Papel.ADMIN);
+        Usuario outro = usuarioComId(2L, Papel.COLABORADOR);
+        when(usuarioRepository.findByAtivoTrueOrderByNomeAsc()).thenReturn(List.of(admin, outro));
+
+        assertThat(service.listarUsuariosVisiveis(admin)).containsExactly(admin, outro);
+    }
+
+    @Test
+    void colaboradorListaSoASiMesmo() {
+        Usuario colaborador = usuarioComId(1L, Papel.COLABORADOR);
+
+        assertThat(service.listarUsuariosVisiveis(colaborador)).containsExactly(colaborador);
+    }
+
+    @Test
+    void gestorListaSiMesmoEQuemDivideProjetoComEle() {
+        Usuario gestor = usuarioComId(2L, Papel.GESTOR);
+        Usuario membro = usuarioComId(3L, Papel.COLABORADOR);
+        Projeto projetoComum = projetoComId(10L);
+        when(membroProjetoRepository.findByUsuario(gestor)).thenReturn(List.of(new MembroProjeto(projetoComum, gestor)));
+        when(membroProjetoRepository.findByProjeto(projetoComum))
+                .thenReturn(List.of(new MembroProjeto(projetoComum, gestor), new MembroProjeto(projetoComum, membro)));
+
+        assertThat(service.listarUsuariosVisiveis(gestor)).containsExactlyInAnyOrder(gestor, membro);
+    }
+
+    @Test
+    void gestorSemProjetoAlgumSoSeVe() {
+        Usuario gestor = usuarioComId(2L, Papel.GESTOR);
+        when(membroProjetoRepository.findByUsuario(gestor)).thenReturn(List.of());
+
+        assertThat(service.listarUsuariosVisiveis(gestor)).containsExactly(gestor);
+    }
 }

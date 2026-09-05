@@ -8,6 +8,7 @@ import { RelatoriosPage } from '../relatorios/RelatoriosPage'
 import { buscarMapaAtivo } from './api'
 import { APARENCIA_PADRAO } from './avatar/aparenciaAvatar'
 import { EditorAvatarPage } from './avatar/EditorAvatarPage'
+import { EscalaPage } from './EscalaPage'
 import './EscritorioPage.css'
 import './ui/hud.css'
 import { CronometroTrabalho } from './CronometroTrabalho'
@@ -29,6 +30,7 @@ import { usePresencaWebSocket } from './usePresencaWebSocket'
 
 const TITULO_PAINEL: Record<PainelId, string> = {
   ponto: '⏱️ Ponto',
+  escala: '🗓️ Minha escala',
   relatorios: '📊 Relatórios',
   projetos: '📁 Projetos',
   colaboradores: '🧑‍💼 Colaboradores',
@@ -136,9 +138,10 @@ export function EscritorioPage() {
         <PainelFlutuante
           titulo={TITULO_PAINEL[painelAberto]}
           aoFechar={() => setPainelAberto(null)}
-          largo={painelAberto === 'projetos'}
+          largo={painelAberto === 'projetos' || painelAberto === 'escala'}
         >
           {painelAberto === 'ponto' && <PainelPonto />}
+          {painelAberto === 'escala' && <EscalaPage />}
           {painelAberto === 'relatorios' && <RelatoriosPage />}
           {painelAberto === 'projetos' && <PainelProjetos />}
           {painelAberto === 'colaboradores' && <ColaboradoresPage />}

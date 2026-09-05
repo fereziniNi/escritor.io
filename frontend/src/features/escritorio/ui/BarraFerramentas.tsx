@@ -3,7 +3,7 @@ import { ControlesAudioVideo } from './ControlesAudioVideo'
 import { MenuUsuario } from './MenuUsuario'
 import type { StatusAvatar } from '../types'
 
-export type PainelId = 'ponto' | 'relatorios' | 'projetos' | 'colaboradores' | 'whatsapp' | 'avatar'
+export type PainelId = 'ponto' | 'escala' | 'relatorios' | 'projetos' | 'colaboradores' | 'whatsapp' | 'avatar'
 
 /**
  * Toolbar inferior - substitui o `.escritorio-dock` antigo (botões com texto+emoji lado a lado)
@@ -72,6 +72,15 @@ export function BarraFerramentas({
           onClick={() => aoAbrirPainel('projetos')}
         >
           📁
+        </button>
+        <button
+          type="button"
+          className={`escritorio-toolbar-botao${painelAberto === 'escala' ? ' escritorio-toolbar-botao--ativo' : ''}`}
+          aria-label="Minha escala"
+          title="Minha escala"
+          onClick={() => aoAbrirPainel('escala')}
+        >
+          🗓️
         </button>
         {(papel === 'GESTOR' || papel === 'ADMIN') && (
           <button

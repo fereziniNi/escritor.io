@@ -1,0 +1,125 @@
+/* Estilos específicos do calendário individual de escala (pedido do usuário: "calendário
+ * individual para indicar os dias que ira trabalhar"). Reaproveita `.secao`/`.cartao`/`.campo`/
+ * `.formulario`/`.linha-botoes`/`.tabela-elegante` já existentes - só o grid do calendário e o
+ * padrão semanal precisam de classes novas. */
+
+.escala-padrao-semanal-lista {
+  list-style: none;
+  margin: 0.75rem 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.escala-padrao-semanal-linha {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  background: var(--cor-superficie);
+}
+
+.escala-padrao-semanal-dia {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 9rem;
+  font-weight: 600;
+}
+
+.escala-calendario-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin: 0.75rem 0;
+}
+
+.escala-calendario-grade {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.3rem;
+}
+
+.escala-calendario-dia-semana {
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--cor-texto-suave);
+  padding-bottom: 0.25rem;
+}
+
+.escala-calendario-dia {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.2rem;
+  min-height: 3.4rem;
+  padding: 0.4rem 0.2rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  font: inherit;
+  font-weight: 400;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.escala-calendario-dia:hover:not(:disabled) {
+  background: var(--cor-primaria-clara);
+  box-shadow: none;
+  transform: none;
+}
+
+.escala-calendario-dia:active:not(:disabled) {
+  box-shadow: none;
+  transform: none;
+}
+
+.escala-calendario-dia--fora-do-mes {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.escala-calendario-dia--trabalha {
+  background: var(--cor-primaria-clara);
+}
+
+.escala-calendario-dia--selecionado {
+  outline: 2px solid var(--cor-primaria-escura);
+  outline-offset: -2px;
+}
+
+.escala-calendario-dia-numero {
+  font-weight: 600;
+}
+
+.escala-calendario-dia-horario {
+  font-size: 0.7rem;
+  color: var(--cor-primaria-escura);
+}
+
+.escala-calendario-formulario {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  background: var(--cor-superficie);
+}
+
+.escala-calendario-formulario-horario {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.escala-equipe-tabela td,
+.escala-equipe-tabela th {
+  white-space: nowrap;
+}

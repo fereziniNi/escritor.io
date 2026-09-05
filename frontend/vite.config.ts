@@ -15,6 +15,7 @@ export default defineConfig({
           '/usuarios',
           '/equipes',
           '/projetos',
+          '/escala',
           '/ponto',
           '/ajustes',
           '/quadros',

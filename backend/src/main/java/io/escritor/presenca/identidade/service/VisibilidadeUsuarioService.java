@@ -6,7 +6,10 @@ import io.escritor.presenca.identidade.domain.Projeto;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.MembroProjetoRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Supplier;
 import org.springframework.stereotype.Service;
 
@@ -73,5 +76,32 @@ public class VisibilidadeUsuarioService {
         }
 
         return usuarioAlvo;
+    }
+
+    /**
+     * Adicionado pro calendário de escala (pedido do usuário: "para que o admin/chefe conseguir
+     * ver os momentos em que os funcionários estarão trabalhando") - diferente de {@link #podeVer}
+     * (par a par), aqui é preciso a lista inteira de quem é visível de uma vez, pra montar uma
+     * tabela com todo mundo. Mesma regra de sempre: ADMIN vê todo mundo (ativo); GESTOR vê quem
+     * está atribuído a algum projeto do qual ele também é membro (incluindo ele mesmo);
+     * COLABORADOR só vê a si mesmo.
+     */
+    public List<Usuario> listarUsuariosVisiveis(Usuario requisitante) {
+        if (requisitante.getPapel() == Papel.ADMIN) {
+            return usuarioRepository.findByAtivoTrueOrderByNomeAsc();
+        }
+        if (requisitante.getPapel() != Papel.GESTOR) {
+            return List.of(requisitante);
+        }
+
+        List<Projeto> projetosDoRequisitante = membroProjetoRepository.findByUsuario(requisitante).stream()
+                .map(MembroProjeto::getProjeto)
+                .toList();
+        Set<Usuario> visiveis = new LinkedHashSet<>();
+        visiveis.add(requisitante);
+        for (Projeto projeto : projetosDoRequisitante) {
+            membroProjetoRepository.findByProjeto(projeto).forEach(membro -> visiveis.add(membro.getUsuario()));
+        }
+        return visiveis.stream().sorted(Comparator.comparing(Usuario::getNome)).toList();
     }
 }
