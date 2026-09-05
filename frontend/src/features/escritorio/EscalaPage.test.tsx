@@ -38,7 +38,7 @@ describe('EscalaPage', () => {
     renderPagina()
 
     expect(await screen.findByText(/padrão semanal/i)).toBeInTheDocument()
-    expect(await screen.findByText(/exceções pontuais/i)).toBeInTheDocument()
+    expect(await screen.findByText(/🗓️ Calendário/i)).toBeInTheDocument()
     expect(screen.queryByText(/escala da equipe/i)).not.toBeInTheDocument()
   })
 

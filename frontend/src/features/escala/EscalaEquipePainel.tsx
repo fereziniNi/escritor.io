@@ -2,29 +2,10 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { formatarDataBr } from '../../shared/formatarData'
 import { buscarEscalaDaEquipe } from './api'
+import { segundaFeiraDaSemana, somarDias } from './datasEscala'
 import './Escala.css'
 
 const DIAS_DA_SEMANA_ABREVIADOS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
-
-function comZero(numero: number, digitos: number): string {
-  return String(numero).padStart(digitos, '0')
-}
-
-function formatarDataIso(data: Date): string {
-  return `${comZero(data.getUTCFullYear(), 4)}-${comZero(data.getUTCMonth() + 1, 2)}-${comZero(data.getUTCDate(), 2)}`
-}
-
-/** Segunda-feira da semana que contém a data dada - mesma disciplina UTC de `construirGradeDoMes`. */
-function segundaFeiraDaSemana(ano: number, mes: number, dia: number): string {
-  const diaDaSemana = new Date(Date.UTC(ano, mes - 1, dia)).getUTCDay() // 0=domingo..6=sábado
-  const deslocamentoAteASegunda = diaDaSemana === 0 ? -6 : 1 - diaDaSemana
-  return formatarDataIso(new Date(Date.UTC(ano, mes - 1, dia + deslocamentoAteASegunda)))
-}
-
-function somarDias(dataIso: string, quantidade: number): string {
-  const [ano, mes, dia] = dataIso.split('-').map(Number)
-  return formatarDataIso(new Date(Date.UTC(ano, mes - 1, dia + quantidade)))
-}
 
 function horaCurta(hora: string | null): string {
   return hora ? hora.slice(0, 5) : ''

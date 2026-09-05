@@ -39,6 +39,50 @@
   margin: 0.75rem 0;
 }
 
+/* Barra de navegação comum às 3 visões (Mês/Semana/Dia), estilo Google Agenda: Hoje + setas +
+ * período à esquerda, abas de visão à direita. */
+.escala-calendario-abas {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0.75rem 0;
+}
+
+.escala-calendario-periodo {
+  margin-right: auto;
+  font-size: 1.05rem;
+}
+
+.escala-calendario-abas-modo {
+  display: flex;
+  gap: 0.2rem;
+  padding: 0.2rem;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: 999px;
+}
+
+.escala-calendario-aba-modo {
+  background: transparent;
+  color: var(--cor-texto);
+  box-shadow: none;
+  padding: 0.35em 0.9em;
+  font-size: 0.85rem;
+}
+
+.escala-calendario-aba-modo:hover:not(:disabled) {
+  background: var(--cor-primaria-clara);
+  box-shadow: none;
+  transform: none;
+}
+
+.escala-calendario-aba-modo--ativa,
+.escala-calendario-aba-modo--ativa:hover {
+  background: var(--cor-primaria);
+  color: #fff;
+}
+
 .escala-calendario-grade {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -98,11 +142,28 @@
 
 .escala-calendario-dia-numero {
   font-weight: 600;
+  min-width: 1.6rem;
+  min-height: 1.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+}
+
+/* Dia de hoje num círculo preenchido, estilo Google Agenda. */
+.escala-calendario-dia-numero--hoje {
+  background: var(--cor-primaria);
+  color: #fff;
 }
 
 .escala-calendario-dia-horario {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
+  font-weight: 600;
   color: var(--cor-primaria-escura);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-primaria-escura);
+  border-radius: 999px;
+  padding: 0.1em 0.55em;
 }
 
 .escala-calendario-formulario {
@@ -122,4 +183,126 @@
 .escala-equipe-tabela td,
 .escala-equipe-tabela th {
   white-space: nowrap;
+}
+
+/* Grade de horário (visões Semana/Dia) - estilo Google Agenda: coluna de rótulos de hora + uma
+ * coluna por dia, 32 linhas de 30min (06:00-22:00). `CalendarioSemana`/`CalendarioDia` (que reusa
+ * o mesmo componente com um dia só) montam essa grade via `style` inline pra `gridColumn`/
+ * `gridRow` de cada célula - aqui só o visual. */
+.escala-grade-horas {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid var(--cor-borda);
+  border-left: 1px solid var(--cor-borda);
+  overflow: hidden;
+  border-radius: var(--raio-borda);
+}
+
+.escala-grade-horas-canto {
+  border-right: 1px solid var(--cor-borda);
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.escala-grade-horas-cabecalho-dia {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  padding: 0.4rem 0.2rem;
+  border-right: 1px solid var(--cor-borda);
+  border-bottom: 1px solid var(--cor-borda);
+  background: var(--cor-superficie);
+}
+
+.escala-grade-horas-cabecalho-abrev {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--cor-texto-suave);
+  text-transform: uppercase;
+}
+
+.escala-grade-horas-cabecalho-numero {
+  font-weight: 700;
+  min-width: 1.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+}
+
+.escala-grade-horas-cabecalho-numero--hoje {
+  background: var(--cor-primaria);
+  color: #fff;
+}
+
+.escala-grade-horas-rotulo {
+  font-size: 0.68rem;
+  color: var(--cor-texto-suave);
+  text-align: right;
+  padding-right: 0.4rem;
+  border-right: 1px solid var(--cor-borda);
+  transform: translateY(-0.6em);
+}
+
+.escala-grade-dia-coluna {
+  position: relative;
+  border-right: 1px solid var(--cor-borda);
+  background-image: repeating-linear-gradient(to bottom, var(--cor-borda) 0 1px, transparent 1px calc(100% / 16));
+  touch-action: none;
+  cursor: pointer;
+}
+
+.escala-bloco-trabalho {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  min-height: 1.1rem;
+  padding: 0.15rem 0.4rem;
+  background: var(--cor-primaria);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: left;
+  box-shadow: none;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.escala-bloco-trabalho:hover:not(:disabled) {
+  background: var(--cor-primaria-escura);
+  box-shadow: none;
+  transform: none;
+}
+
+.escala-bloco-arraste {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  background: var(--cor-primaria-clara);
+  border: 2px dashed var(--cor-primaria-escura);
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.escala-linha-agora {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--cor-perigo);
+  z-index: 1;
+}
+
+.escala-linha-agora::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--cor-perigo);
 }
