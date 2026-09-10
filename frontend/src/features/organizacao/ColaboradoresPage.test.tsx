@@ -42,7 +42,7 @@ describe('ColaboradoresPage', () => {
     const linha = (await screen.findByText('Ana Souza')).closest('li')!
     expect(within(linha).getByText('ana@escritor.io')).toBeInTheDocument()
     expect(within(linha).getByText('Colaborador')).toBeInTheDocument()
-    expect(within(linha).getByText(/Hoje: 8h00/)).toBeInTheDocument()
+    expect(within(linha).getByText(/Hoje: 8h/)).toBeInTheDocument()
   })
 
   it('cria um colaborador e atualiza a lista', async () => {
@@ -106,6 +106,6 @@ describe('ColaboradoresPage', () => {
     await user.type(campo, '360')
     await user.click(screen.getByRole('button', { name: 'Salvar' }))
 
-    expect(await screen.findByText(/Hoje: 6h00/)).toBeInTheDocument()
+    expect(await screen.findByText(/Hoje: 6h/)).toBeInTheDocument()
   })
 })

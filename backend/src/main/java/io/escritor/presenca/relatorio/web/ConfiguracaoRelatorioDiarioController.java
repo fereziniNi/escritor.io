@@ -33,6 +33,7 @@ public class ConfiguracaoRelatorioDiarioController {
     @PutMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ConfiguracaoRelatorioDiarioResponse atualizar(@Valid @RequestBody AtualizarConfiguracaoRelatorioDiarioRequest request) {
-        return ConfiguracaoRelatorioDiarioResponse.de(configuracaoService.salvar(request.horarioEnvio(), request.habilitado()));
+        return ConfiguracaoRelatorioDiarioResponse.de(
+                configuracaoService.salvar(request.horarioEnvio(), request.habilitado(), request.preferencias()));
     }
 }

@@ -6,14 +6,15 @@ import { AquarioAnimado } from './AquarioAnimado'
 import { AvatarPixi } from './AvatarPixi'
 import { calcularTransformCamera } from './camera'
 import type { TransformCamera } from './camera'
+import { cabineTemAlguemDentro } from './construirBloqueioDeCapacidade'
 import { PROXIMIDADE_RAIO_TILES, TILE_PX, ZOOM_MAXIMO, ZOOM_MINIMO, ZOOM_PADRAO } from './constantes'
-import { MOBILIA_MUNDO } from './dadosMundo'
+import { BORDA_PORTA_POR_TIPO, MOBILIA_MUNDO } from './dadosMundo'
+import { gerarParedesDeZona } from './gerarParedesDeZona'
 import { PixiMundo } from './PixiMundo'
 import { PlantaAnimada } from './PlantaAnimada'
 import { calcularParesProximos, usuariosProximosDeAlguem } from './proximidade'
-import { RotuloZona } from './RotuloZona'
 import { SeguidorCamera } from './SeguidorCamera'
-import { desenharMobilia, desenharPiso, desenharPisoZonas } from './spriteFactory'
+import { desenharMobilia, desenharParedes, desenharPiso, desenharPisoZonas } from './spriteFactory'
 import { VaporAnimado } from './VaporAnimado'
 
 /** Fase 6: `aquario`/`planta` viraram componentes animados próprios (nadam/balançam de verdade via
@@ -53,10 +54,18 @@ function useTamanhoViewport(containerRef: React.RefObject<HTMLDivElement | null>
 
 /**
  * Compõe o mundo Pixi: piso + móveis + avatares, com uma câmera que segue o próprio jogador
- * (suavizada por `SeguidorCamera`) - roda do mouse ainda ajusta o zoom. Sem paredes de propósito
- * (pedido do usuário: "remover as paredes, deixar o mapa mais vivo") - as 4 salas continuam
- * distinguíveis por terem material/cor de piso própria (`desenharPisoZonas`, Fase 6) e pela
- * densidade de móveis de cada uma, sem barreira física nem colisão entre elas.
+ * (suavizada por `SeguidorCamera`) - roda do mouse ainda ajusta o zoom. Paredes de verdade em toda
+ * sala (pedido do usuário: "coloque parede em todas [as áreas]" - decisão anterior de mapa aberto,
+ * "remover as paredes, deixar o mapa mais vivo", foi revertida por completo): cada zona ganha
+ * parede de perímetro com uma única porta, a borda escolhida por tipo (`BORDA_PORTA_POR_TIPO` em
+ * `dadosMundo.ts`) - mesma fonte de paredes que `EscritorioPage.tsx` usa pra bloquear o movimento
+ * de verdade (`desenharParedes`/`gerarParedesDeZona`). Uma cabine ocupada perde a porta no desenho
+ * também - pedido do usuário: "quando a sala estiver fechada para uma pessoa, deve fechar
+ * visualmente também", depois "fechar pra quem entra também" (`cabineTemAlguemDentro`, igual pra
+ * todo mundo incluindo o próprio ocupante - diferente de `cabineEstaCheia`, que só o bloqueio de
+ * movimento usa). Sem rótulo de nome flutuando sobre
+ * a sala (pedido do usuário: "remova os nomes das áreas" - `RotuloZona.tsx` foi removido por
+ * completo).
  */
 export function CamadaMundo({
   larguraTiles,
@@ -64,12 +73,15 @@ export function CamadaMundo({
   zonas,
   usuarios,
   meuUsuarioId,
+  falando,
 }: {
   larguraTiles: number
   alturaTiles: number
   zonas: Zona[]
   usuarios: EstadoPresencaUsuario[]
   meuUsuarioId: number | null
+  /** Pedido do usuário: "voice" - ids de quem está com a voz ativa agora (`useVozProximidade.ts`). */
+  falando?: Set<number>
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewport = useTamanhoViewport(hostRef)
@@ -110,6 +122,20 @@ export function CamadaMundo({
   // precisa mover (isso continua barato, é só um transform).
   const desenharPisoMemo = useCallback((g: import('pixi.js').Graphics) => desenharPiso(g, larguraTiles, alturaTiles), [larguraTiles, alturaTiles])
   const desenharPisoZonasMemo = useCallback((g: import('pixi.js').Graphics) => desenharPisoZonas(g, zonas), [zonas])
+  // Pedido do usuário: "quando a sala estiver fechada para uma pessoa, deve fechar visualmente
+  // também" - depois: "o usuário que entrou... a porta fica aberta [pra ele], mas os outros veem
+  // fechada. Tem como fechar pra quem entra também?" - `cabineTemAlguemDentro` (diferente de
+  // `cabineEstaCheia`, usada só pro bloqueio de movimento) não exclui "eu mesmo": uma cabine
+  // ocupada perde a porta no desenho pra QUALQUER UM que olhar, o próprio ocupante incluso. A
+  // borda vira `null`, que `gerarParedesDeZona` fecha por completo, sem vão nenhum.
+  const paredes = useMemo(
+    () =>
+      gerarParedesDeZona(zonas, (zona) =>
+        zona.tipo === 'CABINE' && cabineTemAlguemDentro(zona, usuarios) ? null : BORDA_PORTA_POR_TIPO[zona.tipo],
+      ),
+    [zonas, usuarios],
+  )
+  const desenharParedesMemo = useCallback((g: import('pixi.js').Graphics) => desenharParedes(g, paredes), [paredes])
   const desenharMobiliaMemo = useCallback((g: import('pixi.js').Graphics) => desenharMobilia(g, MOBILIA_ESTATICA), [])
 
   return (
@@ -134,6 +160,7 @@ export function CamadaMundo({
         <pixiContainer x={transform.x} y={transform.y} scale={transform.scale}>
           <pixiGraphics draw={desenharPisoMemo} />
           <pixiGraphics draw={desenharPisoZonasMemo} />
+          <pixiGraphics draw={desenharParedesMemo} />
           <pixiGraphics draw={desenharMobiliaMemo} />
           {ITENS_AQUARIO.map((item, indice) => (
             <AquarioAnimado key={`aquario-${indice}`} tileX={item.x} tileY={item.y} />
@@ -143,9 +170,6 @@ export function CamadaMundo({
           ))}
           {ITENS_CAFETEIRA.map((item, indice) => (
             <VaporAnimado key={`vapor-${indice}`} tileX={item.x} tileY={item.y} />
-          ))}
-          {zonas.map((zona) => (
-            <RotuloZona key={zona.id} zona={zona} />
           ))}
           {usuarios.map((usuario) => (
             <AvatarPixi
@@ -157,6 +181,7 @@ export function CamadaMundo({
               status={COR_STATUS[usuario.status]}
               destaque={usuario.usuarioId === meuUsuarioId}
               proximo={proximos.has(usuario.usuarioId)}
+              falando={falando?.has(usuario.usuarioId) ?? false}
               offline={usuario.status === 'OFFLINE'}
             />
           ))}

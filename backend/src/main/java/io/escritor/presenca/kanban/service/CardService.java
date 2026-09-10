@@ -1,5 +1,8 @@
 package io.escritor.presenca.kanban.service;
 
+import io.escritor.presenca.escritorio.ws.PresencaWebSocketHandler;
+import io.escritor.presenca.escritorio.ws.PresencaWebSocketHandler.NovaTarefaWs;
+import io.escritor.presenca.escritorio.ws.PresencaWebSocketHandler.TarefaConcluidaWs;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
@@ -14,8 +17,12 @@ import io.escritor.presenca.kanban.repository.CardRepository;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
 import io.escritor.presenca.kanban.web.CardResponse;
 import io.escritor.presenca.kanban.ws.ProjetoWebSocketHandler;
+import io.escritor.presenca.notificacao.domain.TipoNotificacao;
+import io.escritor.presenca.notificacao.service.NotificacaoService;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -26,18 +33,24 @@ public class CardService {
     private final UsuarioRepository usuarioRepository;
     private final ProjetoWebSocketHandler projetoWebSocketHandler;
     private final CardEventoRepository cardEventoRepository;
+    private final PresencaWebSocketHandler presencaWebSocketHandler;
+    private final NotificacaoService notificacaoService;
 
     public CardService(
             CardRepository cardRepository,
             ColunaRepository colunaRepository,
             UsuarioRepository usuarioRepository,
             ProjetoWebSocketHandler projetoWebSocketHandler,
-            CardEventoRepository cardEventoRepository) {
+            CardEventoRepository cardEventoRepository,
+            PresencaWebSocketHandler presencaWebSocketHandler,
+            NotificacaoService notificacaoService) {
         this.cardRepository = cardRepository;
         this.colunaRepository = colunaRepository;
         this.usuarioRepository = usuarioRepository;
         this.projetoWebSocketHandler = projetoWebSocketHandler;
         this.cardEventoRepository = cardEventoRepository;
+        this.presencaWebSocketHandler = presencaWebSocketHandler;
+        this.notificacaoService = notificacaoService;
     }
 
     public CardResponse criar(
@@ -65,6 +78,22 @@ public class CardService {
         // S3.17: o evento nasce aqui, dentro do mesmo serviço que cria o card - nunca é escrito
         // manualmente por outra camada (controller, evento assíncrono, etc.).
         cardEventoRepository.save(new CardEvento(salvo, criadoPor, TipoEventoCard.CRIACAO, null, coluna.getNome()));
+
+        // Pedido do usuário: "quando qualquer pessoa adicionar uma tarefa nova... deve informar
+        // todos os usuários do sistema... em qual projeto foi" - broadcast global (todo mundo
+        // conectado agora, exceto quem criou), não uma lista de destinatários específicos como
+        // `avisarSeFinalizouATarefa`.
+        presencaWebSocketHandler.avisarNovaTarefa(
+                criadoPor.getId(), new NovaTarefaWs(salvo.getId(), salvo.getTitulo(), coluna.getProjeto().getNome(), criadoPor.getNome()));
+        // Mesmo escopo do broadcast acima ("todos os usuários do sistema") - diferente dele, não
+        // depende de estar conectado agora: quem estiver offline ainda vê isto na central de
+        // notificações depois (pedido do usuário: "ver as últimas que chegaram no sistema").
+        String textoNovaTarefa = criadoPor.getNome() + " criou a tarefa \"" + salvo.getTitulo() + "\" em " + coluna.getProjeto().getNome();
+        for (Usuario usuario : usuarioRepository.findByAtivoTrueOrderByNomeAsc()) {
+            if (!usuario.getId().equals(criadoPor.getId())) {
+                notificacaoService.registrar(usuario, TipoNotificacao.NOVA_TAREFA, textoNovaTarefa, null);
+            }
+        }
 
         return CardResponse.de(salvo);
     }
@@ -107,11 +136,53 @@ public class CardService {
         if (!colunaAnterior.getId().equals(novaColuna.getId())) {
             cardEventoRepository.save(
                     new CardEvento(salvo, autor, TipoEventoCard.MUDANCA_COLUNA, colunaAnterior.getNome(), novaColuna.getNome()));
+            avisarSeFinalizouATarefa(salvo, novaColuna, autor);
         }
 
         projetoWebSocketHandler.broadcastCardMovido(novaColuna.getProjeto().getId(), response);
 
         return response;
+    }
+
+    /**
+     * Pedido do usuário: "sempre que alguém finalizar uma tarefa... notificado ao usuário" - o
+     * board não tem uma coluna com significado fixo de "concluído" (nomes livres, só
+     * `Coluna.ordem` pra ordenar), então a heurística é a convenção usual de Kanban: entrar na
+     * ÚLTIMA coluna do projeto (maior `ordem`) conta como "terminou". Avisa o responsável e/ou
+     * criador do card - nunca quem fez o próprio movimento (mover o próprio card não é novidade
+     * pra quem moveu). Um board de coluna única não dispara nada (não existe "última coluna
+     * diferente da atual" pra chegar).
+     */
+    private void avisarSeFinalizouATarefa(Card card, Coluna colunaDestino, Usuario autor) {
+        List<Coluna> colunasDoProjeto = colunaRepository.findByProjetoOrderByOrdemAsc(colunaDestino.getProjeto());
+        // defensivo - `colunaDestino` é uma coluna de verdade desse projeto, então essa lista
+        // nunca deveria vir vazia; só não quebra se vier (dado inconsistente é motivo pra não
+        // notificar, não pra derrubar o mover em si).
+        if (colunasDoProjeto.isEmpty()) {
+            return;
+        }
+        Coluna ultimaColuna = colunasDoProjeto.get(colunasDoProjeto.size() - 1);
+        if (!ultimaColuna.getId().equals(colunaDestino.getId())) {
+            return;
+        }
+
+        // Deduplica por id, não por igualdade de objeto - `Usuario` não sobrescreve
+        // `equals`/`hashCode` (identidade padrão), então dois `Usuario` carregados
+        // separadamente pro mesmo id não seriam iguais num `Set<Usuario>` comum.
+        Map<Long, Usuario> destinatarios = new LinkedHashMap<>();
+        if (card.getResponsavel() != null) {
+            destinatarios.put(card.getResponsavel().getId(), card.getResponsavel());
+        }
+        destinatarios.put(card.getCriadoPor().getId(), card.getCriadoPor());
+        destinatarios.remove(autor.getId());
+
+        String textoConcluida = autor.getNome() + " concluiu \"" + card.getTitulo() + "\" em " + colunaDestino.getProjeto().getNome();
+        for (Usuario destinatario : destinatarios.values()) {
+            presencaWebSocketHandler.avisarTarefaConcluida(
+                    destinatario.getId(),
+                    new TarefaConcluidaWs(card.getId(), card.getTitulo(), colunaDestino.getProjeto().getNome(), autor.getNome()));
+            notificacaoService.registrar(destinatario, TipoNotificacao.TAREFA_CONCLUIDA, textoConcluida, null);
+        }
     }
 
     private Usuario buscarUsuario(Long id) {

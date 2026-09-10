@@ -20,10 +20,11 @@ import org.springframework.web.bind.annotation.RestController;
  * deve definir [a carga diária] pros outros funcionários"). {@link #listarBasico} é a exceção
  * deliberada: id+nome só, aberto a qualquer autenticado, pra alimentar autocomplete de "escolher
  * uma pessoa" em qualquer lugar do sistema (pedido do cliente: nome em vez de id, com sugestão
- * das pessoas cadastradas). {@link #meuUsuario}/{@link #atualizarMinhaAparencia} são a outra
- * exceção: self-service, qualquer autenticado só sobre o próprio usuário (via {@code
- * ContextoUsuarioAutenticado}, não `{id}`), pedido do usuário "a opção para todos detalhar da
- * melhor maneira possível o avatar". */
+ * das pessoas cadastradas). {@link #meuUsuario}/{@link #atualizarMinhaAparencia}/{@link
+ * #atualizarMeuPerfil} são a outra exceção: self-service, qualquer autenticado só sobre o próprio
+ * usuário (via {@code ContextoUsuarioAutenticado}, não `{id}`), pedido do usuário "a opção para
+ * todos detalhar da melhor maneira possível o avatar" e, depois, "edição de perfil. Nome e
+ * email". */
 @RestController
 @RequestMapping("/usuarios")
 public class UsuarioController {
@@ -68,5 +69,10 @@ public class UsuarioController {
     @PatchMapping("/me/aparencia")
     public UsuarioResponse atualizarMinhaAparencia(@Valid @RequestBody AtualizarAparenciaRequest request) {
         return usuarioService.atualizarMinhaAparencia(contextoUsuarioAutenticado.usuarioAtual(), request);
+    }
+
+    @PatchMapping("/me/perfil")
+    public UsuarioResponse atualizarMeuPerfil(@Valid @RequestBody AtualizarPerfilRequest request) {
+        return usuarioService.atualizarMeuPerfil(contextoUsuarioAutenticado.usuarioAtual(), request);
     }
 }

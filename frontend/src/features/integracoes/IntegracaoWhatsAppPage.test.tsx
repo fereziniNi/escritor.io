@@ -6,11 +6,22 @@ import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { IntegracaoWhatsAppPage } from './IntegracaoWhatsAppPage'
 
+const PREFERENCIAS_PADRAO = {
+  ponto: true,
+  tarefasCriadasMovidas: true,
+  tarefasConcluidas: false,
+  reunioes: false,
+  ausencias: false,
+  resumoEquipe: false,
+}
+
 // `IntegracaoWhatsAppPage` agora também busca a configuração do resumo diário ao montar -
 // handler padrão de "ainda não configurado", restaurado a cada teste por `resetHandlers`; os
 // testes que se importam com o resumo diário sobrescrevem via `server.use(...)`.
 const server = setupServer(
-  http.get('/admin/relatorio-diario', () => HttpResponse.json({ configurado: false, horarioEnvio: null, habilitado: false })),
+  http.get('/admin/relatorio-diario', () =>
+    HttpResponse.json({ configurado: false, horarioEnvio: null, habilitado: false, preferencias: PREFERENCIAS_PADRAO }),
+  ),
 )
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
@@ -83,7 +94,7 @@ describe('IntegracaoWhatsAppPage', () => {
   })
 
   describe('resumo diário', () => {
-    it('campo de horário vazio quando ainda não foi configurado', async () => {
+    it('campo de horário vazio e preferências padrão quando ainda não foi configurado', async () => {
       server.use(
         http.get('/admin/whatsapp/estado', () => HttpResponse.json({ situacao: 'CONECTADO', qrCodeBase64: null, mensagem: null })),
       )
@@ -92,12 +103,27 @@ describe('IntegracaoWhatsAppPage', () => {
 
       const campoHorario = await screen.findByLabelText(/horário de envio/i)
       expect(campoHorario).toHaveValue('')
+      // pedido do usuário: "visualizar as possibilidades de filtros que poderá utilizar" - a
+      // lista inteira de blocos já aparece, mesmo sem nada configurado ainda.
+      expect(screen.getByLabelText('Ponto (horas trabalhadas)')).toBeChecked()
+      expect(screen.getByLabelText('Tarefas criadas/movidas')).toBeChecked()
+      expect(screen.getByLabelText('Tarefas concluídas')).not.toBeChecked()
+      expect(screen.getByLabelText('Reuniões do dia')).not.toBeChecked()
+      expect(screen.getByLabelText('Quem não bateu ponto (ausências)')).not.toBeChecked()
+      expect(screen.getByLabelText('Resumo agregado da equipe')).not.toBeChecked()
     })
 
-    it('pré-preenche com o horário já configurado', async () => {
+    it('pré-preenche com o horário e as preferências já configuradas', async () => {
       server.use(
         http.get('/admin/whatsapp/estado', () => HttpResponse.json({ situacao: 'CONECTADO', qrCodeBase64: null, mensagem: null })),
-        http.get('/admin/relatorio-diario', () => HttpResponse.json({ configurado: true, horarioEnvio: '18:00:00', habilitado: true })),
+        http.get('/admin/relatorio-diario', () =>
+          HttpResponse.json({
+            configurado: true,
+            horarioEnvio: '18:00:00',
+            habilitado: true,
+            preferencias: { ...PREFERENCIAS_PADRAO, tarefasConcluidas: true, resumoEquipe: true },
+          }),
+        ),
       )
 
       renderPagina()
@@ -105,16 +131,24 @@ describe('IntegracaoWhatsAppPage', () => {
       const campoHorario = await screen.findByLabelText(/horário de envio/i)
       expect(campoHorario).toHaveValue('18:00')
       expect(screen.getByLabelText(/habilitado/i)).toBeChecked()
+      expect(screen.getByLabelText('Tarefas concluídas')).toBeChecked()
+      expect(screen.getByLabelText('Resumo agregado da equipe')).toBeChecked()
     })
 
-    it('salva o horário escolhido pelo admin', async () => {
+    it('salva o horário e as preferências escolhidas pelo admin', async () => {
       server.use(
         http.get('/admin/whatsapp/estado', () => HttpResponse.json({ situacao: 'CONECTADO', qrCodeBase64: null, mensagem: null })),
         http.put('/admin/relatorio-diario', async ({ request }) => {
-          const corpo = (await request.json()) as { horarioEnvio: string; habilitado: boolean }
+          const corpo = (await request.json()) as Record<string, unknown>
           expect(corpo.horarioEnvio).toBe('19:30:00')
           expect(corpo.habilitado).toBe(true)
-          return HttpResponse.json({ configurado: true, horarioEnvio: corpo.horarioEnvio, habilitado: corpo.habilitado })
+          expect(corpo.incluirTarefasConcluidas).toBe(true)
+          return HttpResponse.json({
+            configurado: true,
+            horarioEnvio: corpo.horarioEnvio,
+            habilitado: corpo.habilitado,
+            preferencias: { ...PREFERENCIAS_PADRAO, tarefasConcluidas: true },
+          })
         }),
       )
       const user = userEvent.setup()
@@ -126,9 +160,11 @@ describe('IntegracaoWhatsAppPage', () => {
       if (!(campoHabilitado as HTMLInputElement).checked) {
         await user.click(campoHabilitado)
       }
+      // pedido do usuário: "adicionar mais informações" - liga um bloco novo antes de salvar.
+      await user.click(screen.getByLabelText('Tarefas concluídas'))
       await user.click(screen.getByRole('button', { name: /salvar/i }))
 
-      expect(await screen.findByText(/horário salvo/i)).toBeInTheDocument()
+      expect(await screen.findByText(/configuração salva/i)).toBeInTheDocument()
     })
 
     it('mostra erro quando salvar falha', async () => {
@@ -143,7 +179,7 @@ describe('IntegracaoWhatsAppPage', () => {
       await user.type(campoHorario, '19:30')
       await user.click(screen.getByRole('button', { name: /salvar/i }))
 
-      expect(await screen.findByText(/não foi possível salvar o horário/i)).toBeInTheDocument()
+      expect(await screen.findByText(/não foi possível salvar a configuração/i)).toBeInTheDocument()
     })
   })
 })

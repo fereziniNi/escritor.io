@@ -11,29 +11,30 @@ import {
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router'
 import { useAuthStore } from '../auth/authStore'
 import { CampoPessoa } from '../../shared/CampoPessoa'
 import { encontrarPessoaPorNome, existeSugestaoPara, type PessoaBasica } from '../../shared/encontrarPessoaPorNome'
 import { formatarDataHoraBr } from '../../shared/formatarData'
+import { formatarHms } from '../../shared/formatarHms'
 import { adicionarMembroAoProjeto, buscarProjeto, criarColuna, listarPessoas } from '../organizacao/api'
 import { ROTULO_STATUS_PROJETO, type ProjetoDetalhe } from '../organizacao/types'
 import {
-  criarApontamentoManual,
+  buscarCronometro,
   criarCard,
   criarComentario,
-  editarApontamento,
-  excluirApontamento,
-  listarApontamentos,
+  finalizarCronometro,
+  iniciarCronometro,
   listarComentarios,
   listarEventos,
   moverCard,
+  pausarCronometro,
 } from './api'
-import { mesclarHistorico } from './mesclarHistorico'
+import { rotuloEvento } from './rotuloEvento'
 import { moverCardOtimista } from './moverCardOtimista'
 import { resolverMovimento } from './resolverMovimento'
-import type { Apontamento, Card, ColunaComCards } from './types'
+import type { Card, ColunaComCards } from './types'
 import { useProjetoWebSocket } from './useProjetoWebSocket'
 import './Kanban.css'
 
@@ -99,30 +100,22 @@ function ComentariosSecao({ cardId }: { cardId: number }) {
 }
 
 /**
- * Pedido do usuário: "eu iniciei o timer de uma atividade... mas ela não ficou marcada no
- * historico!! no historico deve estar o dia hora e quanto tempo foi feita" - o Histórico mostrava
- * só os eventos de ciclo de vida do card (`EventoCard`), nunca o tempo apontado. Agora mescla
- * eventos com apontamentos (`mesclarHistorico`) numa única linha do tempo, com dia/hora
- * (`formatarDataHoraBr`) na frente de cada item. Reaproveita a MESMA queryKey de
- * `ApontamentosSecao` (`['cards', cardId, 'apontamentos']`) de propósito - é o cache
- * compartilhado do TanStack Query que faz o Histórico se atualizar sozinho quando um lançamento
- * manual é criado/editado/excluído, sem duplicar a busca nem inventar um canal de sincronização
- * novo.
+ * Volta a ser só `listarEventos` (pedido do usuário: cronômetro substitui o apontamento manual) -
+ * os 3 eventos novos de cronômetro (`INICIOU_TRABALHO`/`PAUSOU_TRABALHO`/`FINALIZOU_TRABALHO`,
+ * gravados por `CronometroSecao` via backend) já aparecem sozinhos nesta mesma lista, cronológica,
+ * com dia/hora (`formatarDataHoraBr`) na frente de cada item - sem precisar mesclar duas fontes.
  */
 function HistoricoSecao({ cardId }: { cardId: number }) {
   const eventosQuery = useQuery({ queryKey: ['cards', cardId, 'eventos'], queryFn: () => listarEventos(cardId) })
-  const apontamentosQuery = useQuery({ queryKey: ['cards', cardId, 'apontamentos'], queryFn: () => listarApontamentos(cardId) })
-
-  const linhas = mesclarHistorico(eventosQuery.data ?? [], apontamentosQuery.data ?? [])
 
   return (
     <div className="kanban-subsecao">
       <h3 className="kanban-subsecao-titulo">🕘 Histórico</h3>
-      {(eventosQuery.isError || apontamentosQuery.isError) && <p className="mensagem-erro">Não foi possível carregar o histórico.</p>}
+      {eventosQuery.isError && <p className="mensagem-erro">Não foi possível carregar o histórico.</p>}
       <ul aria-label="Histórico do card" className="kanban-subsecao-lista">
-        {linhas.map((linha) => (
-          <li key={linha.chave} className="kanban-subsecao-item">
-            <span className="kanban-historico-quando">{formatarDataHoraBr(linha.quando)}</span> — {linha.rotulo}
+        {eventosQuery.data?.map((evento) => (
+          <li key={evento.id} className="kanban-subsecao-item">
+            <span className="kanban-historico-quando">{formatarDataHoraBr(evento.criadoEm)}</span> — {rotuloEvento(evento)}
           </li>
         ))}
       </ul>
@@ -130,180 +123,143 @@ function HistoricoSecao({ cardId }: { cardId: number }) {
   )
 }
 
-function LinhaApontamento({
-  apontamento,
-  emEdicao,
-  onIniciarEdicao,
-  onCancelarEdicao,
-  onSalvarEdicao,
-  salvandoEdicao,
-  onExcluir,
-}: {
-  apontamento: Apontamento
-  emEdicao: boolean
-  onIniciarEdicao: () => void
-  onCancelarEdicao: () => void
-  onSalvarEdicao: (minutos: string, descricao: string) => void
-  salvandoEdicao: boolean
-  onExcluir: () => void
-}) {
-  const [minutos, setMinutos] = useState(String(apontamento.minutos ?? ''))
-  const [descricao, setDescricao] = useState(apontamento.descricao ?? '')
+/**
+ * Pedido do usuário: "deixe somente um contador de tempo onde a pessoa inicia, pausa e finaliza e
+ * descreve o que foi feito quando finaliza a tarefa" - substitui o antigo apontamento manual
+ * (lançamentos soltos, editáveis/excluíveis) por um cronômetro único por card. A descrição só é
+ * pedida UMA VEZ, ao Finalizar, cobrindo a tarefa inteira - não mais uma por lançamento. Mesmo
+ * cálculo de relógio ao vivo que `CronometroTrabalho` (Ponto) já usa: total fechado
+ * (`totalMinutosFechados`, em minutos) + segundos decorridos desde `iniciadoEm`, só enquanto há
+ * uma sessão aberta agora.
+ */
+function CronometroSecao({ cardId }: { cardId: number }) {
+  const queryClient = useQueryClient()
+  const [finalizando, setFinalizando] = useState(false)
+  const [descricaoConclusao, setDescricaoConclusao] = useState('')
 
-  if (emEdicao) {
-    return (
-      <li className="kanban-subsecao-item">
+  const cronometroQuery = useQuery({ queryKey: ['cards', cardId, 'cronometro'], queryFn: () => buscarCronometro(cardId) })
+
+  function invalidar() {
+    queryClient.invalidateQueries({ queryKey: ['cards', cardId, 'cronometro'] })
+    queryClient.invalidateQueries({ queryKey: ['cards', cardId, 'eventos'] })
+    // Widget global do canto superior direito (`CronometroTarefaAtiva`) - reage na hora em vez de
+    // esperar o próprio refetchInterval dele.
+    queryClient.invalidateQueries({ queryKey: ['cronometro-ativo'] })
+  }
+
+  const iniciarMutation = useMutation({ mutationFn: () => iniciarCronometro(cardId), onSuccess: invalidar })
+  const pausarMutation = useMutation({ mutationFn: () => pausarCronometro(cardId), onSuccess: invalidar })
+  const finalizarMutation = useMutation({
+    mutationFn: () => finalizarCronometro(cardId, descricaoConclusao),
+    onSuccess: () => {
+      invalidar()
+      setFinalizando(false)
+      setDescricaoConclusao('')
+    },
+  })
+
+  const dados = cronometroQuery.data
+  const emAndamento = dados?.iniciadoEm != null
+
+  const [agora, setAgora] = useState(() => Date.now())
+  useEffect(() => {
+    if (!emAndamento) {
+      return undefined
+    }
+    const id = setInterval(() => setAgora(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [emAndamento])
+
+  if (cronometroQuery.isPending) {
+    return null
+  }
+  if (cronometroQuery.isError || !dados) {
+    return <p className="mensagem-erro">Não foi possível carregar o cronômetro.</p>
+  }
+
+  const jaTrabalhouAntes = dados.totalMinutosFechados > 0 || emAndamento
+  let segundosTotais = dados.totalMinutosFechados * 60
+  if (emAndamento && dados.iniciadoEm) {
+    segundosTotais += Math.max(0, Math.floor((agora - new Date(dados.iniciadoEm).getTime()) / 1000))
+  }
+
+  return (
+    <div className="kanban-subsecao">
+      <h3 className="kanban-subsecao-titulo">⏱️ Cronômetro</h3>
+
+      {dados.concluidoEm !== null ? (
+        <div className="kanban-cronometro-concluido">
+          <span className="kanban-cronometro-relogio" role="timer" aria-label="Tempo trabalhado nesta tarefa">
+            {formatarHms(dados.totalMinutosFechados * 60)}
+          </span>
+          <p className="kanban-subsecao-item">✅ {dados.descricaoConclusao}</p>
+        </div>
+      ) : (
+        <>
+          {jaTrabalhouAntes && (
+            <div className="kanban-cronometro-relogio" role="timer" aria-label="Tempo trabalhado nesta tarefa">
+              {formatarHms(segundosTotais)}
+            </div>
+          )}
+          <div className="linha-botoes">
+            {!emAndamento && (
+              <button
+                type="button"
+                className="botao-pequeno"
+                onClick={() => iniciarMutation.mutate()}
+                disabled={iniciarMutation.isPending}
+              >
+                ▶️ {jaTrabalhouAntes ? 'Retomar' : 'Iniciar'}
+              </button>
+            )}
+            {emAndamento && (
+              <button
+                type="button"
+                className="botao-secundario botao-pequeno"
+                onClick={() => pausarMutation.mutate()}
+                disabled={pausarMutation.isPending}
+              >
+                ⏸️ Pausar
+              </button>
+            )}
+            <button type="button" className="botao-pequeno" onClick={() => setFinalizando(true)} disabled={finalizarMutation.isPending}>
+              ✅ Finalizar
+            </button>
+          </div>
+          {(iniciarMutation.isError || pausarMutation.isError) && (
+            <p className="mensagem-erro">Não foi possível atualizar o cronômetro.</p>
+          )}
+        </>
+      )}
+
+      {finalizando && (
         <form
           className="formulario"
           onSubmit={(evento) => {
             evento.preventDefault()
-            onSalvarEdicao(minutos, descricao)
+            finalizarMutation.mutate()
           }}
         >
-          {/* fim (e portanto minutos) só existe pra apontamento já encerrado - PATCH /apontamentos/{id}
-          nunca aceita minutos direto (S4.6), então editar duração aqui recalcula fim a partir do
-          inicio original + minutos novos, mantendo o inicio intocado. Um eventual apontamento
-          legado sem fim (de antes da remoção do "Iniciar timer") não tem duração pra editar
-          ainda, só descrição. */}
-          {apontamento.fim !== null && (
-            <div className="campo">
-              <label htmlFor={`minutos-edicao-${apontamento.id}`}>Minutos</label>
-              <input
-                id={`minutos-edicao-${apontamento.id}`}
-                type="number"
-                value={minutos}
-                onChange={(evento) => setMinutos(evento.target.value)}
-                required
-              />
-            </div>
-          )}
           <div className="campo">
-            <label htmlFor={`descricao-edicao-${apontamento.id}`}>Descrição</label>
-            <input id={`descricao-edicao-${apontamento.id}`} value={descricao} onChange={(evento) => setDescricao(evento.target.value)} />
+            <label htmlFor={`descricao-conclusao-${cardId}`}>O que foi feito</label>
+            <textarea
+              id={`descricao-conclusao-${cardId}`}
+              value={descricaoConclusao}
+              onChange={(evento) => setDescricaoConclusao(evento.target.value)}
+              required
+            />
           </div>
           <div className="campo-acoes">
-            <button type="submit" className="botao-pequeno" disabled={salvandoEdicao}>
-              Salvar
+            <button type="submit" className="botao-pequeno" disabled={finalizarMutation.isPending}>
+              Confirmar
             </button>
-            <button type="button" className="botao-secundario botao-pequeno" onClick={onCancelarEdicao}>
+            <button type="button" className="botao-secundario botao-pequeno" onClick={() => setFinalizando(false)}>
               Cancelar
             </button>
           </div>
+          {finalizarMutation.isError && <p className="mensagem-erro">Não foi possível finalizar a tarefa.</p>}
         </form>
-      </li>
-    )
-  }
-
-  return (
-    <li className="kanban-subsecao-item">
-      <span>{apontamento.minutos !== null ? `${apontamento.minutos} min` : 'em andamento'}</span>
-      {apontamento.descricao && <span> — {apontamento.descricao}</span>}
-      <div className="linha-botoes" style={{ marginTop: '0.35rem' }}>
-        <button type="button" className="botao-secundario botao-pequeno" onClick={onIniciarEdicao}>
-          Editar
-        </button>
-        <button type="button" className="botao-perigo botao-pequeno" aria-label={`Excluir apontamento ${apontamento.id}`} onClick={onExcluir}>
-          🗑️
-        </button>
-      </div>
-    </li>
-  )
-}
-
-function ApontamentosSecao({ cardId }: { cardId: number }) {
-  const queryClient = useQueryClient()
-  const [editandoId, setEditandoId] = useState<number | null>(null)
-  const [minutosManual, setMinutosManual] = useState('')
-  const [descricaoManual, setDescricaoManual] = useState('')
-
-  const apontamentosQuery = useQuery({ queryKey: ['cards', cardId, 'apontamentos'], queryFn: () => listarApontamentos(cardId) })
-
-  const criarManualMutation = useMutation({
-    mutationFn: criarApontamentoManual,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cards', cardId, 'apontamentos'] })
-      setMinutosManual('')
-      setDescricaoManual('')
-    },
-  })
-
-  const editarMutation = useMutation({
-    mutationFn: editarApontamento,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cards', cardId, 'apontamentos'] })
-      setEditandoId(null)
-    },
-  })
-
-  const excluirMutation = useMutation({
-    mutationFn: excluirApontamento,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cards', cardId, 'apontamentos'] })
-    },
-  })
-
-  return (
-    <div className="kanban-subsecao">
-      <h3 className="kanban-subsecao-titulo">🧾 Apontamentos</h3>
-      {apontamentosQuery.isError && <p className="mensagem-erro">Não foi possível carregar os apontamentos.</p>}
-      <ul aria-label="Apontamentos do card" className="kanban-subsecao-lista">
-        {apontamentosQuery.data?.map((apontamento) => (
-          <LinhaApontamento
-            key={apontamento.id}
-            apontamento={apontamento}
-            emEdicao={editandoId === apontamento.id}
-            onIniciarEdicao={() => setEditandoId(apontamento.id)}
-            onCancelarEdicao={() => setEditandoId(null)}
-            salvandoEdicao={editarMutation.isPending}
-            onSalvarEdicao={(minutos, descricao) => {
-              const novosMinutos = Number(minutos)
-              const novoFim =
-                apontamento.fim !== null
-                  ? new Date(new Date(apontamento.inicio).getTime() + novosMinutos * 60_000).toISOString()
-                  : null
-              editarMutation.mutate({ apontamentoId: apontamento.id, inicio: null, fim: novoFim, descricao: descricao || null })
-            }}
-            onExcluir={() => excluirMutation.mutate(apontamento.id)}
-          />
-        ))}
-      </ul>
-      {editarMutation.isError && <p className="mensagem-erro">Não foi possível editar o apontamento.</p>}
-      {excluirMutation.isError && <p className="mensagem-erro">Não foi possível excluir o apontamento.</p>}
-
-      <form
-        className="formulario"
-        onSubmit={(evento) => {
-          evento.preventDefault()
-          criarManualMutation.mutate({
-            cardId,
-            inicio: null,
-            fim: null,
-            minutos: Number(minutosManual),
-            descricao: descricaoManual || null,
-          })
-        }}
-      >
-        <div className="campo">
-          <label htmlFor={`minutos-manual-${cardId}`}>Minutos trabalhados</label>
-          <input
-            id={`minutos-manual-${cardId}`}
-            type="number"
-            value={minutosManual}
-            onChange={(evento) => setMinutosManual(evento.target.value)}
-            required
-          />
-        </div>
-        <div className="campo">
-          <label htmlFor={`descricao-manual-${cardId}`}>Descrição</label>
-          <input id={`descricao-manual-${cardId}`} value={descricaoManual} onChange={(evento) => setDescricaoManual(evento.target.value)} />
-        </div>
-        <div className="campo-acoes">
-          <button type="submit" className="botao-pequeno" disabled={criarManualMutation.isPending}>
-            Lançar
-          </button>
-          {criarManualMutation.isError && <p className="mensagem-erro">Não foi possível lançar o apontamento.</p>}
-        </div>
-      </form>
+      )}
     </div>
   )
 }
@@ -311,12 +267,28 @@ function ApontamentosSecao({ cardId }: { cardId: number }) {
 /**
  * Pedido do usuário: "está muito complexo... facilite o front" - um único toggle no lugar dos três
  * que existiam antes (Apontamentos/Comentários/Histórico cada um com seu próprio botão).
+ *
+ * `abrirInicialmente` existe pro widget global do cronômetro ativo (canto superior direito,
+ * `CronometroTarefaAtiva`): clicar nele navega direto até o card certo já com "Detalhes"
+ * expandido, e rola a tela até ele (senão poderia abrir expandido fora da área visível num board
+ * com muitas colunas/cards).
  */
-function DetalhesDoCard({ cardId }: { cardId: number }) {
-  const [aberto, setAberto] = useState(false)
+function DetalhesDoCard({ cardId, abrirInicialmente = false }: { cardId: number; abrirInicialmente?: boolean }) {
+  const [aberto, setAberto] = useState(abrirInicialmente)
+  const divRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    // `scrollIntoView` não existe no jsdom dos testes (nem em navegadores bem antigos) - checagem
+    // defensiva em vez de deixar estourar.
+    if (abrirInicialmente && typeof divRef.current?.scrollIntoView === 'function') {
+      divRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+    // só na montagem - é um "abrir e rolar uma vez", não algo que deva repetir a cada re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
-    <div className="kanban-detalhes">
+    <div className="kanban-detalhes" ref={divRef}>
       <button type="button" className="kanban-detalhes-botao" onClick={() => setAberto((atual) => !atual)}>
         <span className={`kanban-detalhes-seta${aberto ? ' kanban-detalhes-seta-aberta' : ''}`} aria-hidden="true">
           ▸
@@ -325,7 +297,7 @@ function DetalhesDoCard({ cardId }: { cardId: number }) {
       </button>
       {aberto && (
         <div className="kanban-detalhes-corpo">
-          <ApontamentosSecao cardId={cardId} />
+          <CronometroSecao cardId={cardId} />
           <ComentariosSecao cardId={cardId} />
           <HistoricoSecao cardId={cardId} />
         </div>
@@ -334,7 +306,15 @@ function DetalhesDoCard({ cardId }: { cardId: number }) {
   )
 }
 
-function CardArrastavel({ card, nomeDoResponsavel }: { card: Card; nomeDoResponsavel: string | null }) {
+function CardArrastavel({
+  card,
+  nomeDoResponsavel,
+  cardIdParaAbrir,
+}: {
+  card: Card
+  nomeDoResponsavel: string | null
+  cardIdParaAbrir?: number
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
     data: { type: 'card', colunaId: card.colunaId, cardId: card.id },
@@ -362,7 +342,7 @@ function CardArrastavel({ card, nomeDoResponsavel }: { card: Card; nomeDoRespons
           {card.estimativaMinutos !== null && <span className="badge badge-neutro">⏱️ {card.estimativaMinutos} min</span>}
         </p>
       )}
-      <DetalhesDoCard cardId={card.id} />
+      <DetalhesDoCard cardId={card.id} abrirInicialmente={card.id === cardIdParaAbrir} />
     </li>
   )
 }
@@ -375,6 +355,7 @@ function ColunaComDrop({
   onNovoCardChange,
   onCriarCard,
   criandoCard,
+  cardIdParaAbrir,
 }: {
   coluna: ColunaComCards
   pessoas: PessoaBasica[]
@@ -383,6 +364,7 @@ function ColunaComDrop({
   onNovoCardChange: (valor: { titulo: string; responsavelNome: string; estimativaMinutos: string }) => void
   onCriarCard: () => void
   criandoCard: boolean
+  cardIdParaAbrir?: number
 }) {
   const { setNodeRef } = useDroppable({ id: `coluna-${coluna.id}`, data: { type: 'coluna', colunaId: coluna.id } })
   // Substring, não nome exato: "b" enquanto o usuário ainda está digitando "Beto Lima" (que
@@ -420,6 +402,7 @@ function ColunaComDrop({
               key={card.id}
               card={card}
               nomeDoResponsavel={card.responsavelId === null ? null : (nomePorUsuarioId.get(card.responsavelId) ?? null)}
+              cardIdParaAbrir={cardIdParaAbrir}
             />
           ))}
         </ul>
@@ -633,9 +616,13 @@ const NOVO_CARD_VAZIO = { titulo: '', responsavelNome: '', estimativaMinutos: ''
  * `projetoIdProp` é opcional - só existe pro `PainelProjetos` (dock do Escritório, "uma tela só")
  * poder passar o id direto, sem precisar de uma rota `/projetos/:id` de verdade. `useParams()`
  * continua sendo chamado incondicionalmente (regra dos hooks), só o resultado é ignorado quando
- * `projetoIdProp` vem preenchido.
+ * `projetoIdProp` vem preenchido. `cardIdParaAbrir` é o mesmo tipo de atalho, pro widget global do
+ * cronômetro ativo (`CronometroTarefaAtiva`) abrir direto no card certo com "Detalhes" expandido.
  */
-export function ProjetoDetalhePage({ projetoIdProp }: { projetoIdProp?: number } = {}) {
+export function ProjetoDetalhePage({
+  projetoIdProp,
+  cardIdParaAbrir,
+}: { projetoIdProp?: number; cardIdParaAbrir?: number } = {}) {
   const { id } = useParams()
   const projetoId = projetoIdProp ?? Number(id)
   const queryClient = useQueryClient()
@@ -783,6 +770,7 @@ export function ProjetoDetalhePage({ projetoIdProp }: { projetoIdProp?: number }
             pessoas={pessoas}
             nomePorUsuarioId={nomePorUsuarioId}
             novoCard={novoCardPorColuna[coluna.id] ?? NOVO_CARD_VAZIO}
+            cardIdParaAbrir={cardIdParaAbrir}
             onNovoCardChange={(valor) => setNovoCardPorColuna((atual) => ({ ...atual, [coluna.id]: valor }))}
             onCriarCard={() => {
               const dados = novoCardPorColuna[coluna.id] ?? NOVO_CARD_VAZIO

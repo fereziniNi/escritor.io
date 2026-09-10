@@ -211,6 +211,12 @@ deixaria a margem interna exagerada. */
   transform: translateY(-1px);
 }
 
+/* Pedido do usuário: "ver as últimas que chegaram no sistema" - destaque sutil (borda lateral) nas
+   notificações ainda não lidas, mesmo cartão de sempre por baixo. */
+.cartao-item--nao-lida {
+  border-left: 3px solid var(--cor-primaria);
+}
+
 .cartao-item-cabecalho {
   display: flex;
   align-items: center;

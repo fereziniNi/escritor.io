@@ -214,6 +214,14 @@
   animation: escala-excecao-modal-entrada 160ms ease-out;
 }
 
+/* Pedido do usuário: "Mude o UI e UX da tela de marcar a reunião. Ficou péssimo!!" - os 420px
+ * padrão (pensados pro popup de "horário de um dia só") espremiam a lista de participantes do
+ * `MarcarReuniaoComMeetModal` numa coluna estreita. Só quem passa `largo` (`EscalaModal`) usa isso -
+ * os outros modais (exceção do dia, padrão semanal) continuam do jeito que já funcionavam bem. */
+.escala-excecao-modal-largo {
+  width: min(640px, 100%);
+}
+
 @keyframes escala-excecao-modal-fundo-entrada {
   from {
     opacity: 0;
@@ -341,6 +349,34 @@
   pointer-events: none;
 }
 
+/* Pedido do usuário: "A reunião tem preioridade no lugar do trabalhando. Então se marcar das 14:30
+ * a reuniao ate as 15:00 deve aparecer esse intervalo no calendario" - por cima do bloco de
+ * trabalho (`z-index` maior), cor distinta (acento, não a primária usada pro trabalho). */
+.escala-bloco-reuniao {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  z-index: 2;
+  min-height: 1.1rem;
+  padding: 0.15rem 0.4rem;
+  background: var(--cor-acento);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: left;
+  box-shadow: none;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.escala-bloco-reuniao:hover:not(:disabled) {
+  background: var(--cor-acento-escuro);
+  box-shadow: none;
+  transform: none;
+}
+
 .escala-linha-agora {
   position: absolute;
   left: 0;
@@ -359,4 +395,150 @@
   height: 8px;
   border-radius: 999px;
   background: var(--cor-perigo);
+}
+
+/* Pedido do usuário: "o chefe terá a possibilidade de marcar reuniões" - célula de dia trabalhado
+ * vira um botão clicável (abre `MarcarReuniaoComMeetModal`, pré-preenchido) em vez de só texto;
+ * mostra um chip por reunião já marcada nesse dia. */
+.escala-equipe-celula-dia {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  background: transparent;
+  color: var(--cor-texto);
+  border: none;
+  box-shadow: none;
+  padding: 0.2rem 0.3rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.escala-equipe-celula-dia:hover:not(:disabled) {
+  background: var(--cor-primaria-clara);
+  box-shadow: none;
+  transform: none;
+}
+
+.escala-reuniao-chip {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--cor-acento);
+  border-radius: 999px;
+  padding: 0.1em 0.55em;
+  white-space: nowrap;
+}
+
+.escala-reuniao-detalhe {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.escala-reuniao-detalhe-titulo {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+/* Pedido do usuário: "deixar disponível para entrar na reunião com quem ele quer dos
+ * funcionários" - lista de checkbox com rolagem própria (`MarcarReuniaoComMeetModal`), filtrável
+ * por nome; sem isso uma lista grande de colaboradores estouraria a altura do modal. */
+.reuniao-participantes-lista {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  max-height: 10rem;
+  overflow-y: auto;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+}
+
+.reuniao-participantes-lista li {
+  padding: 0.35rem 0.6rem;
+}
+
+.reuniao-participantes-lista li:hover {
+  background: var(--cor-primaria-clara);
+}
+
+/* Bug real achado na verificação visual (pedido do usuário: "Ficou péssimo!!"): `.campo label`
+ * (paineis.css) foi pensado só pro rótulo do próprio campo ("PARTICIPANTES", em maiúsculas
+ * pequenas) mas, por ser `.campo label` (qualquer `label` dentro de um `.campo`), também pegava
+ * cada nome da lista - "Beto Lima" saía maiúsculo/apertado feito rótulo de campo. Pior: `.campo
+ * input { width: 100% }` também pegava o `<input type="checkbox">` de cada linha, esticando a
+ * caixinha nativa pra quase a largura inteira da lista e empurrando o nome lá pra longe dela.
+ * Seletor mais específico (`li label`/`li input`, não só `label`/`input`) pra vencer isso sem
+ * precisar `!important` nem mexer no utilitário compartilhado. */
+.reuniao-participantes-lista li label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--cor-texto);
+}
+
+.reuniao-participantes-lista li input[type='checkbox'] {
+  width: auto;
+  flex: none;
+}
+
+/* Pedido do usuário: "Mude o UI e UX... Ficou péssimo!!" - antes a única forma de saber quem já
+ * tinha sido escolhido era achar o checkbox marcado dentro da lista rolável (some de vista ao
+ * filtrar por nome). Os chips ficam sempre visíveis, acima da lista, com um jeito rápido de tirar
+ * alguém sem precisar procurar de novo. */
+.reuniao-participantes-chips {
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.reuniao-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.25em 0.4em 0.25em 0.7em;
+  border-radius: 999px;
+  background: var(--cor-primaria-clara);
+  color: var(--cor-primaria-escura);
+}
+
+.reuniao-chip-remover {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1em;
+  height: 1.1em;
+  border-radius: 50%;
+  font-size: 0.75em;
+  line-height: 1;
+}
+
+.reuniao-chip-remover:hover {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+/* Pedido do usuário: "Não consegui marcar a reunião!!" - antes não tinha como saber, antes de
+ * enviar, se algum convidado não trabalha no dia/horário escolhido (`GET
+ * /escala/disponibilidade`, novo). */
+.reuniao-disponibilidade-lista {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
 }

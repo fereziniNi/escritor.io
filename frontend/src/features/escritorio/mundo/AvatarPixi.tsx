@@ -66,6 +66,15 @@ function desenharAnelProximidade(g: PixiGraphics): void {
   g.stroke({ width: 2, color: 0x4fa8d6 })
 }
 
+/** Pedido do usuário: "voice... Implemente da melhor maneira possível" - anel verde de "falando
+ * agora" (`useVozProximidade.ts`, detecção de volume do stream), mais externo que os outros dois
+ * pra não se confundir com destaque/proximidade quando os três coincidem. */
+function desenharAnelFalando(g: PixiGraphics): void {
+  g.clear()
+  g.circle(PIVO_BASE.x, PIVO_BASE.y - 26, 36)
+  g.stroke({ width: 2.5, color: 0x4ade80, alpha: 0.9 })
+}
+
 function desenharIndicadorStatus(g: PixiGraphics, cor: number): void {
   g.clear()
   g.circle(PIVO_BASE.x + 18, PIVO_BASE.y - 4, 4.5)
@@ -146,6 +155,7 @@ export function AvatarPixi({
   status,
   destaque,
   proximo = false,
+  falando = false,
   offline = false,
 }: {
   tileX: number
@@ -157,6 +167,8 @@ export function AvatarPixi({
   destaque: boolean
   /** Fase 3 - alguém está dentro do raio de proximidade deste avatar (`proximidade.ts`). */
   proximo?: boolean
+  /** Pedido do usuário: "voice" - a voz deste usuário está ativa agora (`useVozProximidade.ts`). */
+  falando?: boolean
   /** Backend marcou esse usuário como OFFLINE (desconectou, estacionado em "Fora do trabalho") -
    * avatar renderiza apagado + nome com sufixo, pra não parecer alguém realmente presente. */
   offline?: boolean
@@ -169,6 +181,7 @@ export function AvatarPixi({
   const raizRef = useRef<PixiContainer | null>(null)
   const corpoContainerRef = useRef<PixiContainer | null>(null)
   const anelProximidadeRef = useRef<PixiGraphics | null>(null)
+  const anelFalandoRef = useRef<PixiGraphics | null>(null)
 
   const alvoRef = useRef<PosicaoTile>({ x: tileX, y: tileY })
   const inicioGlideRef = useRef<PosicaoTile>({ x: tileX, y: tileY })
@@ -230,6 +243,12 @@ export function AvatarPixi({
       anelProximidadeRef.current.alpha = 0.5 + Math.sin(tempoPulsoRef.current * 0.004) * 0.3
     }
 
+    if (falando && anelFalandoRef.current) {
+      tempoPulsoRef.current += ticker.deltaMS
+      // pulso mais rápido que o de proximidade - "falando" é um sinal mais imediato/vivo.
+      anelFalandoRef.current.alpha = 0.6 + Math.sin(tempoPulsoRef.current * 0.01) * 0.35
+    }
+
     tempoBobRef.current += ticker.deltaMS
     if (corpoContainerRef.current) {
       corpoContainerRef.current.y = Math.sin(tempoBobRef.current * VELOCIDADE_BOB) * AMPLITUDE_BOB_PX
@@ -242,6 +261,7 @@ export function AvatarPixi({
         <pixiGraphics draw={desenharSombraAvatar} />
         {destaque && <pixiGraphics draw={desenharAnelDestaque} />}
         {proximo && <pixiGraphics ref={anelProximidadeRef} draw={desenharAnelProximidade} />}
+        {falando && <pixiGraphics ref={anelFalandoRef} draw={desenharAnelFalando} />}
         {CAMADAS_EM_ORDEM.map((chave) => {
           const camada = camadas[chave]
           if (!camada) return null

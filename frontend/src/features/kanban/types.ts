@@ -6,7 +6,13 @@ export interface Comentario {
   criadoEm: string
 }
 
-export type TipoEventoCard = 'CRIACAO' | 'MUDANCA_COLUNA' | 'MUDANCA_RESPONSAVEL'
+export type TipoEventoCard =
+  | 'CRIACAO'
+  | 'MUDANCA_COLUNA'
+  | 'MUDANCA_RESPONSAVEL'
+  | 'INICIOU_TRABALHO'
+  | 'PAUSOU_TRABALHO'
+  | 'FINALIZOU_TRABALHO'
 
 export interface EventoCard {
   id: number
@@ -18,17 +24,27 @@ export interface EventoCard {
   criadoEm: string
 }
 
-export interface Apontamento {
-  id: number
-  usuarioId: number
+/** Estado do cronômetro de uma tarefa - "iniciadoEm" não nulo significa que há uma sessão aberta
+ * agora (o front usa isso pra tocar o relógio ao vivo). `descricaoConclusao`/`concluidoEm` só
+ * existem depois de Finalizar. */
+export interface Cronometro {
   cardId: number
-  inicio: string
-  fim: string | null
-  minutos: number | null
-  descricao: string | null
-  origem: 'TIMER' | 'MANUAL'
-  criadoEm: string
-  editadoEm: string
+  iniciadoEm: string | null
+  totalMinutosFechados: number
+  descricaoConclusao: string | null
+  concluidoEm: string | null
+}
+
+/** Pedido do usuário: widget global (canto superior direito, vermelho) da tarefa que a pessoa está
+ * com o cronômetro rodando agora, em qualquer projeto - carrega `cardId`/`projetoId` pra navegar
+ * direto até o card ao clicar. Só existe uma por vez (o backend impede 2 cronômetros
+ * simultâneos do mesmo usuário), então nunca é uma lista. */
+export interface CronometroAtivo {
+  cardId: number
+  cardTitulo: string
+  projetoId: number
+  iniciadoEm: string
+  totalMinutosFechados: number
 }
 
 export interface TotalApontado {

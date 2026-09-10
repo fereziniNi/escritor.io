@@ -59,6 +59,15 @@ public class Card {
     @Column(nullable = false)
     private boolean arquivado;
 
+    /** Pedido do usuário: "descreve o que foi feito quando finaliza a tarefa" - uma descrição só,
+     * da tarefa inteira (diferente de {@link #descricao}, que é sobre o que a tarefa É, definida
+     * na criação), gravada por {@code SessaoTrabalhoService#finalizar}. */
+    @Column(name = "descricao_conclusao", columnDefinition = "TEXT")
+    private String descricaoConclusao;
+
+    @Column(name = "concluido_em")
+    private Instant concluidoEm;
+
     protected Card() {
         // JPA
     }
@@ -134,6 +143,14 @@ public class Card {
         return arquivado;
     }
 
+    public String getDescricaoConclusao() {
+        return descricaoConclusao;
+    }
+
+    public Instant getConcluidoEm() {
+        return concluidoEm;
+    }
+
     /**
      * Diferente de {@code RegistroPonto}, {@code Card} não é append-only - mover é um `UPDATE`
      * de verdade (PRD E2: "arrastar cards entre colunas, com a mudança persistida"). Quem calcula
@@ -142,5 +159,13 @@ public class Card {
     public void mover(Coluna novaColuna, double novaPosicao) {
         this.coluna = novaColuna;
         this.posicao = novaPosicao;
+    }
+
+    /** Pedido do usuário: "descreve o que foi feito quando finaliza a tarefa" - chamado por
+     * {@code SessaoTrabalhoService#finalizar}, uma vez só (o próprio serviço rejeita finalizar de
+     * novo checando {@link #getConcluidoEm()} antes de chamar isto). */
+    public void finalizar(String descricaoConclusao, Instant quando) {
+        this.descricaoConclusao = descricaoConclusao;
+        this.concluidoEm = quando;
     }
 }

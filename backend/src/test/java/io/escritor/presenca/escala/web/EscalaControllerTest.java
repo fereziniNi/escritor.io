@@ -141,6 +141,28 @@ class EscalaControllerTest {
     }
 
     @Test
+    void disponibilidadeSemAutenticacaoRetorna401() throws Exception {
+        mockMvc.perform(get("/escala/disponibilidade").param("usuarioIds", "2").param("data", "2026-09-10"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "COLABORADOR")
+    void colaboradorConsultaDisponibilidadeDeQualquerColega() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(escalaService.consultarDisponibilidade(List.of(2L, 3L), LocalDate.of(2026, 9, 10)))
+                .thenReturn(List.of(
+                        new DisponibilidadeResponse(2L, "Beto Lima", true, LocalTime.of(9, 0), LocalTime.of(18, 0)),
+                        new DisponibilidadeResponse(3L, "Caio Reis", false, null, null)));
+
+        mockMvc.perform(get("/escala/disponibilidade").param("usuarioIds", "2", "3").param("data", "2026-09-10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].nome").value("Beto Lima"))
+                .andExpect(jsonPath("$[0].trabalha").value(true))
+                .andExpect(jsonPath("$[1].trabalha").value(false));
+    }
+
+    @Test
     void equipeSemAutenticacaoRetorna401() throws Exception {
         mockMvc.perform(get("/escala/equipe").param("inicio", "2026-01-01").param("fim", "2026-01-31"))
                 .andExpect(status().isUnauthorized());

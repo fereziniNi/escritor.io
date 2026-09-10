@@ -1,15 +1,9 @@
-import type { StatusAvatar, TipoZona } from './types'
+import type { StatusAvatar } from './types'
 
-/** Tipos de zona hoje mapeiam pras 4 salas por função do redesign (V24): FOCO = Área de trabalho,
- * REUNIAO = Sala de reunião, CAFE = Café, LIVRE = Fora do trabalho (lounge) - ATENDIMENTO não é
- * mais usado por nenhuma zona seedada, mas o mapeamento continua completo por tipo. */
-export const ICONE_ZONA: Record<TipoZona, string> = {
-  FOCO: '💻',
-  REUNIAO: '🗣️',
-  CAFE: '☕',
-  ATENDIMENTO: '🛎️',
-  LIVRE: '🛋️',
-}
+// `ICONE_ZONA` (rótulo flutuante com nome+ícone por sala) existiu aqui até o pedido do usuário:
+// "Remova os nomes das áreas" - `RotuloZona.tsx` foi removido por completo, não só desativado
+// (mesmo espírito do que já tinha acontecido com as paredes antes: "removidos por completo, não
+// só desativados").
 
 export const ICONE_STATUS: Record<StatusAvatar, string> = {
   DISPONIVEL: '🟢',

@@ -9,6 +9,7 @@ import io.escritor.presenca.identidade.domain.Usuario;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
@@ -121,7 +122,8 @@ public class GoogleCalendarSincronizacaoService {
         for (DiaEfetivoResponse dia : dias) {
             String eventId = idDoEvento(usuario.getId(), dia.data());
             if (dia.trabalha() && dia.horaInicio() != null && dia.horaFim() != null) {
-                upsertEvento(conta, accessToken, eventId, dia);
+                Map<String, Object> corpo = corpoDoEvento(eventId, "Trabalho - escritor.io", dia.data(), dia.horaInicio(), dia.horaFim());
+                upsertEvento(conta, accessToken, eventId, corpo);
             } else {
                 removerEvento(conta, accessToken, eventId);
             }
@@ -136,8 +138,7 @@ public class GoogleCalendarSincronizacaoService {
         return "esc" + usuarioId + data.format(DateTimeFormatter.BASIC_ISO_DATE);
     }
 
-    private void upsertEvento(ContaGoogleCalendar conta, String accessToken, String eventId, DiaEfetivoResponse dia) {
-        Map<String, Object> corpo = corpoDoEvento(eventId, dia);
+    private void upsertEvento(ContaGoogleCalendar conta, String accessToken, String eventId, Map<String, Object> corpo) {
         try {
             comRetentativa(() -> restClient
                     .post()
@@ -192,12 +193,12 @@ public class GoogleCalendarSincronizacaoService {
         }
     }
 
-    private Map<String, Object> corpoDoEvento(String eventId, DiaEfetivoResponse dia) {
-        String inicio = dia.data() + "T" + dia.horaInicio().format(FORMATO_HORA_COM_SEGUNDOS);
-        String fim = dia.data() + "T" + dia.horaFim().format(FORMATO_HORA_COM_SEGUNDOS);
+    private Map<String, Object> corpoDoEvento(String eventId, String summary, LocalDate data, LocalTime horaInicio, LocalTime horaFim) {
+        String inicio = data + "T" + horaInicio.format(FORMATO_HORA_COM_SEGUNDOS);
+        String fim = data + "T" + horaFim.format(FORMATO_HORA_COM_SEGUNDOS);
         return Map.of(
                 "id", eventId,
-                "summary", "Trabalho - escritor.io",
+                "summary", summary,
                 "start", Map.of("dateTime", inicio, "timeZone", fusoHorario),
                 "end", Map.of("dateTime", fim, "timeZone", fusoHorario));
     }

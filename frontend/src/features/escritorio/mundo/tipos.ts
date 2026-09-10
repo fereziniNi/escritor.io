@@ -1,10 +1,21 @@
 /**
- * Sem paredes/portas de propósito (pedido do usuário: "remover as paredes, deixar o mapa mais
- * vivo") - salas continuam com identidade visual só pelo tingimento de piso (`desenharZonas`) e
- * pela densidade de móveis, sem barreira física nem colisão. `SegmentoParede`/`PortaOverride`
- * (gerarParedesDeZona/construirGradeColisao) existiam antes e foram removidos por completo, não
- * só desativados.
+ * Sem paredes/portas de propósito pro resto do escritório (pedido do usuário: "remover as
+ * paredes, deixar o mapa mais vivo") - salas continuam com identidade visual só pelo tingimento de
+ * piso (`desenharPisoZonas`) e pela densidade de móveis, sem barreira física nem colisão.
+ * `SegmentoParede`/`BordaZona` (`gerarParedesDeZona`/`construirGradeColisao`) tinham sido removidos
+ * por completo nessa época - voltaram (pedido posterior: "cabines fechadas... devem ter paredes e
+ * só é possível entrar por um lado"), mas escopados só pras zonas `CABINE` - o resto do mapa
+ * continua sem parede/colisão.
  */
+export interface SegmentoParede {
+  x: number
+  y: number
+  orientacao: 'horizontal' | 'vertical'
+  comprimento: number
+}
+
+export type BordaZona = 'norte' | 'sul' | 'leste' | 'oeste'
+
 export type TipoMovel =
   | 'mesa'
   | 'cadeira'

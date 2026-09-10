@@ -83,6 +83,15 @@ public class Usuario {
         this.cargaDiariaMinutos = novaCargaDiariaMinutos;
     }
 
+    /** Pedido do usuário: "edição de perfil. Nome e email nesse modal" - self-service (mesmo
+     * espírito de {@link #alterarAparencia}), diferente de {@link #alterarCargaDiaria}
+     * (ADMIN-only). A checagem de e-mail duplicado já rodou antes de chegar aqui, em {@code
+     * UsuarioService} - este método só troca os valores. */
+    public void alterarPerfil(String novoNome, String novoEmail) {
+        this.nome = novoNome;
+        this.email = novoEmail;
+    }
+
     public boolean isAtivo() {
         return ativo;
     }

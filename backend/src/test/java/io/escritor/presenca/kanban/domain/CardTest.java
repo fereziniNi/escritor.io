@@ -4,6 +4,7 @@ import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Projeto;
 import io.escritor.presenca.identidade.domain.StatusProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
+import java.time.Instant;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 
@@ -30,6 +31,8 @@ class CardTest {
         assertThat(card.getCriadoPor()).isSameAs(criadoPor);
         assertThat(card.getCriadoEm()).isNotNull();
         assertThat(card.isArquivado()).isFalse();
+        assertThat(card.getDescricaoConclusao()).isNull();
+        assertThat(card.getConcluidoEm()).isNull();
     }
 
     @Test
@@ -87,5 +90,16 @@ class CardTest {
 
         assertThat(card.getColuna()).isSameAs(coluna);
         assertThat(card.getPosicao()).isEqualTo(512.0);
+    }
+
+    @Test
+    void finalizarGravaADescricaoEQuando() {
+        Card card = new Card(coluna, "Corrigir bug", null, 1024.0, null, null, null, criadoPor);
+        Instant quando = Instant.parse("2026-01-13T18:00:00Z");
+
+        card.finalizar("Corrigido e testado em produção", quando);
+
+        assertThat(card.getDescricaoConclusao()).isEqualTo("Corrigido e testado em produção");
+        assertThat(card.getConcluidoEm()).isEqualTo(quando);
     }
 }

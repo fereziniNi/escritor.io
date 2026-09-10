@@ -40,6 +40,24 @@ describe('rotuloEvento', () => {
     expect(rotulo).toBe('Responsável definido como Beto')
   })
 
+  it('cronômetro iniciado', () => {
+    const rotulo = rotuloEvento(evento({ tipo: 'INICIOU_TRABALHO', de: null, para: null }))
+
+    expect(rotulo).toBe('Cronômetro iniciado')
+  })
+
+  it('cronômetro pausado: mostra os minutos da sessão fechada', () => {
+    const rotulo = rotuloEvento(evento({ tipo: 'PAUSOU_TRABALHO', de: null, para: '30 min' }))
+
+    expect(rotulo).toBe('Cronômetro pausado (30 min)')
+  })
+
+  it('tarefa finalizada: mostra o total trabalhado e a descrição', () => {
+    const rotulo = rotuloEvento(evento({ tipo: 'FINALIZOU_TRABALHO', de: '60 min', para: 'Corrigido e testado' }))
+
+    expect(rotulo).toBe('Tarefa finalizada (60 min) — "Corrigido e testado"')
+  })
+
   it('tipo desconhecido usa um rótulo genérico em vez de quebrar', () => {
     const rotulo = rotuloEvento(evento({ tipo: 'ALGO_NOVO' as EventoCard['tipo'], de: 'X', para: 'Y' }))
 

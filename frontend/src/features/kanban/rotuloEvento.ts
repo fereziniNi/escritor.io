@@ -16,6 +16,12 @@ export function rotuloEvento(evento: EventoCard): string {
       return evento.de === null
         ? `Responsável definido como ${evento.para}`
         : `Responsável alterado de ${evento.de} para ${evento.para}`
+    case 'INICIOU_TRABALHO':
+      return 'Cronômetro iniciado'
+    case 'PAUSOU_TRABALHO':
+      return `Cronômetro pausado (${evento.para})`
+    case 'FINALIZOU_TRABALHO':
+      return `Tarefa finalizada (${evento.de}) — "${evento.para}"`
     default:
       return `Evento: ${evento.tipo}`
   }

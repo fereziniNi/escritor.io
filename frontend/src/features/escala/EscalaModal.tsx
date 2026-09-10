@@ -14,12 +14,28 @@ import './Escala.css'
  * registrariam um listener de Esc na `window`, e como o painel externo já está montado primeiro,
  * o dele sempre dispararia e fecharia TUDO, não só este popup - por isso aqui só fecha por clique
  * fora ou pelos botões do próprio formulário, sem atalho de teclado.
+ *
+ * <p>`largo` (pedido do usuário: "Mude o UI e UX da tela de marcar a reunião. Ficou péssimo!!"):
+ * os 420px padrão foram pensados pro formulário original (hora de início/fim de um dia só) e
+ * ficavam espremidos demais pro de `MarcarReuniaoComMeetModal` (lista de participantes + data/hora
+ * + disponibilidade, tudo isso na mesma grade estreita) - `largo` dá mais respiro só pra quem
+ * precisa, sem mudar nada pros modais mais simples que continuam com o padrão.
  */
-export function EscalaModal({ titulo, aoFechar, children }: { titulo: string; aoFechar: () => void; children: ReactNode }) {
+export function EscalaModal({
+  titulo,
+  aoFechar,
+  largo,
+  children,
+}: {
+  titulo: string
+  aoFechar: () => void
+  largo?: boolean
+  children: ReactNode
+}) {
   return (
     <div className="escala-excecao-modal-fundo" onClick={aoFechar}>
       <div
-        className="escala-excecao-modal"
+        className={largo ? 'escala-excecao-modal escala-excecao-modal-largo' : 'escala-excecao-modal'}
         role="dialog"
         aria-modal="true"
         aria-label={titulo}

@@ -3,7 +3,23 @@ import { ControlesAudioVideo } from './ControlesAudioVideo'
 import { MenuUsuario } from './MenuUsuario'
 import type { StatusAvatar } from '../types'
 
-export type PainelId = 'ponto' | 'escala' | 'relatorios' | 'projetos' | 'colaboradores' | 'whatsapp' | 'avatar'
+export type PainelId =
+  | 'ponto'
+  | 'configuracoes'
+  | 'reunioes'
+  | 'relatorios'
+  | 'projetos'
+  | 'colaboradores'
+  | 'whatsapp'
+  // Pedido do usuário: sala "Happy Hour" no mapa - painel sem botão próprio na toolbar (mesmo
+  // padrão de `abrirEditorDePersonagem`/`entrarNaReuniao`, que chamam `setPainelAberto` direto) -
+  // só abre pelo mural (`MuralHappyHour`) quando a pessoa está dentro da zona.
+  | 'happyHour'
+  // Pedido do usuário: "algo relacionado à notificação para ver as últimas que chegaram no
+  // sistema" - sem botão próprio aqui na toolbar (pedido posterior: "tirar o botão de notificação
+  // do menu e deixar na parte superior... eu não quero que fique o botão! Inove") - abre pelo
+  // `SinoDeNotificacoes` (flutuante, canto superior), ver `EscritorioPage.tsx`.
+  | 'notificacoes'
 
 /**
  * Toolbar inferior - substitui o `.escritorio-dock` antigo (botões com texto+emoji lado a lado)
@@ -19,8 +35,9 @@ export function BarraFerramentas({
   papel,
   painelAberto,
   aoAbrirPainel,
-  participantesAberto,
-  aoAlternarParticipantes,
+  aoAbrirEditorAvatar,
+  micAtivo,
+  aoAlternarMic,
 }: {
   nome: string
   meuAparencia: AparenciaAvatar
@@ -29,8 +46,9 @@ export function BarraFerramentas({
   papel: string | null
   painelAberto: PainelId | null
   aoAbrirPainel: (id: PainelId) => void
-  participantesAberto: boolean
-  aoAlternarParticipantes: () => void
+  aoAbrirEditorAvatar: () => void
+  micAtivo: boolean
+  aoAlternarMic: () => void
 }) {
   return (
     <div className="escritorio-toolbar">
@@ -39,22 +57,12 @@ export function BarraFerramentas({
         aparencia={meuAparencia}
         status={meuStatus}
         aoMudarStatus={aoMudarStatus}
-        aoAbrirEditorAvatar={() => aoAbrirPainel('avatar')}
+        aoAbrirEditorAvatar={aoAbrirEditorAvatar}
       />
 
       <span className="escritorio-toolbar-separador" />
 
       <div className="escritorio-toolbar-grupo" role="group" aria-label="Funções">
-        <button
-          type="button"
-          className={`escritorio-toolbar-botao${participantesAberto ? ' escritorio-toolbar-botao--ativo' : ''}`}
-          aria-label="Participantes"
-          aria-pressed={participantesAberto}
-          title="Quem está no escritório"
-          onClick={aoAlternarParticipantes}
-        >
-          🧭
-        </button>
         <button
           type="button"
           className={`escritorio-toolbar-botao${painelAberto === 'ponto' ? ' escritorio-toolbar-botao--ativo' : ''}`}
@@ -73,14 +81,16 @@ export function BarraFerramentas({
         >
           📁
         </button>
+        {/* Pedido do usuário: "onde o usuário do sistema (independente) vai conseguir marcar e
+            entrar nas reuniões do meet" - deixou de ser GESTOR/ADMIN só. */}
         <button
           type="button"
-          className={`escritorio-toolbar-botao${painelAberto === 'escala' ? ' escritorio-toolbar-botao--ativo' : ''}`}
-          aria-label="Minha escala"
-          title="Minha escala"
-          onClick={() => aoAbrirPainel('escala')}
+          className={`escritorio-toolbar-botao${painelAberto === 'reunioes' ? ' escritorio-toolbar-botao--ativo' : ''}`}
+          aria-label="Reuniões"
+          title="Reuniões"
+          onClick={() => aoAbrirPainel('reunioes')}
         >
-          🗓️
+          🤝
         </button>
         {(papel === 'GESTOR' || papel === 'ADMIN') && (
           <button
@@ -115,11 +125,22 @@ export function BarraFerramentas({
             📱
           </button>
         )}
+        {/* Pedido do usuário: "na ordem esse botao fique por ultimo" - sempre o último do grupo,
+            depois de qualquer botão restrito por papel (GESTOR/ADMIN só veem os de cima). */}
+        <button
+          type="button"
+          className={`escritorio-toolbar-botao${painelAberto === 'configuracoes' ? ' escritorio-toolbar-botao--ativo' : ''}`}
+          aria-label="Configurações pessoais"
+          title="Configurações pessoais"
+          onClick={() => aoAbrirPainel('configuracoes')}
+        >
+          ⚙️
+        </button>
       </div>
 
       <span className="escritorio-toolbar-separador" />
 
-      <ControlesAudioVideo />
+      <ControlesAudioVideo micAtivo={micAtivo} aoAlternarMic={aoAlternarMic} />
 
       <span className="escritorio-toolbar-dica">⬅️⬆️➡️⬇️ ou WASD pra andar</span>
     </div>

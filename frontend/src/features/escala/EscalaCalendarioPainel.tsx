@@ -1,7 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { decodeJwt } from '../auth/jwt'
+import { useAuthStore } from '../auth/authStore'
 import { formatarDataBr } from '../../shared/formatarData'
-import { buscarEscalaEfetiva, listarExcecoesDaEscala, removerExcecaoDaEscala, salvarExcecaoDaEscala } from './api'
+import {
+  buscarEscalaEfetiva,
+  listarExcecoesDaEscala,
+  listarMinhasReunioes,
+  removerExcecaoDaEscala,
+  removerReuniao,
+  salvarExcecaoDaEscala,
+} from './api'
 import { CalendarioDia } from './CalendarioDia'
 import { CalendarioMes } from './CalendarioMes'
 import { CalendarioSemana } from './CalendarioSemana'
@@ -9,7 +18,7 @@ import { construirGradeDoMes } from './construirGradeDoMes'
 import { anoDaData, dataDeHoje, diaDaData, mesDaData, nomeDoDiaDaSemana, segundaFeiraDaSemana, somarDias } from './datasEscala'
 import { EscalaModal } from './EscalaModal'
 import { FormularioExcecaoDoDia } from './FormularioExcecaoDoDia'
-import type { SalvarExcecaoInput } from './types'
+import type { Reuniao, SalvarExcecaoInput } from './types'
 import './Escala.css'
 
 const MESES = [
@@ -67,10 +76,13 @@ function rotuloDoPeriodo(modo: Modo, dataReferencia: string, inicio: string, fim
  * mesclados) aparece como um bloco, e clique/arraste num horário livre cria/edita uma exceção. O
  * estado de consulta/mutação fica aqui, compartilhado pelas 3 - cada visão é só apresentação.
  */
-export function EscalaCalendarioPainel() {
+export function EscalaCalendarioPainel({ aoEntrarNaReuniao }: { aoEntrarNaReuniao: () => void }) {
   const [modo, setModo] = useState<Modo>('mes')
   const [dataReferencia, setDataReferencia] = useState(dataDeHoje)
   const [selecao, setSelecao] = useState<Selecao | null>(null)
+  const [reuniaoSelecionada, setReuniaoSelecionada] = useState<Reuniao | null>(null)
+  const accessToken = useAuthStore((estado) => estado.accessToken)
+  const meuUsuarioId = accessToken ? Number(decodeJwt(accessToken).sub) : null
   const queryClient = useQueryClient()
 
   const { inicio, fim } = calcularIntervalo(modo, dataReferencia)
@@ -82,6 +94,12 @@ export function EscalaCalendarioPainel() {
   const excecoesQuery = useQuery({
     queryKey: ['escala', 'excecoes', inicio, fim],
     queryFn: () => listarExcecoesDaEscala(inicio, fim),
+  })
+  // Pedido do usuário: reunião marcada "fica registrada e aparece... pro funcionário" - traz
+  // reuniões onde a pessoa é criadora OU convidada (qualquer uma marca agora, não só o chefe).
+  const reunioesQuery = useQuery({
+    queryKey: ['escala', 'reunioes', inicio, fim],
+    queryFn: () => listarMinhasReunioes(inicio, fim),
   })
 
   function invalidarConsultas() {
@@ -101,6 +119,13 @@ export function EscalaCalendarioPainel() {
     onSuccess: () => {
       invalidarConsultas()
       setSelecao(null)
+    },
+  })
+  const cancelarReuniaoMutation = useMutation({
+    mutationFn: (id: number) => removerReuniao(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['escala', 'reunioes'] })
+      setReuniaoSelecionada(null)
     },
   })
 
@@ -143,6 +168,11 @@ export function EscalaCalendarioPainel() {
   const efetivoPorData = new Map((efetivaQuery.data ?? []).map((dia) => [dia.data, dia]))
   const excecaoSelecionada = selecao ? (excecoesQuery.data?.find((excecao) => excecao.data === selecao.data) ?? null) : null
   const efetivoSelecionado = selecao ? efetivoPorData.get(selecao.data) : undefined
+
+  const reunioesPorData = new Map<string, Reuniao[]>()
+  for (const reuniao of reunioesQuery.data ?? []) {
+    reunioesPorData.set(reuniao.data, [...(reunioesPorData.get(reuniao.data) ?? []), reuniao])
+  }
 
   const diasDaSemana =
     modo === 'semana'
@@ -217,18 +247,22 @@ export function EscalaCalendarioPainel() {
             <CalendarioSemana
               diasDaSemana={diasDaSemana}
               efetivoPorData={efetivoPorData}
+              reunioesPorData={reunioesPorData}
               aoSelecionarIntervalo={(data, horaInicioSugerida, horaFimSugerida) =>
                 setSelecao({ data, horaInicioSugerida, horaFimSugerida })
               }
+              aoSelecionarReuniao={setReuniaoSelecionada}
             />
           )}
           {modo === 'dia' && (
             <CalendarioDia
               data={dataReferencia}
               efetivoPorData={efetivoPorData}
+              reunioesPorData={reunioesPorData}
               aoSelecionarIntervalo={(data, horaInicioSugerida, horaFimSugerida) =>
                 setSelecao({ data, horaInicioSugerida, horaFimSugerida })
               }
+              aoSelecionarReuniao={setReuniaoSelecionada}
             />
           )}
 
@@ -250,6 +284,64 @@ export function EscalaCalendarioPainel() {
                 aoRemover={(id) => removerMutation.mutate(id)}
                 aoFechar={() => setSelecao(null)}
               />
+            </EscalaModal>
+          )}
+
+          {reuniaoSelecionada && (
+            // Pedido do usuário: "quero adicionar de alguma forma integrada ao Google Meet...
+            // disponibilizar o link caso queira compartilhar" - "Entrar no Meet"/"Copiar link" são
+            // a videochamada de verdade; "Entrar na reunião" continua sendo o teleporte pro
+            // escritório virtual (pedido anterior: "onde está o link da reunião para eu entrar?
+            // Preciso entrar no google?" -> a Sala de Reunião do mapa, sem link nenhum) - as duas
+            // convivem, não são a mesma coisa. Cancelar só aparece pra quem criou.
+            <EscalaModal titulo="Reunião" aoFechar={() => setReuniaoSelecionada(null)}>
+              <div className="escala-reuniao-detalhe">
+                <p className="escala-reuniao-detalhe-titulo">{reuniaoSelecionada.titulo}</p>
+                <p>
+                  {formatarDataBr(reuniaoSelecionada.data)}, {reuniaoSelecionada.horaInicio.slice(0, 5)}–
+                  {reuniaoSelecionada.horaFim.slice(0, 5)}
+                </p>
+                <p className="mensagem-vazia">
+                  Marcada por {reuniaoSelecionada.criadorNome} · com{' '}
+                  {reuniaoSelecionada.participantes.map((participante) => participante.nome).join(', ')}
+                </p>
+                {reuniaoSelecionada.linkMeet && (
+                  <div className="campo">
+                    <label htmlFor="reuniao-detalhe-link">Link do Meet</label>
+                    <input id="reuniao-detalhe-link" value={reuniaoSelecionada.linkMeet} readOnly />
+                  </div>
+                )}
+                <div className="linha-botoes">
+                  {reuniaoSelecionada.linkMeet && (
+                    <>
+                      <a className="botao-secundario" href={reuniaoSelecionada.linkMeet} target="_blank" rel="noreferrer">
+                        🎥 Entrar no Meet
+                      </a>
+                      <button
+                        type="button"
+                        className="botao-secundario"
+                        onClick={() => navigator.clipboard?.writeText(reuniaoSelecionada.linkMeet ?? '')}
+                      >
+                        🔗 Copiar link
+                      </button>
+                    </>
+                  )}
+                  <button type="button" className="botao-secundario" onClick={aoEntrarNaReuniao}>
+                    🗣️ Entrar na sala do escritório
+                  </button>
+                  {reuniaoSelecionada.criadorId === meuUsuarioId && (
+                    <button
+                      type="button"
+                      className="botao-secundario"
+                      disabled={cancelarReuniaoMutation.isPending}
+                      onClick={() => cancelarReuniaoMutation.mutate(reuniaoSelecionada.id)}
+                    >
+                      Cancelar reunião
+                    </button>
+                  )}
+                </div>
+                {cancelarReuniaoMutation.isError && <p className="mensagem-erro">Não foi possível cancelar a reunião.</p>}
+              </div>
             </EscalaModal>
           )}
         </>

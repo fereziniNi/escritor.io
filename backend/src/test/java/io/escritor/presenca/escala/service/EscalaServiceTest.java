@@ -6,6 +6,7 @@ import io.escritor.presenca.escala.domain.HorarioInvalidoException;
 import io.escritor.presenca.escala.repository.EscalaExcecaoRepository;
 import io.escritor.presenca.escala.repository.EscalaSemanalRepository;
 import io.escritor.presenca.escala.web.DiaEfetivoResponse;
+import io.escritor.presenca.escala.web.DisponibilidadeResponse;
 import io.escritor.presenca.escala.web.EscalaEquipeResponse;
 import io.escritor.presenca.escala.web.EscalaExcecaoResponse;
 import io.escritor.presenca.escala.web.EscalaSemanalResponse;
@@ -13,6 +14,7 @@ import io.escritor.presenca.escala.web.ItemEscalaSemanalRequest;
 import io.escritor.presenca.escala.web.SalvarExcecaoRequest;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Usuario;
+import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.identidade.service.VisibilidadeUsuarioService;
 import java.time.DayOfWeek;
@@ -30,6 +32,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -45,6 +48,9 @@ class EscalaServiceTest {
     @Mock
     private VisibilidadeUsuarioService visibilidadeUsuarioService;
 
+    @Mock
+    private UsuarioRepository usuarioRepository;
+
     private final Usuario usuario = usuarioComId(1L);
 
     private EscalaService escalaService;
@@ -57,7 +63,8 @@ class EscalaServiceTest {
 
     @BeforeEach
     void setUp() {
-        escalaService = new EscalaService(escalaSemanalRepository, escalaExcecaoRepository, visibilidadeUsuarioService);
+        escalaService =
+                new EscalaService(escalaSemanalRepository, escalaExcecaoRepository, visibilidadeUsuarioService, usuarioRepository);
     }
 
     @Test
@@ -206,5 +213,22 @@ class EscalaServiceTest {
         List<EscalaEquipeResponse> resultado = escalaService.calcularEfetivaDaEquipe(usuario, dia, dia);
 
         assertThat(resultado).extracting(EscalaEquipeResponse::usuarioId).containsExactly(1L, 2L);
+    }
+
+    @Test
+    void consultarDisponibilidadeDevolveUmItemPorUsuarioComOCalculoEfetivoDaData() {
+        LocalDate quinta = LocalDate.of(2026, 9, 10);
+        Usuario semExpediente = usuarioComId(6L);
+        when(usuarioRepository.findAllById(List.of(1L, 6L))).thenReturn(List.of(usuario, semExpediente));
+        when(escalaSemanalRepository.findByUsuario(usuario))
+                .thenReturn(List.of(new EscalaSemanal(usuario, DayOfWeek.THURSDAY, LocalTime.of(9, 0), LocalTime.of(18, 0))));
+        when(escalaSemanalRepository.findByUsuario(semExpediente)).thenReturn(List.of());
+        when(escalaExcecaoRepository.findByUsuarioAndDataBetween(any(), eq(quinta), eq(quinta))).thenReturn(List.of());
+
+        List<DisponibilidadeResponse> resultado = escalaService.consultarDisponibilidade(List.of(1L, 6L), quinta);
+
+        assertThat(resultado).containsExactly(
+                new DisponibilidadeResponse(1L, "Ana Souza", true, LocalTime.of(9, 0), LocalTime.of(18, 0)),
+                new DisponibilidadeResponse(6L, "Ana Souza", false, null, null));
     }
 }

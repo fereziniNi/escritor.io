@@ -2,11 +2,13 @@ package io.escritor.presenca.identidade.service;
 
 import io.escritor.presenca.escritorio.ws.PresencaWebSocketHandler;
 import io.escritor.presenca.identidade.domain.AparenciaAvatar;
+import io.escritor.presenca.identidade.domain.EmailJaCadastradoException;
 import io.escritor.presenca.identidade.domain.PaletaAparenciaAvatar;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.identidade.web.AtualizarAparenciaRequest;
 import io.escritor.presenca.identidade.web.AtualizarCargaDiariaRequest;
+import io.escritor.presenca.identidade.web.AtualizarPerfilRequest;
 import io.escritor.presenca.identidade.web.CriarUsuarioRequest;
 import io.escritor.presenca.identidade.web.UsuarioBasicoResponse;
 import io.escritor.presenca.identidade.web.UsuarioResponse;
@@ -54,9 +56,9 @@ public class UsuarioService {
         return usuarioRepository.findByAtivoTrueOrderByNomeAsc().stream().map(UsuarioBasicoResponse::de).toList();
     }
 
-    /** Único campo editável depois da criação até agora (pedido do usuário: "o admin deve
-     * definir [a carga diária] para os outros funcionários, não deve ser padrão") - os demais
-     * (nome/email/papel) não têm uma tela de edição ainda, fora de escopo aqui. */
+    /** ADMIN-only (diferente de {@link #atualizarMeuPerfil}, self-service) - pedido do usuário:
+     * "o admin deve definir [a carga diária] para os outros funcionários, não deve ser padrão".
+     * `papel` continua sem tela de edição, fora de escopo aqui. */
     public UsuarioResponse atualizarCargaDiaria(Long usuarioId, AtualizarCargaDiariaRequest request) {
         Usuario usuario = usuarioRepository
                 .findById(usuarioId)
@@ -73,7 +75,7 @@ public class UsuarioService {
      * self-service, diferente de {@link #atualizarCargaDiaria} (ADMIN-only): {@code
      * usuarioAutenticado} já vem resolvido de {@code ContextoUsuarioAutenticado.usuarioAtual()},
      * então não existe "editar a aparência de outra pessoa" pra checar aqui, mesma garantia
-     * estrutural que {@code ApontamentoController}/PATCH de apontamento já usa em outro contexto.
+     * estrutural que {@code SessaoTrabalhoController} já usa em outro contexto.
      */
     public UsuarioResponse buscarMeuUsuario(Usuario usuarioAutenticado) {
         return UsuarioResponse.de(usuarioAutenticado);
@@ -126,6 +128,29 @@ public class UsuarioService {
         Usuario salvo = usuarioRepository.save(usuarioAutenticado);
 
         presencaWebSocketHandler.atualizarAparencia(salvo.getId(), novaAparencia);
+
+        return UsuarioResponse.de(salvo);
+    }
+
+    /**
+     * Pedido do usuário: "edição de perfil. Nome e email nesse modal" - self-service, mesmo
+     * espírito de {@link #atualizarMinhaAparencia} (não existe "editar o perfil de outra pessoa"
+     * pra checar aqui). E-mail duplicado não pode virar um 500 de violação de constraint do banco -
+     * checa explicitamente antes de salvar (`findByEmailAndAtivoTrue` já existe, usado hoje pelo
+     * login); sem efeito quando a pessoa manda o próprio e-mail de volta sem mudar nada.
+     */
+    public UsuarioResponse atualizarMeuPerfil(Usuario usuarioAutenticado, AtualizarPerfilRequest request) {
+        boolean emailMudou = !request.email().equalsIgnoreCase(usuarioAutenticado.getEmail());
+        if (emailMudou) {
+            usuarioRepository.findByEmailAndAtivoTrue(request.email()).ifPresent(outro -> {
+                if (!outro.getId().equals(usuarioAutenticado.getId())) {
+                    throw new EmailJaCadastradoException("Esse e-mail já está em uso por outra pessoa");
+                }
+            });
+        }
+
+        usuarioAutenticado.alterarPerfil(request.nome(), request.email());
+        Usuario salvo = usuarioRepository.save(usuarioAutenticado);
 
         return UsuarioResponse.de(salvo);
     }

@@ -67,7 +67,7 @@ public class EnvioRelatorioDiarioScheduler {
         }
 
         log.info("Enviando o resumo diário pro chefe (horário configurado: {})", configuracao.getHorarioEnvio());
-        envioWhatsApp.enviarParaChefe(relatorioDiarioService.montarResumoDoDia());
+        envioWhatsApp.enviarParaChefe(relatorioDiarioService.montarResumoDoDia(configuracao.getPreferencias()));
         configuracao.registrarEnvio(Instant.now(clock));
         configuracaoRepository.save(configuracao);
     }

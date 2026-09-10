@@ -1,18 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
+import { formatarHms } from '../../shared/formatarHms'
 import { buscarEstadoAtual } from '../ponto/api'
-
-function doisDigitos(numero: number): string {
-  return String(numero).padStart(2, '0')
-}
-
-function formatarHms(totalSegundos: number): string {
-  const segundos = Math.max(0, Math.floor(totalSegundos))
-  const horas = Math.floor(segundos / 3600)
-  const minutos = Math.floor((segundos % 3600) / 60)
-  const resto = segundos % 60
-  return `${doisDigitos(horas)}:${doisDigitos(minutos)}:${doisDigitos(resto)}`
-}
 
 /**
  * Cronômetro do tempo de trabalho hoje, canto superior direito (pedido do usuário: "muito parecido

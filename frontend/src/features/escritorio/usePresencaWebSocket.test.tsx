@@ -205,6 +205,155 @@ describe('usePresencaWebSocket', () => {
     })
   })
 
+  it('um CONVITE_REUNIAO vira um item em convitesRecebidos, sem mexer no mapa de usuários', async () => {
+    // pedido do usuário: "chamar para reunião pela plataforma" - mensagem própria, não deve ser
+    // tratada como STATUS/POSICAO/SNAPSHOT (que sempre esperam `usuarios`).
+    const { result } = renderHook(() => usePresencaWebSocket())
+    act(() => {
+      WebSocketFalso.instancias[0].disparaMensagem({
+        tipo: 'SNAPSHOT',
+        usuarios: [{ usuarioId: 1, nome: 'Ana', x: 0, y: 0, status: 'DISPONIVEL' }],
+      })
+    })
+    await waitFor(() => expect(result.current.usuarios[1]).toBeDefined())
+
+    act(() => {
+      WebSocketFalso.instancias[0].disparaMensagem({
+        tipo: 'CONVITE_REUNIAO',
+        reuniaoId: 42,
+        titulo: 'Alinhamento',
+        criadorNome: 'Beto',
+        data: '2026-01-05',
+        horaInicio: '14:30:00',
+        horaFim: '15:00:00',
+        linkMeet: 'https://meet.google.com/abc-defg-hij',
+      })
+    })
+
+    await waitFor(() => {
+      expect(result.current.convitesRecebidos).toHaveLength(1)
+      expect(result.current.convitesRecebidos[0]).toMatchObject({ reuniaoId: 42, titulo: 'Alinhamento', criadorNome: 'Beto' })
+    })
+    expect(result.current.usuarios[1]).toEqual({ usuarioId: 1, nome: 'Ana', x: 0, y: 0, status: 'DISPONIVEL' })
+  })
+
+  it('uma CHAT_MENSAGEM vira um item em mensagensRecebidas, sem mexer no mapa de usuários', async () => {
+    // pedido do usuário: "chat... em tempo real... Não deve conter atraso" - mensagem própria,
+    // mesma lógica de CONVITE_REUNIAO acima.
+    const { result } = renderHook(() => usePresencaWebSocket())
+    act(() => {
+      WebSocketFalso.instancias[0].disparaMensagem({
+        tipo: 'SNAPSHOT',
+        usuarios: [{ usuarioId: 1, nome: 'Ana', x: 0, y: 0, status: 'DISPONIVEL' }],
+      })
+    })
+    await waitFor(() => expect(result.current.usuarios[1]).toBeDefined())
+
+    act(() => {
+      WebSocketFalso.instancias[0].disparaMensagem({
+        tipo: 'CHAT_MENSAGEM',
+        conversaId: 5,
+        mensagemId: 900,
+        autorId: 2,
+        autorNome: 'Beto',
+        texto: 'Oi, tudo bem?',
+        criadoEm: '2026-01-15T12:00:00Z',
+      })
+    })
+
+    await waitFor(() => {
+      expect(result.current.mensagensRecebidas).toHaveLength(1)
+      expect(result.current.mensagensRecebidas[0]).toMatchObject({ conversaId: 5, mensagemId: 900, texto: 'Oi, tudo bem?' })
+    })
+    expect(result.current.usuarios[1]).toEqual({ usuarioId: 1, nome: 'Ana', x: 0, y: 0, status: 'DISPONIVEL' })
+  })
+
+  it('uma TAREFA_CONCLUIDA vira um item em tarefasConcluidasRecebidas, sem mexer no mapa de usuários', async () => {
+    // pedido do usuário: "sempre que alguém finalizar uma tarefa... notificado ao usuário" -
+    // mensagem própria, mesma lógica de CONVITE_REUNIAO/CHAT_MENSAGEM acima.
+    const { result } = renderHook(() => usePresencaWebSocket())
+    act(() => {
+      WebSocketFalso.instancias[0].disparaMensagem({
+        tipo: 'SNAPSHOT',
+        usuarios: [{ usuarioId: 1, nome: 'Ana', x: 0, y: 0, status: 'DISPONIVEL' }],
+      })
+    })
+    await waitFor(() => expect(result.current.usuarios[1]).toBeDefined())
+
+    act(() => {
+      WebSocketFalso.instancias[0].disparaMensagem({
+        tipo: 'TAREFA_CONCLUIDA',
+        cardId: 42,
+        cardTitulo: 'Corrigir bug',
+        projetoNome: 'Backlog',
+        autorNome: 'Beto',
+      })
+    })
+
+    await waitFor(() => {
+      expect(result.current.tarefasConcluidasRecebidas).toHaveLength(1)
+      expect(result.current.tarefasConcluidasRecebidas[0]).toMatchObject({ cardId: 42, cardTitulo: 'Corrigir bug', autorNome: 'Beto' })
+    })
+    expect(result.current.usuarios[1]).toEqual({ usuarioId: 1, nome: 'Ana', x: 0, y: 0, status: 'DISPONIVEL' })
+  })
+
+  it('uma NOVA_TAREFA vira um item em novasTarefasRecebidas, sem mexer no mapa de usuários', async () => {
+    // pedido do usuário: "quando qualquer pessoa adicionar alguma tarefa nova... deve informar
+    // todos os usuários do sistema" - mesma lógica de TAREFA_CONCLUIDA acima.
+    const { result } = renderHook(() => usePresencaWebSocket())
+    act(() => {
+      WebSocketFalso.instancias[0].disparaMensagem({
+        tipo: 'SNAPSHOT',
+        usuarios: [{ usuarioId: 1, nome: 'Ana', x: 0, y: 0, status: 'DISPONIVEL' }],
+      })
+    })
+    await waitFor(() => expect(result.current.usuarios[1]).toBeDefined())
+
+    act(() => {
+      WebSocketFalso.instancias[0].disparaMensagem({
+        tipo: 'NOVA_TAREFA',
+        cardId: 43,
+        cardTitulo: 'Escrever testes',
+        projetoNome: 'Backlog',
+        autorNome: 'Beto',
+      })
+    })
+
+    await waitFor(() => {
+      expect(result.current.novasTarefasRecebidas).toHaveLength(1)
+      expect(result.current.novasTarefasRecebidas[0]).toMatchObject({ cardId: 43, cardTitulo: 'Escrever testes', autorNome: 'Beto' })
+    })
+    expect(result.current.usuarios[1]).toEqual({ usuarioId: 1, nome: 'Ana', x: 0, y: 0, status: 'DISPONIVEL' })
+  })
+
+  it('um SORTEIO_HAPPY_HOUR vira um item em sorteiosHappyHourRecebidos, sem mexer no mapa de usuários', async () => {
+    // pedido do usuário: "uma parte para roleta onde será sorteado qual atividade será feita" -
+    // mesma lógica de TAREFA_CONCLUIDA/NOVA_TAREFA acima.
+    const { result } = renderHook(() => usePresencaWebSocket())
+    act(() => {
+      WebSocketFalso.instancias[0].disparaMensagem({
+        tipo: 'SNAPSHOT',
+        usuarios: [{ usuarioId: 1, nome: 'Ana', x: 0, y: 0, status: 'DISPONIVEL' }],
+      })
+    })
+    await waitFor(() => expect(result.current.usuarios[1]).toBeDefined())
+
+    act(() => {
+      WebSocketFalso.instancias[0].disparaMensagem({
+        tipo: 'SORTEIO_HAPPY_HOUR',
+        atividadeId: 7,
+        descricao: 'Karaokê',
+        sorteadoPorNome: 'Beto',
+      })
+    })
+
+    await waitFor(() => {
+      expect(result.current.sorteiosHappyHourRecebidos).toHaveLength(1)
+      expect(result.current.sorteiosHappyHourRecebidos[0]).toMatchObject({ atividadeId: 7, descricao: 'Karaokê', sorteadoPorNome: 'Beto' })
+    })
+    expect(result.current.usuarios[1]).toEqual({ usuarioId: 1, nome: 'Ana', x: 0, y: 0, status: 'DISPONIVEL' })
+  })
+
   it('reconecta se a conexão cair sem ter sido fechada pelo próprio componente', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
 

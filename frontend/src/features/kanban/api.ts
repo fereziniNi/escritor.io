@@ -1,5 +1,5 @@
 import { apiFetch } from '../../shared/api/http'
-import type { Apontamento, Card, Comentario, EventoCard, TotalApontado, TotalPorCard } from './types'
+import type { Card, Comentario, Cronometro, CronometroAtivo, EventoCard, TotalApontado, TotalPorCard } from './types'
 
 /** Pedido do cliente: qualquer pessoa (não só admin/gestor) pode criar tarefa, atribuir a alguém
  * (por id do usuário - mesma disciplina de não montar dropdown pra API que não existe pra todo
@@ -65,54 +65,53 @@ export async function listarEventos(cardId: number): Promise<EventoCard[]> {
   return response.json()
 }
 
-export async function listarApontamentos(cardId: number): Promise<Apontamento[]> {
-  const response = await apiFetch(`/cards/${cardId}/apontamentos`)
+export async function buscarCronometro(cardId: number): Promise<Cronometro> {
+  const response = await apiFetch(`/cards/${cardId}/cronometro`)
   if (!response.ok) {
-    throw new Error('Não foi possível carregar os apontamentos')
+    throw new Error('Não foi possível carregar o cronômetro')
   }
   return response.json()
 }
 
-export async function criarApontamentoManual(dados: {
-  cardId: number
-  inicio: string | null
-  fim: string | null
-  minutos: number | null
-  descricao: string | null
-}): Promise<Apontamento> {
-  const response = await apiFetch(`/cards/${dados.cardId}/apontamentos`, {
+export async function iniciarCronometro(cardId: number): Promise<Cronometro> {
+  const response = await apiFetch(`/cards/${cardId}/cronometro/iniciar`, { method: 'POST' })
+  if (!response.ok) {
+    throw new Error('Não foi possível iniciar o cronômetro')
+  }
+  return response.json()
+}
+
+export async function pausarCronometro(cardId: number): Promise<Cronometro> {
+  const response = await apiFetch(`/cards/${cardId}/cronometro/pausar`, { method: 'POST' })
+  if (!response.ok) {
+    throw new Error('Não foi possível pausar o cronômetro')
+  }
+  return response.json()
+}
+
+export async function finalizarCronometro(cardId: number, descricao: string): Promise<Cronometro> {
+  const response = await apiFetch(`/cards/${cardId}/cronometro/finalizar`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ inicio: dados.inicio, fim: dados.fim, minutos: dados.minutos, descricao: dados.descricao }),
+    body: JSON.stringify({ descricao }),
   })
   if (!response.ok) {
-    throw new Error('Não foi possível lançar o apontamento')
+    throw new Error('Não foi possível finalizar a tarefa')
   }
   return response.json()
 }
 
-export async function editarApontamento(dados: {
-  apontamentoId: number
-  inicio: string | null
-  fim: string | null
-  descricao: string | null
-}): Promise<Apontamento> {
-  const response = await apiFetch(`/apontamentos/${dados.apontamentoId}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ inicio: dados.inicio, fim: dados.fim, descricao: dados.descricao }),
-  })
+/** Pedido do usuário: widget global (canto superior direito) da tarefa com o cronômetro rodando
+ * agora - `204` (sem corpo) é um estado válido, "ninguém rodando agora", não um erro. */
+export async function buscarCronometroAtivo(): Promise<CronometroAtivo | null> {
+  const response = await apiFetch('/cronometro/ativo')
+  if (response.status === 204) {
+    return null
+  }
   if (!response.ok) {
-    throw new Error('Não foi possível editar o apontamento')
+    throw new Error('Não foi possível carregar o cronômetro ativo')
   }
   return response.json()
-}
-
-export async function excluirApontamento(apontamentoId: number): Promise<void> {
-  const response = await apiFetch(`/apontamentos/${apontamentoId}`, { method: 'DELETE' })
-  if (!response.ok) {
-    throw new Error('Não foi possível excluir o apontamento')
-  }
 }
 
 /** Quanto tempo foi apontado em cada card, num período - usado pela "Jornada de hoje" (ponto)

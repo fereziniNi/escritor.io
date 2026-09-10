@@ -1,5 +1,6 @@
 package io.escritor.presenca.identidade.web;
 
+import io.escritor.presenca.identidade.domain.EmailJaCadastradoException;
 import io.escritor.presenca.identidade.domain.EstiloBottom;
 import io.escritor.presenca.identidade.domain.EstiloCabelo;
 import io.escritor.presenca.identidade.domain.EstiloJaqueta;
@@ -282,6 +283,72 @@ class UsuarioControllerTest {
         mockMvc.perform(patch("/usuarios/me/aparencia")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejeitaAtualizarMeuPerfilSemAutenticacao() throws Exception {
+        mockMvc.perform(patch("/usuarios/me/perfil")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"Ana Souza","email":"ana@escritor.io"}
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void qualquerUsuarioAutenticadoAtualizaOProprioNomeEEmail() throws Exception {
+        Usuario eu = usuarioAutenticadoFalso();
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(eu);
+        when(usuarioService.atualizarMeuPerfil(eq(eu), any()))
+                .thenReturn(new UsuarioResponse(1L, "Ana Souza Lima", "ana.lima@escritor.io", Papel.COLABORADOR, 480, true, APARENCIA_PADRAO));
+
+        mockMvc.perform(patch("/usuarios/me/perfil")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"Ana Souza Lima","email":"ana.lima@escritor.io"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nome").value("Ana Souza Lima"))
+                .andExpect(jsonPath("$.email").value("ana.lima@escritor.io"));
+    }
+
+    @Test
+    @WithMockUser
+    void atualizarMeuPerfilComEmailJaCadastradoRetorna409() throws Exception {
+        Usuario eu = usuarioAutenticadoFalso();
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(eu);
+        when(usuarioService.atualizarMeuPerfil(eq(eu), any()))
+                .thenThrow(new EmailJaCadastradoException("Esse e-mail já está em uso por outra pessoa"));
+
+        mockMvc.perform(patch("/usuarios/me/perfil")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"Ana Souza","email":"beto@escritor.io"}
+                                """))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @WithMockUser
+    void atualizarMeuPerfilComEmailInvalidoRetorna400() throws Exception {
+        mockMvc.perform(patch("/usuarios/me/perfil")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"Ana Souza","email":"nao-e-um-email"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser
+    void atualizarMeuPerfilComNomeEmBrancoRetorna400() throws Exception {
+        mockMvc.perform(patch("/usuarios/me/perfil")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"","email":"ana@escritor.io"}
+                                """))
                 .andExpect(status().isBadRequest());
     }
 }

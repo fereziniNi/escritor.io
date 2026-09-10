@@ -1,6 +1,29 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { atualizarConfiguracaoRelatorioDiario, buscarConfiguracaoRelatorioDiario, buscarEstadoWhatsApp } from './api'
+import type { PreferenciasConteudoRelatorioDiario } from './types'
+
+const PREFERENCIAS_PADRAO: PreferenciasConteudoRelatorioDiario = {
+  ponto: true,
+  tarefasCriadasMovidas: true,
+  tarefasConcluidas: false,
+  reunioes: false,
+  ausencias: false,
+  resumoEquipe: false,
+}
+
+/** Pedido do usuário: "adicionar mais informações no relatório diário, mas deixe personalizado
+ * para o admin / conseguir visualizar as possibilidades de filtros que poderá utilizar" - um
+ * checkbox por bloco, a lista inteira sempre visível (não escondida atrás de "avançado" ou
+ * parecido) - é a própria tela que mostra "as possibilidades" que existem pra escolher. */
+const BLOCOS_DE_CONTEUDO: { chave: keyof PreferenciasConteudoRelatorioDiario; rotulo: string }[] = [
+  { chave: 'ponto', rotulo: 'Ponto (horas trabalhadas)' },
+  { chave: 'tarefasCriadasMovidas', rotulo: 'Tarefas criadas/movidas' },
+  { chave: 'tarefasConcluidas', rotulo: 'Tarefas concluídas' },
+  { chave: 'reunioes', rotulo: 'Reuniões do dia' },
+  { chave: 'ausencias', rotulo: 'Quem não bateu ponto (ausências)' },
+  { chave: 'resumoEquipe', rotulo: 'Resumo agregado da equipe' },
+]
 
 /**
  * Pedido do cliente: "o admin pode escolher a hora do dia para receber um documento sobre o que
@@ -13,16 +36,20 @@ function ResumoDiarioConfig() {
   const configQuery = useQuery({ queryKey: ['whatsapp', 'relatorio-diario'], queryFn: buscarConfiguracaoRelatorioDiario })
   const [horario, setHorario] = useState('')
   const [habilitado, setHabilitado] = useState(true)
+  const [preferencias, setPreferencias] = useState<PreferenciasConteudoRelatorioDiario>(PREFERENCIAS_PADRAO)
 
   useEffect(() => {
     if (configQuery.data?.configurado && configQuery.data.horarioEnvio) {
       setHorario(configQuery.data.horarioEnvio.slice(0, 5))
       setHabilitado(configQuery.data.habilitado)
     }
+    if (configQuery.data?.preferencias) {
+      setPreferencias(configQuery.data.preferencias)
+    }
   }, [configQuery.data])
 
   const salvarMutation = useMutation({
-    mutationFn: () => atualizarConfiguracaoRelatorioDiario({ horarioEnvio: `${horario}:00`, habilitado }),
+    mutationFn: () => atualizarConfiguracaoRelatorioDiario({ horarioEnvio: `${horario}:00`, habilitado, preferencias }),
     onSuccess: (dados) => queryClient.setQueryData(['whatsapp', 'relatorio-diario'], dados),
   })
 
@@ -30,7 +57,7 @@ function ResumoDiarioConfig() {
     <section className="secao cartao">
       <h2 className="secao-titulo">📋 Resumo diário</h2>
       <p className="mensagem-vazia">
-        Todo dia, no horário escolhido, o chefe recebe no WhatsApp um resumo do que cada funcionário fez (ponto + tarefas).
+        Todo dia, no horário escolhido, o chefe recebe no WhatsApp um resumo do que cada funcionário fez.
       </p>
 
       {configQuery.isPending && <p className="mensagem-carregando">Carregando…</p>}
@@ -54,7 +81,8 @@ function ResumoDiarioConfig() {
               required
             />
           </div>
-          <div className="campo-acoes">
+
+          <div className="campo campo-acoes" style={{ gridColumn: '1 / -1' }}>
             <label htmlFor="habilitado-relatorio-diario">
               <input
                 id="habilitado-relatorio-diario"
@@ -64,6 +92,26 @@ function ResumoDiarioConfig() {
               />{' '}
               Habilitado
             </label>
+          </div>
+
+          <div className="campo" style={{ gridColumn: '1 / -1' }}>
+            <span>O que incluir no resumo</span>
+            <div className="linha-botoes" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+              {BLOCOS_DE_CONTEUDO.map((bloco) => (
+                <label key={bloco.chave} htmlFor={`preferencia-${bloco.chave}`}>
+                  <input
+                    id={`preferencia-${bloco.chave}`}
+                    type="checkbox"
+                    checked={preferencias[bloco.chave]}
+                    onChange={(evento) => setPreferencias((atual) => ({ ...atual, [bloco.chave]: evento.target.checked }))}
+                  />{' '}
+                  {bloco.rotulo}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="campo-acoes" style={{ gridColumn: '1 / -1' }}>
             <button type="submit" className="botao-pequeno" disabled={salvarMutation.isPending || !horario}>
               Salvar
             </button>
@@ -71,8 +119,8 @@ function ResumoDiarioConfig() {
         </form>
       )}
 
-      {salvarMutation.isSuccess && <p className="mensagem-sucesso">✅ Horário salvo.</p>}
-      {salvarMutation.isError && <p className="mensagem-erro">Não foi possível salvar o horário.</p>}
+      {salvarMutation.isSuccess && <p className="mensagem-sucesso">✅ Configuração salva.</p>}
+      {salvarMutation.isError && <p className="mensagem-erro">Não foi possível salvar a configuração.</p>}
     </section>
   )
 }

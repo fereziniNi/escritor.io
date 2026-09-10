@@ -1,20 +1,21 @@
 /**
- * Botões de mic/câmera/compartilhar tela existem visualmente no HUD (fidelidade com o dock do
- * Gather) mas não funcionam de verdade - decisão explícita do usuário nesta sessão: sem WebRTC,
- * sem signaling, sem chamada real. `aria-disabled` + tooltip "Em breve" é um estado não-funcional
- * honesto (o botão não finge fazer algo que não faz), em vez de um clique morto sem explicação.
+ * Botão de mic no HUD. Câmera e compartilhar tela saíram daqui por pedido do usuário ("Deixe so o
+ * microfone e tire os outros dois do lado dele") - continuam fora de escopo (decisão anterior:
+ * "sem WebRTC, sem signaling, sem chamada real" pra elas). O microfone liga/desliga voz por
+ * proximidade de verdade (WebRTC, `mundo/useVozProximidade.ts`), acionado por `EscritorioPage`.
  */
-export function ControlesAudioVideo() {
+export function ControlesAudioVideo({ micAtivo, aoAlternarMic }: { micAtivo: boolean; aoAlternarMic: () => void }) {
   return (
-    <div className="escritorio-toolbar-grupo" role="group" aria-label="Áudio e vídeo (em breve)">
-      <button type="button" className="escritorio-toolbar-botao" aria-disabled="true" title="Microfone - em breve">
-        🎤
-      </button>
-      <button type="button" className="escritorio-toolbar-botao" aria-disabled="true" title="Câmera - em breve">
-        📷
-      </button>
-      <button type="button" className="escritorio-toolbar-botao" aria-disabled="true" title="Compartilhar tela - em breve">
-        🖥️
+    <div className="escritorio-toolbar-grupo" role="group" aria-label="Áudio">
+      <button
+        type="button"
+        className={`escritorio-toolbar-botao${micAtivo ? ' escritorio-toolbar-botao--ativo' : ''}`}
+        aria-label={micAtivo ? 'Desativar microfone' : 'Ativar microfone'}
+        aria-pressed={micAtivo}
+        title={micAtivo ? 'Microfone ativado - voz por proximidade' : 'Ativar microfone (voz por proximidade)'}
+        onClick={aoAlternarMic}
+      >
+        {micAtivo ? '🎤' : '🔇'}
       </button>
     </div>
   )

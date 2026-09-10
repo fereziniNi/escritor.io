@@ -45,9 +45,10 @@ class ZonaRepositoryIT {
     void zonasSeedadasPelaMigracaoPertencemAoMapaAtivo() {
         Mapa mapaAtivo = mapaRepository.findAll().stream().filter(Mapa::isAtivo).findFirst().orElseThrow();
 
-        // 4 zonas desde V23__reorganiza_zonas_do_mapa.sql (3 originais da V21 reposicionadas + Recepção nova)
+        // 8 zonas: 4 desde V23__reorganiza_zonas_do_mapa.sql (3 originais da V21 reposicionadas +
+        // Recepção nova) + Happy Hour da V46__happy_hour.sql + 3 cabines da V49__adiciona_cabines.sql
         assertThat(zonaRepository.findAll())
-                .hasSize(4)
+                .hasSize(8)
                 .allSatisfy(zona -> assertThat(zona.getMapa().getId()).isEqualTo(mapaAtivo.getId()));
     }
 }

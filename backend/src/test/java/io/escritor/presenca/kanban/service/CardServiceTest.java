@@ -1,5 +1,6 @@
 package io.escritor.presenca.kanban.service;
 
+import io.escritor.presenca.escritorio.ws.PresencaWebSocketHandler;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Projeto;
 import io.escritor.presenca.identidade.domain.StatusProjeto;
@@ -18,6 +19,8 @@ import io.escritor.presenca.kanban.repository.CardRepository;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
 import io.escritor.presenca.kanban.web.CardResponse;
 import io.escritor.presenca.kanban.ws.ProjetoWebSocketHandler;
+import io.escritor.presenca.notificacao.domain.TipoNotificacao;
+import io.escritor.presenca.notificacao.service.NotificacaoService;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -33,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -56,6 +60,12 @@ class CardServiceTest {
     @Mock
     private CardEventoRepository cardEventoRepository;
 
+    @Mock
+    private PresencaWebSocketHandler presencaWebSocketHandler;
+
+    @Mock
+    private NotificacaoService notificacaoService;
+
     private final Coluna coluna = colunaComId(1L);
     private final Usuario criadoPor = usuarioComId(1L);
 
@@ -68,6 +78,15 @@ class CardServiceTest {
     private static Coluna colunaComId(Long id, Integer limiteWip) {
         Projeto projeto = new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null);
         Coluna coluna = new Coluna(projeto, "A fazer", 0, limiteWip);
+        ReflectionTestUtils.setField(coluna, "id", id);
+        return coluna;
+    }
+
+    /** Pra testar a heurística de "última coluna do projeto" (ver {@code
+     * CardService#avisarSeFinalizouATarefa}) - precisa de duas colunas de VERDADE do mesmo
+     * projeto (`colunaComId` sozinho cria um `Projeto` novo a cada chamada). */
+    private static Coluna outraColunaMesmoProjeto(Coluna referencia, Long id, String nome) {
+        Coluna coluna = new Coluna(referencia.getProjeto(), nome, 1, null);
         ReflectionTestUtils.setField(coluna, "id", id);
         return coluna;
     }
@@ -86,7 +105,9 @@ class CardServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new CardService(cardRepository, colunaRepository, usuarioRepository, projetoWebSocketHandler, cardEventoRepository);
+        service = new CardService(
+                cardRepository, colunaRepository, usuarioRepository, projetoWebSocketHandler, cardEventoRepository,
+                presencaWebSocketHandler, notificacaoService);
     }
 
     @Test
@@ -171,6 +192,37 @@ class CardServiceTest {
         assertThat(captor.getValue().getDe()).isNull();
         assertThat(captor.getValue().getPara()).isEqualTo("A fazer");
         assertThat(captor.getValue().getAutor()).isSameAs(criadoPor);
+    }
+
+    @Test
+    void criarAvisaTodoMundoDeUmaTarefaNovaExcetoQuemCriou() {
+        when(colunaRepository.findById(1L)).thenReturn(Optional.of(coluna));
+        when(cardRepository.findFirstByColunaOrderByPosicaoDesc(coluna)).thenReturn(Optional.empty());
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        service.criar(1L, "Corrigir bug", null, null, null, null, criadoPor);
+
+        var captor = ArgumentCaptor.forClass(PresencaWebSocketHandler.NovaTarefaWs.class);
+        verify(presencaWebSocketHandler).avisarNovaTarefa(eq(criadoPor.getId()), captor.capture());
+        assertThat(captor.getValue().cardTitulo()).isEqualTo("Corrigir bug");
+        assertThat(captor.getValue().projetoNome()).isEqualTo(coluna.getProjeto().getNome());
+        assertThat(captor.getValue().autorNome()).isEqualTo(criadoPor.getNome());
+    }
+
+    @Test
+    void criarNotificaTodosOsUsuariosAtivosExcetoQuemCriou() {
+        Usuario outro = usuarioComId(2L);
+        when(colunaRepository.findById(1L)).thenReturn(Optional.of(coluna));
+        when(cardRepository.findFirstByColunaOrderByPosicaoDesc(coluna)).thenReturn(Optional.empty());
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+        // mesmo escopo "todos os usuários do sistema" do broadcast em tempo real, mas persistido -
+        // pedido do usuário: "ver as últimas que chegaram no sistema" funciona mesmo offline.
+        when(usuarioRepository.findByAtivoTrueOrderByNomeAsc()).thenReturn(List.of(criadoPor, outro));
+
+        service.criar(1L, "Corrigir bug", null, null, null, null, criadoPor);
+
+        verify(notificacaoService).registrar(eq(outro), eq(TipoNotificacao.NOVA_TAREFA), any(), isNull());
+        verify(notificacaoService, never()).registrar(eq(criadoPor), any(), any(), any());
     }
 
     @Test
@@ -377,5 +429,121 @@ class CardServiceTest {
         service.mover(10L, 1L, 0, criadoPor);
 
         verify(cardEventoRepository, never()).save(any());
+        verify(presencaWebSocketHandler, never()).avisarTarefaConcluida(any(), any());
+    }
+
+    // ---------- pedido do usuário: "sempre que alguém finalizar uma tarefa... notificado" ----------
+
+    @Test
+    void moverParaAUltimaColunaDoProjetoNotificaResponsavelECriadorExcetoQuemMoveu() {
+        Coluna destino = colunaComId(2L);
+        Coluna primeiraColuna = outraColunaMesmoProjeto(destino, 1L, "A fazer");
+        Usuario responsavel = usuarioComId(3L);
+        Usuario quemMoveu = usuarioComId(4L);
+        Card card = new Card(primeiraColuna, "Corrigir bug", null, 1024.0, responsavel, null, null, criadoPor);
+        ReflectionTestUtils.setField(card, "id", 10L);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(colunaRepository.findById(2L)).thenReturn(Optional.of(destino));
+        when(cardRepository.findByColunaOrderByPosicaoAsc(destino)).thenReturn(List.of());
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+        when(colunaRepository.findByProjetoOrderByOrdemAsc(destino.getProjeto())).thenReturn(List.of(primeiraColuna, destino));
+
+        service.mover(10L, 2L, 0, quemMoveu);
+
+        verify(presencaWebSocketHandler).avisarTarefaConcluida(eq(responsavel.getId()), any());
+        verify(presencaWebSocketHandler).avisarTarefaConcluida(eq(criadoPor.getId()), any());
+        verify(presencaWebSocketHandler, never()).avisarTarefaConcluida(eq(quemMoveu.getId()), any());
+        // pedido do usuário: "ver as últimas que chegaram no sistema" - mesmos destinatários da
+        // notificação em tempo real, agora também persistidos.
+        verify(notificacaoService).registrar(eq(responsavel), eq(TipoNotificacao.TAREFA_CONCLUIDA), any(), isNull());
+        verify(notificacaoService).registrar(eq(criadoPor), eq(TipoNotificacao.TAREFA_CONCLUIDA), any(), isNull());
+        verify(notificacaoService, never()).registrar(eq(quemMoveu), any(), any(), any());
+    }
+
+    @Test
+    void moverParaUmaColunaDoMeioNaoNotificaNinguem() {
+        Coluna destino = colunaComId(2L);
+        Coluna ultimaColuna = outraColunaMesmoProjeto(destino, 3L, "Concluído");
+        Card card = cardComId(10L, coluna, 1024.0);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(colunaRepository.findById(2L)).thenReturn(Optional.of(destino));
+        when(cardRepository.findByColunaOrderByPosicaoAsc(destino)).thenReturn(List.of());
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+        when(colunaRepository.findByProjetoOrderByOrdemAsc(destino.getProjeto())).thenReturn(List.of(destino, ultimaColuna));
+
+        service.mover(10L, 2L, 0, criadoPor);
+
+        verify(presencaWebSocketHandler, never()).avisarTarefaConcluida(any(), any());
+    }
+
+    @Test
+    void moverParaAUltimaColunaSemResponsavelNotificaSoOCriador() {
+        Coluna destino = colunaComId(2L);
+        Coluna primeiraColuna = outraColunaMesmoProjeto(destino, 1L, "A fazer");
+        Usuario quemMoveu = usuarioComId(4L);
+        Card card = cardComId(10L, primeiraColuna, 1024.0); // sem responsável, criadoPor = campo da classe (id 1)
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(colunaRepository.findById(2L)).thenReturn(Optional.of(destino));
+        when(cardRepository.findByColunaOrderByPosicaoAsc(destino)).thenReturn(List.of());
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+        when(colunaRepository.findByProjetoOrderByOrdemAsc(destino.getProjeto())).thenReturn(List.of(primeiraColuna, destino));
+
+        service.mover(10L, 2L, 0, quemMoveu);
+
+        verify(presencaWebSocketHandler, times(1)).avisarTarefaConcluida(eq(criadoPor.getId()), any());
+    }
+
+    @Test
+    void moverParaAUltimaColunaComResponsavelIgualAoCriadorNotificaUmaVezSo() {
+        Coluna destino = colunaComId(2L);
+        Coluna primeiraColuna = outraColunaMesmoProjeto(destino, 1L, "A fazer");
+        Usuario quemMoveu = usuarioComId(4L);
+        Card card = new Card(primeiraColuna, "Corrigir bug", null, 1024.0, criadoPor, null, null, criadoPor);
+        ReflectionTestUtils.setField(card, "id", 10L);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(colunaRepository.findById(2L)).thenReturn(Optional.of(destino));
+        when(cardRepository.findByColunaOrderByPosicaoAsc(destino)).thenReturn(List.of());
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+        when(colunaRepository.findByProjetoOrderByOrdemAsc(destino.getProjeto())).thenReturn(List.of(primeiraColuna, destino));
+
+        service.mover(10L, 2L, 0, quemMoveu);
+
+        verify(presencaWebSocketHandler, times(1)).avisarTarefaConcluida(eq(criadoPor.getId()), any());
+    }
+
+    @Test
+    void moverOProprioCardSozinhoPraAUltimaColunaNaoNotificaNinguem() {
+        // responsável == criador == autor - ninguém sobra pra avisar depois de excluir quem moveu.
+        Coluna destino = colunaComId(2L);
+        Coluna primeiraColuna = outraColunaMesmoProjeto(destino, 1L, "A fazer");
+        Card card = new Card(primeiraColuna, "Corrigir bug", null, 1024.0, criadoPor, null, null, criadoPor);
+        ReflectionTestUtils.setField(card, "id", 10L);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(colunaRepository.findById(2L)).thenReturn(Optional.of(destino));
+        when(cardRepository.findByColunaOrderByPosicaoAsc(destino)).thenReturn(List.of());
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+        when(colunaRepository.findByProjetoOrderByOrdemAsc(destino.getProjeto())).thenReturn(List.of(primeiraColuna, destino));
+
+        service.mover(10L, 2L, 0, criadoPor);
+
+        verify(presencaWebSocketHandler, never()).avisarTarefaConcluida(any(), any());
+    }
+
+    @Test
+    void moverParaOutraColunaSemInformacaoDasColunasDoProjetoNaoQuebraNemNotifica() {
+        // defensivo - `findByProjetoOrderByOrdemAsc` sem stub devolve lista vazia (padrão do
+        // Mockito pra retorno `List`), não deveria acontecer de verdade (a própria coluna de
+        // destino é uma coluna real do projeto), mas não pode derrubar o mover em si.
+        Coluna destino = colunaComId(2L);
+        Card card = cardComId(10L, coluna, 1024.0);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(colunaRepository.findById(2L)).thenReturn(Optional.of(destino));
+        when(cardRepository.findByColunaOrderByPosicaoAsc(destino)).thenReturn(List.of());
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        var resposta = service.mover(10L, 2L, 0, criadoPor);
+
+        assertThat(resposta.colunaId()).isEqualTo(2L);
+        verify(presencaWebSocketHandler, never()).avisarTarefaConcluida(any(), any());
     }
 }

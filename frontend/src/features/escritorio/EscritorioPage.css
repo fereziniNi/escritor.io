@@ -28,14 +28,40 @@
   color: var(--cor-acento-escuro);
 }
 
-/** Pedido do usuário: "cronômetro contando o tempo de trabalho no canto superior direito... muito
- * parecido com o digital" - pílula escura + dígitos verdes tipo display de LED, fonte pixelada
- * (`--fonte-jogo`) já usada no resto do HUD do jogo em vez de uma fonte "digital" nova. */
-.escritorio-cronometro {
+/** Canto superior direito - só o cronômetro por enquanto (virou uma coluna flex, não mais um
+ * `position: absolute` direto no `.escritorio-cronometro`, pra caber mais algo aqui embaixo dele
+ * no futuro sem precisar recalcular offset em pixel). */
+.escritorio-canto-superior-direito {
   position: absolute;
   top: 0.9rem;
   right: 1rem;
   z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+/** Pedido do usuário: "um mini chat aberto na lateral esquerda no topo, igual ao tempo mas do
+ * lado esquerdo" - espelha `.escritorio-canto-superior-direito`, só que à esquerda, pro
+ * `ChatMiniWidget` (popup de chat sempre visível, ver `Chat.css`). Virou uma linha flex (pedido
+ * posterior: "Deixe a notificação do lado do chat") - `SinoDeNotificacoes` mora aqui do lado,
+ * `align-items: flex-start` pra ficar no mesmo nível do cabeçalho do chat, não esticado pela altura
+ * dele (que cresce conforme a lista de conversas). */
+.escritorio-canto-superior-esquerdo {
+  position: absolute;
+  top: 0.9rem;
+  left: 1rem;
+  z-index: 10;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+/** Pedido do usuário: "cronômetro contando o tempo de trabalho no canto superior direito... muito
+ * parecido com o digital" - pílula escura + dígitos verdes tipo display de LED, fonte pixelada
+ * (`--fonte-jogo`) já usada no resto do HUD do jogo em vez de uma fonte "digital" nova. */
+.escritorio-cronometro {
   background: #1c1c28;
   border: 2px solid #33334a;
   border-radius: 10px;
@@ -48,14 +74,278 @@
   box-shadow: var(--sombra-cartao);
 }
 
+/** Pedido do usuário: "o cronometro [da tarefa] deve estar abaixo do cronometro de horas
+ * trabalhadas... menor e com cores vermelhas. Se eu clicar nele abre o modal dessa atividade" -
+ * mesma pílula escura de `.escritorio-cronometro`, só que menor e em tons de vermelho em vez de
+ * verde, e um `<button>` de verdade (clicável, com foco de teclado). */
+.escritorio-cronometro-tarefa {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  max-width: 220px;
+  background: #1c1c28;
+  border: 2px solid #7a2222;
+  border-radius: 8px;
+  padding: 0.35rem 0.7rem;
+  cursor: pointer;
+  box-shadow: var(--sombra-cartao);
+  text-align: right;
+}
+
+.escritorio-cronometro-tarefa:hover {
+  border-color: #a33131;
+}
+
+.escritorio-cronometro-tarefa-titulo {
+  font-size: 0.6rem;
+  color: #fca5a5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/**
+ * Pedido do usuário: "quando a pessoa entra [na sala Happy Hour] aparece um modal pequeno escrito
+ * 'mural'" - depois, ao ver a 1ª versão (um pill liso igual aos outros widgets do HUD): "gostaria
+ * que o botão do mural fosse diferente. Me surpreenda". Virou um bilhete de verdade: papel
+ * levemente amarelado, torto (rotacionado), "colado" no mundo por uma tira de fita crepe
+ * (`::before`) e escrito à mão (`--fonte-manuscrita`, Kalam) - em vez de mais um pill liso feito
+ * dos outros widgets do canto (`.escritorio-cronometro*`). Cantos irregulares (`border-radius`
+ * assimétrico) reforçam o "papel arrancado", não uma forma geométrica perfeita.
+ *
+ * Acima da toolbar inferior (`BarraFerramentas`) pra não brigar com ela. Só renderiza (ver
+ * `MuralHappyHour.tsx`) enquanto a pessoa está dentro da zona. Sem animação contínua de propósito
+ * (uma pulsação infinita, testada, deixa o clique impreciso - a posição do cartão muda a cada
+ * frame) - só endireita e levanta um pouco no `:hover`.
+ */
+.escritorio-mural-happy-hour {
+  position: absolute;
+  bottom: 5.5rem;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  transform: translateX(-50%) rotate(-4deg);
+  transform-origin: center top;
+  z-index: 15;
+  background: #fbf3d9;
+  background-image: repeating-linear-gradient(180deg, transparent 0 23px, rgba(184, 53, 143, 0.08) 23px 24px);
+  border: none;
+  border-radius: 3px 16px 6px 18px / 14px 4px 18px 6px;
+  padding: 0.85rem 1.5rem 0.65rem;
+  cursor: pointer;
+  box-shadow:
+    0 8px 14px rgba(43, 26, 20, 0.28),
+    0 2px 4px rgba(43, 26, 20, 0.18);
+  transition:
+    transform 200ms ease-out,
+    box-shadow 200ms ease-out;
+}
+
+/* Tira de fita crepe "colando" o bilhete no mundo - listrada na mesma paleta rosa/dourada do piso
+   da sala (`spriteFactory.ts`), num ângulo diferente do bilhete pra parecer colada à mão. */
+.escritorio-mural-happy-hour::before {
+  content: '';
+  position: absolute;
+  top: -0.7rem;
+  left: 50%;
+  width: 2.8rem;
+  height: 1.2rem;
+  transform: translateX(-50%) rotate(5deg);
+  background: repeating-linear-gradient(135deg, #f5c9e6 0 6px, #e8a0d0 6px 12px);
+  opacity: 0.9;
+  box-shadow: 0 1px 3px rgba(43, 26, 20, 0.25);
+  border-radius: 2px;
+}
+
+.escritorio-mural-happy-hour-titulo {
+  font-family: var(--fonte-manuscrita);
+  font-weight: 700;
+  font-size: 1.3rem;
+  line-height: 1;
+  color: #6c2058;
+}
+
+.escritorio-mural-happy-hour-dica {
+  font-family: var(--fonte-manuscrita);
+  font-size: 0.85rem;
+  color: #a3527f;
+}
+
+.escritorio-mural-happy-hour:hover {
+  transform: translateX(-50%) rotate(0deg) translateY(-4px);
+  box-shadow:
+    0 12px 20px rgba(43, 26, 20, 0.32),
+    0 3px 6px rgba(43, 26, 20, 0.2);
+}
+
+/**
+ * Pedido do usuário: "tirar o botão de notificação do menu e deixar na parte superior... eu não
+ * quero que fique o botão! Inove" - saiu da toolbar. 1ª versão: um sininho redondo discreto no
+ * canto superior direito, acima do cronômetro. O usuário mandou o print de volta: "Gostaria que a
+ * notificação tivesse um botão diferente e notável que seja de notificação. Não somente esse botão
+ * dessa forma" - virou uma medalha hexagonal (silhueta bem diferente de um círculo liso), com o
+ * rótulo "Notificações" escrito por baixo pra nunca deixar dúvida do que é, mesmo em repouso. Por
+ * fim: "Deixe a notificação do lado do chat" - mudou de canto, agora mora dentro de
+ * `.escritorio-canto-superior-esquerdo` (ver acima), do lado do `ChatMiniWidget`.
+ *
+ * Sempre alcançável (histórico continua acessível a qualquer momento, mesmo sem nada novo), mas
+ * com dois estados bem diferentes: discreta (bronze, pequena) em repouso, e "tocando" (maior,
+ * dourada, com brilho e a etiqueta de contagem) assim que chega alguma notificação. A troca de
+ * estado usa `key` (ver `SinoDeNotificacoes.tsx`) pra remontar o elemento e disparar de novo a
+ * animação de balanço - sem loop contínuo (lição real desta mesma tela: uma pulsação infinita no
+ * mural deixava o clique impreciso, ver `.escritorio-mural-happy-hour` acima) - toca uma vez e se
+ * acomoda.
+ */
+.escritorio-sino {
+  all: unset;
+  position: relative;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.escritorio-sino-medalha {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+  background: linear-gradient(160deg, #cbc2a0, #948a68);
+  box-shadow: 0 2px 0 #6d6449;
+  transition:
+    transform 160ms ease-out,
+    background 160ms ease-out,
+    box-shadow 160ms ease-out;
+}
+
+.escritorio-sino-icone {
+  font-size: 1.35rem;
+  filter: grayscale(0.35);
+  transition: font-size 160ms ease-out;
+}
+
+.escritorio-sino:hover .escritorio-sino-medalha {
+  transform: translateY(-2px) scale(1.05);
+}
+
+.escritorio-sino-rotulo {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #d8d8e6;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.escritorio-sino--tocando .escritorio-sino-medalha {
+  width: 3.2rem;
+  height: 3.2rem;
+  background: linear-gradient(160deg, #ffe08a, #e8a530);
+  box-shadow:
+    0 2px 0 #a5670f,
+    0 0 16px rgba(242, 165, 65, 0.55);
+  animation: escritorio-sino-tocar 650ms cubic-bezier(0.36, 1.8, 0.4, 1) both;
+}
+
+.escritorio-sino--tocando .escritorio-sino-icone {
+  filter: none;
+  font-size: 1.6rem;
+}
+
+.escritorio-sino--tocando .escritorio-sino-rotulo {
+  color: var(--cor-acento);
+}
+
+.escritorio-sino--aberto .escritorio-sino-medalha {
+  transform: scale(0.94);
+}
+
+@keyframes escritorio-sino-tocar {
+  0% {
+    transform: rotate(0deg) scale(0.6);
+  }
+  25% {
+    transform: rotate(-18deg) scale(1.05);
+  }
+  50% {
+    transform: rotate(14deg) scale(1.05);
+  }
+  70% {
+    transform: rotate(-8deg);
+  }
+  85% {
+    transform: rotate(4deg);
+  }
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+.escritorio-sino-contador {
+  position: absolute;
+  top: -0.3rem;
+  right: -0.4rem;
+  background: var(--cor-perigo);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 800;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.25rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: 0 0 0 2px #1c1c28;
+}
+
+.escritorio-cronometro-tarefa [role='timer'] {
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  color: #f87171;
+  text-shadow: 0 0 5px rgba(248, 113, 113, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+
 .escritorio-layout {
   position: absolute;
   inset: 0;
 }
 
 .escritorio-coluna-mapa {
+  position: relative;
   width: 100%;
   height: 100%;
+}
+
+/* Pedido do usuário: "após entrar [numa cabine], a tela do mapa (apenas do mapa) fica mais escura,
+   como se tivesse em modo off" - irmã do canvas, dentro de `.escritorio-coluna-mapa` só (nunca
+   escurece a toolbar/painéis/chat/sino, que ficam fora deste container). `pointer-events: none`
+   porque o movimento é só por teclado - a div nunca deveria capturar clique de nada. */
+.escritorio-mapa-escurecido {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 8, 14, 0.6);
+  pointer-events: none;
+  z-index: 5;
+  animation: escritorio-mapa-escurecido-entrada 220ms ease-out;
+}
+
+@keyframes escritorio-mapa-escurecido-entrada {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* ---------- painel flutuante (dock -> funções integradas) ---------- */
@@ -150,80 +440,5 @@
   background: rgba(244, 241, 230, 0.8);
   padding: 0.15rem 0.5rem;
   border-radius: 6px;
-}
-
-/* ---------- lista de presença ---------- */
-
-.escritorio-lista-presenca {
-  background: var(--cor-superficie);
-  border: 1px solid var(--cor-borda);
-  border-radius: var(--raio-borda);
-  box-shadow: var(--sombra-cartao);
-  padding: 1rem 1.15rem;
-}
-
-.escritorio-lista-presenca h3 {
-  font-size: 0.95rem;
-  margin-bottom: 0.75rem;
-}
-
-.escritorio-lista-grupo {
-  margin-bottom: 0.85rem;
-}
-
-.escritorio-lista-grupo h4 {
-  font-size: 0.78rem;
-  font-weight: 800;
-  color: var(--cor-primaria-escura);
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-bottom: 0.3rem;
-}
-
-.escritorio-lista-grupo ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.escritorio-lista-grupo li {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.82rem;
-  background: var(--cor-primaria-clara);
-  border-radius: 8px;
-  padding: 0.28em 0.6em;
-}
-
-/* Fase 3 (redesign Gather) - destaque de proximidade: mesmo azul-ciano do anel que aparece no
-mundo Pixi por cima do avatar (`AvatarPixi.tsx`, desenharAnelProximidade), pra a lista lateral e o
-mundo contarem a mesma história de "quem está perto de quem agora". */
-.escritorio-lista-item--proximo {
-  outline: 2px solid #4fc3f2;
-  outline-offset: -1px;
-}
-
-.escritorio-lista-item-proximidade {
-  margin-left: auto;
-  font-size: 0.78rem;
-}
-
-.escritorio-lista-avatar-swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.3);
-  flex: none;
-}
-
-.escritorio-lista-grupo p {
-  font-size: 0.78rem;
-  color: var(--cor-texto-suave);
-  margin: 0;
 }
 

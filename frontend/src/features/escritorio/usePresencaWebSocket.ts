@@ -4,7 +4,16 @@ import { decodeJwt } from '../auth/jwt'
 import { calcularAtrasoReconexao } from './backoffReconexao'
 import { construirUrlWebSocketPresenca } from './presencaSocket'
 import { criarEnviadorComThrottle } from './throttlePosicao'
-import type { EstadoPresencaUsuario, StatusAvatar } from './types'
+import type {
+  ConviteReuniao,
+  EstadoPresencaUsuario,
+  MensagemRecebida,
+  NovaTarefa,
+  SinalRtcRecebido,
+  SorteioHappyHour,
+  StatusAvatar,
+  TarefaConcluida,
+} from './types'
 
 const ATRASO_RECONEXAO_BASE_MS = 1000
 const ATRASO_RECONEXAO_MAXIMO_MS = 30_000
@@ -13,6 +22,39 @@ const ATRASO_ENVIO_POSICAO_MS = 100
 interface EventoPresencaWs {
   tipo: 'SNAPSHOT' | 'POSICAO' | 'STATUS' | 'APARENCIA'
   usuarios: EstadoPresencaUsuario[]
+}
+
+/** Pedido do usuário: "chamar para reunião pela plataforma" - mensagem própria, não confundir com
+ * {@link EventoPresencaWs} (que sempre carrega `usuarios`, nunca dados de uma reunião). */
+interface ConviteReuniaoWs extends ConviteReuniao {
+  tipo: 'CONVITE_REUNIAO'
+}
+
+/** Pedido do usuário: "chat... em tempo real... Não deve conter atraso". */
+interface ChatMensagemWs extends MensagemRecebida {
+  tipo: 'CHAT_MENSAGEM'
+}
+
+/** Pedido do usuário: "sempre que alguém finalizar uma tarefa... notificado ao usuário". */
+interface TarefaConcluidaWs extends TarefaConcluida {
+  tipo: 'TAREFA_CONCLUIDA'
+}
+
+/** Pedido do usuário: "quando qualquer pessoa adicionar uma tarefa nova... deve informar todos os
+ * usuários do sistema". */
+interface NovaTarefaWs extends NovaTarefa {
+  tipo: 'NOVA_TAREFA'
+}
+
+/** Pedido do usuário: "uma parte para roleta onde será sorteado qual atividade será feita". */
+interface SorteioHappyHourWs extends SorteioHappyHour {
+  tipo: 'SORTEIO_HAPPY_HOUR'
+}
+
+/** Pedido do usuário: "voice, onde podemos falar dentro da sala... ou com a pessoa mais
+ * próxima" - sinalização WebRTC relayada (ver `useVozProximidade.ts`). */
+interface RtcSinalWs extends SinalRtcRecebido {
+  tipo: 'RTC_SINAL'
 }
 
 /**
@@ -39,6 +81,12 @@ interface EventoPresencaWs {
 export function usePresencaWebSocket() {
   const accessToken = useAuthStore((state) => state.accessToken)
   const [usuarios, setUsuarios] = useState<Record<number, EstadoPresencaUsuario>>({})
+  const [convitesRecebidos, setConvitesRecebidos] = useState<ConviteReuniao[]>([])
+  const [mensagensRecebidas, setMensagensRecebidas] = useState<MensagemRecebida[]>([])
+  const [tarefasConcluidasRecebidas, setTarefasConcluidasRecebidas] = useState<TarefaConcluida[]>([])
+  const [novasTarefasRecebidas, setNovasTarefasRecebidas] = useState<NovaTarefa[]>([])
+  const [sorteiosHappyHourRecebidos, setSorteiosHappyHourRecebidos] = useState<SorteioHappyHour[]>([])
+  const [sinaisRtcRecebidos, setSinaisRtcRecebidos] = useState<SinalRtcRecebido[]>([])
   const enviarPosicaoRef = useRef<(x: number, y: number) => void>(() => {})
   const socketRef = useRef<WebSocket | null>(null)
 
@@ -64,7 +112,38 @@ export function usePresencaWebSocket() {
       }
 
       socket.onmessage = (evento) => {
-        const dados = JSON.parse(evento.data as string) as EventoPresencaWs
+        const dados = JSON.parse(evento.data as string) as
+          | EventoPresencaWs
+          | ConviteReuniaoWs
+          | ChatMensagemWs
+          | TarefaConcluidaWs
+          | NovaTarefaWs
+          | SorteioHappyHourWs
+          | RtcSinalWs
+        if (dados.tipo === 'CONVITE_REUNIAO') {
+          setConvitesRecebidos((atual) => [...atual, dados])
+          return
+        }
+        if (dados.tipo === 'CHAT_MENSAGEM') {
+          setMensagensRecebidas((atual) => [...atual, dados])
+          return
+        }
+        if (dados.tipo === 'TAREFA_CONCLUIDA') {
+          setTarefasConcluidasRecebidas((atual) => [...atual, dados])
+          return
+        }
+        if (dados.tipo === 'NOVA_TAREFA') {
+          setNovasTarefasRecebidas((atual) => [...atual, dados])
+          return
+        }
+        if (dados.tipo === 'SORTEIO_HAPPY_HOUR') {
+          setSorteiosHappyHourRecebidos((atual) => [...atual, dados])
+          return
+        }
+        if (dados.tipo === 'RTC_SINAL') {
+          setSinaisRtcRecebidos((atual) => [...atual, dados])
+          return
+        }
         setUsuarios((atual) => {
           const proximo = dados.tipo === 'SNAPSHOT' ? {} : { ...atual }
           dados.usuarios.forEach((usuario) => {
@@ -126,5 +205,25 @@ export function usePresencaWebSocket() {
     socketRef.current?.send(JSON.stringify({ tipo: 'STATUS', status }))
   }
 
-  return { usuarios, meuUsuarioId, mover, definirStatus }
+  /** Pedido do usuário: "voice... com a pessoa mais próxima" - manda um sinal WebRTC (SDP offer/
+   * answer ou ICE candidate) pra um destinatário específico, pelo mesmo socket já aberto (sem
+   * conexão nova só pra sinalização). `useVozProximidade.ts` é quem decide o conteúdo de `sinal`
+   * e pra quem mandar. */
+  function enviarSinalRtc(destinatarioId: number, sinal: unknown) {
+    socketRef.current?.send(JSON.stringify({ tipo: 'RTC_SINAL', destinatarioId, sinal }))
+  }
+
+  return {
+    usuarios,
+    meuUsuarioId,
+    mover,
+    definirStatus,
+    convitesRecebidos,
+    mensagensRecebidas,
+    tarefasConcluidasRecebidas,
+    novasTarefasRecebidas,
+    sorteiosHappyHourRecebidos,
+    sinaisRtcRecebidos,
+    enviarSinalRtc,
+  }
 }

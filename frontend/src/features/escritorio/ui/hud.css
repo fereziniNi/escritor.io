@@ -1,9 +1,9 @@
 /**
  * Fase 4 do redesign estilo Gather (toolbar/painéis) - toolbar inferior com botões quadrados só de
  * ícone (proporção mais perto do dock de controles real do Gather que os botões texto+emoji de
- * antes), menu de usuário com avatar, drawer de participantes recolhível, e uma pilha de toasts.
- * Reaproveita os tokens de cor/sombra já estabelecidos (`--cor-acento`, `--sombra-cartao` etc, de
- * `index.css`) - só a composição/proporção do HUD muda, não a identidade visual do produto.
+ * antes), menu de usuário com avatar, e uma pilha de toasts. Reaproveita os tokens de cor/sombra
+ * já estabelecidos (`--cor-acento`, `--sombra-cartao` etc, de `index.css`) - só a composição/
+ * proporção do HUD muda, não a identidade visual do produto.
  */
 
 .escritorio-toolbar {
@@ -68,6 +68,8 @@
 .escritorio-toolbar-botao--ativo {
   background: var(--cor-acento);
 }
+
+/* removed - chat badge moved out of the toolbar entirely, see .chat-notificacao-flutuante */
 
 .escritorio-toolbar-botao[aria-disabled='true'] {
   opacity: 0.45;
@@ -147,37 +149,6 @@
   border-radius: 6px;
 }
 
-/* ---------- drawer de participantes ---------- */
-
-.escritorio-painel-lateral {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  z-index: 10;
-  width: min(300px, calc(100vw - 2rem));
-  max-height: calc(100vh - 2rem);
-  display: flex;
-  flex-direction: column;
-  animation: escritorio-painel-lateral-entrada 160ms ease-out;
-}
-
-.escritorio-painel-lateral .escritorio-lista-presenca {
-  flex: 1;
-  overflow-y: auto;
-  background: rgba(255, 255, 255, 0.94);
-}
-
-@keyframes escritorio-painel-lateral-entrada {
-  from {
-    opacity: 0;
-    transform: translateX(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
 /* ---------- notificações ---------- */
 
 .escritorio-notificacoes {
@@ -194,6 +165,9 @@
 }
 
 .escritorio-notificacao {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   background: #2b2b3a;
   color: #fff;
   font-size: 0.82rem;
@@ -202,6 +176,25 @@
   border-radius: 999px;
   box-shadow: var(--sombra-cartao);
   animation: escritorio-notificacao-entrada 200ms ease-out;
+}
+
+/* Pedido do usuário: "chamar para reunião pela plataforma" - o toast em si continua sem capturar
+ * clique (`.escritorio-notificacoes` tem `pointer-events: none`, pra nunca atrapalhar o mundo por
+ * baixo), mas este botão específico reabilita pra si (permitido mesmo com um ancestral desabilitando). */
+.escritorio-notificacao-acao {
+  pointer-events: auto;
+  background: #fff;
+  color: #2b2b3a;
+  padding: 0.3em 0.8em;
+  font-size: 0.78rem;
+  box-shadow: none;
+}
+
+.escritorio-notificacao-acao:hover:not(:disabled) {
+  background: var(--cor-acento, #f2a541);
+  color: #fff;
+  box-shadow: none;
+  transform: none;
 }
 
 @keyframes escritorio-notificacao-entrada {
@@ -216,11 +209,6 @@
 }
 
 @media (max-width: 720px) {
-  .escritorio-painel-lateral {
-    width: calc(100vw - 2rem);
-    max-height: 40vh;
-  }
-
   .escritorio-toolbar-dica {
     display: none;
   }

@@ -2,7 +2,7 @@ import { useEffect, useState, type PointerEvent as ReactPointerEvent } from 'rea
 import { formatarDataBr } from '../../shared/formatarData'
 import { abreviacaoDoDiaDaSemana, dataDeHoje, diaDaData } from './datasEscala'
 import { HORAS_DO_ROTULO, HORA_FIM_GRADE, HORA_INICIO_GRADE, TOTAL_SLOTS, horaParaSlot, slotParaHora } from './gradeDeHoras'
-import type { DiaEfetivo } from './types'
+import type { DiaEfetivo, Reuniao } from './types'
 
 function horaCurta(hora: string | null): string {
   return hora ? hora.slice(0, 5) : ''
@@ -24,15 +24,23 @@ function slotDoPonteiro(elemento: HTMLElement, clientY: number): number {
  * com uma coluna só, pela visão de Dia (`CalendarioDia.tsx`). Clicar numa área vazia cria uma
  * exceção de 1h a partir do slot clicado; arrastar seleciona o intervalo exato; clicar no bloco já
  * trabalhado abre o formulário pra editá-lo.
+ *
+ * <p>`reunioesPorData` (opcional) é renderizado por cima do bloco de trabalho, com `z-index` maior
+ * - pedido do usuário: "A reunião tem preioridade no lugar do trabalhando. Então se marcar das
+ * 14:30 a reuniao ate as 15:00 deve aparecer esse intervalo no calendario".
  */
 export function CalendarioSemana({
   diasDaSemana,
   efetivoPorData,
+  reunioesPorData,
   aoSelecionarIntervalo,
+  aoSelecionarReuniao,
 }: {
   diasDaSemana: string[]
   efetivoPorData: Map<string, DiaEfetivo>
+  reunioesPorData?: Map<string, Reuniao[]>
   aoSelecionarIntervalo: (data: string, horaInicio: string, horaFim: string) => void
+  aoSelecionarReuniao?: (reuniao: Reuniao) => void
 }) {
   const hoje = dataDeHoje()
   const [agora, setAgora] = useState(() => new Date())
@@ -145,6 +153,22 @@ export function CalendarioSemana({
                 {horaCurta(efetivo.horaInicio)}–{horaCurta(efetivo.horaFim)}
               </button>
             )}
+
+            {(reunioesPorData?.get(data) ?? []).map((reuniao) => (
+              <button
+                key={reuniao.id}
+                type="button"
+                className="escala-bloco-reuniao"
+                style={{
+                  top: `${pctDoSlot(horaParaSlot(reuniao.horaInicio))}%`,
+                  height: `${pctDoSlot(horaParaSlot(reuniao.horaFim) - horaParaSlot(reuniao.horaInicio))}%`,
+                }}
+                onPointerDown={(evento) => evento.stopPropagation()}
+                onClick={() => aoSelecionarReuniao?.(reuniao)}
+              >
+                📹 {reuniao.titulo}
+              </button>
+            ))}
           </div>
         )
       })}

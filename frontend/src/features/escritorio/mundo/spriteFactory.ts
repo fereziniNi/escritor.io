@@ -1,7 +1,7 @@
 import type { Graphics as PixiGraphics } from 'pixi.js'
 import type { TipoZona, Zona } from '../types'
 import { TILE_PX } from './constantes'
-import type { ItemMobilia } from './tipos'
+import type { ItemMobilia, SegmentoParede } from './tipos'
 
 /**
  * "Fábrica" de desenho procedural do mundo - móveis/piso continuam 100% `PIXI.Graphics` (forma
@@ -66,6 +66,12 @@ const MATERIAL_POR_ZONA: Record<TipoZona, MaterialZona> = {
   FOCO: { padrao: 'tramado', corA: 0xe1d5b4, corB: 0xc9b384, corFaixa: 0x7c6742 },
   LIVRE: { padrao: 'losango', corA: 0xdccaf0, corB: 0xc3a8e6, corFaixa: 0x6c4a94 },
   ATENDIMENTO: { padrao: 'xadrez', corA: 0xf0c9d1, corB: 0xe0a7b3, corFaixa: 0x943f52 },
+  // Pedido do usuário: nova sala "Happy Hour" - paleta festiva (rosa/dourado), bem distinta das
+  // outras 4 salas mais "sérias".
+  HAPPY_HOUR: { padrao: 'losango', corA: 0xf5c9e6, corB: 0xe8a0d0, corFaixa: 0xb8358f },
+  // Pedido do usuário: "cabines fechadas... não escutar o barulho da sala" - cinza-esverdeado
+  // acolchoado, evocando espuma acústica, sem puxar pra cor de nenhuma sala existente.
+  CABINE: { padrao: 'tramado', corA: 0xb9c9c7, corB: 0x9fb3b0, corFaixa: 0x4a6360 },
 }
 
 const ALTURA_FAIXA_TILES = 0.42
@@ -140,6 +146,34 @@ export function desenharPisoZonas(g: PixiGraphics, zonas: Zona[]): void {
       desenharPisoTramadoZona(g, zona, material.corA, material.corB)
     }
     desenharFaixaSuperior(g, zona, material.corFaixa)
+  }
+}
+
+/* ==================== paredes (cabines) ==================== */
+
+const ESPESSURA_PAREDE_PX = 6
+const COR_PAREDE = 0x2b1f16
+const COR_PAREDE_BORDA = 0x1a120c
+
+/** Pedido do usuário: "cabines... devem ter paredes e só é possível entrar por um lado" - desenha
+ * todos os segmentos (`gerarParedesDeZona`, já escopado só pras zonas `CABINE` por quem chama)
+ * num único `Graphics`: cada segmento vira um retângulo fino sobre a linha de grade
+ * correspondente, esticado meia espessura além das pontas nominais pra as quinas entre segmentos
+ * perpendiculares fecharem sem buraco visual. Mesmo estilo "geometria simples com contorno" do
+ * piso, nenhum asset de imagem. */
+export function desenharParedes(g: PixiGraphics, paredes: SegmentoParede[]): void {
+  g.clear()
+  for (const parede of paredes) {
+    const meia = ESPESSURA_PAREDE_PX / 2
+    if (parede.orientacao === 'horizontal') {
+      const largura = parede.comprimento * TILE_PX + ESPESSURA_PAREDE_PX
+      g.rect(parede.x * TILE_PX - meia, parede.y * TILE_PX - meia, largura, ESPESSURA_PAREDE_PX)
+    } else {
+      const altura = parede.comprimento * TILE_PX + ESPESSURA_PAREDE_PX
+      g.rect(parede.x * TILE_PX - meia, parede.y * TILE_PX - meia, ESPESSURA_PAREDE_PX, altura)
+    }
+    g.fill({ color: COR_PAREDE })
+    g.stroke({ width: 1, color: COR_PAREDE_BORDA })
   }
 }
 

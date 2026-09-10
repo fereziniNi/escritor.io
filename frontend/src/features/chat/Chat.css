@@ -1,0 +1,249 @@
+/**
+ * Pedido do usuário: "eu quero que voce deixe um mini chat aberto na lateral esquerda no topo,
+ * igual ao tempo mas do lado esquerdo, onde tem as ultimas mensagens e pessoas, igual ao whats,
+ * mas em miniatura igual um popup" - popup pequeno, permanentemente montado (`ChatMiniWidget`),
+ * cabeçalho escuro + corpo claro (mesma convenção de `.escritorio-painel-cabecalho`/`-corpo`),
+ * uma coluna só navegando entre lista de conversas ↔ nova conversa ↔ conversa aberta.
+ */
+
+.chat-mini {
+  width: min(300px, calc(100vw - 2rem));
+  background: var(--cor-fundo);
+  border-radius: var(--raio-borda);
+  box-shadow: var(--sombra-cartao);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: chat-mini-entrada 160ms ease-out;
+}
+
+@keyframes chat-mini-entrada {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chat-mini-cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #2b2b3a;
+  color: #fff;
+  padding: 0.55rem 0.6rem;
+}
+
+.chat-mini-voltar {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.chat-mini-voltar:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.chat-mini-titulo {
+  flex: 1;
+  min-width: 0;
+  font-weight: 800;
+  font-size: 0.88rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-mini-badge {
+  flex-shrink: 0;
+  background: var(--cor-perigo);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.25rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.chat-mini-acao {
+  all: unset;
+  cursor: pointer;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.chat-mini-acao:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.chat-mini-corpo {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- lista de conversas / lista de pessoas (nova conversa) ---------- */
+
+.chat-mini-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0.3rem;
+  overflow-y: auto;
+  max-height: 320px;
+}
+
+.chat-mini-item {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.5rem;
+  border-radius: 10px;
+}
+
+.chat-mini-item:hover {
+  background: var(--cor-primaria-clara);
+}
+
+.chat-mini-item-icone {
+  flex-shrink: 0;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.chat-mini-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+.chat-mini-item-nome {
+  font-weight: 700;
+  font-size: 0.86rem;
+  color: var(--cor-texto);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-mini-item-preview {
+  font-size: 0.74rem;
+  color: var(--cor-texto-suave);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-mini-item-badge {
+  flex-shrink: 0;
+  background: var(--cor-perigo);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.25rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+/* ---------- nova conversa ---------- */
+
+.chat-mini-nova {
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-mini-filtro {
+  box-sizing: border-box;
+  width: calc(100% - 0.6rem);
+  margin: 0.3rem 0.3rem 0;
+}
+
+/* ---------- conversa aberta (thread) ---------- */
+
+.chat-mini-mensagens {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.55rem;
+  overflow-y: auto;
+  max-height: 260px;
+  min-height: 120px;
+}
+
+.chat-bolha {
+  align-self: flex-start;
+  max-width: 85%;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-borda);
+  padding: 0.4rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-size: 0.86rem;
+}
+
+.chat-bolha--minha {
+  align-self: flex-end;
+  background: var(--cor-primaria-clara);
+  border-color: var(--cor-primaria);
+}
+
+.chat-bolha-autor {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: var(--cor-primaria-escura);
+}
+
+.chat-bolha-texto {
+  color: var(--cor-texto);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chat-mini-formulario {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  border-top: 1px solid var(--cor-borda);
+}
+
+.chat-mini-formulario input {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-mini-formulario button {
+  flex-shrink: 0;
+  width: 2.2rem;
+  padding: 0;
+}

@@ -1,0 +1,36 @@
+/* `ConfiguracoesPessoaisPage.tsx` - barra de abas "Personagem"/"Minha escala", mesmo visual de
+ * pílula usado pelas abas Mês/Semana/Dia do calendário (`.escala-calendario-abas-modo` em
+ * Escala.css), com classes próprias pra não criar uma dependência cruzada entre as features
+ * `escritorio` e `escala` só por causa de um widget de abas. */
+
+/* Sem padding próprio de propósito, mesma razão de `.pagina` (Escala.css/paineis.css): já roda
+ * dentro do corpo de um `PainelFlutuante`, que já tem o próprio padding. */
+.configuracoes-pessoais-abas {
+  display: inline-flex;
+  gap: 0.2rem;
+  padding: 0.2rem;
+  margin: 1rem 0;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: 999px;
+}
+
+.configuracoes-pessoais-aba {
+  background: transparent;
+  color: var(--cor-texto);
+  box-shadow: none;
+  padding: 0.4em 1em;
+  font-size: 0.85rem;
+}
+
+.configuracoes-pessoais-aba:hover:not(:disabled) {
+  background: var(--cor-primaria-clara);
+  box-shadow: none;
+  transform: none;
+}
+
+.configuracoes-pessoais-aba--ativa,
+.configuracoes-pessoais-aba--ativa:hover {
+  background: var(--cor-primaria);
+  color: #fff;
+}

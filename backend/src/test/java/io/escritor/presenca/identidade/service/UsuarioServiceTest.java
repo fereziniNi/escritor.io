@@ -3,6 +3,7 @@ package io.escritor.presenca.identidade.service;
 import io.escritor.presenca.escritorio.ws.PresencaWebSocketHandler;
 import io.escritor.presenca.identidade.domain.AparenciaAvatar;
 import io.escritor.presenca.identidade.domain.AparenciaInvalidaException;
+import io.escritor.presenca.identidade.domain.EmailJaCadastradoException;
 import io.escritor.presenca.identidade.domain.EstiloBottom;
 import io.escritor.presenca.identidade.domain.EstiloCabelo;
 import io.escritor.presenca.identidade.domain.EstiloJaqueta;
@@ -19,6 +20,7 @@ import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.identidade.web.AtualizarAparenciaRequest;
 import io.escritor.presenca.identidade.web.AtualizarCargaDiariaRequest;
+import io.escritor.presenca.identidade.web.AtualizarPerfilRequest;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -142,5 +144,37 @@ class UsuarioServiceTest {
 
         assertThatThrownBy(() -> usuarioService.atualizarMinhaAparencia(ana, requisicaoComCorInvalida))
                 .isInstanceOf(AparenciaInvalidaException.class);
+    }
+
+    @Test
+    void atualizaOProprioNomeEEmail() {
+        Usuario ana = comId(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480), 1L);
+        when(usuarioRepository.findByEmailAndAtivoTrue("ana.souza@escritor.io")).thenReturn(Optional.empty());
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(chamada -> chamada.getArgument(0));
+
+        var resposta = usuarioService.atualizarMeuPerfil(ana, new AtualizarPerfilRequest("Ana Souza Lima", "ana.souza@escritor.io"));
+
+        assertThat(resposta.nome()).isEqualTo("Ana Souza Lima");
+        assertThat(resposta.email()).isEqualTo("ana.souza@escritor.io");
+    }
+
+    @Test
+    void naoConsultaDuplicidadeQuandoOEmailNaoMudou() {
+        Usuario ana = comId(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480), 1L);
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(chamada -> chamada.getArgument(0));
+
+        usuarioService.atualizarMeuPerfil(ana, new AtualizarPerfilRequest("Ana S.", "ana@escritor.io"));
+
+        verify(usuarioRepository, org.mockito.Mockito.never()).findByEmailAndAtivoTrue(any());
+    }
+
+    @Test
+    void rejeitaEmailJaUsadoPorOutraPessoa() {
+        Usuario ana = comId(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480), 1L);
+        Usuario beto = comId(new Usuario("Beto Lima", "beto@escritor.io", Papel.GESTOR, 360), 2L);
+        when(usuarioRepository.findByEmailAndAtivoTrue("beto@escritor.io")).thenReturn(Optional.of(beto));
+
+        assertThatThrownBy(() -> usuarioService.atualizarMeuPerfil(ana, new AtualizarPerfilRequest("Ana Souza", "beto@escritor.io")))
+                .isInstanceOf(EmailJaCadastradoException.class);
     }
 }

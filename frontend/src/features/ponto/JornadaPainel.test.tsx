@@ -42,7 +42,7 @@ describe('JornadaPainel', () => {
 
     renderJornadaPainel()
 
-    expect(await screen.findByText('8h00')).toBeInTheDocument()
+    expect(await screen.findByText('8h')).toBeInTheDocument()
     expect(screen.getByText('Trabalhado hoje')).toBeInTheDocument()
     expect(screen.queryByText('Estado do dia')).not.toBeInTheDocument()
     expect(screen.queryByText('Saldo do dia')).not.toBeInTheDocument()
@@ -63,9 +63,9 @@ describe('JornadaPainel', () => {
     renderJornadaPainel()
 
     expect(await screen.findByText('Corrigir bug de login')).toBeInTheDocument()
-    expect(screen.getByText('1h30')).toBeInTheDocument()
+    expect(screen.getByText('1h30min')).toBeInTheDocument()
     expect(screen.getByText('Revisar PR')).toBeInTheDocument()
-    expect(screen.getByText('0h30')).toBeInTheDocument()
+    expect(screen.getByText('30 min')).toBeInTheDocument()
   })
 
   it('mostra aviso quando nenhuma tarefa foi apontada hoje', async () => {

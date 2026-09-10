@@ -16,6 +16,7 @@
 
   --fonte-jogo: 'Press Start 2P', 'Courier New', monospace;
   --fonte-corpo: 'Nunito', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --fonte-manuscrita: 'Kalam', 'Comic Sans MS', cursive;
 
   --raio-borda: 12px;
   --sombra-cartao: 0 2px 0 var(--cor-borda), 0 6px 16px rgba(43, 43, 58, 0.08);

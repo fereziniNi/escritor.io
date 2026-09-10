@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
@@ -7,7 +7,7 @@ import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { useAuthStore } from '../auth/authStore'
 import { ProjetoDetalhePage } from './ProjetoDetalhePage'
-import type { ColunaComCards } from './types'
+import type { ColunaComCards, Cronometro } from './types'
 
 // Pedido do cliente: sugestões de pessoa vêm de TODAS as pessoas cadastradas (`GET
 // /usuarios/basico`), não só de quem já é membro do projeto - handler padrão restaurado a cada
@@ -18,14 +18,17 @@ const PESSOAS_CADASTRADAS = [
   { id: 2, nome: 'Beto Lima' },
 ]
 
-// Pedido do usuário: "está muito complexo... facilite o front" - Apontamentos/Comentários/
+const CRONOMETRO_NUNCA_INICIADO: Cronometro = { cardId: 7, iniciadoEm: null, totalMinutosFechados: 0, descricaoConclusao: null, concluidoEm: null }
+
+// Pedido do usuário: "está muito complexo... facilite o front" - Cronômetro/Comentários/
 // Histórico agora vivem juntos atrás de um único toggle ("Detalhes"), então abrir o card sempre
 // dispara os três GETs de uma vez (antes cada um só disparava com seu próprio toggle). Handlers
-// padrão de lista vazia pro card fixo desta suíte (id 7), restaurados a cada teste por
-// `resetHandlers`; testes que precisam de dado de verdade sobrescrevem com `server.use(...)`.
+// padrão de lista vazia/cronômetro-nunca-iniciado pro card fixo desta suíte (id 7), restaurados a
+// cada teste por `resetHandlers`; testes que precisam de dado de verdade sobrescrevem com
+// `server.use(...)`.
 const server = setupServer(
   http.get('/usuarios/basico', () => HttpResponse.json(PESSOAS_CADASTRADAS)),
-  http.get('/cards/7/apontamentos', () => HttpResponse.json([])),
+  http.get('/cards/7/cronometro', () => HttpResponse.json(CRONOMETRO_NUNCA_INICIADO)),
   http.get('/cards/7/comentarios', () => HttpResponse.json([])),
   http.get('/cards/7/eventos', () => HttpResponse.json([])),
 )
@@ -41,13 +44,13 @@ beforeEach(() => {
   useAuthStore.getState().definirSessao('token-fake', 'COLABORADOR')
 })
 
-function renderPagina() {
+function renderPagina(cardIdParaAbrir?: number) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={['/projetos/1']}>
         <Routes>
-          <Route path="/projetos/:id" element={<ProjetoDetalhePage />} />
+          <Route path="/projetos/:id" element={<ProjetoDetalhePage cardIdParaAbrir={cardIdParaAbrir} />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -403,7 +406,7 @@ describe('ProjetoDetalhePage', () => {
     expect(screen.getByRole('button', { name: /nova seção/i })).toBeInTheDocument()
   })
 
-  it('não busca comentários/histórico/apontamentos antes do card ser expandido (um único toggle "Detalhes")', async () => {
+  it('não busca comentários/histórico/cronômetro antes do card ser expandido (um único toggle "Detalhes")', async () => {
     server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
 
     renderPagina()
@@ -411,10 +414,20 @@ describe('ProjetoDetalhePage', () => {
     await screen.findByText('Corrigir bug')
     expect(screen.queryByText('Já revisei')).not.toBeInTheDocument()
     expect(screen.queryByText(/card criado em/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/pareamento/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /iniciar/i })).not.toBeInTheDocument()
   })
 
-  it('um clique em "Detalhes" mostra apontamentos, comentários E histórico juntos (pedido: "facilite o front")', async () => {
+  it('cardIdParaAbrir já abre "Detalhes" daquele card, sem precisar clicar (widget do cronômetro ativo)', async () => {
+    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
+
+    renderPagina(7)
+
+    await screen.findByText('Corrigir bug')
+    expect(await screen.findByRole('button', { name: /ocultar detalhes/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /cronômetro/i })).toBeInTheDocument()
+  })
+
+  it('um clique em "Detalhes" mostra cronômetro, comentários E histórico juntos (pedido: "facilite o front")', async () => {
     server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
     const user = userEvent.setup()
     renderPagina()
@@ -422,7 +435,7 @@ describe('ProjetoDetalhePage', () => {
     await screen.findByText('Corrigir bug')
     await user.click(screen.getByRole('button', { name: /detalhes/i }))
 
-    expect(await screen.findByRole('heading', { name: /apontamentos/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /cronômetro/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /comentários/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /histórico/i })).toBeInTheDocument()
   })
@@ -481,38 +494,22 @@ describe('ProjetoDetalhePage', () => {
     expect(await screen.findByText(/não foi possível carregar os comentários/i)).toBeInTheDocument()
   })
 
-  it('expande o histórico e mostra eventos e apontamentos mesclados, em ordem cronológica, com dia/hora', async () => {
+  it('expande o histórico e mostra os eventos do cronômetro, em ordem cronológica, com dia/hora', async () => {
     server.use(
       http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)),
       http.get('/cards/7/eventos', () =>
         HttpResponse.json([
           { id: 1, cardId: 7, autorId: 1, tipo: 'CRIACAO', de: null, para: 'A fazer', criadoEm: '2026-01-15T09:00:00Z' },
+          { id: 2, cardId: 7, autorId: 1, tipo: 'INICIOU_TRABALHO', de: null, para: null, criadoEm: '2026-01-15T10:00:00Z' },
+          { id: 3, cardId: 7, autorId: 1, tipo: 'PAUSOU_TRABALHO', de: null, para: '45 min', criadoEm: '2026-01-15T10:45:00Z' },
           {
-            id: 2,
+            id: 4,
             cardId: 7,
             autorId: 1,
-            tipo: 'MUDANCA_COLUNA',
-            de: 'A fazer',
-            para: 'Em progresso',
+            tipo: 'FINALIZOU_TRABALHO',
+            de: '45 min',
+            para: 'Corrigido e testado',
             criadoEm: '2026-01-15T11:00:00Z',
-          },
-        ]),
-      ),
-      // pedido do usuário: "no historico deve estar o dia hora e quanto tempo foi feita" - o
-      // apontamento (entre os dois eventos, pela hora de início) precisa aparecer na mesma lista.
-      http.get('/cards/7/apontamentos', () =>
-        HttpResponse.json([
-          {
-            id: 1,
-            usuarioId: 1,
-            cardId: 7,
-            inicio: '2026-01-15T10:00:00Z',
-            fim: '2026-01-15T10:45:00Z',
-            minutos: 45,
-            descricao: null,
-            origem: 'TIMER',
-            criadoEm: '2026-01-15T10:00:00Z',
-            editadoEm: '2026-01-15T10:45:00Z',
           },
         ]),
       ),
@@ -527,10 +524,11 @@ describe('ProjetoDetalhePage', () => {
     const itens = within(lista).getAllByRole('listitem')
     expect(itens.map((item) => item.textContent)).toEqual([
       expect.stringContaining('Card criado em "A fazer"'),
-      expect.stringContaining('45 min apontados (timer)'),
-      expect.stringContaining('Movido de "A fazer" para "Em progresso"'),
+      expect.stringContaining('Cronômetro iniciado'),
+      expect.stringContaining('Cronômetro pausado (45 min)'),
+      expect.stringContaining('Tarefa finalizada (45 min) — "Corrigido e testado"'),
     ])
-    // dia/hora precisa estar visível, não só o rótulo do evento/apontamento.
+    // dia/hora precisa estar visível, não só o rótulo do evento.
     expect(itens[0].textContent).toMatch(/\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}/)
   })
 
@@ -548,61 +546,30 @@ describe('ProjetoDetalhePage', () => {
     expect(await screen.findByText(/não foi possível carregar o histórico/i)).toBeInTheDocument()
   })
 
-  it('expande e mostra os apontamentos existentes do card', async () => {
-    server.use(
-      http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)),
-      http.get('/cards/7/apontamentos', () =>
-        HttpResponse.json([
-          {
-            id: 1,
-            usuarioId: 1,
-            cardId: 7,
-            inicio: '2026-01-15T09:00:00Z',
-            fim: '2026-01-15T10:00:00Z',
-            minutos: 60,
-            descricao: 'Pareamento',
-            origem: 'MANUAL',
-            criadoEm: '2026-01-15T10:00:00Z',
-            editadoEm: '2026-01-15T10:00:00Z',
-          },
-        ]),
-      ),
-    )
+  it('tarefa nunca trabalhada mostra só o botão Iniciar, sem relógio', async () => {
+    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
     const user = userEvent.setup()
     renderPagina()
 
     await screen.findByText('Corrigir bug')
     await user.click(screen.getByRole('button', { name: /detalhes/i }))
 
-    // Escopado na lista de Apontamentos de propósito: com os três agora sempre juntos (pedido do
-    // usuário: "facilite o front"), o Histórico mostra a MESMA descrição do apontamento, e um
-    // `screen.findByText` sem escopo bate em duas ocorrências.
-    const listaApontamentos = await screen.findByRole('list', { name: /apontamentos do card/i })
-    expect(within(listaApontamentos).getByText(/pareamento/i)).toBeInTheDocument()
-    expect(within(listaApontamentos).getByText(/60 min/)).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /▶️ iniciar/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /pausar/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('timer')).not.toBeInTheDocument()
   })
 
-  it('lança um apontamento manual e ele aparece na lista sem reload manual', async () => {
-    let apontamentos: unknown[] = []
+  it('inicia o cronômetro e passa a mostrar o relógio rodando e o botão Pausar', async () => {
+    // Handler de GET é stateful (mesmo padrão de `membros`/`colunas` nos testes acima) - a mutação
+    // não escreve direto no cache, é o refetch disparado por `invalidateQueries` que precisa
+    // devolver o estado novo pra UI atualizar.
+    let cronometro: Cronometro = CRONOMETRO_NUNCA_INICIADO
     server.use(
       http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)),
-      http.get('/cards/7/apontamentos', () => HttpResponse.json(apontamentos)),
-      http.post('/cards/7/apontamentos', async ({ request }) => {
-        const corpo = (await request.json()) as { minutos: number; descricao: string | null }
-        const novo = {
-          id: 1,
-          usuarioId: 1,
-          cardId: 7,
-          inicio: '2026-01-15T09:00:00Z',
-          fim: '2026-01-15T11:00:00Z',
-          minutos: corpo.minutos,
-          descricao: corpo.descricao,
-          origem: 'MANUAL',
-          criadoEm: '2026-01-15T11:00:00Z',
-          editadoEm: '2026-01-15T11:00:00Z',
-        }
-        apontamentos = [novo]
-        return HttpResponse.json(novo, { status: 201 })
+      http.get('/cards/7/cronometro', () => HttpResponse.json(cronometro)),
+      http.post('/cards/7/cronometro/iniciar', () => {
+        cronometro = { cardId: 7, iniciadoEm: '2026-01-15T09:00:00Z', totalMinutosFechados: 0, descricaoConclusao: null, concluidoEm: null }
+        return HttpResponse.json(cronometro)
       }),
     )
     const user = userEvent.setup()
@@ -610,37 +577,21 @@ describe('ProjetoDetalhePage', () => {
 
     await screen.findByText('Corrigir bug')
     await user.click(screen.getByRole('button', { name: /detalhes/i }))
-    await screen.findByLabelText(/minutos trabalhados/i)
-    await user.type(screen.getByLabelText(/minutos trabalhados/i), '120')
-    await user.type(screen.getByLabelText(/^descrição$/i), 'Revisão de código')
-    await user.click(screen.getByRole('button', { name: /^lançar$/i }))
+    await user.click(await screen.findByRole('button', { name: /▶️ iniciar/i }))
 
-    // Escopado (mesmo motivo do teste anterior): Histórico mescla o mesmo apontamento.
-    const listaApontamentos = screen.getByRole('list', { name: /apontamentos do card/i })
-    expect(await within(listaApontamentos).findByText(/revisão de código/i)).toBeInTheDocument()
-    expect(within(listaApontamentos).getByText(/120 min/)).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /pausar/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /▶️ iniciar/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('timer')).toHaveTextContent(/\d{2}:\d{2}:\d{2}/)
   })
 
-  it('edita a descrição e os minutos de um apontamento existente inline', async () => {
-    let apontamento = {
-      id: 1,
-      usuarioId: 1,
-      cardId: 7,
-      inicio: '2026-01-15T09:00:00Z',
-      fim: '2026-01-15T10:00:00Z',
-      minutos: 60,
-      descricao: 'Original',
-      origem: 'MANUAL',
-      criadoEm: '2026-01-15T10:00:00Z',
-      editadoEm: '2026-01-15T10:00:00Z',
-    }
+  it('pausa o cronômetro e mostra o total parado com o botão Retomar', async () => {
+    let cronometro: Cronometro = { cardId: 7, iniciadoEm: '2026-01-15T09:00:00Z', totalMinutosFechados: 0, descricaoConclusao: null, concluidoEm: null }
     server.use(
       http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)),
-      http.get('/cards/7/apontamentos', () => HttpResponse.json([apontamento])),
-      http.patch('/apontamentos/1', async ({ request }) => {
-        const corpo = (await request.json()) as { fim: string | null; descricao: string | null }
-        apontamento = { ...apontamento, fim: corpo.fim ?? apontamento.fim, minutos: 90, descricao: corpo.descricao ?? apontamento.descricao }
-        return HttpResponse.json(apontamento)
+      http.get('/cards/7/cronometro', () => HttpResponse.json(cronometro)),
+      http.post('/cards/7/cronometro/pausar', () => {
+        cronometro = { cardId: 7, iniciadoEm: null, totalMinutosFechados: 45, descricaoConclusao: null, concluidoEm: null }
+        return HttpResponse.json(cronometro)
       }),
     )
     const user = userEvent.setup()
@@ -648,45 +599,21 @@ describe('ProjetoDetalhePage', () => {
 
     await screen.findByText('Corrigir bug')
     await user.click(screen.getByRole('button', { name: /detalhes/i }))
-    // Escopado (mesmo motivo dos testes anteriores): Histórico mescla o mesmo apontamento, então
-    // "Original"/"Corrigido" aparecem duas vezes na tela sem o escopo na lista de Apontamentos.
-    const listaApontamentos = await screen.findByRole('list', { name: /apontamentos do card/i })
-    await within(listaApontamentos).findByText(/original/i)
-    await user.click(within(listaApontamentos).getByRole('button', { name: /^editar$/i }))
+    await user.click(await screen.findByRole('button', { name: /pausar/i }))
 
-    const campoMinutos = within(listaApontamentos).getByLabelText(/^minutos$/i)
-    await user.clear(campoMinutos)
-    await user.type(campoMinutos, '90')
-    const campoDescricao = within(listaApontamentos).getByLabelText(/^descrição$/i)
-    await user.clear(campoDescricao)
-    await user.type(campoDescricao, 'Corrigido')
-    await user.click(within(listaApontamentos).getByRole('button', { name: /^salvar$/i }))
-
-    expect(await within(listaApontamentos).findByText(/corrigido/i)).toBeInTheDocument()
-    expect(within(listaApontamentos).getByText(/90 min/)).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /▶️ retomar/i })).toBeInTheDocument()
+    expect(screen.getByRole('timer')).toHaveTextContent('00:45:00')
   })
 
-  it('exclui um apontamento e ele some da lista sem reload manual', async () => {
-    let apontamentos = [
-      {
-        id: 1,
-        usuarioId: 1,
-        cardId: 7,
-        inicio: '2026-01-15T09:00:00Z',
-        fim: '2026-01-15T10:00:00Z',
-        minutos: 60,
-        descricao: 'Pareamento',
-        origem: 'MANUAL',
-        criadoEm: '2026-01-15T10:00:00Z',
-        editadoEm: '2026-01-15T10:00:00Z',
-      },
-    ]
+  it('finaliza a tarefa pedindo uma descrição do que foi feito e mostra o resultado, sem mais botões', async () => {
+    let cronometro: Cronometro = { cardId: 7, iniciadoEm: null, totalMinutosFechados: 45, descricaoConclusao: null, concluidoEm: null }
     server.use(
       http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)),
-      http.get('/cards/7/apontamentos', () => HttpResponse.json(apontamentos)),
-      http.delete('/apontamentos/1', () => {
-        apontamentos = []
-        return new HttpResponse(null, { status: 204 })
+      http.get('/cards/7/cronometro', () => HttpResponse.json(cronometro)),
+      http.post('/cards/7/cronometro/finalizar', async ({ request }) => {
+        const corpo = (await request.json()) as { descricao: string }
+        cronometro = { cardId: 7, iniciadoEm: null, totalMinutosFechados: 45, descricaoConclusao: corpo.descricao, concluidoEm: '2026-01-15T12:00:00Z' }
+        return HttpResponse.json(cronometro)
       }),
     )
     const user = userEvent.setup()
@@ -694,11 +621,13 @@ describe('ProjetoDetalhePage', () => {
 
     await screen.findByText('Corrigir bug')
     await user.click(screen.getByRole('button', { name: /detalhes/i }))
-    // Escopado (mesmo motivo dos testes anteriores): Histórico mescla o mesmo apontamento.
-    const listaApontamentos = await screen.findByRole('list', { name: /apontamentos do card/i })
-    await within(listaApontamentos).findByText(/pareamento/i)
-    await user.click(screen.getByRole('button', { name: /excluir apontamento 1/i }))
+    await user.click(await screen.findByRole('button', { name: /finalizar/i }))
+    await user.type(screen.getByLabelText(/o que foi feito/i), 'Corrigido e testado em produção')
+    await user.click(screen.getByRole('button', { name: /confirmar/i }))
 
-    await waitFor(() => expect(within(listaApontamentos).queryByText(/pareamento/i)).not.toBeInTheDocument())
+    expect(await screen.findByText(/corrigido e testado em produção/i)).toBeInTheDocument()
+    expect(screen.getByRole('timer')).toHaveTextContent('00:45:00')
+    expect(screen.queryByRole('button', { name: /▶️ retomar/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /finalizar/i })).not.toBeInTheDocument()
   })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatarDataBr, formatarDataHoraBr } from './formatarData'
+import { formatarDataBr, formatarDataHoraBr, formatarTempoRelativo } from './formatarData'
 
 describe('formatarDataBr', () => {
   it('formata uma data pura (AAAA-MM-DD) como DD/MM/AAAA', () => {
@@ -36,5 +36,33 @@ describe('formatarDataHoraBr', () => {
   it('preenche hora e minuto com zero à esquerda', () => {
     const instante = '2026-03-02T01:07:00Z'
     expect(formatarDataHoraBr(instante)).toBe(esperado(instante))
+  })
+})
+
+describe('formatarTempoRelativo', () => {
+  const AGORA = new Date('2026-01-15T12:00:00Z')
+
+  it('pedido do usuário: "ver as últimas que chegaram no sistema" - "agora" pra menos de 1 minuto', () => {
+    expect(formatarTempoRelativo('2026-01-15T11:59:30Z', AGORA)).toBe('agora')
+  })
+
+  it('minutos', () => {
+    expect(formatarTempoRelativo('2026-01-15T11:55:00Z', AGORA)).toBe('há 5 min')
+  })
+
+  it('horas', () => {
+    expect(formatarTempoRelativo('2026-01-15T10:00:00Z', AGORA)).toBe('há 2h')
+  })
+
+  it('dias, com plural', () => {
+    expect(formatarTempoRelativo('2026-01-13T12:00:00Z', AGORA)).toBe('há 2 dias')
+  })
+
+  it('um dia só, sem plural', () => {
+    expect(formatarTempoRelativo('2026-01-14T12:00:00Z', AGORA)).toBe('há 1 dia')
+  })
+
+  it('depois de uma semana, cai pra data/hora completa', () => {
+    expect(formatarTempoRelativo('2026-01-07T09:05:00Z', AGORA)).toBe(formatarDataHoraBr('2026-01-07T09:05:00Z'))
   })
 })

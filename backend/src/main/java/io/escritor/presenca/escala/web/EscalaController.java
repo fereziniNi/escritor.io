@@ -27,6 +27,12 @@ import org.springframework.web.bind.annotation.RestController;
  * sempre sobre o usuário autenticado, sem parâmetro {@code usuarioId} - ninguém edita a escala de
  * outra pessoa, nem ADMIN. Só {@code /equipe} é GESTOR/ADMIN, e é somente leitura.
  *
+ * <p>Exceção de leitura aberta a qualquer autenticado (não só o próprio dono): {@code
+ * /disponibilidade} - pedido do usuário: "Não consegui marcar a reunião!!" (a causa era não ter
+ * como saber, antes de tentar salvar, se o convidado trabalha na data escolhida). Mesma filosofia
+ * de {@code GET /usuarios/basico} - ver javadoc de {@link
+ * io.escritor.presenca.escala.service.EscalaService#consultarDisponibilidade}.
+ *
  * <p>Toda mutação também dispara {@link GoogleCalendarSincronizacaoService#sincronizarSeConectado}
  * (assíncrono, não atrasa a resposta) - pedido do usuário: "algo muito parecido com o agenda do
  * google... ou ate mesmo integrar". Fica aqui no controller, não dentro de {@code EscalaService},
@@ -88,6 +94,11 @@ public class EscalaController {
     @GetMapping("/efetiva")
     public List<DiaEfetivoResponse> efetiva(@RequestParam LocalDate inicio, @RequestParam LocalDate fim) {
         return escalaService.calcularEfetiva(contextoUsuarioAutenticado.usuarioAtual(), inicio, fim);
+    }
+
+    @GetMapping("/disponibilidade")
+    public List<DisponibilidadeResponse> disponibilidade(@RequestParam List<Long> usuarioIds, @RequestParam LocalDate data) {
+        return escalaService.consultarDisponibilidade(usuarioIds, data);
     }
 
     @GetMapping("/equipe")

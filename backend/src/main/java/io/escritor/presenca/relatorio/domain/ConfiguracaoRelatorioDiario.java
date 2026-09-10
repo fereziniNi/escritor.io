@@ -13,6 +13,12 @@ import java.time.LocalTime;
  * migração V29) - só existe um "chefe" configurado no sistema (mesma decisão já tomada pra
  * {@code EVOLUTION_CHEFE_NUMERO}), então uma configuração global é suficiente, sem precisar de
  * uma linha por admin.
+ *
+ * <p>Pedido do usuário (V47): "adicionar mais informações no relatório diário, mas deixe
+ * personalizado para o admin" - os seis campos {@code incluir*} (agrupados como {@link
+ * PreferenciasConteudoRelatorioDiario} fora da entidade) escolhem quais blocos entram no resumo
+ * ({@code RelatorioDiarioService}); os dois primeiros nasceram `true` na migração pra preservar o
+ * comportamento de quem já tinha configurado antes desta personalização existir.
  */
 @Entity
 @Table(name = "configuracao_relatorio_diario")
@@ -30,6 +36,24 @@ public class ConfiguracaoRelatorioDiario {
     @Column(nullable = false)
     private boolean habilitado;
 
+    @Column(name = "incluir_ponto", nullable = false)
+    private boolean incluirPonto;
+
+    @Column(name = "incluir_tarefas_criadas_movidas", nullable = false)
+    private boolean incluirTarefasCriadasMovidas;
+
+    @Column(name = "incluir_tarefas_concluidas", nullable = false)
+    private boolean incluirTarefasConcluidas;
+
+    @Column(name = "incluir_reunioes", nullable = false)
+    private boolean incluirReunioes;
+
+    @Column(name = "incluir_ausencias", nullable = false)
+    private boolean incluirAusencias;
+
+    @Column(name = "incluir_resumo_equipe", nullable = false)
+    private boolean incluirResumoEquipe;
+
     @Column(name = "ultimo_envio_em")
     private Instant ultimoEnvioEm;
 
@@ -40,17 +64,35 @@ public class ConfiguracaoRelatorioDiario {
         // JPA
     }
 
-    public ConfiguracaoRelatorioDiario(LocalTime horarioEnvio, boolean habilitado, Instant agora) {
+    public ConfiguracaoRelatorioDiario(
+            LocalTime horarioEnvio, boolean habilitado, PreferenciasConteudoRelatorioDiario preferencias, Instant agora) {
         this.id = ID_UNICO;
         this.horarioEnvio = horarioEnvio;
         this.habilitado = habilitado;
+        aplicarPreferencias(preferencias);
         this.atualizadoEm = agora;
     }
 
-    public void atualizar(LocalTime horarioEnvio, boolean habilitado, Instant agora) {
+    public void atualizar(LocalTime horarioEnvio, boolean habilitado, PreferenciasConteudoRelatorioDiario preferencias, Instant agora) {
         this.horarioEnvio = horarioEnvio;
         this.habilitado = habilitado;
+        aplicarPreferencias(preferencias);
         this.atualizadoEm = agora;
+    }
+
+    private void aplicarPreferencias(PreferenciasConteudoRelatorioDiario preferencias) {
+        this.incluirPonto = preferencias.ponto();
+        this.incluirTarefasCriadasMovidas = preferencias.tarefasCriadasMovidas();
+        this.incluirTarefasConcluidas = preferencias.tarefasConcluidas();
+        this.incluirReunioes = preferencias.reunioes();
+        this.incluirAusencias = preferencias.ausencias();
+        this.incluirResumoEquipe = preferencias.resumoEquipe();
+    }
+
+    public PreferenciasConteudoRelatorioDiario getPreferencias() {
+        return new PreferenciasConteudoRelatorioDiario(
+                incluirPonto, incluirTarefasCriadasMovidas, incluirTarefasConcluidas, incluirReunioes, incluirAusencias,
+                incluirResumoEquipe);
     }
 
     /**

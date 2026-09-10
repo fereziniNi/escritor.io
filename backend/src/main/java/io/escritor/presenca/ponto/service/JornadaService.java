@@ -1,9 +1,9 @@
 package io.escritor.presenca.ponto.service;
 
-import io.escritor.presenca.apontamento.domain.Apontamento;
-import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.service.VisibilidadeUsuarioService;
+import io.escritor.presenca.kanban.domain.SessaoTrabalho;
+import io.escritor.presenca.kanban.repository.SessaoTrabalhoRepository;
 import io.escritor.presenca.ponto.domain.EstadoDia;
 import io.escritor.presenca.ponto.domain.JornadaDeOutroUsuarioException;
 import io.escritor.presenca.ponto.domain.JornadaDiaria;
@@ -34,17 +34,17 @@ import org.springframework.stereotype.Service;
 public class JornadaService {
 
     private final RegistroPontoRepository registroPontoRepository;
-    private final ApontamentoRepository apontamentoRepository;
+    private final SessaoTrabalhoRepository sessaoTrabalhoRepository;
     private final VisibilidadeUsuarioService visibilidadeUsuarioService;
     private final Clock clock;
 
     public JornadaService(
             RegistroPontoRepository registroPontoRepository,
-            ApontamentoRepository apontamentoRepository,
+            SessaoTrabalhoRepository sessaoTrabalhoRepository,
             VisibilidadeUsuarioService visibilidadeUsuarioService,
             Clock clock) {
         this.registroPontoRepository = registroPontoRepository;
-        this.apontamentoRepository = apontamentoRepository;
+        this.sessaoTrabalhoRepository = sessaoTrabalhoRepository;
         this.visibilidadeUsuarioService = visibilidadeUsuarioService;
         this.clock = clock;
     }
@@ -67,9 +67,8 @@ public class JornadaService {
 
     /**
      * `totalApontadoMinutos` é um cálculo paralelo ao saldo de ponto (E1), nunca o altera - PRD
-     * §3.4: apontamento é dado de gestão de card, não de jornada. Só soma apontamentos já
-     * encerrados do dia; um timer ainda aberto não entra na soma (o frontend mostra ele separado,
-     * S4.4/S4.9).
+     * §3.4: tempo de card é dado de gestão, não de jornada. Só soma sessões do cronômetro já
+     * fechadas do dia; uma sessão ainda aberta não entra na soma.
      */
     public JornadaDoDiaResponse jornadaDoDia(Usuario usuario) {
         Instant agora = Instant.now(clock);
@@ -85,10 +84,10 @@ public class JornadaService {
         long minutosTrabalhados = JornadaDiaria.minutosTrabalhados(marcacoesDeHoje);
         long saldoDia = JornadaDiaria.saldo(marcacoesDeHoje, cargaDiariaMinutos);
         long saldoAcumuladoNoPeriodo = SaldoAcumulado.calcular(marcacoesPorDia, cargaDiariaMinutos);
-        long totalApontadoMinutos = apontamentoRepository
+        long totalApontadoMinutos = sessaoTrabalhoRepository
                 .findByUsuarioAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(usuario, inicioDoDia, fimDoDia)
                 .stream()
-                .mapToLong(Apontamento::getMinutos)
+                .mapToLong(SessaoTrabalho::getMinutos)
                 .sum();
 
         return new JornadaDoDiaResponse(hoje, estado, minutosTrabalhados, saldoDia, saldoAcumuladoNoPeriodo, totalApontadoMinutos);

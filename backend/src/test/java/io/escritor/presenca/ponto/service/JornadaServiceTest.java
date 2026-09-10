@@ -1,8 +1,5 @@
 package io.escritor.presenca.ponto.service;
 
-import io.escritor.presenca.apontamento.domain.Apontamento;
-import io.escritor.presenca.apontamento.domain.OrigemApontamento;
-import io.escritor.presenca.apontamento.repository.ApontamentoRepository;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Projeto;
 import io.escritor.presenca.identidade.domain.StatusProjeto;
@@ -10,6 +7,8 @@ import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.service.VisibilidadeUsuarioService;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.Coluna;
+import io.escritor.presenca.kanban.domain.SessaoTrabalho;
+import io.escritor.presenca.kanban.repository.SessaoTrabalhoRepository;
 import io.escritor.presenca.ponto.domain.EstadoDia;
 import io.escritor.presenca.ponto.domain.JornadaDeOutroUsuarioException;
 import io.escritor.presenca.ponto.domain.OrigemRegistroPonto;
@@ -43,7 +42,7 @@ class JornadaServiceTest {
     private RegistroPontoRepository registroPontoRepository;
 
     @Mock
-    private ApontamentoRepository apontamentoRepository;
+    private SessaoTrabalhoRepository sessaoTrabalhoRepository;
 
     @Mock
     private VisibilidadeUsuarioService visibilidadeUsuarioService;
@@ -80,11 +79,11 @@ class JornadaServiceTest {
     void setUp() {
         // terça-feira 2026-01-13, 20h - já bateu entrada e saída hoje
         Clock clock = Clock.fixed(Instant.parse("2026-01-13T20:00:00Z"), ZoneOffset.UTC);
-        jornadaService = new JornadaService(registroPontoRepository, apontamentoRepository, visibilidadeUsuarioService, clock);
-        // stub padrão pra não obrigar todo teste a mockar apontamentos - só sobrescrito nos testes
-        // que exercitam totalApontadoMinutos de verdade.
+        jornadaService = new JornadaService(registroPontoRepository, sessaoTrabalhoRepository, visibilidadeUsuarioService, clock);
+        // stub padrão pra não obrigar todo teste a mockar sessões de trabalho - só sobrescrito nos
+        // testes que exercitam totalApontadoMinutos de verdade.
         lenient()
-                .when(apontamentoRepository.findByUsuarioAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(any(), any(), any()))
+                .when(sessaoTrabalhoRepository.findByUsuarioAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(any(), any(), any()))
                 .thenReturn(List.of());
     }
 
@@ -105,15 +104,15 @@ class JornadaServiceTest {
     }
 
     @Test
-    void totalApontadoMinutosSomaSoOsApontamentosFechadosDoDia() {
+    void totalApontadoMinutosSomaSoAsSessoesDeTrabalhoFechadasDoDia() {
         when(registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualOrderByMomentoAsc(any(), any())).thenReturn(List.of());
-        Apontamento fechado1 = new Apontamento(
-                usuario, card, Instant.parse("2026-01-13T09:00:00Z"), Instant.parse("2026-01-13T10:00:00Z"), null, OrigemApontamento.MANUAL);
-        Apontamento fechado2 = new Apontamento(
-                usuario, card, Instant.parse("2026-01-13T11:00:00Z"), Instant.parse("2026-01-13T11:30:00Z"), null, OrigemApontamento.MANUAL);
-        when(apontamentoRepository.findByUsuarioAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(
+        SessaoTrabalho fechada1 = new SessaoTrabalho(card, usuario, Instant.parse("2026-01-13T09:00:00Z"));
+        fechada1.pausar(Instant.parse("2026-01-13T10:00:00Z"));
+        SessaoTrabalho fechada2 = new SessaoTrabalho(card, usuario, Instant.parse("2026-01-13T11:00:00Z"));
+        fechada2.pausar(Instant.parse("2026-01-13T11:30:00Z"));
+        when(sessaoTrabalhoRepository.findByUsuarioAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(
                         usuario, Instant.parse("2026-01-13T00:00:00Z"), Instant.parse("2026-01-14T00:00:00Z")))
-                .thenReturn(List.of(fechado1, fechado2));
+                .thenReturn(List.of(fechada1, fechada2));
 
         var jornada = jornadaService.jornadaDoDia(usuario);
 

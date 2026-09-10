@@ -6,12 +6,14 @@ import io.escritor.presenca.escala.domain.HorarioInvalidoException;
 import io.escritor.presenca.escala.repository.EscalaExcecaoRepository;
 import io.escritor.presenca.escala.repository.EscalaSemanalRepository;
 import io.escritor.presenca.escala.web.DiaEfetivoResponse;
+import io.escritor.presenca.escala.web.DisponibilidadeResponse;
 import io.escritor.presenca.escala.web.EscalaEquipeResponse;
 import io.escritor.presenca.escala.web.EscalaExcecaoResponse;
 import io.escritor.presenca.escala.web.EscalaSemanalResponse;
 import io.escritor.presenca.escala.web.ItemEscalaSemanalRequest;
 import io.escritor.presenca.escala.web.SalvarExcecaoRequest;
 import io.escritor.presenca.identidade.domain.Usuario;
+import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.identidade.service.VisibilidadeUsuarioService;
 import java.time.DayOfWeek;
@@ -42,14 +44,17 @@ public class EscalaService {
     private final EscalaSemanalRepository escalaSemanalRepository;
     private final EscalaExcecaoRepository escalaExcecaoRepository;
     private final VisibilidadeUsuarioService visibilidadeUsuarioService;
+    private final UsuarioRepository usuarioRepository;
 
     public EscalaService(
             EscalaSemanalRepository escalaSemanalRepository,
             EscalaExcecaoRepository escalaExcecaoRepository,
-            VisibilidadeUsuarioService visibilidadeUsuarioService) {
+            VisibilidadeUsuarioService visibilidadeUsuarioService,
+            UsuarioRepository usuarioRepository) {
         this.escalaSemanalRepository = escalaSemanalRepository;
         this.escalaExcecaoRepository = escalaExcecaoRepository;
         this.visibilidadeUsuarioService = visibilidadeUsuarioService;
+        this.usuarioRepository = usuarioRepository;
     }
 
     public List<EscalaSemanalResponse> listarSemanal(Usuario usuario) {
@@ -141,6 +146,25 @@ public class EscalaService {
                     : new DiaEfetivoResponse(data, false, null, null));
         }
         return dias;
+    }
+
+    /**
+     * Pedido do usuário: "Não consegui marcar a reunião!!" - a causa mais comum era escolher uma
+     * data/hora fora do expediente de algum convidado sem nenhum jeito de saber isso antes de
+     * tentar salvar (o 400 do {@code POST /escala/reunioes} não carrega motivo, convenção do
+     * projeto). Igual à filosofia de {@code GET /usuarios/basico} (aberto a qualquer autenticado):
+     * consultar a disponibilidade de um colega numa data é uma checagem leve pra marcar reunião,
+     * não uma tela administrativa - não passa por {@link VisibilidadeUsuarioService}. Reaproveita
+     * {@link #calcularEfetiva} (mesmo cálculo de padrão semanal + exceção) só que devolvido por
+     * pessoa, pra {@code MarcarReuniaoComMeetModal} avisar antes de enviar.
+     */
+    public List<DisponibilidadeResponse> consultarDisponibilidade(List<Long> usuarioIds, LocalDate data) {
+        return usuarioRepository.findAllById(usuarioIds).stream()
+                .map(usuario -> {
+                    DiaEfetivoResponse dia = calcularEfetiva(usuario, data, data).get(0);
+                    return new DisponibilidadeResponse(usuario.getId(), usuario.getNome(), dia.trabalha(), dia.horaInicio(), dia.horaFim());
+                })
+                .toList();
     }
 
     /**

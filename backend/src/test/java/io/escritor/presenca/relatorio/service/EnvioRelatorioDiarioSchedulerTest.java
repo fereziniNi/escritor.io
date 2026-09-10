@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import io.escritor.presenca.ponto.notificacao.EnvioWhatsApp;
 import io.escritor.presenca.relatorio.domain.ConfiguracaoRelatorioDiario;
+import io.escritor.presenca.relatorio.domain.PreferenciasConteudoRelatorioDiario;
 import io.escritor.presenca.relatorio.repository.ConfiguracaoRelatorioDiarioRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -51,7 +52,8 @@ class EnvioRelatorioDiarioSchedulerTest {
     }
 
     private static ConfiguracaoRelatorioDiario configuracao(LocalTime horario, boolean habilitado, Instant ultimoEnvio) {
-        ConfiguracaoRelatorioDiario configuracao = new ConfiguracaoRelatorioDiario(horario, habilitado, Instant.EPOCH);
+        ConfiguracaoRelatorioDiario configuracao =
+                new ConfiguracaoRelatorioDiario(horario, habilitado, PreferenciasConteudoRelatorioDiario.padrao(), Instant.EPOCH);
         if (ultimoEnvio != null) {
             configuracao.registrarEnvio(ultimoEnvio);
         }
@@ -62,8 +64,7 @@ class EnvioRelatorioDiarioSchedulerTest {
     void envolveOResumoQuandoBateOHorarioConfigurado() {
         when(configuracaoRepository.findById(ConfiguracaoRelatorioDiario.ID_UNICO))
                 .thenReturn(Optional.of(configuracao(LocalTime.of(18, 0), true, null)));
-        when(relatorioDiarioService.montarResumoDoDia()).thenReturn("resumo do dia")
-                ;
+        when(relatorioDiarioService.montarResumoDoDia(PreferenciasConteudoRelatorioDiario.padrao())).thenReturn("resumo do dia");
 
         scheduler.verificarEEnviarSeForAHora();
 
@@ -117,7 +118,7 @@ class EnvioRelatorioDiarioSchedulerTest {
         Instant ontemNoMesmoHorario = AS_18H_NO_BRASIL.minus(java.time.Duration.ofDays(1));
         when(configuracaoRepository.findById(ConfiguracaoRelatorioDiario.ID_UNICO))
                 .thenReturn(Optional.of(configuracao(LocalTime.of(18, 0), true, ontemNoMesmoHorario)));
-        when(relatorioDiarioService.montarResumoDoDia()).thenReturn("resumo do dia");
+        when(relatorioDiarioService.montarResumoDoDia(PreferenciasConteudoRelatorioDiario.padrao())).thenReturn("resumo do dia");
 
         scheduler.verificarEEnviarSeForAHora();
 
@@ -128,7 +129,7 @@ class EnvioRelatorioDiarioSchedulerTest {
     void registraOMomentoDoEnvioParaEvitarDuplicar() {
         ConfiguracaoRelatorioDiario configuracao = configuracao(LocalTime.of(18, 0), true, null);
         when(configuracaoRepository.findById(ConfiguracaoRelatorioDiario.ID_UNICO)).thenReturn(Optional.of(configuracao));
-        when(relatorioDiarioService.montarResumoDoDia()).thenReturn("resumo do dia");
+        when(relatorioDiarioService.montarResumoDoDia(PreferenciasConteudoRelatorioDiario.padrao())).thenReturn("resumo do dia");
 
         scheduler.verificarEEnviarSeForAHora();
 
