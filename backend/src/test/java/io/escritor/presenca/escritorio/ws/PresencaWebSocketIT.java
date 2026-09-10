@@ -26,6 +26,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -71,6 +72,16 @@ class PresencaWebSocketIT {
 
     @Autowired
     private EventoPresencaRepository eventoPresencaRepository;
+
+    @BeforeEach
+    void isolarEstadoEntreTestes() throws InterruptedException {
+        // o bean do handler é singleton e o contexto é reaproveitado entre os testes desta classe;
+        // o fechamento do WebSocket é assíncrono, então um `sessaoAna.close()` do teste anterior
+        // pode disparar o broadcast de OFFLINE só agora - a pausa deixa esse `afterConnectionClosed`
+        // pendente rodar antes de zerar o estado, pra ele não vazar pra fila do teste que vem.
+        Thread.sleep(400);
+        presencaWebSocketHandler.limparEstadoParaTeste();
+    }
 
     @Test
     void conectarRegistraOUsuarioERecebeUmSnapshotDeSiMesmo() throws Exception {
@@ -155,8 +166,8 @@ class PresencaWebSocketIT {
 
         WebSocketSession sessaoAna = conectar(tokenAna, new LinkedBlockingQueue<>());
         try {
-            // mapa seedado por V24__redesenha_salas_por_funcao.sql tem largura_tiles=28 - x=30 está fora
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":30,\"y\":5}"));
+            // mapa seedado tem largura_tiles=36 (V51__centraliza_mapa_verticalmente.sql) - x=40 está fora
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":40,\"y\":5}"));
             Thread.sleep(500); // dá tempo do servidor processar (e rejeitar) a mensagem
 
             Usuario beto = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s64c@escritor.io", Papel.COLABORADOR, 480));
@@ -166,7 +177,7 @@ class PresencaWebSocketIT {
             try {
                 String snapshot = mensagensBeto.poll(5, TimeUnit.SECONDS);
 
-                assertThat(snapshot).isNotNull().doesNotContain("\"x\":30");
+                assertThat(snapshot).isNotNull().doesNotContain("\"x\":40");
             } finally {
                 sessaoBeto.close();
             }
@@ -330,12 +341,12 @@ class PresencaWebSocketIT {
 
         WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
         try {
-            mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
+            aguardarSnapshot(mensagensAna);
 
-            // zona "Área de trabalho" (tipo FOCO) seedada por V24__redesenha_salas_por_funcao.sql cobre x em [1,13) e y em [10,18)
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":2,\"y\":11}"));
+            // zona "Área de trabalho" (tipo FOCO), pós V50/V51: x em [7,19) e y em [15,23)
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":10,\"y\":16}"));
 
-            String recebido = mensagensAna.poll(5, TimeUnit.SECONDS);
+            String recebido = proximaMensagemDe(mensagensAna, ana.getId());
             assertThat(recebido).isNotNull().contains("\"status\":\"FOCO\"");
         } finally {
             sessaoAna.close();
@@ -350,17 +361,15 @@ class PresencaWebSocketIT {
 
         WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
         try {
-            mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":2,\"y\":11}")); // entra na Área de trabalho (FOCO)
-            String dentro = mensagensAna.poll(5, TimeUnit.SECONDS);
-            assertThat(dentro).isNotNull().contains("\"status\":\"FOCO\"");
+            aguardarSnapshot(mensagensAna);
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":10,\"y\":16}")); // entra na Área de trabalho (FOCO)
+            assertThat(proximaMensagemDe(mensagensAna, ana.getId())).isNotNull().contains("\"status\":\"FOCO\"");
 
-            // (8,8) não cai em nenhuma zona seedada (V24: reuniões/café ficam em y 1-6, área de
-            // trabalho/fora do trabalho em y 10-17 - (8,8) fica no corredor aberto entre elas)
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":8,\"y\":8}"));
+            // (20,13) fica no corredor horizontal aberto entre a fileira de cima (salas em y 6-11)
+            // e a de baixo (Área de trabalho/Fora do trabalho em y 15-22) - fora de toda zona
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":20,\"y\":13}"));
 
-            String fora = mensagensAna.poll(5, TimeUnit.SECONDS);
-            assertThat(fora).isNotNull().contains("\"status\":\"DISPONIVEL\"");
+            assertThat(proximaMensagemDe(mensagensAna, ana.getId())).isNotNull().contains("\"status\":\"DISPONIVEL\"");
         } finally {
             sessaoAna.close();
         }
@@ -374,37 +383,44 @@ class PresencaWebSocketIT {
 
         WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
         try {
-            mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":2,\"y\":11}")); // entra na Área de trabalho (FOCO)
-            mensagensAna.poll(5, TimeUnit.SECONDS);
+            aguardarSnapshot(mensagensAna);
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":10,\"y\":16}")); // entra na Área de trabalho (FOCO)
+            proximaMensagemDe(mensagensAna, ana.getId());
 
             sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"STATUS\",\"status\":\"ALMOCO\"}")); // troca manual, ainda dentro da zona
-            mensagensAna.poll(5, TimeUnit.SECONDS);
+            proximaMensagemDe(mensagensAna, ana.getId());
 
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":8,\"y\":8}")); // sai da zona pro espaço aberto
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":20,\"y\":13}")); // sai da zona pro espaço aberto
 
-            String fora = mensagensAna.poll(5, TimeUnit.SECONDS);
-            assertThat(fora).isNotNull().contains("\"status\":\"ALMOCO\"");
+            assertThat(proximaMensagemDe(mensagensAna, ana.getId())).isNotNull().contains("\"status\":\"ALMOCO\"");
         } finally {
             sessaoAna.close();
         }
     }
 
     @Test
-    void entrarNumaZonaSemStatusCorrespondenteNaoMudaOStatus() throws Exception {
+    void entrarEmQualquerZonaAtualizaOStatus() throws Exception {
+        // pedido do usuário: "independente de qual sala seja, atualize o status" - antes só FOCO/
+        // REUNIAO mudavam o status; Café/Fora do trabalho/Cabine agora também mudam.
         Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s67d@escritor.io", Papel.COLABORADOR, 480));
         String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
         BlockingQueue<String> mensagensAna = new LinkedBlockingQueue<>();
 
         WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
         try {
-            mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
+            aguardarSnapshot(mensagensAna);
 
-            // zona "Café" seedada por V24__redesenha_salas_por_funcao.sql cobre x em [13,19) e y em [1,7) - sem StatusAvatar.CAFE
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":15,\"y\":2}"));
+            // "Café" (tipo CAFE), pós V50/V51: x em [19,25) e y em [6,12) -> ALMOCO
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":21,\"y\":8}"));
+            assertThat(proximaMensagemDe(mensagensAna, ana.getId())).isNotNull().contains("\"status\":\"ALMOCO\"");
 
-            String recebido = mensagensAna.poll(5, TimeUnit.SECONDS);
-            assertThat(recebido).isNotNull().contains("\"status\":\"DISPONIVEL\"");
+            // "Fora do trabalho" (tipo LIVRE): x em [22,32) e y em [15,23) -> AUSENTE
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":25,\"y\":18}"));
+            assertThat(proximaMensagemDe(mensagensAna, ana.getId())).isNotNull().contains("\"status\":\"AUSENTE\"");
+
+            // "Cabine 1" (tipo CABINE): x em [1,4) e y em [6,9) -> FOCO
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":2,\"y\":7}"));
+            assertThat(proximaMensagemDe(mensagensAna, ana.getId())).isNotNull().contains("\"status\":\"FOCO\"");
         } finally {
             sessaoAna.close();
         }
@@ -418,13 +434,13 @@ class PresencaWebSocketIT {
 
         WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
         try {
-            mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
+            aguardarSnapshot(mensagensAna);
 
             // chama a varredura direto, sem esperar 5 minutos de verdade nem o @Scheduled real -
             // "agora" simulado já passou do limiar de inatividade (PRD)
             presencaWebSocketHandler.verificarInatividade(Instant.now().plus(Duration.ofMinutes(6)));
 
-            String recebido = mensagensAna.poll(5, TimeUnit.SECONDS);
+            String recebido = proximaMensagemDe(mensagensAna, ana.getId());
             assertThat(recebido).isNotNull().contains("\"tipo\":\"STATUS\"").contains("\"status\":\"AUSENTE\"");
         } finally {
             sessaoAna.close();
@@ -439,13 +455,12 @@ class PresencaWebSocketIT {
 
         WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
         try {
-            mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
+            aguardarSnapshot(mensagensAna);
 
             // "agora" simulado é só um instante depois de conectar - bem abaixo do limiar de 5 min
             presencaWebSocketHandler.verificarInatividade(Instant.now());
 
-            String recebido = mensagensAna.poll(2, TimeUnit.SECONDS);
-            assertThat(recebido).isNull();
+            assertThat(proximaMensagemDe(mensagensAna, ana.getId(), 2000)).isNull();
         } finally {
             sessaoAna.close();
         }
@@ -459,15 +474,14 @@ class PresencaWebSocketIT {
 
         WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
         try {
-            mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
+            aguardarSnapshot(mensagensAna);
             presencaWebSocketHandler.verificarInatividade(Instant.now().plus(Duration.ofMinutes(6)));
-            String ausente = mensagensAna.poll(5, TimeUnit.SECONDS);
-            assertThat(ausente).isNotNull().contains("\"status\":\"AUSENTE\"");
+            assertThat(proximaMensagemDe(mensagensAna, ana.getId())).isNotNull().contains("\"status\":\"AUSENTE\"");
 
-            // (8,8) não cai em nenhuma zona seedada - qualquer mensagem nova já tira do AUSENTE
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":8,\"y\":8}"));
+            // (20,13) fica no corredor aberto, fora de toda zona - qualquer mensagem nova já tira do AUSENTE
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":20,\"y\":13}"));
 
-            String recuperado = mensagensAna.poll(5, TimeUnit.SECONDS);
+            String recuperado = proximaMensagemDe(mensagensAna, ana.getId());
             assertThat(recuperado).isNotNull().contains("\"status\":\"DISPONIVEL\"").doesNotContain("\"status\":\"AUSENTE\"");
         } finally {
             sessaoAna.close();
@@ -484,8 +498,8 @@ class PresencaWebSocketIT {
         try {
             mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
 
-            // zona "Área de trabalho" (tipo FOCO) seedada por V24__redesenha_salas_por_funcao.sql cobre x em [1,13) e y em [10,18)
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":2,\"y\":11}"));
+            // zona "Área de trabalho" (tipo FOCO), pós V50/V51: x em [7,19) e y em [15,23)
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":10,\"y\":16}"));
             String recebido = mensagensAna.poll(5, TimeUnit.SECONDS);
             assertThat(recebido).isNotNull(); // o broadcast já saiu antes da escrita do evento (PRD, S6.12)
             // receber o broadcast no cliente não prova que a escrita seguinte no servidor (mesma
@@ -513,11 +527,11 @@ class PresencaWebSocketIT {
         WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
         try {
             mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":2,\"y\":11}")); // entra na Área de trabalho (FOCO)
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":10,\"y\":16}")); // entra na Área de trabalho (FOCO)
             mensagensAna.poll(5, TimeUnit.SECONDS);
 
-            // (8,8) não cai em nenhuma zona seedada
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":8,\"y\":8}"));
+            // (20,13) fica no corredor aberto, fora de toda zona
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":20,\"y\":13}"));
             mensagensAna.poll(5, TimeUnit.SECONDS);
             Thread.sleep(300); // receber o broadcast não prova que a escrita seguinte já terminou
 
@@ -538,14 +552,14 @@ class PresencaWebSocketIT {
         WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
         try {
             mensagensAna.poll(5, TimeUnit.SECONDS); // snapshot inicial, descartado
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":2,\"y\":11}")); // entra na Área de trabalho (FOCO)
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":10,\"y\":16}")); // entra na Área de trabalho (FOCO)
             mensagensAna.poll(5, TimeUnit.SECONDS);
 
-            // zona "Sala de reunião" seedada por V24__redesenha_salas_por_funcao.sql cobre x em [1,8) e y em [1,7) -
-            // não é fisicamente adjacente à Área de trabalho no layout novo, mas não há checagem de velocidade/
-            // teleporte no servidor (ValidadorPosicaoMapa só valida limites do mapa), então uma única mensagem
-            // POSICAO "pulando" direto pra dentro da outra zona ainda é o cenário válido que este teste quer cobrir.
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":2,\"y\":2}"));
+            // zona "Sala de reunião" (tipo REUNIAO), pós V50/V51: x em [7,14) e y em [6,12) - não é
+            // fisicamente adjacente à Área de trabalho no layout, mas não há checagem de velocidade/
+            // teleporte no servidor (ValidadorPosicaoMapa só valida limites do mapa), então uma única
+            // mensagem POSICAO "pulando" direto pra dentro da outra zona ainda é o cenário válido aqui.
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":10,\"y\":8}"));
             mensagensAna.poll(5, TimeUnit.SECONDS);
             Thread.sleep(300); // receber o broadcast não prova que a escrita seguinte já terminou
 
@@ -568,7 +582,7 @@ class PresencaWebSocketIT {
         BlockingQueue<String> mensagensAna = new LinkedBlockingQueue<>();
 
         WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
-        sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":2,\"y\":11}")); // entra na Área de trabalho (FOCO)
+        sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":10,\"y\":16}")); // entra na Área de trabalho (FOCO)
         mensagensAna.poll(5, TimeUnit.SECONDS);
 
         sessaoAna.close();
@@ -600,15 +614,15 @@ class PresencaWebSocketIT {
             String recebidoCaio = mensagensCaio.poll(5, TimeUnit.SECONDS);
 
             // Ana continua no snapshot (não some) - só que agora OFFLINE e estacionada no centro
-            // de "Fora do trabalho" (V24: x=16,y=10,largura=10,altura=8 -> centro 21,14)
+            // de "Fora do trabalho" (pós V50/V51: x=22,y=15,largura=10,altura=8 -> centro 27,19)
             assertThat(recebidoCaio)
                     .isNotNull()
                     .contains("\"usuarioId\":" + beto.getId())
                     .contains("\"usuarioId\":" + caio.getId())
                     .contains("\"usuarioId\":" + ana.getId())
                     .contains("\"status\":\"OFFLINE\"")
-                    .contains("\"x\":21")
-                    .contains("\"y\":14");
+                    .contains("\"x\":27")
+                    .contains("\"y\":19");
         } finally {
             sessaoBeto.close();
             sessaoCaio.close();
@@ -621,6 +635,44 @@ class PresencaWebSocketIT {
             StandardWebSocketClient wsClient = new StandardWebSocketClient();
             wsClient.execute(new TextWebSocketHandler() {}, "ws://localhost:" + port + "/ws/presenca").get(5, TimeUnit.SECONDS);
         }).isInstanceOf(ExecutionException.class);
+    }
+
+    /**
+     * Espera a próxima mensagem de POSICAO/STATUS sobre {@code usuarioId} (pula o SNAPSHOT inicial
+     * e broadcasts sobre outros usuários). O {@code PresencaWebSocketIT} reaproveita o mesmo bean
+     * do handler entre os testes da classe e o fechamento do WebSocket é assíncrono, então um
+     * broadcast de OFFLINE de um {@code close()} de um teste anterior pode chegar tarde na fila
+     * deste teste - filtrar por usuário deixa a asserção robusta a esse ruído em vez de flaky.
+     */
+    /**
+     * Bloqueia até o SNAPSHOT inicial chegar - serve de barreira de sincronização (garante que o
+     * {@code afterConnectionEstablished} do servidor já rodou e registrou o usuário no estado)
+     * antes do teste mandar POSICAO/STATUS ou chamar {@code verificarInatividade}.
+     */
+    private void aguardarSnapshot(BlockingQueue<String> mensagens) throws InterruptedException {
+        long fim = System.currentTimeMillis() + 5000;
+        while (System.currentTimeMillis() < fim) {
+            String msg = mensagens.poll(Math.max(0, fim - System.currentTimeMillis()), TimeUnit.MILLISECONDS);
+            if (msg != null && msg.contains("\"tipo\":\"SNAPSHOT\"")) {
+                return;
+            }
+        }
+    }
+
+    private String proximaMensagemDe(BlockingQueue<String> mensagens, long usuarioId) throws InterruptedException {
+        return proximaMensagemDe(mensagens, usuarioId, 5000);
+    }
+
+    private String proximaMensagemDe(BlockingQueue<String> mensagens, long usuarioId, long timeoutMs) throws InterruptedException {
+        long fim = System.currentTimeMillis() + timeoutMs;
+        String alvo = "\"usuarioId\":" + usuarioId + ",";
+        while (System.currentTimeMillis() < fim) {
+            String msg = mensagens.poll(Math.max(0, fim - System.currentTimeMillis()), TimeUnit.MILLISECONDS);
+            if (msg != null && !msg.contains("\"tipo\":\"SNAPSHOT\"") && msg.contains(alvo)) {
+                return msg;
+            }
+        }
+        return null;
     }
 
     private WebSocketSession conectar(String token, BlockingQueue<String> mensagens)
