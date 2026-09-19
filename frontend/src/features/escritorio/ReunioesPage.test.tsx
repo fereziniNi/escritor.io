@@ -32,9 +32,11 @@ function renderPagina() {
  * Pedido do usuário: "para agendar as reunioes em outra opcao do sistema" - `EscalaEquipePainel`
  * saiu de dentro de `EscalaPage` e virou esta página própria. Depois, "onde o usuário do sistema
  * (independente) vai conseguir marcar e entrar nas reuniões do meet": deixou de ser GESTOR/ADMIN
- * só - "➕ Nova reunião" é pra qualquer papel (exige Google conectado); "Escala da equipe" continua
- * um atalho só de GESTOR/ADMIN, decidido aqui dentro (a página não é mais GESTOR/ADMIN-only por
- * inteiro, então o gate migrou de `EscritorioPage`/`BarraFerramentas` pra cá).
+ * só - "➕ Nova reunião" é pra qualquer papel (exige Google conectado). "Escala da equipe" também
+ * era um atalho só de GESTOR/ADMIN, mas o usuário pediu pra abrir pra todo mundo ("gostaria que
+ * todos tivessem o menu e as opções também") - hoje aparece pra qualquer papel autenticado, sem
+ * gate nenhum aqui dentro (quem limita o que aparece na tabela é o backend, via
+ * `VisibilidadeUsuarioService`).
  */
 describe('ReunioesPage', () => {
   afterEach(() => useAuthStore.setState(ESTADO_INICIAL, true))
@@ -50,7 +52,7 @@ describe('ReunioesPage', () => {
     expect(screen.queryByRole('button', { name: /nova reunião/i })).not.toBeInTheDocument()
   })
 
-  it('com o Google conectado, mostra o botão de marcar reunião pra qualquer papel', async () => {
+  it('com o Google conectado, mostra o botão de marcar reunião e a escala da equipe pra qualquer papel', async () => {
     useAuthStore.setState(ESTADO_INICIAL, true)
     useAuthStore.getState().definirSessao('token-fake', 'COLABORADOR')
     server.use(http.get('/integracoes/google/estado', () => HttpResponse.json({ habilitado: true, conectado: true })))
@@ -58,7 +60,7 @@ describe('ReunioesPage', () => {
     renderPagina()
 
     expect(await screen.findByRole('button', { name: /nova reunião/i })).toBeInTheDocument()
-    expect(screen.queryByText(/escala da equipe/i)).not.toBeInTheDocument()
+    expect(await screen.findByText(/escala da equipe/i)).toBeInTheDocument()
   })
 
   it('gestor também vê a escala da equipe', async () => {

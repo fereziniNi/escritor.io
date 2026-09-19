@@ -72,4 +72,58 @@ class EnvioWhatsAppEvolutionTest {
 
         assertThatCode(() -> ambiente.servico().enviarParaChefe("Oi, chefe")).doesNotThrowAnyException();
     }
+
+    // ---------- pedido do usuário: avisar por WhatsApp de tarefa concluída/mensagem de chat,
+    // pro WhatsApp de CADA colaborador (não pro chefe fixo) - `enviar(numero, texto)` ----------
+
+    @Test
+    void enviaOTextoPraQualquerNumeroInformado() {
+        var ambiente = montar("5511999999999", true);
+        ambiente.servidor()
+                .expect(requestTo(BASE_URL + "/message/sendText/escritorio"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header("apikey", "chave-123"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"number\":\"5511988887777\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("concluiu")))
+                .andRespond(withSuccess());
+
+        ambiente.servico().enviar("5511988887777", "concluiu a tarefa");
+
+        ambiente.servidor().verify();
+    }
+
+    @Test
+    void enviarNaoMandaNadaQuandoDesabilitado() {
+        var ambiente = montar("5511999999999", false);
+
+        ambiente.servico().enviar("5511988887777", "concluiu a tarefa");
+
+        ambiente.servidor().verify();
+    }
+
+    @Test
+    void enviarNaoMandaNadaQuandoONumeroInformadoEstaVazio() {
+        var ambiente = montar("5511999999999", true);
+
+        ambiente.servico().enviar("", "concluiu a tarefa");
+
+        ambiente.servidor().verify();
+    }
+
+    @Test
+    void enviarNaoMandaNadaQuandoONumeroInformadoENulo() {
+        var ambiente = montar("5511999999999", true);
+
+        ambiente.servico().enviar(null, "concluiu a tarefa");
+
+        ambiente.servidor().verify();
+    }
+
+    @Test
+    void enviarNaoPropagaExcecaoQuandoOEnvioFalha() {
+        var ambiente = montar("5511999999999", true);
+        ambiente.servidor().expect(requestTo(BASE_URL + "/message/sendText/escritorio")).andRespond(withServerError());
+
+        assertThatCode(() -> ambiente.servico().enviar("5511988887777", "concluiu a tarefa")).doesNotThrowAnyException();
+    }
 }

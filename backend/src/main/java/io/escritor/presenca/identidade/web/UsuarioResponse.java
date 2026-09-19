@@ -10,7 +10,8 @@ public record UsuarioResponse(
         Papel papel,
         Integer cargaDiariaMinutos,
         boolean ativo,
-        AparenciaAvatarResponse aparencia) {
+        AparenciaAvatarResponse aparencia,
+        String whatsapp) {
 
     public static UsuarioResponse de(Usuario usuario) {
         return new UsuarioResponse(
@@ -20,6 +21,7 @@ public record UsuarioResponse(
                 usuario.getPapel(),
                 usuario.getCargaDiariaMinutos(),
                 usuario.isAtivo(),
-                AparenciaAvatarResponse.de(usuario.getAparencia()));
+                AparenciaAvatarResponse.de(usuario.getAparencia()),
+                usuario.getWhatsapp());
     }
 }

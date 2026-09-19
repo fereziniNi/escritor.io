@@ -133,9 +133,35 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
+            <!--
+                Auditoria de segurança (VULN-01, CRITICAL): JwtService agora recusa subir com o
+                placeholder de app.jwt.segredo do application.yml (era possível forjar um JWT de
+                ADMIN só lendo o repositório). Todo teste que sobe o contexto Spring inteiro
+                (@SpringBootTest/IT) dependia implicitamente desse placeholder - sem sobrescrever
+                aqui, a suíte inteira quebraria no boot. Variável de ambiente (maior precedência
+                que application.yml, mesmo mecanismo do docker-compose.yml em produção/dev real) em
+                vez de um application.yml em src/test/resources de propósito: um application.yml
+                de teste SUBSTITUIRIA o de main inteiro no classpath (não faz merge), derrubando
+                datasource/flyway/mail/management também - a env var só troca esta propriedade.
+                Não é segredo de verdade, só precisa não ser o placeholder nem ser curto demais.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <environmentVariables>
+                        <APP_JWT_SEGREDO>segredo-de-teste-automatizado-nunca-usar-fora-da-suite-de-testes-0000000000</APP_JWT_SEGREDO>
+                    </environmentVariables>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <environmentVariables>
+                        <APP_JWT_SEGREDO>segredo-de-teste-automatizado-nunca-usar-fora-da-suite-de-testes-0000000000</APP_JWT_SEGREDO>
+                    </environmentVariables>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>

@@ -90,7 +90,7 @@ class UsuarioControllerTest {
     @WithMockUser(roles = "ADMIN")
     void permiteCriacaoParaAdmin() throws Exception {
         when(usuarioService.criar(any()))
-                .thenReturn(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 360, true, APARENCIA_PADRAO));
+                .thenReturn(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 360, true, APARENCIA_PADRAO, null));
 
         mockMvc.perform(post("/usuarios")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -124,7 +124,7 @@ class UsuarioControllerTest {
     @WithMockUser(roles = "ADMIN")
     void listaUsuariosParaAdmin() throws Exception {
         when(usuarioService.listar())
-                .thenReturn(java.util.List.of(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 360, true, APARENCIA_PADRAO)));
+                .thenReturn(java.util.List.of(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 360, true, APARENCIA_PADRAO, null)));
 
         mockMvc.perform(get("/usuarios"))
                 .andExpect(status().isOk())
@@ -173,7 +173,7 @@ class UsuarioControllerTest {
     @WithMockUser(roles = "ADMIN")
     void permiteAtualizarCargaDiariaParaAdmin() throws Exception {
         when(usuarioService.atualizarCargaDiaria(eq(1L), any()))
-                .thenReturn(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 420, true, APARENCIA_PADRAO));
+                .thenReturn(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 420, true, APARENCIA_PADRAO, null));
 
         mockMvc.perform(patch("/usuarios/1/carga-diaria")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -209,6 +209,110 @@ class UsuarioControllerTest {
                 .andExpect(status().isNotFound());
     }
 
+    // ---------- pedido do usuário: avisar por WhatsApp de tarefa concluída/mensagem de chat ----------
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void permiteCriacaoComWhatsapp() throws Exception {
+        when(usuarioService.criar(any()))
+                .thenReturn(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 360, true, APARENCIA_PADRAO, "5511999998888"));
+
+        mockMvc.perform(post("/usuarios")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"Ana Souza","email":"ana@escritor.io","papel":"COLABORADOR","cargaDiariaMinutos":360,"whatsapp":"5511999998888"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.whatsapp").value("5511999998888"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void rejeitaWhatsappComLetraNaCriacaoComoBadRequest() throws Exception {
+        mockMvc.perform(post("/usuarios")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"Ana Souza","email":"ana@escritor.io","papel":"COLABORADOR","cargaDiariaMinutos":360,"whatsapp":"não é número"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejeitaAtualizarWhatsappSemAutenticacao() throws Exception {
+        mockMvc.perform(patch("/usuarios/1/whatsapp")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"whatsapp":"5511999998888"}
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "GESTOR")
+    void rejeitaAtualizarWhatsappParaPapelNaoAdmin() throws Exception {
+        mockMvc.perform(patch("/usuarios/1/whatsapp")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"whatsapp":"5511999998888"}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void permiteAtualizarWhatsappParaAdmin() throws Exception {
+        when(usuarioService.atualizarWhatsapp(eq(1L), any()))
+                .thenReturn(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480, true, APARENCIA_PADRAO, "5511988887777"));
+
+        mockMvc.perform(patch("/usuarios/1/whatsapp")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"whatsapp":"5511988887777"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.whatsapp").value("5511988887777"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void permiteLimparOWhatsappMandandoVazio() throws Exception {
+        when(usuarioService.atualizarWhatsapp(eq(1L), any()))
+                .thenReturn(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480, true, APARENCIA_PADRAO, null));
+
+        mockMvc.perform(patch("/usuarios/1/whatsapp")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"whatsapp":""}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.whatsapp").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void rejeitaWhatsappComLetraComoBadRequest() throws Exception {
+        mockMvc.perform(patch("/usuarios/1/whatsapp")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"whatsapp":"não é número"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void atualizarWhatsappDeUsuarioInexistenteRetorna404() throws Exception {
+        when(usuarioService.atualizarWhatsapp(eq(999L), any()))
+                .thenThrow(new RecursoNaoEncontradoException("Usuário não encontrado"));
+
+        mockMvc.perform(patch("/usuarios/999/whatsapp")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"whatsapp":"5511988887777"}
+                                """))
+                .andExpect(status().isNotFound());
+    }
+
     private static Usuario usuarioAutenticadoFalso() {
         Usuario usuario = new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480);
         ReflectionTestUtils.setField(usuario, "id", 1L);
@@ -226,7 +330,7 @@ class UsuarioControllerTest {
         Usuario eu = usuarioAutenticadoFalso();
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(eu);
         when(usuarioService.buscarMeuUsuario(eu))
-                .thenReturn(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480, true, APARENCIA_PADRAO));
+                .thenReturn(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480, true, APARENCIA_PADRAO, null));
 
         mockMvc.perform(get("/usuarios/me"))
                 .andExpect(status().isOk())
@@ -253,7 +357,7 @@ class UsuarioControllerTest {
                 TipoChapeu.NENHUM, "#6b7280", TipoOculos.NENHUM, "#6b7280", EstiloOutro.NENHUM, "#6b7280");
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(eu);
         when(usuarioService.atualizarMinhaAparencia(eq(eu), any()))
-                .thenReturn(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480, true, aparenciaNova));
+                .thenReturn(new UsuarioResponse(1L, "Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480, true, aparenciaNova, null));
 
         mockMvc.perform(patch("/usuarios/me/aparencia")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -302,7 +406,7 @@ class UsuarioControllerTest {
         Usuario eu = usuarioAutenticadoFalso();
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(eu);
         when(usuarioService.atualizarMeuPerfil(eq(eu), any()))
-                .thenReturn(new UsuarioResponse(1L, "Ana Souza Lima", "ana.lima@escritor.io", Papel.COLABORADOR, 480, true, APARENCIA_PADRAO));
+                .thenReturn(new UsuarioResponse(1L, "Ana Souza Lima", "ana.lima@escritor.io", Papel.COLABORADOR, 480, true, APARENCIA_PADRAO, null));
 
         mockMvc.perform(patch("/usuarios/me/perfil")
                         .contentType(MediaType.APPLICATION_JSON)

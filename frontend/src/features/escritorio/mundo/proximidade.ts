@@ -13,9 +13,10 @@ export interface ParProximo {
  * tile (x,y) que já vem do servidor - nunca posição de tela/DOM (o mundo pode estar em qualquer
  * zoom/pan, isso não deve mudar quem está "perto"). Distância euclidiana, não Manhattan - "perto"
  * inclui a diagonal, como esperado de proximidade espacial de verdade. Ignora quem está OFFLINE -
- * são avatares estacionados em "Fora do trabalho" pelo backend (desconectaram), não tem ninguém
- * de verdade ali pra estar "perto" - sem isso, um avatar fantasma dispararia notificação de
- * proximidade pra quem só está passando pela sala.
+ * desconectou (o backend só troca o status, não move mais a posição - pedido do usuário: "não
+ * coloque ela para o lugar de descanso/fora do trabalho"), então não tem ninguém de verdade
+ * naquele lugar pra estar "perto" - sem isso, um avatar fantasma dispararia notificação de
+ * proximidade pra quem só está passando por onde a pessoa desconectou.
  */
 export function calcularParesProximos(usuarios: EstadoPresencaUsuario[], raioTiles: number): ParProximo[] {
   const online = usuarios.filter((usuario) => usuario.status !== 'OFFLINE')

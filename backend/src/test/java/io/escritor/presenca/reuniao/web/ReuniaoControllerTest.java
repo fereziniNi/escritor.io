@@ -28,7 +28,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Pedido do usuário: "onde o usuário do sistema (independente) vai conseguir marcar e entrar nas
  * reuniões do meet" - criar/cancelar/consultar as próprias é qualquer papel autenticado (deixou de
- * ser GESTOR/ADMIN só); só {@code /equipe} (visão de todo mundo) continua GESTOR/ADMIN.
+ * ser GESTOR/ADMIN só); {@code /equipe} (visão de todo mundo) também deixou de exigir GESTOR/ADMIN
+ * depois ("gostaria que todos tivessem o menu e as opções também") - filtro de visibilidade
+ * continua sendo o {@code VisibilidadeUsuarioService} por trás do serviço, não o papel de quem
+ * chama.
  */
 @WebMvcTest(ReuniaoController.class)
 @Import({SecurityConfig.class, JwtService.class})
@@ -124,9 +127,12 @@ class ReuniaoControllerTest {
 
     @Test
     @WithMockUser(roles = "COLABORADOR")
-    void equipeComPapelColaboradorRetorna403() throws Exception {
+    void colaboradorListaAsReunioesDaEquipe() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(reuniaoService.listarDaEquipe(any(), any(), any())).thenReturn(List.of());
+
         mockMvc.perform(get("/escala/reunioes/equipe").param("inicio", "2026-01-01").param("fim", "2026-01-31"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
     }
 
     @Test

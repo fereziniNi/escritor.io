@@ -1,8 +1,6 @@
 package io.escritor.presenca.reuniao.service;
 
 import io.escritor.presenca.escala.domain.HorarioInvalidoException;
-import io.escritor.presenca.escala.service.EscalaService;
-import io.escritor.presenca.escala.web.DiaEfetivoResponse;
 import io.escritor.presenca.escritorio.ws.PresencaWebSocketHandler;
 import io.escritor.presenca.escritorio.ws.PresencaWebSocketHandler.ConviteReuniaoWs;
 import io.escritor.presenca.googlecalendar.domain.GoogleNaoConectadoException;
@@ -36,9 +34,15 @@ import org.springframework.transaction.annotation.Transactional;
  * plataforma... deixar disponível para entrar na reunião com quem ele quer dos funcionários".
  * Evolução do que já existia (só chefe marcava, com um funcionário só, sem Meet): agora qualquer
  * usuário autenticado cria, com um ou mais participantes - a única exigência é ter conectado a
- * própria conta Google (é o organizador que gera o link do Meet). Confirmado com o usuário: o
- * horário escolhido ainda precisa caber no expediente efetivo de CADA participante (não do
- * criador).
+ * própria conta Google (é o organizador que gera o link do Meet).
+ *
+ * <p>O horário escolhido já foi obrigado a caber no expediente efetivo de cada participante, mas o
+ * usuário pediu pra soltar essa trava ("pode permitir marcar a reunião fora do horário de
+ * trabalho, mas deve deixar informando para deixar ciente") - marcar fora do expediente de alguém
+ * é permitido agora; quem cria só é avisado (front-end, via {@code GET /escala/disponibilidade},
+ * antes de enviar) em vez de ser bloqueado. Só continua proibido marcar em cima de outra reunião já
+ * existente de um participante ({@link #validarSemSobreposicao}) - isso não é sobre horário de
+ * trabalho, é sobre a pessoa fisicamente não poder estar em dois lugares ao mesmo tempo.
  */
 @Service
 public class ReuniaoService {
@@ -47,7 +51,6 @@ public class ReuniaoService {
 
     private final ReuniaoRepository reuniaoRepository;
     private final UsuarioRepository usuarioRepository;
-    private final EscalaService escalaService;
     private final VisibilidadeUsuarioService visibilidadeUsuarioService;
     private final GoogleOAuthService googleOAuthService;
     private final GoogleMeetService googleMeetService;
@@ -58,7 +61,6 @@ public class ReuniaoService {
     public ReuniaoService(
             ReuniaoRepository reuniaoRepository,
             UsuarioRepository usuarioRepository,
-            EscalaService escalaService,
             VisibilidadeUsuarioService visibilidadeUsuarioService,
             GoogleOAuthService googleOAuthService,
             GoogleMeetService googleMeetService,
@@ -67,7 +69,6 @@ public class ReuniaoService {
             Clock clock) {
         this.reuniaoRepository = reuniaoRepository;
         this.usuarioRepository = usuarioRepository;
-        this.escalaService = escalaService;
         this.visibilidadeUsuarioService = visibilidadeUsuarioService;
         this.googleOAuthService = googleOAuthService;
         this.googleMeetService = googleMeetService;
@@ -78,12 +79,12 @@ public class ReuniaoService {
 
     /**
      * Valida, nessa ordem: (1) o criador conectou o Google (sem isso não existe link de Meet pra
-     * gerar); (2) todos os participantes existem; (3) cada um deles efetivamente trabalha nesse
-     * dia (padrão semanal ou exceção) e o intervalo pedido está inteiramente contido no expediente
-     * efetivo de cada um; (4) o intervalo não sobrepõe outra reunião já marcada pra cada um deles.
-     * A chamada à Google é síncrona de propósito (pedido: "disponibilizar o link caso queira
-     * compartilhar" - precisa vir na própria resposta desta criação) - se falhar, a
-     * {@code @Transactional} desfaz a criação também, sem deixar reunião "pela metade".
+     * gerar); (2) todos os participantes existem; (3) o intervalo não sobrepõe outra reunião já
+     * marcada pra cada um deles. Fora do expediente efetivo de um participante ainda é permitido -
+     * o front-end já avisa antes de enviar (ver {@code MarcarReuniaoComMeetModal}), mas quem cria
+     * decide mesmo assim. A chamada à Google é síncrona de propósito (pedido: "disponibilizar o
+     * link caso queira compartilhar" - precisa vir na própria resposta desta criação) - se falhar,
+     * a {@code @Transactional} desfaz a criação também, sem deixar reunião "pela metade".
      */
     @Transactional
     public ReuniaoResponse criar(Usuario criador, CriarReuniaoRequest request) {
@@ -96,7 +97,6 @@ public class ReuniaoService {
             throw new RecursoNaoEncontradoException("Um ou mais participantes não encontrados");
         }
         for (Usuario participante : participantes) {
-            validarDentroDoExpedienteEfetivo(participante, request);
             validarSemSobreposicao(participante, request);
         }
 
@@ -159,20 +159,6 @@ public class ReuniaoService {
             googleMeetService.removerEvento(criador, reuniaoId);
         } catch (RuntimeException erro) {
             log.warn("Falha ao remover o evento do Meet da reunião {}", reuniaoId, erro);
-        }
-    }
-
-    private void validarDentroDoExpedienteEfetivo(Usuario participante, CriarReuniaoRequest request) {
-        List<DiaEfetivoResponse> dias = escalaService.calcularEfetiva(participante, request.data(), request.data());
-        DiaEfetivoResponse dia = dias.get(0);
-        boolean dentroDoExpediente = dia.trabalha()
-                && dia.horaInicio() != null
-                && dia.horaFim() != null
-                && !request.horaInicio().isBefore(dia.horaInicio())
-                && !request.horaFim().isAfter(dia.horaFim());
-        if (!dentroDoExpediente) {
-            throw new HorarioInvalidoException(
-                    "A reunião precisa estar dentro do horário em que " + participante.getNome() + " vai trabalhar nesse dia");
         }
     }
 

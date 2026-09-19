@@ -90,6 +90,9 @@ export async function criarColaborador(dados: {
   email: string
   papel: Papel
   cargaDiariaMinutos: number
+  /** Pedido do usuário: avisar por WhatsApp quando uma tarefa é concluída ou uma mensagem de chat
+   * chega - opcional, ninguém é obrigado a cadastrar. */
+  whatsapp?: string
 }): Promise<Colaborador> {
   const response = await apiFetch('/usuarios', {
     method: 'POST',
@@ -102,9 +105,8 @@ export async function criarColaborador(dados: {
   return response.json()
 }
 
-/** Único campo editável hoje pra quem já existe (pedido do usuário: "o admin deve definir [a
- * carga diária] pros outros funcionários, não deve ser padrão") - nome/email/papel não têm tela
- * de edição ainda. */
+/** Pedido do usuário: "o admin deve definir [a carga diária] pros outros funcionários, não deve
+ * ser padrão" - nome/email/papel não têm tela de edição ainda. */
 export async function atualizarCargaDiaria(colaboradorId: number, cargaDiariaMinutos: number): Promise<Colaborador> {
   const response = await apiFetch(`/usuarios/${colaboradorId}/carga-diaria`, {
     method: 'PATCH',
@@ -113,6 +115,21 @@ export async function atualizarCargaDiaria(colaboradorId: number, cargaDiariaMin
   })
   if (!response.ok) {
     throw new Error('Não foi possível atualizar a carga diária')
+  }
+  return response.json()
+}
+
+/** Pedido do usuário: avisar por WhatsApp quando uma tarefa é concluída ou uma mensagem de chat
+ * chega, pro WhatsApp de cada colaborador (ADMIN-only, mesmo padrão de
+ * {@link atualizarCargaDiaria}) - `whatsapp` vazio desliga o aviso pra essa pessoa. */
+export async function atualizarWhatsapp(colaboradorId: number, whatsapp: string): Promise<Colaborador> {
+  const response = await apiFetch(`/usuarios/${colaboradorId}/whatsapp`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ whatsapp }),
+  })
+  if (!response.ok) {
+    throw new Error('Não foi possível atualizar o WhatsApp')
   }
   return response.json()
 }

@@ -23,6 +23,7 @@ import { SinoDeNotificacoes } from './SinoDeNotificacoes'
 import { CamadaMundo } from './mundo/CamadaMundo'
 import { PROXIMIDADE_RAIO_TILES } from './mundo/constantes'
 import { construirBloqueioDeCapacidade } from './mundo/construirBloqueioDeCapacidade'
+import { construirBloqueioDeOcupacao } from './mundo/construirBloqueioDeOcupacao'
 import { construirGradeColisao } from './mundo/construirGradeColisao'
 import { BORDA_PORTA_POR_TIPO } from './mundo/dadosMundo'
 import { gerarParedesDeZona } from './mundo/gerarParedesDeZona'
@@ -176,9 +177,17 @@ export function EscritorioPage() {
     () => construirBloqueioDeCapacidade(cabines, Object.values(usuarios), meuUsuarioId),
     [cabines, usuarios, meuUsuarioId],
   )
+  // Pedido do usuário: "não deixe nenhum ficar em cima um do outro não importa o lugar" - além da
+  // capacidade de cabine (só dentro delas), ninguém pode andar pro tile onde outra pessoa já está,
+  // em lugar nenhum do mapa.
+  const bloqueadaPorOcupacao = useMemo(
+    () => construirBloqueioDeOcupacao(Object.values(usuarios), meuUsuarioId),
+    [usuarios, meuUsuarioId],
+  )
   const transicaoBloqueada = useMemo(
-    () => (de: PosicaoTile, para: PosicaoTile) => bloqueadaPelaParede(de, para) || bloqueadaPelaCapacidade(de, para),
-    [bloqueadaPelaParede, bloqueadaPelaCapacidade],
+    () => (de: PosicaoTile, para: PosicaoTile) =>
+      bloqueadaPelaParede(de, para) || bloqueadaPelaCapacidade(de, para) || bloqueadaPorOcupacao(de, para),
+    [bloqueadaPelaParede, bloqueadaPelaCapacidade, bloqueadaPorOcupacao],
   )
 
   useMovimentoTeclado({

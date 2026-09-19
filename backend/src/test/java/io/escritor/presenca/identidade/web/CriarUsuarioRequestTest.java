@@ -22,7 +22,7 @@ class CriarUsuarioRequestTest {
     @Test
     void rejeitaCargaDiariaZero() {
         CriarUsuarioRequest request =
-                new CriarUsuarioRequest("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 0);
+                new CriarUsuarioRequest("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 0, null);
 
         Set<ConstraintViolation<CriarUsuarioRequest>> violacoes = validator.validate(request);
 
@@ -34,7 +34,7 @@ class CriarUsuarioRequestTest {
     @Test
     void rejeitaCargaDiariaNegativa() {
         CriarUsuarioRequest request =
-                new CriarUsuarioRequest("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, -60);
+                new CriarUsuarioRequest("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, -60, null);
 
         Set<ConstraintViolation<CriarUsuarioRequest>> violacoes = validator.validate(request);
 
@@ -46,10 +46,66 @@ class CriarUsuarioRequestTest {
     @Test
     void aceitaCargaDiariaPositiva() {
         CriarUsuarioRequest request =
-                new CriarUsuarioRequest("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 360);
+                new CriarUsuarioRequest("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 360, null);
 
         Set<ConstraintViolation<CriarUsuarioRequest>> violacoes = validator.validate(request);
 
         assertThat(violacoes).isEmpty();
+    }
+
+    // ---------- pedido do usuário: avisar por WhatsApp de tarefa concluída/mensagem de chat ----------
+
+    @Test
+    void aceitaWhatsappNulo() {
+        CriarUsuarioRequest request =
+                new CriarUsuarioRequest("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 360, null);
+
+        Set<ConstraintViolation<CriarUsuarioRequest>> violacoes = validator.validate(request);
+
+        assertThat(violacoes).isEmpty();
+    }
+
+    @Test
+    void aceitaWhatsappVazio() {
+        CriarUsuarioRequest request =
+                new CriarUsuarioRequest("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 360, "");
+
+        Set<ConstraintViolation<CriarUsuarioRequest>> violacoes = validator.validate(request);
+
+        assertThat(violacoes).isEmpty();
+    }
+
+    @Test
+    void aceitaWhatsappSoComDigitos() {
+        CriarUsuarioRequest request =
+                new CriarUsuarioRequest("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 360, "5511999998888");
+
+        Set<ConstraintViolation<CriarUsuarioRequest>> violacoes = validator.validate(request);
+
+        assertThat(violacoes).isEmpty();
+    }
+
+    @Test
+    void rejeitaWhatsappComLetra() {
+        CriarUsuarioRequest request =
+                new CriarUsuarioRequest("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 360, "não é número");
+
+        Set<ConstraintViolation<CriarUsuarioRequest>> violacoes = validator.validate(request);
+
+        assertThat(violacoes)
+                .extracting(v -> v.getPropertyPath().toString())
+                .contains("whatsapp");
+    }
+
+    @Test
+    void rejeitaWhatsappCurtoDemais() {
+        CriarUsuarioRequest request =
+                new CriarUsuarioRequest("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 360, "123");
+
+        Set<ConstraintViolation<CriarUsuarioRequest>> violacoes = validator.validate(request);
+
+        assertThat(violacoes)
+                .extracting(v -> v.getPropertyPath().toString())
+                .contains("whatsapp");
     }
 }

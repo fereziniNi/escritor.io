@@ -3,10 +3,36 @@ import type { SinalRtcRecebido } from '../types'
 import { PROXIMIDADE_RAIO_TILES } from './constantes'
 import { calcularVolumePorDistancia, type ParProximo } from './proximidade'
 
-/** Só STUN público (sem TURN, que é infraestrutura paga/self-hosted - fora de escopo). Cobre a
- * maioria das redes; alguém atrás de NAT muito restritivo pode não conseguir conectar - limitação
- * conhecida e aceita. Dois servidores por redundância, não porque um sozinho não bastasse. */
-const ICE_SERVERS: RTCIceServer[] = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }]
+/** Bug real relatado pelo usuário: "abro o microfone e falo, quem está do lado não escuta" - só
+ * STUN não basta quando alguém está atrás de NAT restritivo/CGNAT (comum em rede móvel/corporativa
+ * no Brasil); a conexão simplesmente nunca fecha e fica muda, sem erro nenhum pro usuário
+ * (`onconnectionstatechange` abaixo). TURN retransmite o áudio quando a conexão direta P2P não é
+ * possível.
+ *
+ * Primeira tentativa (Open Relay Project, credenciais públicas fixas) verificada ao vivo como
+ * quebrada - o servidor rejeitava toda alocação com erro 400. Trocado pela conta gratuita do
+ * usuário na Metered.ca (sem cartão), que gera credenciais de TURN de verdade sob demanda via
+ * `/api/v1/turn/credentials` - essa chave é feita pra ir no cliente (é assim que a própria Metered
+ * documenta o uso), só autoriza gerar credenciais de TURN de curta duração, não é um segredo de
+ * conta. */
+const METERED_DOMINIO = 'escritorio-io.metered.live'
+const METERED_API_KEY = 'ff79f8a1bb8b6272c5713bf36a75e3eb7c85'
+
+const STUN_SERVERS: RTCIceServer[] = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }]
+
+/** Busca os servidores TURN da Metered - chamada uma vez só por montagem do hook (efeito com `[]`
+ * mais abaixo, que já evita rebuscar à toa), então não precisa de cache próprio aqui. Se a busca
+ * falhar (Metered fora do ar, chave revogada), cai de volta pro STUN puro em vez de travar a voz
+ * por proximidade inteira. */
+async function buscarIceServers(): Promise<RTCIceServer[]> {
+  try {
+    const resposta = await fetch(`https://${METERED_DOMINIO}/api/v1/turn/credentials?apiKey=${METERED_API_KEY}`)
+    const turnServers = (await resposta.json()) as RTCIceServer[]
+    return [...STUN_SERVERS, ...turnServers]
+  } catch {
+    return STUN_SERVERS
+  }
+}
 
 const LIMIAR_FALANDO = 0.02
 const INTERVALO_DETECCAO_MS = 200
@@ -62,6 +88,59 @@ export function useVozProximidade({ meuUsuarioId, ativo, paresDeVoz, sinaisRtcRe
   const analisadoresRef = useRef<Map<number | 'local', AnalyserNode>>(new Map())
   const enviarSinalRtcRef = useRef(enviarSinalRtc)
   enviarSinalRtcRef.current = enviarSinalRtc
+  const audioEmEsperaDeGestoRef = useRef<Set<HTMLAudioElement>>(new Set())
+
+  /** Busca os ICE servers uma vez, assim que o hook monta - fora do caminho de `criarConexao` de
+   * propósito: `criarConexao` precisa continuar 100% síncrona até `conexoesRef.current.set(...)`
+   * (ver comentário lá) pra não reabrir a corrida de criar duas conexões pro mesmo par. Começa só
+   * com STUN (`iceServersRef.current`) e troca pra STUN+TURN assim que a Metered responder.
+   * Limitação aceita: se um par de voz já existir no exato instante em que o hook monta (raro - a
+   * pessoa precisa estar exatamente ao lado de alguém já no primeiro render), essa primeira
+   * conexão pode nascer só com STUN, porque a promise da busca nunca resolve na mesma volta
+   * síncrona que o efeito de pareamento roda - `RTCPeerConnection` não deixa trocar `iceServers`
+   * depois de criada. Qualquer par formado depois (o caso comum - a pessoa anda até perto de
+   * alguém) já pega STUN+TURN normalmente. */
+  const iceServersRef = useRef<RTCIceServer[]>(STUN_SERVERS)
+  useEffect(() => {
+    let cancelado = false
+    buscarIceServers().then((servidores) => {
+      if (!cancelado) {
+        iceServersRef.current = servidores
+      }
+    })
+    return () => {
+      cancelado = true
+    }
+  }, [])
+
+  /** Bug real relatado pelo usuário: "eu falo, mas quem está do lado não escuta nada" - mesma rede
+   * (confirmado com o usuário), então não é NAT/TURN (verificado ao vivo: a conexão conecta
+   * normal). A política de autoplay do Chrome bloqueia `.play()` com som quando a página ainda não
+   * teve NENHUMA interação do usuário (clique/tecla) - como a conexão de voz nasce sozinha pela
+   * proximidade (pedido: "o som deve estar ligado sempre"), quem fica parado e alguém chega perto
+   * SEM que a pessoa que vai ouvir tenha clicado/digitado nada antes pode nunca ter "ativação de
+   * usuário" nenhuma - `.play()` rejeita, o código antigo só ignorava o erro
+   * ("inofensivo... o áudio some quando o par muda de novo" - falso quando o par NÃO muda, o caso
+   * comum de duas pessoas paradas perto uma da outra) e o elemento ficava mudo pra sempre. Registra
+   * o elemento que falhou e tenta de novo no primeiro gesto real do usuário na página. */
+  useEffect(() => {
+    function tentarDeNovo() {
+      audioEmEsperaDeGestoRef.current.forEach((audioEl) => {
+        audioEl
+          .play()
+          .then(() => audioEmEsperaDeGestoRef.current.delete(audioEl))
+          .catch(() => {
+            // continua na espera - o próximo gesto tenta de novo.
+          })
+      })
+    }
+    window.addEventListener('pointerdown', tentarDeNovo)
+    window.addEventListener('keydown', tentarDeNovo)
+    return () => {
+      window.removeEventListener('pointerdown', tentarDeNovo)
+      window.removeEventListener('keydown', tentarDeNovo)
+    }
+  }, [])
 
   const meusPeerIds = useMemo(() => {
     const ids = new Set<number>()
@@ -117,6 +196,7 @@ export function useVozProximidade({ meuUsuarioId, ativo, paresDeVoz, sinaisRtcRe
     peer.audioEl.pause()
     peer.audioEl.srcObject = null
     peer.audioEl.remove()
+    audioEmEsperaDeGestoRef.current.delete(peer.audioEl)
     conexoesRef.current.delete(peerId)
     analisadoresRef.current.delete(peerId)
   }
@@ -134,7 +214,7 @@ export function useVozProximidade({ meuUsuarioId, ativo, paresDeVoz, sinaisRtcRe
     if (conexoesRef.current.has(peerId)) {
       return
     }
-    const conexao = new RTCPeerConnection({ iceServers: ICE_SERVERS })
+    const conexao = new RTCPeerConnection({ iceServers: iceServersRef.current })
     const transceiver = comOferta ? conexao.addTransceiver('audio', { direction: 'recvonly' }) : null
 
     const audioEl = document.createElement('audio')
@@ -161,12 +241,15 @@ export function useVozProximidade({ meuUsuarioId, ativo, paresDeVoz, sinaisRtcRe
       const stream = evento.streams[0] ?? new MediaStream([evento.track])
       audioEl.srcObject = stream
       // `.play()` pode rejeitar a Promise OU lançar sincronamente dependendo do ambiente (jsdom
-      // nos testes, políticas de autoplay em navegadores de verdade) - os dois são inofensivos
-      // aqui (o áudio some quando o par de voz muda de novo).
+      // nos testes, políticas de autoplay em navegadores de verdade). Bug real relatado pelo
+      // usuário: numa rejeição por autoplay (sem gesto do usuário ainda na página - ver o efeito
+      // que registra `pointerdown`/`keydown` acima), o elemento ficava mudo pra sempre, porque o
+      // par de voz raramente muda de novo (duas pessoas paradas perto uma da outra) - marca o
+      // elemento pra tentar de novo no próximo gesto em vez de desistir silenciosamente.
       try {
-        audioEl.play()?.catch(() => {})
+        audioEl.play()?.catch(() => audioEmEsperaDeGestoRef.current.add(audioEl))
       } catch {
-        // ignorado de propósito
+        audioEmEsperaDeGestoRef.current.add(audioEl)
       }
       registrarAnalisador(peerId, stream)
     }

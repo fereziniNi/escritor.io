@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import type { Papel } from '../auth/types'
 import { formatarMinutos } from '../ponto/formatarMinutos'
-import { atualizarCargaDiaria, criarColaborador, listarColaboradores } from './api'
+import { atualizarCargaDiaria, atualizarWhatsapp, criarColaborador, listarColaboradores } from './api'
 import type { Colaborador } from './types'
 
 const ROTULO_PAPEL: Record<Papel, string> = { COLABORADOR: 'Colaborador', GESTOR: 'Gestor', ADMIN: 'Admin' }
@@ -60,7 +60,48 @@ function LinhaColaborador({ colaborador }: { colaborador: Colaborador }) {
         {salvarMutation.isError && <p className="mensagem-erro">Não foi possível atualizar a carga diária.</p>}
         {salvarMutation.isSuccess && !mudou && <p className="mensagem-sucesso">✅ Carga diária atualizada.</p>}
       </div>
+
+      <CampoWhatsapp colaborador={colaborador} />
     </li>
+  )
+}
+
+/** Pedido do usuário: avisar por WhatsApp quando uma tarefa é concluída ou uma mensagem de chat
+ * chega, pro WhatsApp de cada colaborador - ADMIN-only, mesmo padrão de rascunho local + mutação
+ * própria do campo de carga diária acima. Em branco desliga o aviso pra essa pessoa (backend
+ * aceita e limpa o número salvo). */
+function CampoWhatsapp({ colaborador }: { colaborador: Colaborador }) {
+  const queryClient = useQueryClient()
+  const [rascunho, setRascunho] = useState(colaborador.whatsapp ?? '')
+
+  const salvarMutation = useMutation({
+    mutationFn: (whatsapp: string) => atualizarWhatsapp(colaborador.id, whatsapp),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['colaboradores'] }),
+  })
+
+  const mudou = rascunho !== (colaborador.whatsapp ?? '')
+
+  return (
+    <div className="campo" style={{ marginTop: '0.5rem' }}>
+      <label htmlFor={`whatsapp-${colaborador.id}`}>WhatsApp de {colaborador.nome}</label>
+      <div className="linha-botoes">
+        <input
+          id={`whatsapp-${colaborador.id}`}
+          type="tel"
+          placeholder="5511999998888 (código do país + DDD + número)"
+          value={rascunho}
+          onChange={(evento) => setRascunho(evento.target.value)}
+        />
+        <button type="button" disabled={!mudou || salvarMutation.isPending} onClick={() => salvarMutation.mutate(rascunho)}>
+          Salvar
+        </button>
+      </div>
+      <p className="cartao-item-meta">{colaborador.whatsapp ? 'Recebe avisos de tarefa concluída/mensagem por WhatsApp.' : 'Sem WhatsApp cadastrado - recebe só o aviso na tela.'}</p>
+      {salvarMutation.isError && (
+        <p className="mensagem-erro">Não foi possível atualizar o WhatsApp - confirme que tem só dígitos (código do país + DDD + número).</p>
+      )}
+      {salvarMutation.isSuccess && !mudou && <p className="mensagem-sucesso">✅ WhatsApp atualizado.</p>}
+    </div>
   )
 }
 
@@ -70,16 +111,25 @@ export function ColaboradoresPage() {
   const [email, setEmail] = useState('')
   const [papel, setPapel] = useState<Papel>('COLABORADOR')
   const [cargaDiariaMinutos, setCargaDiariaMinutos] = useState('480')
+  const [whatsapp, setWhatsapp] = useState('')
 
   const colaboradoresQuery = useQuery({ queryKey: ['colaboradores'], queryFn: listarColaboradores })
 
   const criarMutation = useMutation({
-    mutationFn: () => criarColaborador({ nome, email, papel, cargaDiariaMinutos: Number(cargaDiariaMinutos) }),
+    mutationFn: () =>
+      criarColaborador({
+        nome,
+        email,
+        papel,
+        cargaDiariaMinutos: Number(cargaDiariaMinutos),
+        whatsapp: whatsapp.trim() === '' ? undefined : whatsapp,
+      }),
     onSuccess: () => {
       setNome('')
       setEmail('')
       setPapel('COLABORADOR')
       setCargaDiariaMinutos('480')
+      setWhatsapp('')
       queryClient.invalidateQueries({ queryKey: ['colaboradores'] })
     },
   })
@@ -132,6 +182,17 @@ export function ColaboradoresPage() {
               value={cargaDiariaMinutos}
               onChange={(evento) => setCargaDiariaMinutos(evento.target.value)}
               required
+            />
+          </div>
+
+          <div className="campo">
+            <label htmlFor="whatsapp-colaborador">WhatsApp (opcional)</label>
+            <input
+              id="whatsapp-colaborador"
+              type="tel"
+              placeholder="5511999998888 (código do país + DDD + número)"
+              value={whatsapp}
+              onChange={(evento) => setWhatsapp(evento.target.value)}
             />
           </div>
 

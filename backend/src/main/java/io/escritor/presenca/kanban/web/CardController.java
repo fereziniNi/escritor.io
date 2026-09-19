@@ -7,6 +7,7 @@ import io.escritor.presenca.kanban.service.CardService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -17,11 +18,12 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Mover é aberto a qualquer usuário autenticado, mesma simplificação conhecida de criar card
- * (ColunaController, S3.6) - ainda não verifica acesso ao projeto dono do card (mover precisa de
- * {@link ContextoUsuarioAutenticado} mesmo assim, desde S3.17, só pra registrar quem fez a
- * mudança de coluna no histórico). Comentar (S3.15) e ler o histórico (S3.17) exigem acesso ao
- * projeto (403 sem ele).
+ * Mover, comentar, ler o histórico, atualizar e excluir exigem acesso ao projeto dono do card
+ * (403 sem ele, {@code CardService#verificarAcesso}) - aberto a qualquer membro, sem restringir
+ * por cargo ou por quem criou o card (pedido do usuário: "qualquer pessoa com acesso ao
+ * projeto"). Excluir é permanente (pedido do usuário: "apagar de verdade") - comentários/
+ * histórico/sessões de trabalho do card são apagados junto, em cascata no banco (migração V53),
+ * não ficam órfãos.
  */
 @RestController
 @RequestMapping("/cards")
@@ -46,6 +48,24 @@ public class CardController {
     @PatchMapping("/{id}/mover")
     public CardResponse mover(@PathVariable Long id, @Valid @RequestBody MoverCardRequest request) {
         return cardService.mover(id, request.colunaId(), request.indice(), contextoUsuarioAutenticado.usuarioAtual());
+    }
+
+    @PatchMapping("/{id}")
+    public CardResponse atualizar(@PathVariable Long id, @Valid @RequestBody AtualizarCardRequest request) {
+        return cardService.atualizar(
+                id,
+                request.titulo(),
+                request.descricao(),
+                request.responsavelId(),
+                request.prazo(),
+                request.estimativaMinutos(),
+                contextoUsuarioAutenticado.usuarioAtual());
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void excluir(@PathVariable Long id) {
+        cardService.excluir(id, contextoUsuarioAutenticado.usuarioAtual());
     }
 
     @PostMapping("/{id}/comentarios")

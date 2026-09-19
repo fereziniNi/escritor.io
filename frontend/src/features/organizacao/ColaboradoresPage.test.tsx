@@ -77,7 +77,7 @@ describe('ColaboradoresPage', () => {
 
     await screen.findByText('Ana Souza')
     const campo = screen.getByLabelText('Carga diária de Ana Souza (minutos)')
-    const botaoSalvar = screen.getByRole('button', { name: 'Salvar' })
+    const botaoSalvar = within(campo.closest('.campo')!).getByRole('button', { name: 'Salvar' })
     expect(botaoSalvar).toBeDisabled()
 
     await user.clear(campo)
@@ -104,7 +104,7 @@ describe('ColaboradoresPage', () => {
     const campo = screen.getByLabelText('Carga diária de Ana Souza (minutos)')
     await user.clear(campo)
     await user.type(campo, '360')
-    await user.click(screen.getByRole('button', { name: 'Salvar' }))
+    await user.click(within(campo.closest('.campo')!).getByRole('button', { name: 'Salvar' }))
 
     expect(await screen.findByText(/Hoje: 6h/)).toBeInTheDocument()
   })

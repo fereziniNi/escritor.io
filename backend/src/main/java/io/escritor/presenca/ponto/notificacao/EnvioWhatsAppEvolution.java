@@ -11,15 +11,15 @@ import org.springframework.web.client.RestClient;
 
 /**
  * Implementação de {@link EnvioWhatsApp} via Evolution API - ver a interface pro porquê de ficar
- * separada. {@code @Async}: nenhum chamador (marcar ponto, agendador do resumo diário) deve
- * travar esperando uma API externa responder; roda no executor dedicado {@code
- * notificacaoExecutor} (ver {@code AsyncConfig}).
+ * separada. {@code @Async}: nenhum chamador (marcar ponto, agendador do resumo diário, tarefa
+ * concluída, mensagem de chat) deve travar esperando uma API externa responder; roda no executor
+ * dedicado {@code notificacaoExecutor} (ver {@code AsyncConfig}).
  *
- * <p>Fica desligado por padrão ({@code app.evolution.habilitado=false}) ou sem número de chefe
- * configurado - mesmo guard que existia antes só dentro de {@code NotificacaoPontoWhatsApp},
- * agora compartilhado por qualquer coisa que precise avisar o chefe. Erros de rede/API nunca
- * sobem daqui - só ficam em log - cada chamador já tratava isso como best-effort antes desta
- * extração, e continua assim.
+ * <p>Fica desligado por padrão ({@code app.evolution.habilitado=false}), e cada método tem seu
+ * próprio guard de "tem número?" ({@code enviarParaChefe}: {@code app.evolution.chefe-numero};
+ * {@code enviar}: o número passado por quem chama, ex. {@code Usuario#getWhatsapp}). Erros de
+ * rede/API nunca sobem daqui - só ficam em log - cada chamador já tratava isso como best-effort
+ * antes desta extração, e continua assim.
  */
 @Component
 public class EnvioWhatsAppEvolution implements EnvioWhatsApp {
@@ -49,21 +49,32 @@ public class EnvioWhatsAppEvolution implements EnvioWhatsApp {
     @Override
     @Async("notificacaoExecutor")
     public void enviarParaChefe(String texto) {
-        if (!habilitado || chefeNumero == null || chefeNumero.isBlank()) {
+        enviarSe(habilitado && chefeNumero != null && !chefeNumero.isBlank(), chefeNumero, texto);
+    }
+
+    @Override
+    @Async("notificacaoExecutor")
+    public void enviar(String numero, String texto) {
+        enviarSe(habilitado && numero != null && !numero.isBlank(), numero, texto);
+    }
+
+    private void enviarSe(boolean deveEnviar, String numero, String texto) {
+        if (!deveEnviar) {
             return;
         }
-
         try {
             restClient
                     .post()
                     .uri("/message/sendText/{instancia}", instancia)
                     .header("apikey", apiKey)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("number", chefeNumero, "text", texto))
+                    .body(Map.of("number", numero, "text", texto))
                     .retrieve()
                     .toBodilessEntity();
         } catch (RuntimeException erro) {
-            log.warn("Não foi possível mandar mensagem pro chefe via WhatsApp", erro);
+            // não loga o número em si (dado pessoal do colaborador, diferente do chefe fixo) - só
+            // que uma tentativa de envio falhou.
+            log.warn("Não foi possível mandar uma mensagem via WhatsApp", erro);
         }
     }
 }

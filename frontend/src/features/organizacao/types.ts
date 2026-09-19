@@ -2,7 +2,9 @@ import type { Papel } from '../auth/types'
 import type { ColunaComCards } from '../kanban/types'
 
 /** {@code Papel} vem de `features/auth/types.ts` - o mesmo enum de papel usado no login também
- * descreve o papel de cada colaborador aqui. */
+ * descreve o papel de cada colaborador aqui. {@code whatsapp} é opcional (pedido do usuário:
+ * avisar por WhatsApp quando uma tarefa é concluída ou uma mensagem de chat chega) - `null` pra
+ * quem não tem número cadastrado (só ADMIN cadastra/edita, ver `ColaboradoresPage.tsx`). */
 export interface Colaborador {
   id: number
   nome: string
@@ -10,6 +12,7 @@ export interface Colaborador {
   papel: Papel
   cargaDiariaMinutos: number
   ativo: boolean
+  whatsapp: string | null
 }
 
 export type StatusProjeto = 'ATIVO' | 'PAUSADO' | 'CONCLUIDO'

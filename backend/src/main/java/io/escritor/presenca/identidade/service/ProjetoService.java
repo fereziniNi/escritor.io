@@ -1,6 +1,7 @@
 package io.escritor.presenca.identidade.service;
 
 import io.escritor.presenca.identidade.domain.MembroProjeto;
+import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Projeto;
 import io.escritor.presenca.identidade.domain.RegraVisibilidadeProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
@@ -12,6 +13,7 @@ import io.escritor.presenca.identidade.web.CriarProjetoRequest;
 import io.escritor.presenca.identidade.web.MembroProjetoResponse;
 import io.escritor.presenca.identidade.web.ProjetoDetalheResponse;
 import io.escritor.presenca.identidade.web.ProjetoResponse;
+import io.escritor.presenca.kanban.domain.AcessoNegadoException;
 import io.escritor.presenca.kanban.domain.Coluna;
 import io.escritor.presenca.kanban.repository.CardRepository;
 import io.escritor.presenca.kanban.repository.ColunaRepository;
@@ -112,9 +114,21 @@ public class ProjetoService {
      * Pedido do cliente: pessoas atribuídas direto ao projeto, sem quadro/equipe no meio -
      * idempotente (adicionar quem já é membro não duplica nem lança erro), mesmo comportamento
      * de antes.
+     *
+     * <p>Auditoria de segurança (VULN-03, HIGH): {@code @PreAuthorize("hasAnyRole('GESTOR',
+     * 'ADMIN')")} no controller checa só o PAPEL do solicitante, nunca se ele tem qualquer vínculo
+     * com {@code projetoId} - confirmado que, sem a checagem abaixo, QUALQUER GESTOR do sistema
+     * conseguia se autoadicionar (ou adicionar qualquer um) a QUALQUER projeto, ganhando acesso de
+     * leitura/escrita total ao board via {@link #buscarDetalhe} logo em seguida. Agora exige que o
+     * {@code solicitante} já seja membro do projeto-alvo - ou ADMIN, que sempre pôde ver/gerenciar
+     * qualquer projeto (mesmo bypass de {@link #usuarioPodeVer}).
      */
-    public void adicionarMembro(Long projetoId, AdicionarMembroProjetoRequest request) {
+    public void adicionarMembro(Long projetoId, AdicionarMembroProjetoRequest request, Usuario solicitante) {
         Projeto projeto = buscarProjeto(projetoId);
+        if (solicitante.getPapel() != Papel.ADMIN && !membroProjetoRepository.existsByProjetoAndUsuario(projeto, solicitante)) {
+            throw new AcessoNegadoException("Só um membro deste projeto (ou ADMIN) pode adicionar novos membros a ele");
+        }
+
         Usuario usuario = usuarioRepository
                 .findById(request.usuarioId())
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));

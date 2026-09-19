@@ -7,7 +7,6 @@ import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,8 +23,11 @@ import org.springframework.web.bind.annotation.RestController;
  * sistema (independente) vai conseguir marcar e entrar nas reuniões do meet" - criar/cancelar
  * deixou de ser GESTOR/ADMIN só (era assim antes desta reunião ganhar Meet): agora é qualquer
  * usuário autenticado, restrito apenas por ter (ou não) conectado a própria conta Google
- * ({@code ReuniaoService} valida isso). {@code /equipe} continua GESTOR/ADMIN-only - visão de
- * todo mundo, não uma ação de criar.
+ * ({@code ReuniaoService} valida isso). {@code /equipe} (visão de todo mundo, não uma ação de
+ * criar) também deixou de exigir papel GESTOR/ADMIN, a pedido do usuário ("gostaria que todos
+ * tivessem o menu e as opções também") - o filtro de quem aparece continua sendo
+ * {@code VisibilidadeUsuarioService} (mesma regra de {@link
+ * io.escritor.presenca.escala.web.EscalaController#equipe}), não o papel de quem chama.
  */
 @RestController
 @RequestMapping("/escala/reunioes")
@@ -52,7 +54,6 @@ public class ReuniaoController {
     }
 
     @GetMapping("/equipe")
-    @PreAuthorize("hasAnyRole('GESTOR', 'ADMIN')")
     public List<ReuniaoResponse> listarDaEquipe(@RequestParam LocalDate inicio, @RequestParam LocalDate fim) {
         return reuniaoService.listarDaEquipe(contextoUsuarioAutenticado.usuarioAtual(), inicio, fim);
     }

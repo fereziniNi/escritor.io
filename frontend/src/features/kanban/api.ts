@@ -37,6 +37,45 @@ export async function moverCard(dados: { cardId: number; colunaId: number; indic
   return response.json()
 }
 
+/** Pedido do usuário: "não conseguimos editar... algumas atividades" - mesmos campos aceitos por
+ * `criarCard`, agora editáveis depois de criado. `descricao`/`prazo` entram aqui (o formulário de
+ * criação não os pede, mas a entidade já os suporta desde sempre - ver `Card`, backend). */
+export async function atualizarCard(dados: {
+  cardId: number
+  titulo: string
+  descricao: string | null
+  responsavelId: number | null
+  prazo: string | null
+  estimativaMinutos: number | null
+}): Promise<Card> {
+  const response = await apiFetch(`/cards/${dados.cardId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      titulo: dados.titulo,
+      descricao: dados.descricao,
+      responsavelId: dados.responsavelId,
+      prazo: dados.prazo,
+      estimativaMinutos: dados.estimativaMinutos,
+    }),
+  })
+  if (!response.ok) {
+    throw new Error('Não foi possível atualizar a tarefa')
+  }
+  return response.json()
+}
+
+/** Pedido do usuário (segunda pergunta - "apagar de verdade"): exclusão permanente, sem
+ * arquivamento - comentários/histórico/sessões de trabalho do card são apagados junto no backend
+ * (cascata no banco). `204` sem corpo, mesmo espírito de outras respostas vazias deste cliente
+ * (ver `buscarCronometroAtivo`). */
+export async function excluirCard(cardId: number): Promise<void> {
+  const response = await apiFetch(`/cards/${cardId}`, { method: 'DELETE' })
+  if (!response.ok) {
+    throw new Error('Não foi possível apagar a tarefa')
+  }
+}
+
 export async function listarComentarios(cardId: number): Promise<Comentario[]> {
   const response = await apiFetch(`/cards/${cardId}/comentarios`)
   if (!response.ok) {

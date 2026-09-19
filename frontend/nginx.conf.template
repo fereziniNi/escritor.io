@@ -1,0 +1,133 @@
+# Auditoria de segurança (VULN-09, LOW): o handshake de `/ws/presenca`/`/ws/projeto/{id}` carrega
+# o access token JWT como query param (`?token=`) - o WebSocket nativo do browser não permite
+# setar o header Authorization no handshake, então não tem como evitar isso sem trocar pra um
+# esquema de ticket de uso único (mudança maior, considerada e adiada - risco residual já é baixo
+# graças ao token expirar em 15 min, ver `JwtService`). O que dá pra fechar sem essa reforma:
+# access_log combinado por padrão grava a query string inteira em texto claro - aqui o access log
+# do /ws/ usa um formato sem ela (mesmos campos do `combined` padrão do Nginx, só troca "$request"
+# por "$request_method $uri $server_protocol"), então o token não fica espalhado em log de
+# operação. Residual aceito: histórico do navegador de quem usou o app continua carregando a URL
+# completa (client-side, fora do alcance do servidor) - mitigado pela mesma janela de 15 min.
+log_format sem_querystring '$remote_addr - $remote_user [$time_local] '
+                           '"$request_method $uri $server_protocol" $status $body_bytes_sent '
+                           '"$http_referer" "$http_user_agent"';
+
+# Deploy no Railway: virou um TEMPLATE (processado por envsubst no boot do container, mecanismo
+# nativo da imagem oficial nginx - qualquer arquivo em /etc/nginx/templates/*.template vira
+# /etc/nginx/conf.d/*.conf com as variáveis de ambiente substituídas, antes do nginx subir).
+# Motivo: `backend` (nome fixo, hostname resolvido pela rede do docker-compose local) não existe
+# fora do compose - no Railway o backend só é alcançável via rede privada em
+# `<nome-do-serviço>.railway.internal`. `${BACKEND_HOST}`/`${BACKEND_PORT}` resolvem os dois
+# ambientes com o MESMO arquivo: local via docker-compose.yml (BACKEND_HOST=backend,
+# BACKEND_PORT=8080, idêntico ao valor hardcoded de antes) e Railway via variável de ambiente do
+# serviço frontend (BACKEND_HOST=backend.railway.internal). O entrypoint oficial do Nginx só
+# substitui variáveis que existem de verdade no ambiente (envsubst escopado à lista de env vars
+# definidas) - variáveis do próprio Nginx como $host/$remote_addr/$http_upgrade/$scheme não são
+# variáveis de ambiente do processo, então não são tocadas por engano.
+#
+# Espelha a allowlist de proxy do vite.config.ts (server.proxy) - os mesmos prefixos, pro mesmo
+# efeito: tudo que não é um desses vai pro index.html (rotas da SPA). Se um prefixo novo de API
+# for adicionado num, precisa ser adicionado no outro também.
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Achado implantando no Railway: `proxy_pass http://backend.railway.internal:8080` (host fixo
+    # dentro da diretiva) resolve o hostname UMA VEZ, no load do config - quando o Railway recria o
+    # container do backend (qualquer redeploy) o IP privado muda, e o Nginx continua tentando o IP
+    # antigo até dar timeout ("upstream timed out ... connecting to upstream"), derrubando o site
+    # inteiro até o próprio Nginx reiniciar. `resolver` + `proxy_pass` apontando pra uma
+    # *variável* (em vez de um host literal) é o jeito padrão do Nginx de forçar resolução por
+    # requisição, respeitando o TTL do `resolver` - assim um redeploy do backend nunca mais deixa
+    # o frontend travado com um IP morto. `NGINX_LOCAL_RESOLVERS` é preenchida sozinha pelo
+    # entrypoint oficial da imagem (`15-local-resolvers.envsh`, lê /etc/resolv.conf) - só precisa
+    # ligar via a env var `NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1` (ver docker-compose.yml local e a
+    # variável equivalente no serviço frontend do Railway); funciona local (resolvedor embutido do
+    # Docker) e no Railway (resolvedor da rede privada) sem precisar saber o IP de cada um.
+    resolver ${NGINX_LOCAL_RESOLVERS} valid=10s;
+
+    # Auditoria de segurança (VULN-07, MEDIUM): nenhum header de segurança era enviado antes
+    # disto. Nenhuma das 3 locations abaixo define seu próprio `add_header`, então estes valem
+    # pras três (regra do Nginx: `add_header` só deixa de herdar do contexto pai quando o filho
+    # também declara o seu - se isso mudar no futuro, repetir estes headers em cada location).
+    #
+    # - X-Content-Type-Options/X-Frame-Options/Referrer-Policy/Permissions-Policy: padrão, sem
+    #   trade-off - Permissions-Policy libera microphone=(self) de propósito (voz por
+    #   proximidade via WebRTC, `useVozProximidade.ts`, usa getUserMedia({audio:true}) - só
+    #   áudio, nunca câmera).
+    # - Content-Security-Policy: script-src só 'self', sem 'unsafe-eval' (build do Vite não usa
+    #   scripts externos nem inline) - verificado ao vivo com Playwright que isso quebrava o
+    #   mapa por completo (Pixi.js usa `new Function()` internamente pra sincronizar
+    #   shader/UBO); corrigido importando `pixi.js/unsafe-eval` uma vez no bootstrap
+    #   (`main.tsx`) em vez de afrouxar o CSP - é o módulo oficial do próprio Pixi pra ambientes
+    #   com CSP restrito, troca esses caminhos por polyfills sem eval. style-src precisa de
+    #   'unsafe-inline' porque React aplica muito estilo via atributo `style` inline
+    #   (posição/tamanho dos tiles e avatares no mapa, cores de status) - isso é sobre atributo
+    #   de estilo, não execução de script, risco bem menor. connect-src: 'self' cobre a
+    #   API/WebSocket same-origin (inclui ws(s) de mesma origem nos browsers atuais); `stun:`
+    #   (só o esquema, sem host - `stun:host:porta` não é sintaxe válida de source-list e o
+    #   browser silenciosamente ignora esse token) liberam os servidores STUN/TURN públicos
+    #   usados pela voz por proximidade (`ICE_SERVERS`, `useVozProximidade.ts`). Bug real
+    #   encontrado ao vivo: faltava `turn:`/`turns:` aqui - o navegador aplica CSP também na
+    #   descoberta de candidatos ICE, então mesmo com TURN configurado no código a conexão era
+    #   bloqueada silenciosamente (sem erro visível pro usuário, só "Refused to connect" no
+    #   console) - ninguém atrás de NAT restritivo conseguia ouvir o áudio do outro lado. O TURN
+    #   público (Open Relay) depois se provou quebrado de verdade (erro 400 do próprio servidor,
+    #   verificado ao vivo) - trocado pela conta gratuita da Metered.ca do usuário, que exige um
+    #   `fetch()` de verdade (não só `stun:`/`turn:`) pra `escritorio-io.metered.live` buscar
+    #   credenciais de TURN sob demanda (`buscarIceServers`, `useVozProximidade.ts`) - esse host
+    #   precisa estar liberado aqui também, senão o CSP bloqueia o próprio `fetch` da
+    #   mesma forma que bloqueava `turn:` antes. fonts/estilo do Google Fonts é a outra única
+    #   origem externa carregada (via index.html). frame-ancestors 'none' + object-src
+    #   'none' fecham clickjacking/plugin. Sem HSTS de propósito: este Nginx não termina TLS
+    #   (`listen 80`), e o header é ignorado pelo navegador em conexão insegura mesmo assim -
+    #   adicionar quando houver TLS de verdade na frente (ver PRD: produção ainda não definida).
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "geolocation=(), camera=(), payment=(), usb=(), microphone=(self)" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ws: wss: stun: turn: turns: https://escritorio-io.metered.live; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'" always;
+
+    location ~ ^/(health|auth|admin|usuarios|equipes|projetos|escala|chat|integracoes|ponto|ajustes|quadros|colunas|cards|apontamentos|cronometro|happy-hour|mapas|relatorios|notificacoes) {
+        set $backend_upstream http://${BACKEND_HOST}:${BACKEND_PORT};
+        proxy_pass $backend_upstream;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # /ws é upgrade de conexão (S3.11), não request HTTP normal como os prefixos acima - precisa
+    # dos headers Upgrade/Connection, por isso fica num location à parte em vez de entrar na
+    # mesma allowlist regex de cima.
+    #
+    # Pedido do usuário: "toda hora o personagem está voltando para o marco zero da tela... de vez
+    # em quando some e aparece no canto superior" - o padrão do Nginx pra `proxy_read_timeout`/
+    # `proxy_send_timeout` é 60s: alguém parado no mapa (lendo um painel, numa reunião) não gera
+    # nenhum byte de tráfego no WebSocket por mais que isso, e o Nginx fecha a conexão por trás -
+    # o navegador reconecta sozinho (com backoff), visível pros outros como "sumiu e reapareceu".
+    # 1h aqui é bem mais que suficiente mesmo sem nenhum tráfego (o backend também manda um PING de
+    # protocolo a cada 25s - ver `PresencaWebSocketHandler#enviarPing` - que já evita bater nesse
+    # teto quase sempre; este timeout alto é só a segunda camada de defesa, caso aquele PING falhe
+    # ou demore a chegar).
+    location /ws/ {
+        access_log /var/log/nginx/access.log sem_querystring;
+        proxy_read_timeout 1h;
+        proxy_send_timeout 1h;
+        set $backend_upstream_ws http://${BACKEND_HOST}:${BACKEND_PORT};
+        proxy_pass $backend_upstream_ws;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        try_files $uri /index.html;
+    }
+}

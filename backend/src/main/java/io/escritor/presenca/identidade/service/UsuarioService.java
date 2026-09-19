@@ -9,21 +9,30 @@ import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.identidade.web.AtualizarAparenciaRequest;
 import io.escritor.presenca.identidade.web.AtualizarCargaDiariaRequest;
 import io.escritor.presenca.identidade.web.AtualizarPerfilRequest;
+import io.escritor.presenca.identidade.web.AtualizarWhatsappRequest;
 import io.escritor.presenca.identidade.web.CriarUsuarioRequest;
 import io.escritor.presenca.identidade.web.UsuarioBasicoResponse;
 import io.escritor.presenca.identidade.web.UsuarioResponse;
+import io.escritor.presenca.seguranca.email.EnvioEmail;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class UsuarioService {
 
+    private static final Logger log = LoggerFactory.getLogger(UsuarioService.class);
+
     private final UsuarioRepository usuarioRepository;
     private final PresencaWebSocketHandler presencaWebSocketHandler;
+    private final EnvioEmail envioEmail;
 
-    public UsuarioService(UsuarioRepository usuarioRepository, PresencaWebSocketHandler presencaWebSocketHandler) {
+    public UsuarioService(
+            UsuarioRepository usuarioRepository, PresencaWebSocketHandler presencaWebSocketHandler, EnvioEmail envioEmail) {
         this.usuarioRepository = usuarioRepository;
         this.presencaWebSocketHandler = presencaWebSocketHandler;
+        this.envioEmail = envioEmail;
     }
 
     public UsuarioResponse criar(CriarUsuarioRequest request) {
@@ -32,6 +41,7 @@ public class UsuarioService {
                 request.email(),
                 request.papel(),
                 request.cargaDiariaMinutos());
+        usuario.alterarWhatsapp(request.whatsapp());
 
         Usuario salvo = usuarioRepository.save(usuario);
 
@@ -65,6 +75,21 @@ public class UsuarioService {
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
 
         usuario.alterarCargaDiaria(request.cargaDiariaMinutos());
+        Usuario salvo = usuarioRepository.save(usuario);
+
+        return UsuarioResponse.de(salvo);
+    }
+
+    /** ADMIN-only, mesmo espírito de {@link #atualizarCargaDiaria} - pedido do usuário: avisar por
+     * WhatsApp quando uma tarefa é concluída ou uma mensagem de chat chega, pro WhatsApp de cada
+     * colaborador (diferente do "chefe", um número fixo só pra avisos de ponto). Mandar em branco
+     * desliga o aviso (ver {@link Usuario#alterarWhatsapp}). */
+    public UsuarioResponse atualizarWhatsapp(Long usuarioId, AtualizarWhatsappRequest request) {
+        Usuario usuario = usuarioRepository
+                .findById(usuarioId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
+
+        usuario.alterarWhatsapp(request.whatsapp());
         Usuario salvo = usuarioRepository.save(usuario);
 
         return UsuarioResponse.de(salvo);
@@ -138,9 +163,19 @@ public class UsuarioService {
      * pra checar aqui). E-mail duplicado não pode virar um 500 de violação de constraint do banco -
      * checa explicitamente antes de salvar (`findByEmailAndAtivoTrue` já existe, usado hoje pelo
      * login); sem efeito quando a pessoa manda o próprio e-mail de volta sem mudar nada.
+     *
+     * <p>Auditoria de segurança (VULN-10, LOW): a troca em si continua sem exigir reconfirmação
+     * por código (implementar isso de verdade seria um fluxo novo de duas etapas, desproporcional
+     * pra um achado LOW já bastante mitigado pela checagem de unicidade acima) - o que esta
+     * correção adiciona é avisar o e-mail ANTIGO depois que a troca acontece
+     * ({@link EnvioEmail#avisarTrocaDeEmail}, best-effort, nunca desfaz nem atrasa a troca já
+     * salva), pra quem não pediu a mudança ter como perceber rápido. Mesma disciplina de
+     * {@code AutenticacaoService#gerarEEnviarCodigo}: falha de envio vira só um log de aviso, não
+     * uma exceção pro chamador.
      */
     public UsuarioResponse atualizarMeuPerfil(Usuario usuarioAutenticado, AtualizarPerfilRequest request) {
-        boolean emailMudou = !request.email().equalsIgnoreCase(usuarioAutenticado.getEmail());
+        String emailAntigo = usuarioAutenticado.getEmail();
+        boolean emailMudou = !request.email().equalsIgnoreCase(emailAntigo);
         if (emailMudou) {
             usuarioRepository.findByEmailAndAtivoTrue(request.email()).ifPresent(outro -> {
                 if (!outro.getId().equals(usuarioAutenticado.getId())) {
@@ -151,6 +186,14 @@ public class UsuarioService {
 
         usuarioAutenticado.alterarPerfil(request.nome(), request.email());
         Usuario salvo = usuarioRepository.save(usuarioAutenticado);
+
+        if (emailMudou) {
+            try {
+                envioEmail.avisarTrocaDeEmail(emailAntigo, salvo.getEmail());
+            } catch (RuntimeException e) {
+                log.warn("Falha ao avisar {} sobre a troca do próprio e-mail de acesso", emailAntigo, e);
+            }
+        }
 
         return UsuarioResponse.de(salvo);
     }

@@ -3,7 +3,9 @@ import type { AparenciaAvatar } from './avatar/aparenciaAvatar'
 export type TipoZona = 'FOCO' | 'REUNIAO' | 'CAFE' | 'ATENDIMENTO' | 'LIVRE' | 'HAPPY_HOUR' | 'CABINE'
 
 /** OFFLINE é automático (backend marca quem desconecta, nunca escolhido manualmente - não aparece
- * em `OPCOES_STATUS`) - o avatar fica estacionado em "Fora do trabalho" até a pessoa reconectar. */
+ * em `OPCOES_STATUS`) - o avatar fica parado exatamente onde estava até a pessoa reconectar (não
+ * é mais movido pra "Fora do trabalho" - pedido do usuário: "não coloque ela para o lugar de
+ * descanso/fora do trabalho"). */
 export type StatusAvatar = 'DISPONIVEL' | 'FOCO' | 'REUNIAO' | 'ALMOCO' | 'AUSENTE' | 'OFFLINE'
 
 export interface Zona {

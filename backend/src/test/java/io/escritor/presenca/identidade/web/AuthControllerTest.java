@@ -4,8 +4,10 @@ import io.escritor.presenca.identidade.service.AutenticacaoService;
 import io.escritor.presenca.identidade.service.CodigoInvalidoException;
 import io.escritor.presenca.identidade.service.TokenInvalidoException;
 import io.escritor.presenca.identidade.service.TokensAutenticacao;
+import io.escritor.presenca.seguranca.LimitadorDeTaxa;
 import io.escritor.presenca.seguranca.SecurityConfig;
 import io.escritor.presenca.seguranca.JwtService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -14,6 +16,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -32,6 +36,17 @@ class AuthControllerTest {
 
     @MockitoBean
     private AutenticacaoService autenticacaoService;
+
+    @MockitoBean
+    private LimitadorDeTaxa limitadorDeTaxa;
+
+    @BeforeEach
+    void permiteQualquerTentativaPorPadrao() {
+        // Auditoria de segurança (VULN-05) - default permissivo: nenhum teste desta classe testa
+        // o limitador em si (isso é LimitadorDeTaxaTest), então nenhum deveria ter que lidar com
+        // um 429 inesperado por acidente. Os testes dedicados abaixo sobrescrevem isto.
+        when(limitadorDeTaxa.permitir(anyString(), anyInt(), any())).thenReturn(true);
+    }
 
     @Test
     void solicitarCodigoNaoExigeAutenticacao() throws Exception {
@@ -107,5 +122,35 @@ class AuthControllerTest {
     @Test
     void refreshSemCookieRetorna401() throws Exception {
         mockMvc.perform(post("/auth/refresh")).andExpect(status().isUnauthorized());
+    }
+
+    // ---------- auditoria de segurança (VULN-05, MEDIUM) ----------
+
+    @Test
+    void solicitarCodigoAcimaDoLimiteRetorna429ENuncaChamaOServico() throws Exception {
+        when(limitadorDeTaxa.permitir(anyString(), anyInt(), any())).thenReturn(false);
+
+        mockMvc.perform(post("/auth/codigo")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"ana@escritor.io"}
+                                """))
+                .andExpect(status().isTooManyRequests());
+
+        org.mockito.Mockito.verifyNoInteractions(autenticacaoService);
+    }
+
+    @Test
+    void loginAcimaDoLimiteRetorna429ENuncaChamaOServico() throws Exception {
+        when(limitadorDeTaxa.permitir(anyString(), anyInt(), any())).thenReturn(false);
+
+        mockMvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"ana@escritor.io","codigo":"123456"}
+                                """))
+                .andExpect(status().isTooManyRequests());
+
+        org.mockito.Mockito.verifyNoInteractions(autenticacaoService);
     }
 }

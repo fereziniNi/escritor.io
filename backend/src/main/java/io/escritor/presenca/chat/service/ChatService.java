@@ -17,6 +17,7 @@ import io.escritor.presenca.escritorio.ws.PresencaWebSocketHandler.ChatMensagemW
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
+import io.escritor.presenca.ponto.notificacao.EnvioWhatsApp;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Comparator;
@@ -41,6 +42,7 @@ public class ChatService {
     private final MensagemRepository mensagemRepository;
     private final UsuarioRepository usuarioRepository;
     private final PresencaWebSocketHandler presencaWebSocketHandler;
+    private final EnvioWhatsApp envioWhatsApp;
     private final Clock clock;
 
     public ChatService(
@@ -49,12 +51,14 @@ public class ChatService {
             MensagemRepository mensagemRepository,
             UsuarioRepository usuarioRepository,
             PresencaWebSocketHandler presencaWebSocketHandler,
+            EnvioWhatsApp envioWhatsApp,
             Clock clock) {
         this.conversaRepository = conversaRepository;
         this.participanteRepository = participanteRepository;
         this.mensagemRepository = mensagemRepository;
         this.usuarioRepository = usuarioRepository;
         this.presencaWebSocketHandler = presencaWebSocketHandler;
+        this.envioWhatsApp = envioWhatsApp;
         this.clock = clock;
     }
 
@@ -147,14 +151,24 @@ public class ChatService {
         participanteRepository.save(minhaParticipacao);
 
         MensagemResponse resposta = MensagemResponse.de(mensagem);
+        // Pedido do usuário: avisar por WhatsApp quando uma mensagem de chat chega, além do aviso
+        // já existente na tela - só quem cadastrou o próprio WhatsApp (Usuario#getWhatsapp,
+        // ADMIN-only). Vale pra qualquer conversa, incluindo a "Geral" - quem não quiser receber
+        // isso é só não cadastrar o número (ninguém é obrigado).
+        String textoWhatsapp = autor.getNome() + " te mandou uma mensagem: \"" + request.texto() + "\"";
         participanteRepository.findByConversa(conversa).stream()
                 .map(ConversaParticipante::getUsuario)
                 .filter(usuario -> !usuario.getId().equals(autor.getId()))
-                .forEach(usuario -> presencaWebSocketHandler.avisarMensagem(
-                        usuario.getId(),
-                        new ChatMensagemWs(
-                                resposta.conversaId(), resposta.id(), resposta.autorId(), resposta.autorNome(), resposta.texto(),
-                                resposta.criadoEm())));
+                .forEach(usuario -> {
+                    presencaWebSocketHandler.avisarMensagem(
+                            usuario.getId(),
+                            new ChatMensagemWs(
+                                    resposta.conversaId(), resposta.id(), resposta.autorId(), resposta.autorNome(), resposta.texto(),
+                                    resposta.criadoEm()));
+                    if (usuario.getWhatsapp() != null && !usuario.getWhatsapp().isBlank()) {
+                        envioWhatsApp.enviar(usuario.getWhatsapp(), textoWhatsapp);
+                    }
+                });
         return resposta;
     }
 

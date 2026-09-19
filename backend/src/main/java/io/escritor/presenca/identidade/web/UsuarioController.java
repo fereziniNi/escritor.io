@@ -61,6 +61,15 @@ public class UsuarioController {
         return usuarioService.atualizarCargaDiaria(id, request);
     }
 
+    /** Pedido do usuário: avisar por WhatsApp quando uma tarefa é concluída ou uma mensagem de
+     * chat chega - o WhatsApp de cada colaborador, ADMIN-only, mesmo padrão de {@link
+     * #atualizarCargaDiaria}. */
+    @PatchMapping("/{id}/whatsapp")
+    @PreAuthorize("hasRole('ADMIN')")
+    public UsuarioResponse atualizarWhatsapp(@PathVariable Long id, @Valid @RequestBody AtualizarWhatsappRequest request) {
+        return usuarioService.atualizarWhatsapp(id, request);
+    }
+
     @GetMapping("/me")
     public UsuarioResponse meuUsuario() {
         return usuarioService.buscarMeuUsuario(contextoUsuarioAutenticado.usuarioAtual());

@@ -20,6 +20,37 @@ Sobe um Postgres em `localhost:5432` e o Mailpit (SMTP fake para o login por e-m
 
 Na **primeira** subida (volume `postgres_data` vazio), o Postgres também cria o papel `presenca_app` — o papel de runtime que a aplicação usa, sem privilégio de dono sobre as tabelas (ver [ADR 0009](docs/adr/0009-papel-de-banco-separado-para-runtime.md)). Se você já tinha um volume de antes dessa fatia (S2.1) e o backend falhar ao subir com "role presenca_app does not exist", recrie o volume: `docker compose down -v && docker compose up -d`.
 
+## Segredo do JWT (obrigatório)
+
+Auditoria de segurança encontrou (e corrigiu) uma vulnerabilidade CRITICAL: sem isto configurado, o
+backend assinava tokens com um placeholder versionado em `application.yml` — público, então
+qualquer um conseguia forjar um JWT de ADMIN sem nunca ter feito login. `JwtService` agora **recusa
+subir** (falha o boot, não roda vulnerável em silêncio) se o segredo resolvido for esse placeholder
+ou for curto demais.
+
+Gere o seu antes da primeira subida:
+
+```bash
+openssl rand -base64 64
+```
+
+E coloque no `.env` da raiz (mesmo arquivo já usado pra remapear portas/credenciais — ver
+Troubleshooting abaixo; nunca commitar):
+
+```
+JWT_SEGREDO=<o valor gerado acima>
+```
+
+Sem isso, `docker compose up` (qualquer serviço que inclua o `backend`) recusa subir com uma
+mensagem apontando pra esta seção. Rodando o backend direto na máquina (`./mvnw spring-boot:run`,
+fora de container), defina a variável de ambiente equivalente antes de rodar:
+`export APP_JWT_SEGREDO=<o valor gerado>` (PowerShell: `$env:APP_JWT_SEGREDO = "<valor>"`).
+Trocar esse valor depois de já existir gente logada invalida todas as sessões ativas (força
+relogin) — normal, não é bug.
+
+`./mvnw test`/`./mvnw verify` **não** precisam disso configurado à mão — o `pom.xml` já injeta um
+segredo próprio só para a suíte de testes (nunca usado fora dela).
+
 ## Backend
 
 ```bash
@@ -182,7 +213,9 @@ GOOGLE_TOKEN_CHAVE_CRIPTO=<32 bytes em base64, gere com: openssl rand -base64 32
   token da própria sessão (`TokenRenovacao`, só hash), esse precisa voltar em texto claro pra ser
   reenviado à Google, então **nunca reuse a mesma chave de outro segredo** e nunca versione o
   valor real. Trocar essa chave depois de já existir gente conectada invalida os tokens salvos
-  (seria preciso reconectar).
+  (seria preciso reconectar). Auditoria de segurança (VULN-04): sem essa variável, o backend usa
+  um placeholder de dev (32 bytes zerados, público) e agora recusa conectar qualquer conta Google
+  enquanto a chave estiver nesse valor - defina de verdade antes do passo 3 abaixo.
 
 Reinicie o backend pra pegar as novas variáveis.
 
@@ -213,5 +246,14 @@ Ver [docs/testing-strategy.md](docs/testing-strategy.md) para o workflow complet
 
   A porta do perfil `whatsapp` (`EVOLUTION_API_PORT`, padrão 8085) segue o mesmo mecanismo, mas só
   importa se você subir esse perfil (ver "Integração com WhatsApp" acima).
+
+  Auditoria de segurança (VULN-06): `postgres`, `mailpit` e `evolution-api` publicam a porta do
+  host só em `127.0.0.1` (não `0.0.0.0`) — alcançáveis da própria máquina (pra inspecionar o banco
+  com um cliente SQL, ver e-mails no Mailpit, etc.), não de outras máquinas na rede. O Mailpit em
+  especial não tem autenticação nenhuma e concentra os códigos de login de todo mundo — nunca
+  publicá-lo além de localhost. `backend`/`frontend` continuam em `0.0.0.0` de propósito (são a
+  aplicação em si, pensada pra ser usada pelo time pela rede). Se você realmente precisa acessar
+  um desses três de outra máquina (ex.: abrir o Mailpit do celular), use um túnel SSH
+  (`ssh -L 8025:localhost:8025 usuario@maquina`) em vez de reabrir a porta pro mundo.
 
   O `docker compose up` já lê o `.env` automaticamente. **Não use `docker-compose.override.yml` pra isso** — listas como `ports:` se *concatenam* entre `docker-compose.yml` e o override em vez de substituir, então a porta padrão (5432) continua sendo reivindicada junto com a nova, e o conflito persiste. Rodando backend/frontend direto na máquina (fora de container), aponte `spring.datasource.url` / `VITE_BACKEND_URL` pra essas mesmas portas. As portas padrão do projeto (5432, 8080, 5173, 1025, 8025) continuam sendo as documentadas — o `.env` é só local, pra rodar em paralelo com outro projeto que já as ocupa. Só o `SPRING_MAIL_PORT` do container `backend` (`docker-compose.yml`) fica fixo em `1025` mesmo com `MAILPIT_SMTP_PORT` remapeado - é tráfego container-a-container dentro da rede do compose, não passa pela porta remapeada do host.

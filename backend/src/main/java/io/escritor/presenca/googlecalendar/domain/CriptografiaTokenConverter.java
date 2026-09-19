@@ -21,6 +21,16 @@ import org.springframework.stereotype.Component;
  * <p>{@code @Component} de propósito: o Spring Boot registra converters JPA anotados como bean
  * gerenciado automaticamente (via {@code SpringBeanContainer}), permitindo injetar a chave por
  * {@code @Value} em vez de um construtor sem argumentos.
+ *
+ * <p>Auditoria de segurança (VULN-04, MEDIUM): {@code app.google.chave-criptografia} em {@code
+ * application.yml} tem um default de 32 bytes zerados, versionado no repositório - se alguém
+ * conectasse uma conta Google sem sobrescrever essa variável, o refresh token seria "criptografado"
+ * com uma chave pública, trivialmente quebrável por quem tiver acesso ao banco. Diferente do
+ * segredo do JWT (VULN-01, sempre em uso desde o primeiro login), o Google só entra em jogo se
+ * {@code app.google.client-id}/{@code client-secret} também estiverem configurados - por isso a
+ * recusa não é no boot da aplicação (quebraria toda instalação que nunca usa essa integração), é
+ * no primeiro {@link #convertToDatabaseColumn}: é ali, no exato momento em que um segredo de
+ * verdade seria gravado com uma chave pública, que faz sentido travar.
  */
 @Converter
 @Component
@@ -30,17 +40,33 @@ public class CriptografiaTokenConverter implements AttributeConverter<String, St
     private static final int TAMANHO_NONCE_BYTES = 12;
     private static final int TAMANHO_TAG_BITS = 128;
 
+    /** O default literal de {@code application.yml} - 32 bytes zerados em base64. Único jeito
+     * confiável de reconhecer "ninguém configurou isso de verdade": comparar o valor resolvido
+     * contra esse literal específico (comparar só o tamanho não pega esse caso - 32 bytes é
+     * exatamente o tamanho certo pra AES-256, só que com o mesmo valor sempre). */
+    static final String CHAVE_PADRAO_INSEGURA = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
     private final SecretKeySpec chave;
+    private final boolean chaveInsegura;
     private final SecureRandom aleatorio = new SecureRandom();
 
     public CriptografiaTokenConverter(@Value("${app.google.chave-criptografia}") String chaveBase64) {
         this.chave = new SecretKeySpec(Base64.getDecoder().decode(chaveBase64), "AES");
+        this.chaveInsegura = CHAVE_PADRAO_INSEGURA.equals(chaveBase64);
     }
 
     @Override
     public String convertToDatabaseColumn(String valorEmClaro) {
         if (valorEmClaro == null) {
             return null;
+        }
+        if (chaveInsegura) {
+            throw new IllegalStateException(
+                    "app.google.chave-criptografia está com o valor placeholder de desenvolvimento (público, "
+                            + "versionado no repositório) - não é seguro criptografar um token de verdade com ela. "
+                            + "Defina a variável de ambiente APP_GOOGLE_CHAVE_CRIPTOGRAFIA com uma chave gerada "
+                            + "(ex.: `openssl rand -base64 32`) antes de conectar uma conta Google - ver "
+                            + "DEVELOPMENT.md.");
         }
         try {
             byte[] nonce = new byte[TAMANHO_NONCE_BYTES];

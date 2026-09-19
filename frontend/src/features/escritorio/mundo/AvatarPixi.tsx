@@ -2,7 +2,7 @@ import { extend, useTick } from '@pixi/react'
 import type { Container as PixiContainer, Graphics as PixiGraphics, Sprite as PixiSprite } from 'pixi.js'
 import { Container, Graphics, Sprite, Text, Texture } from 'pixi.js'
 import type { RefObject } from 'react'
-import { useCallback, useLayoutEffect, useMemo, useRef } from 'react'
+import { memo, useCallback, useLayoutEffect, useMemo, useRef } from 'react'
 import type { AparenciaAvatar } from '../avatar/aparenciaAvatar'
 import { TILE_PX } from './constantes'
 import { DURACAO_GLIDE_MS, interpolarPosicao } from './glide'
@@ -23,8 +23,9 @@ const PIVO_BASE = { x: 32, y: 58 }
 
 const COR_TEXTO_NOME = 0xffffff
 
-/** Avatar de quem está OFFLINE (estacionado em "Fora do trabalho" pelo backend) renderiza bem
- * apagado - dá pra ver que "tem alguém ali" sem parecer alguém realmente presente/ativo. */
+/** Avatar de quem está OFFLINE (desconectou, mas fica exatamente onde estava - o backend não
+ * move mais ninguém pra "Fora do trabalho" ao desconectar) renderiza bem apagado - dá pra ver que
+ * "tem alguém ali" sem parecer alguém realmente presente/ativo. */
 const ALPHA_OFFLINE = 0.45
 
 /** Quantos ms cada quadro do ciclo de passos fica em tela - 9 quadros × 90ms ≈ 810ms por volta
@@ -89,6 +90,18 @@ function desenharIndicadorStatus(g: PixiGraphics, cor: number): void {
  * o quadro sozinha a cada tick a partir dos refs compartilhados do pai (direção/tempo/progresso do
  * glide) - nenhum estado React por trás disso, só mutação imperativa do `Sprite`, mesma disciplina
  * de performance das rodadas anteriores desta sessão.
+ *
+ * Pedido do usuário: "o personagem está 'travando' ao andar muito" - achado depois que marcar
+ * `AvatarPixi` com `memo` (rodada anterior desta correção) não resolveu: aquilo só cortava
+ * re-render do React, mas o `useTick` daqui é um listener direto no `Ticker` do Pixi, registrado
+ * uma vez no mount - roda a 60fps pra CADA camada de CADA avatar (até ~9 por pessoa) o tempo
+ * TODO, `memo` nenhum evita isso, porque não é o React quem está re-executando esse código.
+ * Antes, `spriteRef.current.texture = ...` era reatribuído em TODO tick, mesmo parado (o quadro
+ * parado é sempre o mesmo índice) - trabalho puro perdido, sem efeito visual nenhum, só ficou
+ * caro de mais com a lista de avatares muito maior depois da correção "não estou vendo meus
+ * colegas" (todo mundo da empresa sempre presente no mapa, não só quem já tinha conectado antes).
+ * `ultimoIndiceRef` faz o `Sprite.texture` só ser tocado quando o índice do quadro realmente muda
+ * (andando de verdade, ou trocando de direção) - parado, o custo por frame cai a zero.
  */
 function CamadaSprite({
   camada,
@@ -103,10 +116,12 @@ function CamadaSprite({
 }) {
   const spriteRef = useRef<PixiSprite | null>(null)
   const quadrosRef = useRef<Texture[] | null>(null)
+  const ultimoIndiceRef = useRef(-1)
 
   useLayoutEffect(() => {
     let cancelado = false
     quadrosRef.current = null
+    ultimoIndiceRef.current = -1
     if (spriteRef.current) spriteRef.current.visible = false
 
     obterTexturaCamada(camada.url, camada.especificacoes).then((folha) => {
@@ -115,6 +130,7 @@ function CamadaSprite({
       if (spriteRef.current) {
         spriteRef.current.texture = quadrosRef.current[0]
         spriteRef.current.visible = true
+        ultimoIndiceRef.current = 0
       }
     })
 
@@ -130,7 +146,10 @@ function CamadaSprite({
     const quadros = quadrosRef.current
     if (!quadros || !spriteRef.current) return
     const quadro = progressoRef.current < 1 ? Math.floor(tempoAnimadoRef.current / MS_POR_QUADRO) % COLUNAS_QUADRO : 0
-    spriteRef.current.texture = quadros[indiceDoQuadro(direcaoRef.current, quadro)]
+    const indice = indiceDoQuadro(direcaoRef.current, quadro)
+    if (indice === ultimoIndiceRef.current) return
+    ultimoIndiceRef.current = indice
+    spriteRef.current.texture = quadros[indice]
   })
 
   return <pixiSprite ref={spriteRef} visible={false} texture={Texture.EMPTY} />
@@ -146,8 +165,22 @@ function CamadaSprite({
  *
  * Perf (lição das duas rodadas de correção desta sessão): nada aqui passa por `useState` - os
  * objetos Pixi (`Container`/`Sprite`/`Graphics`) são mutados direto via `ref` dentro do `useTick`.
+ *
+ * Envolto em `memo` (pedido do usuário: "o personagem está 'travando' ao andar muito") - `
+ * SeguidorCamera` re-renderiza `CamadaMundo` a até 60fps enquanto a câmera ainda está convergindo
+ * pro jogador (deliberado, ver o comentário de `EPSILON_CONVERGENCIA` em `SeguidorCamera.tsx` -
+ * "acontece exatamente enquanto anda"), e {@code CamadaMundo} desenha um `AvatarPixi` por pessoa
+ * presente no escritório - inclusive OFFLINE, desde que "não estou vendo meus colegas" passou a
+ * semear todo mundo da empresa no mapa, não só quem já tinha conectado. Sem `memo`, cada um desses
+ * até-60 re-renders por segundo reexecutava a função inteira (recalculando `useMemo`/`useCallback`)
+ * de TODOS os avatares, mesmo os que não mudaram nada - com poucos colegas isso não incomodava, com
+ * a lista inteira da empresa sempre visível, sim. As props de quem não mudou (posição, aparência,
+ * status) continuam sendo a MESMA referência entre um tick e outro (`usuarios` só troca de
+ * identidade quando uma mensagem de presença de verdade chega, não a cada tick de câmera - ver
+ * `usePresencaWebSocket.ts`), então a comparação rasa padrão do `memo` já é suficiente pra pular
+ * o avatar inteiro na maioria desses re-renders.
  */
-export function AvatarPixi({
+function AvatarPixiBase({
   tileX,
   tileY,
   nome,
@@ -169,7 +202,7 @@ export function AvatarPixi({
   proximo?: boolean
   /** Pedido do usuário: "voice" - a voz deste usuário está ativa agora (`useVozProximidade.ts`). */
   falando?: boolean
-  /** Backend marcou esse usuário como OFFLINE (desconectou, estacionado em "Fora do trabalho") -
+  /** Backend marcou esse usuário como OFFLINE (desconectou, fica parado exatamente onde estava) -
    * avatar renderiza apagado + nome com sufixo, pra não parecer alguém realmente presente. */
   offline?: boolean
 }) {
@@ -249,9 +282,15 @@ export function AvatarPixi({
       anelFalandoRef.current.alpha = 0.6 + Math.sin(tempoPulsoRef.current * 0.01) * 0.35
     }
 
-    tempoBobRef.current += ticker.deltaMS
-    if (corpoContainerRef.current) {
-      corpoContainerRef.current.y = Math.sin(tempoBobRef.current * VELOCIDADE_BOB) * AMPLITUDE_BOB_PX
+    // Pedido do usuário: "travando ao andar muito" - OFFLINE é gente estacionada, parada de
+    // verdade (não é só "sem se mexer agora") - balançar um avatar que nunca vai andar de novo
+    // (até reconectar) é custo puro sem efeito visual que valha a pena, multiplicado por quantos
+    // colegas offline estão sempre no mapa desde a correção "não estou vendo meus colegas".
+    if (!offline) {
+      tempoBobRef.current += ticker.deltaMS
+      if (corpoContainerRef.current) {
+        corpoContainerRef.current.y = Math.sin(tempoBobRef.current * VELOCIDADE_BOB) * AMPLITUDE_BOB_PX
+      }
     }
   })
 
@@ -279,3 +318,5 @@ export function AvatarPixi({
     </pixiContainer>
   )
 }
+
+export const AvatarPixi = memo(AvatarPixiBase)

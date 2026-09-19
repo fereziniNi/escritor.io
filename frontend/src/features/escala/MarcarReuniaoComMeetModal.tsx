@@ -23,14 +23,20 @@ import type { Disponibilidade } from './types'
  * dia só") com a grade `.formulario` de 2 colunas - a lista de participantes (filtro + checkboxes
  * roláveis) ficava espremida numa coluna estreita ao lado da data; (2) não tinha nenhum jeito de
  * saber, ANTES de tentar salvar, se a pessoa convidada trabalha no dia/horário escolhido - o
- * backend só recusa depois, com um 400 sem detalhe (convenção do projeto, `TratamentoErroGlobal`
+ * backend recusava depois, com um 400 sem detalhe (convenção do projeto, `TratamentoErroGlobal`
  * nunca vaza mensagem de exceção no corpo), então a experiência era "tentei, deu erro genérico, não
  * sei por quê". Esta versão: (1) abre `largo` (mais respiro) e usa `formulario-largo` (uma coluna
  * só, nada espremido) com chips mostrando quem já foi escolhido; (2) consulta `GET
  * /escala/disponibilidade` (novo endpoint, aberto a qualquer autenticado - mesma filosofia de
  * `/usuarios/basico`) assim que há participante(s) + data escolhidos, e mostra na hora se algum
- * deles não trabalha nesse horário, desabilitando "Marcar reunião" com o motivo à vista em vez de
- * deixar a pessoa descobrir só depois de tentar enviar.
+ * deles não trabalha nesse horário.
+ *
+ * <p>Pedido do usuário, depois: "pode permitir marcar a reunião fora do horário de trabalho, mas
+ * deve deixar informando para deixar ciente" - o backend não bloqueia mais quem está fora do
+ * expediente (só quem já tem outra reunião marcada em cima continua proibido, isso sim é um
+ * impedimento físico). Aqui o aviso de disponibilidade continua aparecendo do mesmo jeito, mas
+ * deixou de desabilitar "Marcar reunião" - é só um alerta pra quem está marcando decidir com
+ * ciência, não mais um bloqueio.
  *
  * <p>`participanteInicialId`/`dataInicial` (opcionais) pré-preenchem quando aberto a partir de uma
  * célula da "Escala da equipe" - sem eles, abre em branco (pedido: "usuário independente").
@@ -239,13 +245,13 @@ export function MarcarReuniaoComMeetModal({
 
         {indisponiveis.length > 0 && (
           <p className="mensagem-erro">
-            Ajuste o horário: {indisponiveis.map((d) => d.nome).join(', ')} não {indisponiveis.length === 1 ? 'está disponível' : 'estão disponíveis'} nesse horário.
+            ⚠️ Atenção: {indisponiveis.map((d) => d.nome).join(', ')} não {indisponiveis.length === 1 ? 'está disponível' : 'estão disponíveis'} nesse horário. A reunião pode ser marcada mesmo assim.
           </p>
         )}
         {criarMutation.isError && <p className="mensagem-erro">{(criarMutation.error as Error).message}</p>}
 
         <div className="linha-botoes">
-          <button type="submit" disabled={criarMutation.isPending || participantes.size === 0 || indisponiveis.length > 0}>
+          <button type="submit" disabled={criarMutation.isPending || participantes.size === 0}>
             📹 Marcar reunião
           </button>
           <button type="button" className="botao-secundario" onClick={aoFechar}>

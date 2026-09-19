@@ -24,12 +24,29 @@ spring:
     host: localhost
     port: 1025
 
+# Auditoria de segurança (VULN-05, MEDIUM): sem isto, atrás do Nginx (nginx.conf já manda
+# X-Forwarded-For pro backend) o Tomcat via HttpServletRequest#getRemoteAddr() sempre devolve o IP
+# interno do container do Nginx, não o do cliente de verdade - o que faria o limitador de taxa por
+# IP (AuthController/LimitadorDeTaxa) enxergar TODO MUNDO como o mesmo IP e bloquear um usuário
+# pelo excesso de outro. "native" liga o RemoteIpValve do Tomcat, que reescreve getRemoteAddr()
+# a partir de X-Forwarded-For. Limitação conhecida: confia em X-Forwarded-For de qualquer origem
+# (sem allowlist de proxies confiáveis) - aceitável hoje porque a porta do backend só é alcançável
+# dentro da rede do docker-compose/pela própria máquina, não fica exposta publicamente; revisitar
+# com uma allowlist de proxy confiável antes de expor o backend direto pra internet.
+server:
+  forward-headers-strategy: native
+
 app:
   email:
     remetente: no-reply@escritor.io
   jwt:
-    # Segredo de DEV apenas. Em qualquer ambiente real, sobrescrever via variável
-    # de ambiente APP_JWT_SEGREDO com um valor gerado (nunca versionar o de produção).
+    # Placeholder de propósito, NUNCA usado de verdade: auditoria de segurança (VULN-01,
+    # CRITICAL) achou que, sem a variável de ambiente APP_JWT_SEGREDO definida, a aplicação subia
+    # e assinava tokens com este valor - que está versionado neste arquivo, logo é público. Dava
+    # pra forjar um JWT de ADMIN só lendo o repositório, sem nunca ter feito login de verdade.
+    # `JwtService` agora recusa subir (falha o boot) se o valor resolvido for exatamente este ou
+    # for curto demais - sempre defina APP_JWT_SEGREDO (`openssl rand -base64 64`) em qualquer
+    # ambiente, inclusive local via docker-compose (ver .env / DEVELOPMENT.md).
     segredo: troque-este-segredo-em-producao-defina-a-variavel-app-jwt-segredo
   evolution:
     # Pedido do cliente: avisar o chefe no WhatsApp (via Evolution API) sempre que alguém bate

@@ -18,8 +18,6 @@ import io.escritor.presenca.identidade.domain.TipoRosto;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.seguranca.JwtService;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
@@ -216,6 +214,30 @@ class PresencaWebSocketIT {
         }
     }
 
+    /**
+     * Pedido do usuário: "a pessoa não deve ir para a sala de 'off' se ela ficar inativa na
+     * página. Não faça isso." - existia um {@code AUSENTE} automático depois de 5 minutos sem
+     * nenhuma mensagem (PRD original), removido a pedido. Sem esse recurso, ficar quieto (nenhuma
+     * mensagem nova) não deve gerar broadcast de status nenhum - continua {@code DISPONIVEL} (ou o
+     * que quer que a pessoa tenha escolhido) até uma ação de verdade (mover, trocar de status na
+     * mão, ou desconectar).
+     */
+    @Test
+    void ficarInativoNaPaginaNaoDisparaStatusAusenteAutomatico() throws Exception {
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-inatividade@escritor.io", Papel.COLABORADOR, 480));
+        String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
+        BlockingQueue<String> mensagensAna = new LinkedBlockingQueue<>();
+
+        WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
+        try {
+            aguardarSnapshot(mensagensAna);
+
+            assertThat(proximaMensagemDe(mensagensAna, ana.getId(), 1500)).isNull();
+        } finally {
+            sessaoAna.close();
+        }
+    }
+
     @Test
     void naoExisteJeitoDoClienteAlterarOStatusDeOutroUsuario() throws Exception {
         Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s66b@escritor.io", Papel.COLABORADOR, 480));
@@ -401,7 +423,8 @@ class PresencaWebSocketIT {
     @Test
     void entrarEmQualquerZonaAtualizaOStatus() throws Exception {
         // pedido do usuário: "independente de qual sala seja, atualize o status" - antes só FOCO/
-        // REUNIAO mudavam o status; Café/Fora do trabalho/Cabine agora também mudam.
+        // REUNIAO mudavam o status; Café/Cabine também mudam. "Fora do trabalho" é a exceção
+        // (ver o teste abaixo, entrarEmForaDoTrabalhoNaoMudaOStatusParaAusente).
         Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s67d@escritor.io", Papel.COLABORADOR, 480));
         String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
         BlockingQueue<String> mensagensAna = new LinkedBlockingQueue<>();
@@ -414,10 +437,6 @@ class PresencaWebSocketIT {
             sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":21,\"y\":8}"));
             assertThat(proximaMensagemDe(mensagensAna, ana.getId())).isNotNull().contains("\"status\":\"ALMOCO\"");
 
-            // "Fora do trabalho" (tipo LIVRE): x em [22,32) e y em [15,23) -> AUSENTE
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":25,\"y\":18}"));
-            assertThat(proximaMensagemDe(mensagensAna, ana.getId())).isNotNull().contains("\"status\":\"AUSENTE\"");
-
             // "Cabine 1" (tipo CABINE): x em [1,4) e y em [6,9) -> FOCO
             sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":2,\"y\":7}"));
             assertThat(proximaMensagemDe(mensagensAna, ana.getId())).isNotNull().contains("\"status\":\"FOCO\"");
@@ -426,9 +445,16 @@ class PresencaWebSocketIT {
         }
     }
 
+    /**
+     * Pedido do usuário: "ele nunca deve redirecionar para ausente a menos que ele escolha essa
+     * opção" - andar até "Fora do trabalho" não é uma escolha de status, é só andar; deixou de
+     * mudar o status pra AUSENTE sozinho (era a última forma automática que restava depois da
+     * inatividade e da desconexão, ambas já removidas). Vira "zona sem mapeamento", igual espaço
+     * aberto: restaura o status de antes de entrar.
+     */
     @Test
-    void usuarioInativoPorCincoMinutosRecebeStatusAusenteDeVerdade() throws Exception {
-        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s68a@escritor.io", Papel.COLABORADOR, 480));
+    void entrarEmForaDoTrabalhoNaoMudaOStatusParaAusente() throws Exception {
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s67e@escritor.io", Papel.COLABORADOR, 480));
         String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
         BlockingQueue<String> mensagensAna = new LinkedBlockingQueue<>();
 
@@ -436,53 +462,15 @@ class PresencaWebSocketIT {
         try {
             aguardarSnapshot(mensagensAna);
 
-            // chama a varredura direto, sem esperar 5 minutos de verdade nem o @Scheduled real -
-            // "agora" simulado já passou do limiar de inatividade (PRD)
-            presencaWebSocketHandler.verificarInatividade(Instant.now().plus(Duration.ofMinutes(6)));
+            // "Café" primeiro (ALMOCO), pra provar que entrar em "Fora do trabalho" depois
+            // restaura o status de antes do Café (DISPONIVEL), não fica em ALMOCO nem vira AUSENTE
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":21,\"y\":8}"));
+            assertThat(proximaMensagemDe(mensagensAna, ana.getId())).isNotNull().contains("\"status\":\"ALMOCO\"");
 
+            // "Fora do trabalho" (tipo LIVRE), pós V50/V51: x em [22,32) e y em [15,23)
+            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":25,\"y\":18}"));
             String recebido = proximaMensagemDe(mensagensAna, ana.getId());
-            assertThat(recebido).isNotNull().contains("\"tipo\":\"STATUS\"").contains("\"status\":\"AUSENTE\"");
-        } finally {
-            sessaoAna.close();
-        }
-    }
-
-    @Test
-    void usuarioAindaAtivoNaoRecebeStatusAusente() throws Exception {
-        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s68b@escritor.io", Papel.COLABORADOR, 480));
-        String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
-        BlockingQueue<String> mensagensAna = new LinkedBlockingQueue<>();
-
-        WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
-        try {
-            aguardarSnapshot(mensagensAna);
-
-            // "agora" simulado é só um instante depois de conectar - bem abaixo do limiar de 5 min
-            presencaWebSocketHandler.verificarInatividade(Instant.now());
-
-            assertThat(proximaMensagemDe(mensagensAna, ana.getId(), 2000)).isNull();
-        } finally {
-            sessaoAna.close();
-        }
-    }
-
-    @Test
-    void qualquerMensagemNovaTiraOUsuarioDoAusenteAutomatico() throws Exception {
-        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s68c@escritor.io", Papel.COLABORADOR, 480));
-        String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
-        BlockingQueue<String> mensagensAna = new LinkedBlockingQueue<>();
-
-        WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
-        try {
-            aguardarSnapshot(mensagensAna);
-            presencaWebSocketHandler.verificarInatividade(Instant.now().plus(Duration.ofMinutes(6)));
-            assertThat(proximaMensagemDe(mensagensAna, ana.getId())).isNotNull().contains("\"status\":\"AUSENTE\"");
-
-            // (20,13) fica no corredor aberto, fora de toda zona - qualquer mensagem nova já tira do AUSENTE
-            sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":20,\"y\":13}"));
-
-            String recuperado = proximaMensagemDe(mensagensAna, ana.getId());
-            assertThat(recuperado).isNotNull().contains("\"status\":\"DISPONIVEL\"").doesNotContain("\"status\":\"AUSENTE\"");
+            assertThat(recebido).isNotNull().contains("\"status\":\"DISPONIVEL\"").doesNotContain("\"status\":\"AUSENTE\"");
         } finally {
             sessaoAna.close();
         }
@@ -594,7 +582,7 @@ class PresencaWebSocketIT {
     }
 
     @Test
-    void desconectarEstacionaOUsuarioComoOfflineEmForaDoTrabalhoEmVezDeRemover() throws Exception {
+    void desconectarMarcaOUsuarioComoOfflineEmVezDeRemover() throws Exception {
         Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s63c@escritor.io", Papel.COLABORADOR, 480));
         Usuario beto = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s63c@escritor.io", Papel.COLABORADOR, 480));
         Usuario caio = usuarioRepository.saveAndFlush(new Usuario("Caio Reis", "caio-s63c@escritor.io", Papel.COLABORADOR, 480));
@@ -613,19 +601,60 @@ class PresencaWebSocketIT {
         try {
             String recebidoCaio = mensagensCaio.poll(5, TimeUnit.SECONDS);
 
-            // Ana continua no snapshot (não some) - só que agora OFFLINE e estacionada no centro
-            // de "Fora do trabalho" (pós V50/V51: x=22,y=15,largura=10,altura=8 -> centro 27,19)
+            // Pedido do usuário: "se a pessoa ficar 5 horas no mesmo lugar... não coloque ela
+            // para o lugar de descanso/fora do trabalho" - Ana continua no snapshot (não some) e
+            // OFFLINE, mas na posição (0,0) de sempre (nunca mandou POSICAO nenhuma) - não é mais
+            // teleportada pro centro de "Fora do trabalho".
             assertThat(recebidoCaio)
                     .isNotNull()
                     .contains("\"usuarioId\":" + beto.getId())
                     .contains("\"usuarioId\":" + caio.getId())
                     .contains("\"usuarioId\":" + ana.getId())
                     .contains("\"status\":\"OFFLINE\"")
-                    .contains("\"x\":27")
-                    .contains("\"y\":19");
+                    .contains("\"x\":0")
+                    .contains("\"y\":0");
         } finally {
             sessaoBeto.close();
             sessaoCaio.close();
+        }
+    }
+
+    /**
+     * Pedido do usuário: "se a pessoa ficar 5 horas no mesmo lugar, permita isso, mas não coloque
+     * ela para o lugar de descanso/fora do trabalho" - dessa vez com Ana numa posição de verdade
+     * (não o (0,0) padrão de quem nunca andou), pra provar que desconectar não move ninguém, seja
+     * qual for a posição real de onde a pessoa estava.
+     */
+    @Test
+    void desconectarNaoTeleportaQuemEstavaEmUmaPosicaoDeVerdade() throws Exception {
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana-s63e@escritor.io", Papel.COLABORADOR, 480));
+        Usuario beto = usuarioRepository.saveAndFlush(new Usuario("Beto Lima", "beto-s63e@escritor.io", Papel.COLABORADOR, 480));
+        String tokenAna = jwtService.gerarAccessToken(ana.getId(), Papel.COLABORADOR);
+        String tokenBeto = jwtService.gerarAccessToken(beto.getId(), Papel.COLABORADOR);
+        BlockingQueue<String> mensagensAna = new LinkedBlockingQueue<>();
+
+        WebSocketSession sessaoAna = conectar(tokenAna, mensagensAna);
+        aguardarSnapshot(mensagensAna);
+        // "Área de trabalho" (tipo FOCO), pós V50/V51: x em [7,19) e y em [15,23)
+        sessaoAna.sendMessage(new TextMessage("{\"tipo\":\"POSICAO\",\"x\":10,\"y\":16}"));
+        proximaMensagemDe(mensagensAna, ana.getId());
+
+        sessaoAna.close();
+        Thread.sleep(500);
+
+        BlockingQueue<String> mensagensBeto = new LinkedBlockingQueue<>();
+        WebSocketSession sessaoBeto = conectar(tokenBeto, mensagensBeto);
+        try {
+            String recebidoBeto = mensagensBeto.poll(5, TimeUnit.SECONDS);
+
+            assertThat(recebidoBeto)
+                    .isNotNull()
+                    .contains("\"usuarioId\":" + ana.getId())
+                    .contains("\"status\":\"OFFLINE\"")
+                    .contains("\"x\":10")
+                    .contains("\"y\":16");
+        } finally {
+            sessaoBeto.close();
         }
     }
 
@@ -647,7 +676,7 @@ class PresencaWebSocketIT {
     /**
      * Bloqueia até o SNAPSHOT inicial chegar - serve de barreira de sincronização (garante que o
      * {@code afterConnectionEstablished} do servidor já rodou e registrou o usuário no estado)
-     * antes do teste mandar POSICAO/STATUS ou chamar {@code verificarInatividade}.
+     * antes do teste mandar POSICAO/STATUS.
      */
     private void aguardarSnapshot(BlockingQueue<String> mensagens) throws InterruptedException {
         long fim = System.currentTimeMillis() + 5000;

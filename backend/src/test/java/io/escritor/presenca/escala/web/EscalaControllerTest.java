@@ -29,9 +29,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Todo endpoint da própria escala é sempre sobre o usuário autenticado, então qualquer papel
- * consegue usar (diferente de {@code ProjetoController#adicionarMembro}, por exemplo) - só
- * {@code /escala/equipe} é GESTOR/ADMIN, pedido do usuário: "para o admin/chefe conseguir ver os
- * momentos em que os funcionários estarão trabalhando".
+ * consegue usar (diferente de {@code ProjetoController#adicionarMembro}, por exemplo).
+ * {@code /escala/equipe} também é aberto a qualquer papel autenticado desde que o usuário pediu
+ * pra abrir Reuniões/Escala da equipe pra todo mundo ("gostaria que todos tivessem o menu e as
+ * opções também") - quem antes filtrava por role no controller, agora só filtra o próprio
+ * {@code EscalaService} via {@code VisibilidadeUsuarioService}.
  */
 @WebMvcTest(EscalaController.class)
 @Import({SecurityConfig.class, JwtService.class})
@@ -170,9 +172,14 @@ class EscalaControllerTest {
 
     @Test
     @WithMockUser(roles = "COLABORADOR")
-    void equipeComPapelColaboradorRetorna403() throws Exception {
+    void equipeComPapelColaboradorRetorna200() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(escalaService.calcularEfetivaDaEquipe(any(), any(), any()))
+                .thenReturn(List.of(new EscalaEquipeResponse(1L, "Beto Lima", List.of())));
+
         mockMvc.perform(get("/escala/equipe").param("inicio", "2026-01-01").param("fim", "2026-01-31"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].usuarioNome").value("Beto Lima"));
     }
 
     @Test

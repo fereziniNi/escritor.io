@@ -9,6 +9,10 @@ RUN npm run build
 
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# .template (não .conf direto): deploy no Railway precisa do endereço do backend resolvido em
+# runtime, não no build da imagem (ver comentário no topo do nginx.conf.template) - a imagem
+# oficial do Nginx já processa qualquer /etc/nginx/templates/*.template com envsubst
+# automaticamente antes de subir, sem precisar de um entrypoint customizado.
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 
 EXPOSE 80

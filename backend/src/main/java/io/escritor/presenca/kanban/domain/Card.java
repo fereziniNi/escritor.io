@@ -161,6 +161,25 @@ public class Card {
         this.posicao = novaPosicao;
     }
 
+    /** Pedido do usuário: "não conseguimos editar... algumas atividades" - mesmos campos
+     * definíveis na criação (título/descrição/responsável/prazo/estimativa); coluna/posição têm
+     * seu próprio mecanismo ({@link #mover}), não fazem parte de uma edição geral. Mesma validação
+     * do construtor (título obrigatório, estimativa positiva) - um card editado precisa continuar
+     * tão válido quanto um recém-criado. */
+    public void editar(String titulo, String descricao, Usuario responsavel, LocalDate prazo, Integer estimativaMinutos) {
+        if (titulo == null || titulo.isBlank()) {
+            throw new TituloCardObrigatorioException();
+        }
+        if (estimativaMinutos != null && estimativaMinutos <= 0) {
+            throw new EstimativaInvalidaException();
+        }
+        this.titulo = titulo;
+        this.descricao = descricao;
+        this.responsavel = responsavel;
+        this.prazo = prazo;
+        this.estimativaMinutos = estimativaMinutos;
+    }
+
     /** Pedido do usuário: "descreve o que foi feito quando finaliza a tarefa" - chamado por
      * {@code SessaoTrabalhoService#finalizar}, uma vez só (o próprio serviço rejeita finalizar de
      * novo checando {@link #getConcluidoEm()} antes de chamar isto). */

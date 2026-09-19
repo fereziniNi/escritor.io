@@ -17,6 +17,7 @@ import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
+import io.escritor.presenca.ponto.notificacao.EnvioWhatsApp;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -32,6 +33,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -58,6 +60,9 @@ class ChatServiceTest {
     @Mock
     private PresencaWebSocketHandler presencaWebSocketHandler;
 
+    @Mock
+    private EnvioWhatsApp envioWhatsApp;
+
     private final Usuario eu = usuarioComId(1L);
     private final Usuario outro = usuarioComId(2L);
 
@@ -79,7 +84,7 @@ class ChatServiceTest {
     void setUp() {
         chatService = new ChatService(
                 conversaRepository, participanteRepository, mensagemRepository, usuarioRepository, presencaWebSocketHandler,
-                RELOGIO_FIXO);
+                envioWhatsApp, RELOGIO_FIXO);
     }
 
     /** Mocks comuns de {@code construirResposta} (sem mensagem ainda, ninguém leu nada) - só
@@ -166,6 +171,31 @@ class ChatServiceTest {
         assertThat(participacaoAutor.getUltimaLeituraEm()).isEqualTo(RELOGIO_FIXO.instant());
         verify(presencaWebSocketHandler).avisarMensagem(eq(outro.getId()), any());
         verify(presencaWebSocketHandler, never()).avisarMensagem(eq(eu.getId()), any());
+        // "outro" não tem WhatsApp cadastrado neste teste - sem número, sem envio
+        verify(envioWhatsApp, never()).enviar(any(), any());
+    }
+
+    /** Pedido do usuário: avisar por WhatsApp quando uma mensagem de chat chega, além do aviso já
+     * existente na tela - só quem cadastrou o próprio WhatsApp (ADMIN-only, {@code
+     * Usuario#alterarWhatsapp}). */
+    @Test
+    void enviarAvisaPorWhatsappQuemTemNumeroCadastrado() {
+        outro.alterarWhatsapp("5511977776666");
+        Conversa conversa = conversaComId(50L, TipoConversa.DIRETA);
+        ConversaParticipante participacaoAutor = new ConversaParticipante(conversa, eu);
+        when(conversaRepository.findById(50L)).thenReturn(Optional.of(conversa));
+        when(participanteRepository.findByConversaAndUsuario(conversa, eu)).thenReturn(Optional.of(participacaoAutor));
+        when(mensagemRepository.save(any())).thenAnswer(chamada -> {
+            Mensagem mensagem = chamada.getArgument(0);
+            ReflectionTestUtils.setField(mensagem, "id", 901L);
+            return mensagem;
+        });
+        when(participanteRepository.findByConversa(conversa))
+                .thenReturn(List.of(participacaoAutor, new ConversaParticipante(conversa, outro)));
+
+        chatService.enviar(eu, 50L, new EnviarMensagemRequest("Oi, tudo bem?"));
+
+        verify(envioWhatsApp).enviar(eq("5511977776666"), argThat(texto -> texto.contains("Oi, tudo bem?")));
     }
 
     @Test

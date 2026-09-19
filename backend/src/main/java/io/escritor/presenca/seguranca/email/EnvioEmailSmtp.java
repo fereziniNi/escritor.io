@@ -26,4 +26,18 @@ public class EnvioEmailSmtp implements EnvioEmail {
 
         mailSender.send(mensagem);
     }
+
+    @Override
+    public void avisarTrocaDeEmail(String destinatarioAntigo, String novoEmail) {
+        SimpleMailMessage mensagem = new SimpleMailMessage();
+        mensagem.setFrom(remetente);
+        mensagem.setTo(destinatarioAntigo);
+        mensagem.setSubject("Seu e-mail de acesso foi alterado");
+        mensagem.setText(
+                "O e-mail usado pra entrar na sua conta foi trocado para " + novoEmail + ".\n\n"
+                        + "Se foi você, pode ignorar este aviso. Se não foi, fale com o administrador do "
+                        + "sistema o quanto antes.");
+
+        mailSender.send(mensagem);
+    }
 }

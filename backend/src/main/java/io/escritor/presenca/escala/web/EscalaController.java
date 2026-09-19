@@ -8,7 +8,6 @@ import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,7 +24,11 @@ import org.springframework.web.bind.annotation.RestController;
  * admin/chefe conseguir ver os momentos em que os funcionários estarão trabalhando". Todo endpoint
  * de leitura/escrita da própria escala ({@code /semanal}, {@code /excecoes}, {@code /efetiva}) atua
  * sempre sobre o usuário autenticado, sem parâmetro {@code usuarioId} - ninguém edita a escala de
- * outra pessoa, nem ADMIN. Só {@code /equipe} é GESTOR/ADMIN, e é somente leitura.
+ * outra pessoa, nem ADMIN. {@code /equipe} é somente leitura e, a pedido do usuário ("gostaria que
+ * todos tivessem o menu e as opções também", sobre Reuniões/Escala da equipe), deixou de exigir
+ * papel GESTOR/ADMIN - qualquer autenticado pode chamar, mas quem limita o que aparece continua
+ * sendo {@link io.escritor.presenca.identidade.service.VisibilidadeUsuarioService#listarUsuariosVisiveis}:
+ * COLABORADOR só vê a própria linha, GESTOR vê quem divide projeto com ele, ADMIN vê todo mundo.
  *
  * <p>Exceção de leitura aberta a qualquer autenticado (não só o próprio dono): {@code
  * /disponibilidade} - pedido do usuário: "Não consegui marcar a reunião!!" (a causa era não ter
@@ -102,7 +105,6 @@ public class EscalaController {
     }
 
     @GetMapping("/equipe")
-    @PreAuthorize("hasAnyRole('GESTOR', 'ADMIN')")
     public List<EscalaEquipeResponse> equipe(@RequestParam LocalDate inicio, @RequestParam LocalDate fim) {
         return escalaService.calcularEfetivaDaEquipe(contextoUsuarioAutenticado.usuarioAtual(), inicio, fim);
     }

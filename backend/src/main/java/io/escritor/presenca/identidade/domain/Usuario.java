@@ -38,6 +38,16 @@ public class Usuario {
     @Embedded
     private AparenciaAvatar aparencia;
 
+    /** Pedido do usuário: avisar por WhatsApp quando o usuário finaliza uma tarefa (dono/criador do
+     * card) ou recebe uma mensagem de chat, além do aviso já existente na tela - diferente do
+     * "chefe" ({@code app.evolution.chefe-numero}, um número fixo só pra avisos de ponto), este é
+     * o WhatsApp de CADA colaborador. Opcional de propósito (sem {@code nullable = false}): quem
+     * não tiver preenchido simplesmente não recebe aviso por WhatsApp (ver {@code
+     * EnvioWhatsApp#enviar}, que já ignora número em branco). Só ADMIN cadastra/edita - ver
+     * {@link #alterarWhatsapp}. */
+    @Column
+    private String whatsapp;
+
     @Column(name = "criado_em", nullable = false, updatable = false)
     private Instant criadoEm;
 
@@ -111,5 +121,17 @@ public class Usuario {
 
     public Instant getCriadoEm() {
         return criadoEm;
+    }
+
+    public String getWhatsapp() {
+        return whatsapp;
+    }
+
+    /** ADMIN-only (mesmo espírito de {@link #alterarCargaDiaria}) - {@code novoWhatsapp} em branco
+     * ou {@code null} desliga o aviso por WhatsApp pra este usuário (volta a só receber a
+     * notificação na tela). Formato (só dígitos, código do país + DDD + número) validado na camada
+     * web, mesmo padrão de sempre neste tipo. */
+    public void alterarWhatsapp(String novoWhatsapp) {
+        this.whatsapp = (novoWhatsapp == null || novoWhatsapp.isBlank()) ? null : novoWhatsapp;
     }
 }

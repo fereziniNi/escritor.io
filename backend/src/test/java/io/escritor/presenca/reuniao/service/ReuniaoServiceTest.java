@@ -1,8 +1,6 @@
 package io.escritor.presenca.reuniao.service;
 
 import io.escritor.presenca.escala.domain.HorarioInvalidoException;
-import io.escritor.presenca.escala.service.EscalaService;
-import io.escritor.presenca.escala.web.DiaEfetivoResponse;
 import io.escritor.presenca.escritorio.ws.PresencaWebSocketHandler;
 import io.escritor.presenca.googlecalendar.domain.GoogleNaoConectadoException;
 import io.escritor.presenca.googlecalendar.service.GoogleMeetService;
@@ -54,9 +52,6 @@ class ReuniaoServiceTest {
     private UsuarioRepository usuarioRepository;
 
     @Mock
-    private EscalaService escalaService;
-
-    @Mock
     private VisibilidadeUsuarioService visibilidadeUsuarioService;
 
     @Mock
@@ -84,7 +79,7 @@ class ReuniaoServiceTest {
 
     @BeforeEach
     void setUp() {
-        reuniaoService = new ReuniaoService(reuniaoRepository, usuarioRepository, escalaService, visibilidadeUsuarioService,
+        reuniaoService = new ReuniaoService(reuniaoRepository, usuarioRepository, visibilidadeUsuarioService,
                 googleOAuthService, googleMeetService, presencaWebSocketHandler, notificacaoService, RELOGIO_FIXO);
     }
 
@@ -98,10 +93,8 @@ class ReuniaoServiceTest {
     }
 
     @Test
-    void criaAReuniaoQuandoOIntervaloEstaDentroDoExpedienteEfetivo() {
+    void criaAReuniao() {
         mockarConectadoEExistente();
-        when(escalaService.calcularEfetiva(participante, DIA, DIA))
-                .thenReturn(List.of(new DiaEfetivoResponse(DIA, true, LocalTime.of(9, 0), LocalTime.of(18, 0))));
         when(reuniaoRepository.findByParticipantes_UsuarioAndData(participante, DIA)).thenReturn(List.of());
         when(reuniaoRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
         when(googleMeetService.criarEventoComMeet(eq(criador), any())).thenReturn(LINK_MEET);
@@ -135,38 +128,26 @@ class ReuniaoServiceTest {
         assertThatThrownBy(() -> reuniaoService.criar(criador, requestPadrao())).isInstanceOf(RecursoNaoEncontradoException.class);
     }
 
+    /** Pedido do usuário: "pode permitir marcar a reunião fora do horário de trabalho, mas deve
+     * deixar informando para deixar ciente" - o aviso é só no front-end (`GET
+     * /escala/disponibilidade`, consultado pelo `MarcarReuniaoComMeetModal` antes de enviar); o
+     * backend não bloqueia mais mesmo que o participante não trabalhe nesse dia/horário. */
     @Test
-    void rejeitaQuandoOParticipanteNaoTrabalhaNesseDia() {
+    void criaAReuniaoMesmoForaDoExpedienteEfetivoDoParticipante() {
         mockarConectadoEExistente();
-        when(escalaService.calcularEfetiva(participante, DIA, DIA)).thenReturn(List.of(new DiaEfetivoResponse(DIA, false, null, null)));
+        when(reuniaoRepository.findByParticipantes_UsuarioAndData(participante, DIA)).thenReturn(List.of());
+        when(reuniaoRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+        when(googleMeetService.criarEventoComMeet(eq(criador), any())).thenReturn(LINK_MEET);
 
-        assertThatThrownBy(() -> reuniaoService.criar(criador, requestPadrao())).isInstanceOf(HorarioInvalidoException.class);
-        verify(reuniaoRepository, never()).save(any());
-    }
+        ReuniaoResponse resultado = reuniaoService.criar(criador, requestPadrao());
 
-    @Test
-    void rejeitaQuandoOIntervaloComecaAntesDoExpediente() {
-        mockarConectadoEExistente();
-        when(escalaService.calcularEfetiva(participante, DIA, DIA))
-                .thenReturn(List.of(new DiaEfetivoResponse(DIA, true, LocalTime.of(15, 0), LocalTime.of(18, 0))));
-
-        assertThatThrownBy(() -> reuniaoService.criar(criador, requestPadrao())).isInstanceOf(HorarioInvalidoException.class);
-    }
-
-    @Test
-    void rejeitaQuandoOIntervaloTerminaDepoisDoExpediente() {
-        mockarConectadoEExistente();
-        when(escalaService.calcularEfetiva(participante, DIA, DIA))
-                .thenReturn(List.of(new DiaEfetivoResponse(DIA, true, LocalTime.of(9, 0), LocalTime.of(14, 45))));
-
-        assertThatThrownBy(() -> reuniaoService.criar(criador, requestPadrao())).isInstanceOf(HorarioInvalidoException.class);
+        assertThat(resultado.linkMeet()).isEqualTo(LINK_MEET);
+        verify(presencaWebSocketHandler).avisarConvite(eq(participante.getId()), any());
     }
 
     @Test
     void rejeitaQuandoSobrepoeUmaReuniaoJaMarcada() {
         mockarConectadoEExistente();
-        when(escalaService.calcularEfetiva(participante, DIA, DIA))
-                .thenReturn(List.of(new DiaEfetivoResponse(DIA, true, LocalTime.of(9, 0), LocalTime.of(18, 0))));
         Reuniao existente = new Reuniao(criador, List.of(participante), DIA, LocalTime.of(14, 0), LocalTime.of(14, 45), "Já marcada",
                 Instant.now());
         when(reuniaoRepository.findByParticipantes_UsuarioAndData(participante, DIA)).thenReturn(List.of(existente));
@@ -178,8 +159,6 @@ class ReuniaoServiceTest {
     @Test
     void naoSalvaSeAChamadaAoMeetFalhar() {
         mockarConectadoEExistente();
-        when(escalaService.calcularEfetiva(participante, DIA, DIA))
-                .thenReturn(List.of(new DiaEfetivoResponse(DIA, true, LocalTime.of(9, 0), LocalTime.of(18, 0))));
         when(reuniaoRepository.findByParticipantes_UsuarioAndData(participante, DIA)).thenReturn(List.of());
         when(reuniaoRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
         when(googleMeetService.criarEventoComMeet(eq(criador), any())).thenThrow(new RuntimeException("Google fora do ar"));

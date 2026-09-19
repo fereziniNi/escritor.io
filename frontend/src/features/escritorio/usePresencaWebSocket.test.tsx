@@ -127,6 +127,39 @@ describe('usePresencaWebSocket', () => {
     })
   })
 
+  /** Pedido do usuário: "anda pro lado que eu quero e depois volta. Tipo faz o movimento
+   * oposto" - o servidor ecoa (broadcast) toda posição que processa, inclusive a nossa própria;
+   * esse eco pode chegar depois da gente já ter avançado mais passos localmente por predição
+   * (sem nunca esperar confirmação - ver o teste "mover atualiza..." abaixo). Sobrescrever x/y
+   * com esse eco atrasado puxava o personagem de volta pra uma posição já ultrapassada. */
+  it('um eco de POSICAO sobre a própria posição não volta atrás - x/y ficam com a predição local mais nova, status continua vindo do servidor', async () => {
+    const { result } = renderHook(() => usePresencaWebSocket())
+    act(() => {
+      WebSocketFalso.instancias[0].disparaMensagem({
+        tipo: 'SNAPSHOT',
+        usuarios: [{ usuarioId: 1, nome: 'Ana', x: 0, y: 0, status: 'DISPONIVEL' }],
+      })
+    })
+    await waitFor(() => expect(result.current.usuarios[1]).toBeDefined())
+
+    act(() => {
+      result.current.mover(1, 0) // predição local do 1º passo
+      result.current.mover(2, 0) // já avançou pro 2º passo antes de qualquer eco do servidor
+    })
+    expect(result.current.usuarios[1]?.x).toBe(2)
+
+    // eco atrasado do servidor confirmando só o 1º passo (x=1), chegando depois do 2º já local
+    act(() => {
+      WebSocketFalso.instancias[0].disparaMensagem({
+        tipo: 'POSICAO',
+        usuarios: [{ usuarioId: 1, nome: 'Ana', x: 1, y: 0, status: 'FOCO' }],
+      })
+    })
+
+    expect(result.current.usuarios[1]?.x).toBe(2) // não volta pro x=1 do eco atrasado
+    expect(result.current.usuarios[1]?.status).toBe('FOCO') // status do servidor ainda vale (zona muda status sozinho)
+  })
+
   it('mover atualiza a própria posição localmente de imediato, antes de qualquer resposta do servidor', async () => {
     const { result } = renderHook(() => usePresencaWebSocket())
     act(() => {

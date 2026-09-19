@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
@@ -629,5 +629,103 @@ describe('ProjetoDetalhePage', () => {
     expect(screen.getByRole('timer')).toHaveTextContent('00:45:00')
     expect(screen.queryByRole('button', { name: /▶️ retomar/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /finalizar/i })).not.toBeInTheDocument()
+  })
+
+  // ---------- pedido do usuário: "não conseguimos editar e apagar algumas atividades" ----------
+
+  it('edita o título da tarefa e ele aparece atualizado no board sem reload manual', async () => {
+    let card = PROJETO_DETALHE.colunas[0].cards[0]
+    server.use(
+      http.get('/projetos/1', () =>
+        HttpResponse.json({ ...PROJETO_DETALHE, colunas: [{ ...PROJETO_DETALHE.colunas[0], cards: [card] }] }),
+      ),
+      http.patch('/cards/7', async ({ request }) => {
+        const corpo = (await request.json()) as { titulo: string }
+        card = { ...card, titulo: corpo.titulo }
+        return HttpResponse.json(card)
+      }),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.click(screen.getByRole('button', { name: /detalhes/i }))
+    await user.click(await screen.findByRole('button', { name: /✏️ editar/i }))
+    const campoTitulo = screen.getByLabelText('Título')
+    await user.clear(campoTitulo)
+    await user.type(campoTitulo, 'Corrigir bug crítico')
+    await user.click(screen.getByRole('button', { name: /salvar/i }))
+
+    expect(await screen.findByText('Corrigir bug crítico')).toBeInTheDocument()
+  })
+
+  it('cancelar a edição não manda nada e fecha o formulário', async () => {
+    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.click(screen.getByRole('button', { name: /detalhes/i }))
+    await user.click(await screen.findByRole('button', { name: /✏️ editar/i }))
+    await user.click(screen.getByRole('button', { name: /cancelar/i }))
+
+    expect(screen.queryByLabelText('Título')).not.toBeInTheDocument()
+    expect(screen.getByText('Corrigir bug')).toBeInTheDocument()
+  })
+
+  it('excluir pede confirmação antes de apagar de verdade', async () => {
+    let excluiu = false
+    server.use(
+      http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)),
+      http.delete('/cards/7', () => {
+        excluiu = true
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.click(screen.getByRole('button', { name: /detalhes/i }))
+    await user.click(await screen.findByRole('button', { name: /🗑️ excluir/i }))
+
+    expect(screen.getByText(/apagar "corrigir bug" de vez/i)).toBeInTheDocument()
+    expect(excluiu).toBe(false)
+  })
+
+  it('confirmar a exclusão apaga a tarefa de vez e ela some do board sem reload manual', async () => {
+    let cards = [PROJETO_DETALHE.colunas[0].cards[0]]
+    server.use(
+      http.get('/projetos/1', () =>
+        HttpResponse.json({ ...PROJETO_DETALHE, colunas: [{ ...PROJETO_DETALHE.colunas[0], cards }] }),
+      ),
+      http.delete('/cards/7', () => {
+        cards = []
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.click(screen.getByRole('button', { name: /detalhes/i }))
+    await user.click(await screen.findByRole('button', { name: /🗑️ excluir/i }))
+    await user.click(screen.getByRole('button', { name: /sim, apagar/i }))
+
+    await waitFor(() => expect(screen.queryByText('Corrigir bug')).not.toBeInTheDocument())
+  })
+
+  it('cancelar a exclusão fecha a confirmação sem apagar nada', async () => {
+    server.use(http.get('/projetos/1', () => HttpResponse.json(PROJETO_DETALHE)))
+    const user = userEvent.setup()
+    renderPagina()
+
+    await screen.findByText('Corrigir bug')
+    await user.click(screen.getByRole('button', { name: /detalhes/i }))
+    await user.click(await screen.findByRole('button', { name: /🗑️ excluir/i }))
+    await user.click(screen.getByRole('button', { name: /cancelar/i }))
+
+    expect(screen.queryByText(/apagar "corrigir bug" de vez/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /🗑️ excluir/i })).toBeInTheDocument()
   })
 })

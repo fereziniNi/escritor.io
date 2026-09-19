@@ -10,6 +10,7 @@ import io.escritor.presenca.identidade.repository.ProjetoRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.identidade.web.AdicionarMembroProjetoRequest;
 import io.escritor.presenca.identidade.web.CriarProjetoRequest;
+import io.escritor.presenca.kanban.domain.AcessoNegadoException;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.Coluna;
 import io.escritor.presenca.kanban.repository.CardRepository;
@@ -52,11 +53,16 @@ class ProjetoServiceTest {
 
     private final Usuario usuario = usuarioComId(1L);
     private final Usuario outroUsuario = usuarioComId(2L);
+    private final Usuario admin = usuarioComPapel(3L, Papel.ADMIN);
 
     private ProjetoService service;
 
     private static Usuario usuarioComId(Long id) {
-        Usuario usuario = new Usuario("Ana Souza", "ana" + id + "@escritor.io", Papel.COLABORADOR, 480);
+        return usuarioComPapel(id, Papel.COLABORADOR);
+    }
+
+    private static Usuario usuarioComPapel(Long id, Papel papel) {
+        Usuario usuario = new Usuario("Ana Souza", "ana" + id + "@escritor.io", papel, 480);
         ReflectionTestUtils.setField(usuario, "id", id);
         return usuario;
     }
@@ -121,7 +127,7 @@ class ProjetoServiceTest {
         when(usuarioRepository.findById(2L)).thenReturn(Optional.of(outroUsuario));
         when(membroProjetoRepository.existsByProjetoAndUsuario(projeto, outroUsuario)).thenReturn(false);
 
-        service.adicionarMembro(1L, new AdicionarMembroProjetoRequest(2L));
+        service.adicionarMembro(1L, new AdicionarMembroProjetoRequest(2L), admin);
 
         verify(membroProjetoRepository).save(any(MembroProjeto.class));
     }
@@ -133,7 +139,7 @@ class ProjetoServiceTest {
         when(usuarioRepository.findById(2L)).thenReturn(Optional.of(outroUsuario));
         when(membroProjetoRepository.existsByProjetoAndUsuario(projeto, outroUsuario)).thenReturn(true);
 
-        service.adicionarMembro(1L, new AdicionarMembroProjetoRequest(2L));
+        service.adicionarMembro(1L, new AdicionarMembroProjetoRequest(2L), admin);
 
         verify(membroProjetoRepository, never()).save(any());
     }
@@ -144,8 +150,43 @@ class ProjetoServiceTest {
         when(projetoRepository.findById(1L)).thenReturn(Optional.of(projeto));
         when(usuarioRepository.findById(999L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.adicionarMembro(1L, new AdicionarMembroProjetoRequest(999L)))
+        assertThatThrownBy(() -> service.adicionarMembro(1L, new AdicionarMembroProjetoRequest(999L), admin))
                 .isInstanceOf(RecursoNaoEncontradoException.class);
+    }
+
+    /**
+     * Auditoria de segurança (VULN-03, HIGH): antes desta correção, o único guard de
+     * {@code adicionarMembro} era o papel do solicitante ({@code @PreAuthorize} no controller) -
+     * qualquer GESTOR conseguia se autoadicionar (ou adicionar qualquer um) a QUALQUER projeto do
+     * sistema, mesmo sem nenhum vínculo com ele, ganhando acesso de leitura/escrita total ao board
+     * em seguida via {@code GET /projetos/{id}}.
+     */
+    @Test
+    void adicionarMembroPorGestorSemVinculoAoProjetoLancaAcessoNegado() {
+        Projeto projeto = projetoComId(1L, "Backlog");
+        Usuario gestorForasteiro = usuarioComPapel(7L, Papel.GESTOR);
+        when(projetoRepository.findById(1L)).thenReturn(Optional.of(projeto));
+        when(membroProjetoRepository.existsByProjetoAndUsuario(projeto, gestorForasteiro)).thenReturn(false);
+
+        assertThatThrownBy(
+                        () -> service.adicionarMembro(1L, new AdicionarMembroProjetoRequest(2L), gestorForasteiro))
+                .isInstanceOf(AcessoNegadoException.class);
+
+        verify(membroProjetoRepository, never()).save(any());
+    }
+
+    @Test
+    void adicionarMembroPorGestorQueJaEMembroDoProjetoFunciona() {
+        Projeto projeto = projetoComId(1L, "Backlog");
+        Usuario gestorDoProjeto = usuarioComPapel(8L, Papel.GESTOR);
+        when(projetoRepository.findById(1L)).thenReturn(Optional.of(projeto));
+        when(membroProjetoRepository.existsByProjetoAndUsuario(projeto, gestorDoProjeto)).thenReturn(true);
+        when(usuarioRepository.findById(2L)).thenReturn(Optional.of(outroUsuario));
+        when(membroProjetoRepository.existsByProjetoAndUsuario(projeto, outroUsuario)).thenReturn(false);
+
+        service.adicionarMembro(1L, new AdicionarMembroProjetoRequest(2L), gestorDoProjeto);
+
+        verify(membroProjetoRepository).save(any(MembroProjeto.class));
     }
 
     @Test

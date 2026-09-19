@@ -10,12 +10,37 @@ import javax.crypto.SecretKey;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class JwtServiceTest {
 
     private static final String SEGREDO_TESTE = "segredo-de-teste-com-tamanho-suficiente-para-hmac-sha256";
 
     private final JwtService jwtService = new JwtService(SEGREDO_TESTE);
+
+    /** Auditoria de segurança (VULN-01, CRITICAL): trava contra o segredo público voltar a ser
+     * aceito no boot. Se alguém reintroduzir esse valor (ou copiar/colar do application.yml de
+     * volta pra cá), o teste falha explicando o motivo. */
+    @Test
+    void recusaSubirComOSegredoPlaceholderPublico() {
+        assertThatThrownBy(() -> new JwtService(JwtService.SEGREDO_PLACEHOLDER_INSEGURO))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("APP_JWT_SEGREDO");
+    }
+
+    @Test
+    void recusaSubirComSegredoCurtoDemais() {
+        assertThatThrownBy(() -> new JwtService("curto-demais"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("APP_JWT_SEGREDO");
+    }
+
+    @Test
+    void recusaSubirComSegredoNuloOuEmBranco() {
+        assertThatThrownBy(() -> new JwtService("   "))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("APP_JWT_SEGREDO");
+    }
 
     @Test
     void tokenGeradoTemSubjectEPapelCorretos() {

@@ -5,8 +5,15 @@ services:
       POSTGRES_DB: presenca
       POSTGRES_USER: presenca
       POSTGRES_PASSWORD: presenca
+    # Auditoria de segurança (VULN-06, MEDIUM): sem o "127.0.0.1:" na frente, o Docker publica a
+    # porta em TODAS as interfaces de rede do host (0.0.0.0), não só localhost - alcançável por
+    # qualquer outra máquina na mesma rede/Wi-Fi, com a senha padrão "presenca" de dev. O
+    # container só precisa ser alcançável pelo `backend` (rede interna do compose, não passa por
+    # aqui) - essa publicação de porta existe só pra conveniência de inspecionar o banco de fora
+    # com um cliente SQL na própria máquina. `127.0.0.1:` preserva exatamente essa conveniência,
+    # só fecha o acesso de fora do host.
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/src/main/resources/db-init/criar-papel-app.sql:/docker-entrypoint-initdb.d/01-criar-papel-app.sql:ro
@@ -18,9 +25,14 @@ services:
 
   mailpit:
     image: axllent/mailpit
+    # Auditoria de segurança (VULN-06, MEDIUM): o Mailpit não tem autenticação nenhuma e concentra
+    # TODOS os códigos de login de TODOS os usuários - publicado em 0.0.0.0 (sem "127.0.0.1:"),
+    # qualquer um na mesma rede consegue ler os e-mails de qualquer conta e logar como ela, sem
+    # nunca precisar da senha de ninguém (login é passwordless, o código é a única barreira). Só a
+    # própria máquina precisa acessar a UI/SMTP.
     ports:
-      - "${MAILPIT_SMTP_PORT:-1025}:1025"   # SMTP - o backend envia e-mails de login aqui
-      - "${MAILPIT_UI_PORT:-8025}:8025"     # UI web para ver os e-mails capturados
+      - "127.0.0.1:${MAILPIT_SMTP_PORT:-1025}:1025"   # SMTP - o backend envia e-mails de login aqui
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"     # UI web para ver os e-mails capturados
 
   backend:
     build: ./backend
@@ -35,6 +47,14 @@ services:
       SPRING_FLYWAY_URL: jdbc:postgresql://postgres:5432/presenca
       SPRING_MAIL_HOST: mailpit
       SPRING_MAIL_PORT: 1025
+      # Auditoria de segurança (VULN-01, CRITICAL): sem isto, o backend caía de volta pro
+      # placeholder público de application.yml e dava pra forjar um JWT de ADMIN sem autenticar -
+      # confirmado ao vivo nesta auditoria. Diferente das integrações opcionais abaixo (que têm
+      # `:-` com um valor padrão porque vêm desligadas por padrão), JWT é sempre ativo - por isso
+      # `:?` (obrigatório): o `docker compose up` recusa subir sem JWT_SEGREDO no .env, em vez de
+      # silenciosamente cair num valor fraco. Gere o seu com `openssl rand -base64 64` e coloque
+      # em JWT_SEGREDO no .env da raiz (ver DEVELOPMENT.md) - nunca versione o valor real.
+      APP_JWT_SEGREDO: ${JWT_SEGREDO:?defina JWT_SEGREDO no .env - ver DEVELOPMENT.md (openssl rand -base64 64)}
       # Integração com WhatsApp (pedido do cliente: avisar o chefe quando alguém bate ponto) -
       # desligada por padrão (`APP_EVOLUTION_HABILITADO=false`), mesmo com o serviço `evolution-api`
       # do perfil `whatsapp` no ar. Ver DEVELOPMENT.md "Integração com WhatsApp".
@@ -58,6 +78,17 @@ services:
     build: ./frontend
     depends_on:
       - backend
+    environment:
+      # `nginx.conf.template` (deploy no Railway) precisa saber onde está o backend - aqui é
+      # sempre o nome do serviço no compose, mesmo valor que já estava hardcoded no nginx.conf
+      # antes dele virar template.
+      BACKEND_HOST: backend
+      BACKEND_PORT: "8080"
+      # Faz o proxy_pass do Nginx resolver "backend" de novo a cada requisição (via o resolvedor
+      # embutido do Docker) em vez de fixar o IP uma única vez no boot - sem isso, recriar o
+      # container do backend (rebuild, restart) deixa o Nginx preso no IP antigo até reiniciar
+      # também. Ver o comentário completo em nginx.conf.template.
+      NGINX_ENTRYPOINT_LOCAL_RESOLVERS: "1"
     ports:
       - "${FRONTEND_PORT:-5173}:80"
 
@@ -141,8 +172,13 @@ services:
       # MESMA chave usada por `APP_EVOLUTION_API_KEY` acima (o backend chama isto aqui) - troque
       # as duas juntas.
       AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-troque-esta-chave}
+    # Auditoria de segurança (VULN-06, MEDIUM): publicado em 0.0.0.0 (sem "127.0.0.1:"), qualquer
+    # um na mesma rede alcança a API de controle do WhatsApp - com a API key padrão (se
+    # EVOLUTION_API_KEY não foi trocada no .env), dá pra enviar mensagens como o número pareado.
+    # Só a própria máquina precisa (curl manual de pareamento via REST, ver DEVELOPMENT.md) - o
+    # backend fala com ela pela rede interna do compose, não por esta porta publicada.
     ports:
-      - "${EVOLUTION_API_PORT:-8085}:8080"
+      - "127.0.0.1:${EVOLUTION_API_PORT:-8085}:8080"
     volumes:
       - evolution_instances:/evolution/instances
 

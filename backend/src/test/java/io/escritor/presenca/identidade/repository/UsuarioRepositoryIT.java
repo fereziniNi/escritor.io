@@ -8,6 +8,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -53,5 +54,21 @@ class UsuarioRepositoryIT {
 
         assertThatThrownBy(() -> usuarioRepository.saveAndFlush(duplicado))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    /** Pedido do usuário: avisar o admin por WhatsApp quando uma tarefa muda de status/é criada
+     * (`CardService`) - só admin ativo entra, nem gestor/colaborador nem admin inativo. */
+    @Test
+    void encontraSoAdminsAtivosOrdenadosPorNome() {
+        usuarioRepository.saveAndFlush(new Usuario("Zeca Admin", "zeca@escritor.io", Papel.ADMIN, 480));
+        usuarioRepository.saveAndFlush(new Usuario("Ana Admin", "ana-admin@escritor.io", Papel.ADMIN, 480));
+        usuarioRepository.saveAndFlush(new Usuario("Beto Gestor", "beto@escritor.io", Papel.GESTOR, 480));
+        Usuario adminInativo = new Usuario("Carla Admin", "carla@escritor.io", Papel.ADMIN, 480);
+        ReflectionTestUtils.setField(adminInativo, "ativo", false);
+        usuarioRepository.saveAndFlush(adminInativo);
+
+        var admins = usuarioRepository.findByPapelAndAtivoTrueOrderByNomeAsc(Papel.ADMIN);
+
+        assertThat(admins).extracting(Usuario::getNome).containsExactly("Ana Admin", "Zeca Admin");
     }
 }

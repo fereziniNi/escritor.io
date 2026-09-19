@@ -21,9 +21,11 @@ import { formatarHms } from '../../shared/formatarHms'
 import { adicionarMembroAoProjeto, buscarProjeto, criarColuna, listarPessoas } from '../organizacao/api'
 import { ROTULO_STATUS_PROJETO, type ProjetoDetalhe } from '../organizacao/types'
 import {
+  atualizarCard,
   buscarCronometro,
   criarCard,
   criarComentario,
+  excluirCard,
   finalizarCronometro,
   iniciarCronometro,
   listarComentarios,
@@ -265,6 +267,155 @@ function CronometroSecao({ cardId }: { cardId: number }) {
 }
 
 /**
+ * Pedido do usuário: "não conseguimos editar e apagar algumas atividades" - mesmos campos que
+ * `criarCard` já aceita (`ColunaComDrop` abaixo), agora reabertos pra edição. `aberto` fecha o
+ * formulário sozinho ao salvar (mesmo espírito de `NovaColuna`/`CronometroSecao` "Finalizar").
+ */
+function EditarCardSecao({
+  card,
+  projetoId,
+  pessoas,
+  nomePorUsuarioId,
+}: {
+  card: Card
+  projetoId: number
+  pessoas: PessoaBasica[]
+  nomePorUsuarioId: Map<number, string>
+}) {
+  const queryClient = useQueryClient()
+  const [aberto, setAberto] = useState(false)
+  const [titulo, setTitulo] = useState(card.titulo)
+  const [descricao, setDescricao] = useState(card.descricao ?? '')
+  const [responsavelNome, setResponsavelNome] = useState(
+    card.responsavelId === null ? '' : (nomePorUsuarioId.get(card.responsavelId) ?? ''),
+  )
+  const [prazo, setPrazo] = useState(card.prazo ?? '')
+  const [estimativaMinutos, setEstimativaMinutos] = useState(card.estimativaMinutos === null ? '' : String(card.estimativaMinutos))
+
+  const responsavelNaoEncontrado = responsavelNome.trim() !== '' && !existeSugestaoPara(pessoas, responsavelNome)
+
+  const atualizarMutation = useMutation({
+    mutationFn: () => {
+      const responsavel = encontrarPessoaPorNome(pessoas, responsavelNome)
+      return atualizarCard({
+        cardId: card.id,
+        titulo,
+        descricao: descricao.trim() === '' ? null : descricao,
+        responsavelId: responsavel ? responsavel.id : null,
+        prazo: prazo === '' ? null : prazo,
+        estimativaMinutos: estimativaMinutos === '' ? null : Number(estimativaMinutos),
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projetos', projetoId] })
+      setAberto(false)
+    },
+  })
+
+  if (!aberto) {
+    return (
+      <button type="button" className="botao-secundario botao-pequeno" onClick={() => setAberto(true)}>
+        ✏️ Editar
+      </button>
+    )
+  }
+
+  return (
+    <form
+      className="formulario"
+      onSubmit={(evento) => {
+        evento.preventDefault()
+        atualizarMutation.mutate()
+      }}
+    >
+      <div className="campo">
+        <label htmlFor={`titulo-editar-${card.id}`}>Título</label>
+        <input id={`titulo-editar-${card.id}`} value={titulo} onChange={(evento) => setTitulo(evento.target.value)} required />
+      </div>
+      <div className="campo">
+        <label htmlFor={`descricao-editar-${card.id}`}>Descrição</label>
+        <textarea id={`descricao-editar-${card.id}`} value={descricao} onChange={(evento) => setDescricao(evento.target.value)} />
+      </div>
+      <CampoPessoa
+        id={`responsavel-editar-${card.id}`}
+        label="Responsável"
+        valor={responsavelNome}
+        aoMudarValor={setResponsavelNome}
+        pessoas={pessoas}
+        placeholder="Nome do responsável (opcional)"
+      />
+      {responsavelNaoEncontrado && <p className="mensagem-erro">Pessoa não encontrada</p>}
+      <div className="campo">
+        <label htmlFor={`prazo-editar-${card.id}`}>Prazo</label>
+        <input
+          id={`prazo-editar-${card.id}`}
+          type="date"
+          value={prazo}
+          onChange={(evento) => setPrazo(evento.target.value)}
+        />
+      </div>
+      <div className="campo">
+        <label htmlFor={`estimativa-editar-${card.id}`}>Tempo estimado (minutos)</label>
+        <input
+          id={`estimativa-editar-${card.id}`}
+          type="number"
+          value={estimativaMinutos}
+          onChange={(evento) => setEstimativaMinutos(evento.target.value)}
+        />
+      </div>
+      <div className="campo-acoes">
+        <button type="submit" className="botao-pequeno" disabled={atualizarMutation.isPending || responsavelNaoEncontrado}>
+          Salvar
+        </button>
+        <button type="button" className="botao-secundario botao-pequeno" onClick={() => setAberto(false)}>
+          Cancelar
+        </button>
+      </div>
+      {atualizarMutation.isError && <p className="mensagem-erro">Não foi possível atualizar a tarefa.</p>}
+    </form>
+  )
+}
+
+/** Pedido do usuário (segunda pergunta - "apagar de verdade"): exclusão permanente, com uma etapa
+ * de confirmação própria (mesmo espírito de "Finalizar" em `CronometroSecao`) - sem `window.
+ * confirm()` nativo, pra manter a mesma linguagem visual do resto do app. */
+function ExcluirCardBotao({ card, projetoId }: { card: Card; projetoId: number }) {
+  const queryClient = useQueryClient()
+  const [confirmando, setConfirmando] = useState(false)
+
+  const excluirMutation = useMutation({
+    mutationFn: () => excluirCard(card.id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projetos', projetoId] }),
+  })
+
+  if (!confirmando) {
+    return (
+      <button type="button" className="botao-perigo botao-pequeno" onClick={() => setConfirmando(true)}>
+        🗑️ Excluir
+      </button>
+    )
+  }
+
+  return (
+    <div className="campo-acoes">
+      <p className="mensagem-erro">Apagar "{card.titulo}" de vez? Comentários e histórico somem junto - não dá pra desfazer.</p>
+      <button
+        type="button"
+        className="botao-perigo botao-pequeno"
+        disabled={excluirMutation.isPending}
+        onClick={() => excluirMutation.mutate()}
+      >
+        Sim, apagar
+      </button>
+      <button type="button" className="botao-secundario botao-pequeno" onClick={() => setConfirmando(false)}>
+        Cancelar
+      </button>
+      {excluirMutation.isError && <p className="mensagem-erro">Não foi possível apagar a tarefa.</p>}
+    </div>
+  )
+}
+
+/**
  * Pedido do usuário: "está muito complexo... facilite o front" - um único toggle no lugar dos três
  * que existiam antes (Apontamentos/Comentários/Histórico cada um com seu próprio botão).
  *
@@ -273,7 +424,19 @@ function CronometroSecao({ cardId }: { cardId: number }) {
  * expandido, e rola a tela até ele (senão poderia abrir expandido fora da área visível num board
  * com muitas colunas/cards).
  */
-function DetalhesDoCard({ cardId, abrirInicialmente = false }: { cardId: number; abrirInicialmente?: boolean }) {
+function DetalhesDoCard({
+  card,
+  projetoId,
+  pessoas,
+  nomePorUsuarioId,
+  abrirInicialmente = false,
+}: {
+  card: Card
+  projetoId: number
+  pessoas: PessoaBasica[]
+  nomePorUsuarioId: Map<number, string>
+  abrirInicialmente?: boolean
+}) {
   const [aberto, setAberto] = useState(abrirInicialmente)
   const divRef = useRef<HTMLDivElement>(null)
 
@@ -297,9 +460,13 @@ function DetalhesDoCard({ cardId, abrirInicialmente = false }: { cardId: number;
       </button>
       {aberto && (
         <div className="kanban-detalhes-corpo">
-          <CronometroSecao cardId={cardId} />
-          <ComentariosSecao cardId={cardId} />
-          <HistoricoSecao cardId={cardId} />
+          <div className="linha-botoes">
+            <EditarCardSecao card={card} projetoId={projetoId} pessoas={pessoas} nomePorUsuarioId={nomePorUsuarioId} />
+            <ExcluirCardBotao card={card} projetoId={projetoId} />
+          </div>
+          <CronometroSecao cardId={card.id} />
+          <ComentariosSecao cardId={card.id} />
+          <HistoricoSecao cardId={card.id} />
         </div>
       )}
     </div>
@@ -308,10 +475,16 @@ function DetalhesDoCard({ cardId, abrirInicialmente = false }: { cardId: number;
 
 function CardArrastavel({
   card,
+  projetoId,
+  pessoas,
+  nomePorUsuarioId,
   nomeDoResponsavel,
   cardIdParaAbrir,
 }: {
   card: Card
+  projetoId: number
+  pessoas: PessoaBasica[]
+  nomePorUsuarioId: Map<number, string>
   nomeDoResponsavel: string | null
   cardIdParaAbrir?: number
 }) {
@@ -342,13 +515,20 @@ function CardArrastavel({
           {card.estimativaMinutos !== null && <span className="badge badge-neutro">⏱️ {card.estimativaMinutos} min</span>}
         </p>
       )}
-      <DetalhesDoCard cardId={card.id} abrirInicialmente={card.id === cardIdParaAbrir} />
+      <DetalhesDoCard
+        card={card}
+        projetoId={projetoId}
+        pessoas={pessoas}
+        nomePorUsuarioId={nomePorUsuarioId}
+        abrirInicialmente={card.id === cardIdParaAbrir}
+      />
     </li>
   )
 }
 
 function ColunaComDrop({
   coluna,
+  projetoId,
   pessoas,
   nomePorUsuarioId,
   novoCard,
@@ -358,6 +538,7 @@ function ColunaComDrop({
   cardIdParaAbrir,
 }: {
   coluna: ColunaComCards
+  projetoId: number
   pessoas: PessoaBasica[]
   nomePorUsuarioId: Map<number, string>
   novoCard: { titulo: string; responsavelNome: string; estimativaMinutos: string }
@@ -401,6 +582,9 @@ function ColunaComDrop({
             <CardArrastavel
               key={card.id}
               card={card}
+              projetoId={projetoId}
+              pessoas={pessoas}
+              nomePorUsuarioId={nomePorUsuarioId}
               nomeDoResponsavel={card.responsavelId === null ? null : (nomePorUsuarioId.get(card.responsavelId) ?? null)}
               cardIdParaAbrir={cardIdParaAbrir}
             />
@@ -767,6 +951,7 @@ export function ProjetoDetalhePage({
           <ColunaComDrop
             key={coluna.id}
             coluna={coluna}
+            projetoId={projetoId}
             pessoas={pessoas}
             nomePorUsuarioId={nomePorUsuarioId}
             novoCard={novoCardPorColuna[coluna.id] ?? NOVO_CARD_VAZIO}

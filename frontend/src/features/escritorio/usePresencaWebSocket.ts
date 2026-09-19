@@ -77,6 +77,18 @@ interface RtcSinalWs extends SinalRtcRecebido {
  * trata `tipo: "APARENCIA"` genericamente (merge no `usuarios` igual `POSICAO`/`STATUS`), então o
  * próprio usuário vê a mudança refletida sozinho assim que o servidor rebroadcasta pra sessão dele
  * mesma (nenhum código extra necessário aqui pra isso).
+ *
+ * Pedido do usuário: "anda pro lado que eu quero e depois volta" - o servidor ecoa de volta
+ * (broadcast) toda posição que processa, inclusive a nossa própria, e esse eco pode chegar pela
+ * rede depois da gente já ter avançado mais passos localmente por predição (`mover` abaixo nunca
+ * espera confirmação nenhuma); aplicar x/y desse eco atrasado "puxava" o personagem de volta pra
+ * uma posição já ultrapassada. A partir da primeira vez que `mover` roda de verdade
+ * (`jaMoveuLocalmenteRef`), o merge genérico do `onmessage` (fora do `SNAPSHOT`) para de
+ * sobrescrever x/y de nós mesmos com o que vem numa mensagem `POSICAO`/`STATUS`/`APARENCIA` sobre
+ * o próprio usuário - os outros campos (status, aparência) continuam vindo do servidor
+ * normalmente, só x/y ficam protegidos. Antes da primeira predição local (ex.: alguém simulando/
+ * empurrando uma posição pra nós de fora, sem passar por `mover`) o valor do servidor ainda é a
+ * única fonte de verdade que existe, então continua sendo aplicado normalmente.
  */
 export function usePresencaWebSocket() {
   const accessToken = useAuthStore((state) => state.accessToken)
@@ -89,6 +101,10 @@ export function usePresencaWebSocket() {
   const [sinaisRtcRecebidos, setSinaisRtcRecebidos] = useState<SinalRtcRecebido[]>([])
   const enviarPosicaoRef = useRef<(x: number, y: number) => void>(() => {})
   const socketRef = useRef<WebSocket | null>(null)
+  // Verdadeiro assim que `mover` roda pela primeira vez (predição local de verdade, não um
+  // SNAPSHOT/eco vindo do servidor) - ver o comentário completo do `onmessage` abaixo sobre por
+  // que só a partir daí um eco de POSICAO sobre nós mesmos deixa de mexer em x/y.
+  const jaMoveuLocalmenteRef = useRef(false)
 
   const meuUsuarioId = accessToken ? Number(decodeJwt(accessToken).sub) : null
 
@@ -147,6 +163,22 @@ export function usePresencaWebSocket() {
         setUsuarios((atual) => {
           const proximo = dados.tipo === 'SNAPSHOT' ? {} : { ...atual }
           dados.usuarios.forEach((usuario) => {
+            // Pedido do usuário: "anda pro lado que eu quero e depois volta" - o servidor
+            // ecoa de volta (broadcast) toda posição que ele mesmo mandou, inclusive a nossa -
+            // essa mensagem viaja pela rede e pode chegar DEPOIS da gente já ter avançado mais
+            // alguns passos localmente (predição, sem esperar confirmação nenhuma - ver `mover`
+            // abaixo). Sobrescrever x/y com esse eco atrasado "puxava" o personagem de volta pra
+            // uma posição já ultrapassada, visível como "anda pro lado certo e volta". Só entra
+            // aqui depois que `mover` já rodou pelo menos uma vez de verdade
+            // (`jaMoveuLocalmenteRef`) - antes disso (SNAPSHOT à parte, sempre a fonte da posição
+            // inicial) o valor do servidor é a única informação de posição que existe, não tem
+            // predição local nenhuma pra "proteger" ainda. O status continua vindo do servidor
+            // pra nós mesmos de qualquer forma (mudar de zona troca o status automaticamente do
+            // lado do servidor, e isso não tem predição local nenhuma).
+            if (dados.tipo !== 'SNAPSHOT' && usuario.usuarioId === meuUsuarioId && atual[meuUsuarioId] && jaMoveuLocalmenteRef.current) {
+              proximo[usuario.usuarioId] = { ...usuario, x: atual[meuUsuarioId].x, y: atual[meuUsuarioId].y }
+              return
+            }
             proximo[usuario.usuarioId] = usuario
           })
           return proximo
@@ -181,6 +213,7 @@ export function usePresencaWebSocket() {
     if (meuUsuarioId === null) {
       return
     }
+    jaMoveuLocalmenteRef.current = true
     setUsuarios((atual) => {
       const eu = atual[meuUsuarioId]
       if (!eu) {

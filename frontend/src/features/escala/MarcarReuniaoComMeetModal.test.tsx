@@ -46,7 +46,9 @@ function renderModal(props: Partial<ComponentProps<typeof MarcarReuniaoComMeetMo
  * de disponibilizar o link caso queira compartilhar". Depois, "Não consegui marcar a reunião!!
  * Mude o UI e UX da tela de marcar a reunião. Ficou péssimo!!" - os testes de disponibilidade
  * abaixo cobrem o motivo real do "não consegui" (nenhum aviso prévio de que o convidado não
- * trabalha naquele horário).
+ * trabalha naquele horário). Depois ainda, "pode permitir marcar a reunião fora do horário de
+ * trabalho, mas deve deixar informando para deixar ciente" - o aviso continua aparecendo, mas
+ * deixou de bloquear o envio.
  */
 describe('MarcarReuniaoComMeetModal', () => {
   it('lista as pessoas pra escolher como participante, filtrável por nome', async () => {
@@ -128,7 +130,7 @@ describe('MarcarReuniaoComMeetModal', () => {
     expect(screen.getByRole('checkbox', { name: 'Ana Souza' })).not.toBeChecked()
   })
 
-  it('avisa antes de enviar quando o participante não trabalha no horário escolhido, e desabilita o botão', async () => {
+  it('avisa antes de enviar quando o participante não trabalha no horário escolhido, mas deixa marcar mesmo assim', async () => {
     server.use(
       http.get('/escala/disponibilidade', () =>
         HttpResponse.json([{ usuarioId: 2, nome: 'Beto Lima', trabalha: false, horaInicio: null, horaFim: null }]),
@@ -137,8 +139,8 @@ describe('MarcarReuniaoComMeetModal', () => {
     renderModal({ participanteInicialId: 2, dataInicial: '2026-09-10' })
 
     expect(await screen.findByText(/beto lima não trabalha nesse dia/i)).toBeInTheDocument()
-    expect(await screen.findByText(/ajuste o horário/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /marcar reunião/i })).toBeDisabled()
+    expect(await screen.findByText(/atenção/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /marcar reunião/i })).not.toBeDisabled()
   })
 
   it('mostra erro quando o backend recusa por falta de conexão com o Google', async () => {

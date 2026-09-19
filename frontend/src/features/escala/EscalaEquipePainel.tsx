@@ -16,11 +16,13 @@ function horaCurta(hora: string | null): string {
 /**
  * Pedido do usuário: "para que o admin/chefe conseguir ver os momentos em que os funcionários
  * estarão trabalhando" - uma semana por vez, uma linha por colaborador visível (`GET
- * /escala/equipe`, já filtrado por {@code VisibilidadeUsuarioService}: GESTOR só vê quem divide
- * projeto com ele, ADMIN vê todo mundo). Ninguém edita a ESCALA de outra pessoa aqui - clicar numa
- * célula de dia trabalhado só pré-preenche o participante/data no modal de marcar reunião
- * (`MarcarReuniaoComMeetModal`, aberto a qualquer usuário - essa tabela é só um atalho pra chefe
- * não precisar procurar o nome no filtro).
+ * /escala/equipe`, já filtrado por {@code VisibilidadeUsuarioService}: COLABORADOR só vê a si
+ * mesmo, GESTOR vê quem divide projeto com ele, ADMIN vê todo mundo). Painel aberto a qualquer
+ * papel autenticado (pedido do usuário: "gostaria que todos tivessem o menu e as opções também") -
+ * quem limita o que aparece na tabela é sempre o backend, não uma checagem de papel aqui. Ninguém
+ * edita a ESCALA de outra pessoa aqui - clicar numa célula de dia trabalhado só pré-preenche o
+ * participante/data no modal de marcar reunião (`MarcarReuniaoComMeetModal`, aberto a qualquer
+ * usuário - essa tabela é só um atalho pra não precisar procurar o nome no filtro).
  */
 export function EscalaEquipePainel() {
   const [inicioDaSemana, setInicioDaSemana] = useState(() => {

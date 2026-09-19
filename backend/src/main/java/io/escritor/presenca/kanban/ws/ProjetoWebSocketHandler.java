@@ -50,12 +50,31 @@ public class ProjetoWebSocketHandler extends TextWebSocketHandler {
     }
 
     public void broadcastCardMovido(Long projetoId, CardResponse card) {
+        broadcast(projetoId, "CARD_MOVIDO", card);
+    }
+
+    /** Pedido do usuário: "não conseguimos editar... algumas atividades" - mesmo mecanismo de
+     * {@link #broadcastCardMovido} (S3.11), pra quem só está olhando o board também ver a edição
+     * sem precisar recarregar a página. */
+    public void broadcastCardAtualizado(Long projetoId, CardResponse card) {
+        broadcast(projetoId, "CARD_ATUALIZADO", card);
+    }
+
+    /** Manda o {@link CardResponse} do card como ele era um instante antes de ser apagado - o
+     * card já não existe mais no banco nesse ponto, então isto é só pra identificar QUAL card
+     * sumiu (o cliente reage invalidando a query do projeto inteiro, não lendo os campos aqui -
+     * ver {@code useProjetoWebSocket.ts}). */
+    public void broadcastCardExcluido(Long projetoId, CardResponse card) {
+        broadcast(projetoId, "CARD_EXCLUIDO", card);
+    }
+
+    private void broadcast(Long projetoId, String tipo, CardResponse card) {
         Set<WebSocketSession> sessoes = sessoesPorProjeto.get(projetoId);
         if (sessoes == null || sessoes.isEmpty()) {
             return;
         }
 
-        String payload = objectMapper.writeValueAsString(new ProjetoEventoWs("CARD_MOVIDO", card));
+        String payload = objectMapper.writeValueAsString(new ProjetoEventoWs(tipo, card));
         TextMessage mensagem = new TextMessage(payload);
         for (WebSocketSession sessao : sessoes) {
             enviar(sessao, mensagem);

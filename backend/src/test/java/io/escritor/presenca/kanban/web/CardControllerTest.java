@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -239,5 +240,106 @@ class CardControllerTest {
         when(cardEventoService.listar(eq(999L), any())).thenThrow(new RecursoNaoEncontradoException("não encontrado"));
 
         mockMvc.perform(get("/cards/999/eventos")).andExpect(status().isNotFound());
+    }
+
+    // ---------- pedido do usuário: "não conseguimos editar e apagar algumas atividades" ----------
+
+    @Test
+    void atualizarSemAutenticacaoRetorna401() throws Exception {
+        mockMvc.perform(patch("/cards/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"titulo":"Novo título"}
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void qualquerUsuarioAutenticadoPodeAtualizarCard() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(cardService.atualizar(eq(1L), eq("Novo título"), any(), any(), any(), any(), any()))
+                .thenReturn(new CardResponse(
+                        1L, 2L, "Novo título", null, 1024.0, null, null, null, 1L, Instant.now(), false));
+
+        mockMvc.perform(patch("/cards/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"titulo":"Novo título"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.titulo").value("Novo título"));
+    }
+
+    @Test
+    @WithMockUser
+    void atualizarSemTituloRetorna400() throws Exception {
+        mockMvc.perform(patch("/cards/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser
+    void atualizarCardInexistenteRetorna404() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(cardService.atualizar(eq(999L), any(), any(), any(), any(), any(), any()))
+                .thenThrow(new RecursoNaoEncontradoException("não encontrado"));
+
+        mockMvc.perform(patch("/cards/999")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"titulo":"Novo título"}
+                                """))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser
+    void atualizarSemAcessoAoProjetoRetorna403() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(cardService.atualizar(eq(1L), any(), any(), any(), any(), any(), any()))
+                .thenThrow(new AcessoNegadoException("sem acesso"));
+
+        mockMvc.perform(patch("/cards/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"titulo":"Novo título"}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void excluirSemAutenticacaoRetorna401() throws Exception {
+        mockMvc.perform(delete("/cards/1")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void qualquerUsuarioAutenticadoPodeExcluirCard() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+
+        mockMvc.perform(delete("/cards/1")).andExpect(status().isNoContent());
+
+        verify(cardService).excluir(eq(1L), any());
+    }
+
+    @Test
+    @WithMockUser
+    void excluirCardInexistenteRetorna404() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        doThrow(new RecursoNaoEncontradoException("não encontrado")).when(cardService).excluir(eq(999L), any());
+
+        mockMvc.perform(delete("/cards/999")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser
+    void excluirSemAcessoAoProjetoRetorna403() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        doThrow(new AcessoNegadoException("sem acesso")).when(cardService).excluir(eq(1L), any());
+
+        mockMvc.perform(delete("/cards/1")).andExpect(status().isForbidden());
     }
 }

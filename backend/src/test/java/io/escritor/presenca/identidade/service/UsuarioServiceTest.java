@@ -21,6 +21,9 @@ import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.identidade.web.AtualizarAparenciaRequest;
 import io.escritor.presenca.identidade.web.AtualizarCargaDiariaRequest;
 import io.escritor.presenca.identidade.web.AtualizarPerfilRequest;
+import io.escritor.presenca.identidade.web.AtualizarWhatsappRequest;
+import io.escritor.presenca.identidade.web.CriarUsuarioRequest;
+import io.escritor.presenca.seguranca.email.EnvioEmail;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -46,11 +50,14 @@ class UsuarioServiceTest {
     @Mock
     private PresencaWebSocketHandler presencaWebSocketHandler;
 
+    @Mock
+    private EnvioEmail envioEmail;
+
     private UsuarioService usuarioService;
 
     @BeforeEach
     void setUp() {
-        usuarioService = new UsuarioService(usuarioRepository, presencaWebSocketHandler);
+        usuarioService = new UsuarioService(usuarioRepository, presencaWebSocketHandler, envioEmail);
     }
 
     private static Usuario comId(Usuario usuario, Long id) {
@@ -99,6 +106,57 @@ class UsuarioServiceTest {
         when(usuarioRepository.findById(999L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> usuarioService.atualizarCargaDiaria(999L, new AtualizarCargaDiariaRequest(360)))
+                .isInstanceOf(RecursoNaoEncontradoException.class);
+    }
+
+    // ---------- pedido do usuário: avisar por WhatsApp de tarefa concluída/mensagem de chat ----------
+
+    @Test
+    void criarUsuarioComWhatsappSalvaONumero() {
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(chamada -> chamada.getArgument(0));
+
+        var resposta = usuarioService.criar(new CriarUsuarioRequest("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480, "5511999998888"));
+
+        assertThat(resposta.whatsapp()).isEqualTo("5511999998888");
+    }
+
+    @Test
+    void criarUsuarioSemWhatsappFicaSemNumero() {
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(chamada -> chamada.getArgument(0));
+
+        var resposta = usuarioService.criar(new CriarUsuarioRequest("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480, null));
+
+        assertThat(resposta.whatsapp()).isNull();
+    }
+
+    @Test
+    void atualizaOWhatsappDeUmUsuarioExistente() {
+        Usuario ana = comId(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480), 1L);
+        when(usuarioRepository.findById(1L)).thenReturn(Optional.of(ana));
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(chamada -> chamada.getArgument(0));
+
+        var resposta = usuarioService.atualizarWhatsapp(1L, new AtualizarWhatsappRequest("5511988887777"));
+
+        assertThat(resposta.whatsapp()).isEqualTo("5511988887777");
+    }
+
+    @Test
+    void atualizarWhatsappEmBrancoDesligaOAviso() {
+        Usuario ana = comId(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480), 1L);
+        ana.alterarWhatsapp("5511988887777");
+        when(usuarioRepository.findById(1L)).thenReturn(Optional.of(ana));
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(chamada -> chamada.getArgument(0));
+
+        var resposta = usuarioService.atualizarWhatsapp(1L, new AtualizarWhatsappRequest(""));
+
+        assertThat(resposta.whatsapp()).isNull();
+    }
+
+    @Test
+    void atualizarWhatsappDeUsuarioInexistenteLanca404() {
+        when(usuarioRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> usuarioService.atualizarWhatsapp(999L, new AtualizarWhatsappRequest("5511988887777")))
                 .isInstanceOf(RecursoNaoEncontradoException.class);
     }
 
@@ -176,5 +234,44 @@ class UsuarioServiceTest {
 
         assertThatThrownBy(() -> usuarioService.atualizarMeuPerfil(ana, new AtualizarPerfilRequest("Ana Souza", "beto@escritor.io")))
                 .isInstanceOf(EmailJaCadastradoException.class);
+    }
+
+    // ---------- auditoria de segurança (VULN-10, LOW) ----------
+
+    @Test
+    void trocarOEmailAvisaOEnderecoAntigo() {
+        Usuario ana = comId(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480), 1L);
+        when(usuarioRepository.findByEmailAndAtivoTrue("ana.nova@escritor.io")).thenReturn(Optional.empty());
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(chamada -> chamada.getArgument(0));
+
+        usuarioService.atualizarMeuPerfil(ana, new AtualizarPerfilRequest("Ana Souza", "ana.nova@escritor.io"));
+
+        verify(envioEmail).avisarTrocaDeEmail("ana@escritor.io", "ana.nova@escritor.io");
+    }
+
+    @Test
+    void naoAvisaNinguemQuandoOEmailNaoMudou() {
+        Usuario ana = comId(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480), 1L);
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(chamada -> chamada.getArgument(0));
+
+        usuarioService.atualizarMeuPerfil(ana, new AtualizarPerfilRequest("Ana S.", "ana@escritor.io"));
+
+        verify(envioEmail, org.mockito.Mockito.never()).avisarTrocaDeEmail(any(), any());
+    }
+
+    /** Mesma disciplina de {@code AutenticacaoService#gerarEEnviarCodigo}: uma falha no envio do
+     * aviso (SMTP fora do ar, etc.) não pode desfazer nem barrar uma troca de e-mail que já foi
+     * persistida com sucesso - a pessoa já está com o e-mail novo, a resposta HTTP tem que
+     * refletir isso independente do e-mail de aviso ter saído ou não. */
+    @Test
+    void falhaAoAvisarNaoDesfazNemFalhaATroca() {
+        Usuario ana = comId(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480), 1L);
+        when(usuarioRepository.findByEmailAndAtivoTrue("ana.nova@escritor.io")).thenReturn(Optional.empty());
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(chamada -> chamada.getArgument(0));
+        doThrow(new RuntimeException("SMTP fora do ar")).when(envioEmail).avisarTrocaDeEmail(any(), any());
+
+        var resposta = usuarioService.atualizarMeuPerfil(ana, new AtualizarPerfilRequest("Ana Souza", "ana.nova@escritor.io"));
+
+        assertThat(resposta.email()).isEqualTo("ana.nova@escritor.io");
     }
 }

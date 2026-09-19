@@ -6,6 +6,7 @@ import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
 import io.escritor.presenca.identidade.service.ProjetoService;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
+import io.escritor.presenca.kanban.domain.AcessoNegadoException;
 import io.escritor.presenca.kanban.domain.OrdemColunaDuplicadaException;
 import io.escritor.presenca.kanban.service.ColunaService;
 import io.escritor.presenca.kanban.web.CardResponse;
@@ -27,6 +28,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -188,7 +190,7 @@ class ProjetoControllerTest {
     void adicionarMembroDeUsuarioInexistenteRetorna404() throws Exception {
         org.mockito.Mockito.doThrow(new RecursoNaoEncontradoException("não encontrado"))
                 .when(projetoService)
-                .adicionarMembro(eq(1L), any());
+                .adicionarMembro(eq(1L), any(), any());
 
         mockMvc.perform(post("/projetos/1/membros")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -196,6 +198,28 @@ class ProjetoControllerTest {
                                 {"usuarioId":999}
                                 """))
                 .andExpect(status().isNotFound());
+    }
+
+    /**
+     * Auditoria de segurança (VULN-03, HIGH): {@code @PreAuthorize} sozinho não bastava - um
+     * GESTOR sem nenhum vínculo com o projeto conseguia se autoadicionar (ou adicionar qualquer
+     * um) a QUALQUER projeto. `ProjetoService.adicionarMembro` agora lança {@code
+     * AcessoNegadoException} nesse caso, e o teste prova que o controller propaga isso como 403 -
+     * não deixa cair no 204 "de sucesso" por engano.
+     */
+    @Test
+    @WithMockUser(roles = "GESTOR")
+    void adicionarMembroPorGestorSemVinculoAoProjetoRetorna403() throws Exception {
+        org.mockito.Mockito.doThrow(new AcessoNegadoException("Só um membro deste projeto (ou ADMIN) pode adicionar novos membros a ele"))
+                .when(projetoService)
+                .adicionarMembro(eq(1L), any(), any());
+
+        mockMvc.perform(post("/projetos/1/membros")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"usuarioId":2}
+                                """))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -213,7 +237,7 @@ class ProjetoControllerTest {
     void criarColunaComPapelColaboradorRetorna201() throws Exception {
         // Pedido do usuário: "Um funcionário pode adicionar seções e também adicionar novos
         // projetos" - criar coluna (seção) deixou de ser GESTOR/ADMIN só.
-        when(colunaService.criar(1L, "A fazer", 0, null))
+        when(colunaService.criar(eq(1L), eq("A fazer"), eq(0), isNull(), any()))
                 .thenReturn(new ColunaResponse(1L, 1L, "A fazer", 0, null));
 
         mockMvc.perform(post("/projetos/1/colunas")
@@ -229,7 +253,7 @@ class ProjetoControllerTest {
     @Test
     @WithMockUser(roles = "GESTOR")
     void criarColunaComPapelGestorRetorna201() throws Exception {
-        when(colunaService.criar(1L, "A fazer", 0, null))
+        when(colunaService.criar(eq(1L), eq("A fazer"), eq(0), isNull(), any()))
                 .thenReturn(new ColunaResponse(1L, 1L, "A fazer", 0, null));
 
         mockMvc.perform(post("/projetos/1/colunas")
@@ -256,7 +280,7 @@ class ProjetoControllerTest {
     @Test
     @WithMockUser(roles = "GESTOR")
     void criarColunaEmProjetoInexistenteRetorna404() throws Exception {
-        when(colunaService.criar(999L, "A fazer", 0, null))
+        when(colunaService.criar(eq(999L), eq("A fazer"), eq(0), isNull(), any()))
                 .thenThrow(new RecursoNaoEncontradoException("não encontrado"));
 
         mockMvc.perform(post("/projetos/999/colunas")
@@ -270,7 +294,8 @@ class ProjetoControllerTest {
     @Test
     @WithMockUser(roles = "GESTOR")
     void criarColunaComOrdemDuplicadaRetorna409() throws Exception {
-        when(colunaService.criar(1L, "A fazer", 0, null)).thenThrow(new OrdemColunaDuplicadaException(0));
+        when(colunaService.criar(eq(1L), eq("A fazer"), eq(0), isNull(), any()))
+                .thenThrow(new OrdemColunaDuplicadaException(0));
 
         mockMvc.perform(post("/projetos/1/colunas")
                         .contentType(MediaType.APPLICATION_JSON)

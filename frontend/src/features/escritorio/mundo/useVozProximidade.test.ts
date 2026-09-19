@@ -107,11 +107,15 @@ function streamFalsa(): MediaStream {
 }
 
 const getUserMediaMock = vi.fn().mockResolvedValue(undefined)
+const TURN_FALSO = { urls: 'turn:escritorio-io.metered.live:80', username: 'usuario-falso', credential: 'credencial-falsa' }
+const fetchMock = vi.fn().mockResolvedValue({ json: () => Promise.resolve([TURN_FALSO]) })
 
 beforeEach(() => {
   RTCPeerConnectionFalsa.instancias = []
   vi.stubGlobal('RTCPeerConnection', RTCPeerConnectionFalsa)
   vi.stubGlobal('AudioContext', AudioContextFalso)
+  fetchMock.mockReset().mockResolvedValue({ json: () => Promise.resolve([TURN_FALSO]) })
+  vi.stubGlobal('fetch', fetchMock)
   getUserMediaMock.mockReset().mockResolvedValue(streamFalsa())
   Object.defineProperty(navigator, 'mediaDevices', {
     value: { getUserMedia: getUserMediaMock },
@@ -145,6 +149,37 @@ function renderVoz(meuUsuarioId: number, props: Props) {
   )
   return { ...view, enviarSinalRtc }
 }
+
+describe('useVozProximidade - servidores ICE (TURN da Metered)', () => {
+  it('busca os servidores TURN da Metered assim que o hook monta e usa numa conexão criada depois da busca responder', async () => {
+    // sem par nenhum ainda no primeiro render - só depois que a busca responder é que o par se
+    // forma (`rerender`), pra não testar a corrida inerente (a primeiríssima conexão, criada no
+    // mesmíssimo instante em que o hook monta, pode legitimamente nascer só com STUN, antes da
+    // resposta da Metered chegar - ver comentário no `iceServersRef` no hook).
+    const { rerender } = renderVoz(1, { pares: [], ativo: true, sinais: [] })
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('escritorio-io.metered.live/api/v1/turn/credentials')))
+    await new Promise((resolve) => setTimeout(resolve, 10)) // dá tempo do `.then()` da busca aplicar no ref
+
+    rerender({ pares: [{ usuarioIdA: 1, usuarioIdB: 2, distanciaTiles: 1 }], ativo: true, sinais: [] })
+
+    await waitFor(() =>
+      expect(RTCPeerConnectionFalsa.instancias[0]?.config).toMatchObject({
+        iceServers: expect.arrayContaining([expect.objectContaining({ urls: TURN_FALSO.urls })]),
+      }),
+    )
+  })
+
+  it('bug real: se a Metered estiver fora do ar, cai pro STUN puro em vez de travar a voz por proximidade', async () => {
+    fetchMock.mockRejectedValue(new Error('Metered fora do ar'))
+
+    renderVoz(1, { pares: [{ usuarioIdA: 1, usuarioIdB: 2, distanciaTiles: 1 }], ativo: true, sinais: [] })
+
+    await waitFor(() => expect(RTCPeerConnectionFalsa.instancias).toHaveLength(1))
+    const iceServers = RTCPeerConnectionFalsa.instancias[0].config as { iceServers: RTCIceServer[] }
+    expect(iceServers.iceServers.some((s) => JSON.stringify(s).includes('turn:'))).toBe(false)
+  })
+})
 
 describe('useVozProximidade', () => {
   it('pedido do usuário: "voice... com a pessoa mais próxima" - par de voz com mic ativo cria conexão e, sendo o id menor, eu ofereço', async () => {
