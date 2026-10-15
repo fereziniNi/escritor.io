@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatarFaixaDeHora, horaDePico, periodoPadrao } from './estatisticasUtils'
+import { formatarFaixaDeHora, horaDePico, periodoDoMes, periodoPadrao } from './estatisticasUtils'
 
 describe('horaDePico', () => {
   it('pedido do usuário: "horário que mais trabalhou" - acha o índice do maior valor', () => {
@@ -51,5 +51,15 @@ describe('periodoPadrao', () => {
     const periodo = periodoPadrao(new Date('2026-12-31T10:00:00Z'))
     expect(periodo.inicio).toBe('2026-12-01')
     expect(periodo.fim).toBe('2027-01-01')
+  })
+})
+
+describe('periodoDoMes', () => {
+  it('vai do dia 1 até o dia 1 do mês seguinte (fim exclusivo)', () => {
+    expect(periodoDoMes('2026-10')).toEqual({ inicio: '2026-10-01', fim: '2026-11-01' })
+  })
+
+  it('dezembro vira janeiro do ano seguinte', () => {
+    expect(periodoDoMes('2025-12')).toEqual({ inicio: '2025-12-01', fim: '2026-01-01' })
   })
 })

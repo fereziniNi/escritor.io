@@ -36,3 +36,149 @@
   color: var(--cor-texto-suave);
   white-space: nowrap;
 }
+
+/**
+ * Fechamento do mês (`FechamentoMesPainel`) - pedido do usuário: "deixe a tabela bonita, bem
+ * apresentável, agradável de se ver". Reaproveita `.tabela-elegante`/`.stat-cartao` e só
+ * acrescenta o que é dele: avatar com inicial, números alinhados, saldo em etiqueta, total.
+ */
+.fechamento-cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+}
+
+.fechamento-cabecalho .secao-titulo {
+  margin-bottom: 0.3rem;
+}
+
+.fechamento-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.fechamento-acoes .campo {
+  margin: 0;
+}
+
+.fechamento-subtitulo {
+  margin: 0.75rem 0 1rem;
+  color: var(--cor-texto-suave);
+}
+
+.fechamento-tabela-moldura {
+  margin-top: 1.1rem;
+  overflow-x: auto;
+  border-radius: var(--raio-borda);
+  box-shadow: var(--sombra-cartao);
+}
+
+.fechamento-tabela {
+  min-width: 760px;
+  font-variant-numeric: tabular-nums;
+}
+
+.fechamento-tabela th,
+.fechamento-tabela td {
+  padding: 0.75em 1em;
+  vertical-align: middle;
+}
+
+.fechamento-tabela tbody td {
+  border-top: 1px solid rgba(216, 210, 189, 0.55);
+}
+
+.fechamento-tabela .fechamento-numero {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.fechamento-pessoa {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-weight: 700;
+}
+
+.fechamento-avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--cor-primaria-clara);
+  color: var(--cor-primaria-escura);
+  font-weight: 800;
+  font-size: 0.85rem;
+  box-shadow: inset 0 0 0 1px rgba(79, 143, 111, 0.25);
+}
+
+.fechamento-suave {
+  color: var(--cor-texto-suave);
+}
+
+.fechamento-destaque {
+  font-weight: 800;
+}
+
+.fechamento-saldo {
+  display: inline-block;
+  min-width: 5.5em;
+  padding: 0.2em 0.75em;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+
+.fechamento-saldo-positivo {
+  background: var(--cor-primaria-clara);
+  color: var(--cor-primaria-escura);
+}
+
+.fechamento-saldo-negativo {
+  background: #fdece7;
+  color: var(--cor-perigo);
+}
+
+.fechamento-contagem-alerta {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.8em;
+  height: 1.8em;
+  padding: 0 0.4em;
+  border-radius: 999px;
+  background: #fdf1df;
+  color: var(--cor-acento-escuro);
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+
+.fechamento-contagem-zero {
+  color: var(--cor-borda);
+  font-weight: 700;
+}
+
+.fechamento-tabela tfoot th,
+.fechamento-tabela tfoot td {
+  background: var(--cor-primaria-clara);
+  color: var(--cor-primaria-escura);
+  font-weight: 800;
+  border-top: 2px solid var(--cor-primaria);
+  text-align: left;
+}
+
+.fechamento-tabela tfoot .fechamento-numero {
+  text-align: center;
+}
+
+.fechamento-nota {
+  margin: 0.75rem 0 0;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--cor-texto-suave);
+}

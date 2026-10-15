@@ -23,6 +23,7 @@ import io.escritor.presenca.kanban.domain.OrdemColunaDuplicadaException;
 import io.escritor.presenca.kanban.domain.TextoComentarioObrigatorioException;
 import io.escritor.presenca.kanban.domain.TituloCardObrigatorioException;
 import io.escritor.presenca.ponto.domain.JornadaDeOutroUsuarioException;
+import io.escritor.presenca.ponto.domain.MesInvalidoException;
 import io.escritor.presenca.ponto.service.SequenciaInvalidaException;
 import io.escritor.presenca.relatorio.domain.EstatisticasDeOutroUsuarioException;
 import org.springframework.http.HttpStatus;
@@ -36,6 +37,11 @@ public class TratamentoErroGlobal {
     @ExceptionHandler(RecursoNaoEncontradoException.class)
     ResponseEntity<Void> tratarRecursoNaoEncontrado() {
         return ResponseEntity.notFound().build();
+    }
+
+    @ExceptionHandler(MesInvalidoException.class)
+    ResponseEntity<Void> tratarMesInvalido() {
+        return ResponseEntity.badRequest().build();
     }
 
     @ExceptionHandler(SequenciaInvalidaException.class)

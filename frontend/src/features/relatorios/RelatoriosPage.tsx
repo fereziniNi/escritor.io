@@ -7,8 +7,10 @@ import { buscarTotalApontadoPorProjeto } from '../kanban/api'
 import { listarPessoas, listarProjetos } from '../organizacao/api'
 import { buscarDiasInconsistentes, buscarEspelhoDoMes } from '../ponto/api'
 import { formatarMinutos, formatarSaldo } from '../ponto/formatarMinutos'
+import { useAuthStore } from '../auth/authStore'
 import { buscarEstatisticas } from './api'
-import { formatarFaixaDeHora, horaDePico, periodoPadrao } from './estatisticasUtils'
+import { formatarFaixaDeHora, horaDePico, periodoDoMes, periodoPadrao } from './estatisticasUtils'
+import { FechamentoMesPainel } from './FechamentoMesPainel'
 import { MiniGraficoBarras } from './MiniGraficoBarras'
 import type { RankingPessoa } from './types'
 
@@ -58,10 +60,22 @@ function TabelaRanking({ ranking, rotuloValor, formatarValor }: {
  * página carrega; o filtro continua existindo pra quem quiser outro período ou outra pessoa.
  */
 export function RelatoriosPage() {
+  const papel = useAuthStore((estado) => estado.papel)
   const [nomeUsuario, setNomeUsuario] = useState('')
   const [inicio, setInicio] = useState(() => periodoPadrao(new Date()).inicio)
   const [fim, setFim] = useState(() => periodoPadrao(new Date()).fim)
   const [projetoId, setProjetoId] = useState('')
+  // '' = mês corrente (comportamento anterior); preenchido = espelho/saldo desse mês (AAAA-MM)
+  const [mes, setMes] = useState('')
+
+  function escolherMes(novoMes: string) {
+    setMes(novoMes)
+    if (novoMes !== '') {
+      const periodo = periodoDoMes(novoMes)
+      setInicio(periodo.inicio)
+      setFim(periodo.fim)
+    }
+  }
 
   const pessoasQuery = useQuery({ queryKey: ['pessoas'], queryFn: listarPessoas })
   const pessoas = pessoasQuery.data ?? []
@@ -81,8 +95,8 @@ export function RelatoriosPage() {
   // nome desconhecido reaproveitaria o cache de `usuarioId: null` (o mesmo da busca "eu mesmo" com
   // o campo vazio) e o saldo de outra pessoa continuaria na tela junto da mensagem de erro.
   const espelhoQuery = useQuery({
-    queryKey: ['ponto', 'espelho-do-mes', usuarioId, nomeNaoEncontrado],
-    queryFn: () => buscarEspelhoDoMes(usuarioId ?? undefined),
+    queryKey: ['ponto', 'espelho-do-mes', usuarioId, nomeNaoEncontrado, mes],
+    queryFn: () => buscarEspelhoDoMes(usuarioId ?? undefined, mes || undefined),
     enabled: !nomeNaoEncontrado,
   })
 
@@ -119,6 +133,8 @@ export function RelatoriosPage() {
         <h1>📊 Relatórios</h1>
       </div>
 
+      {papel === 'ADMIN' && <FechamentoMesPainel />}
+
       <form className="secao cartao">
         <div className="formulario">
           <div className="campo">
@@ -131,6 +147,17 @@ export function RelatoriosPage() {
               placeholder="Nome da pessoa"
             />
             {nomeNaoEncontrado && <p className="mensagem-erro">Pessoa não encontrada</p>}
+          </div>
+
+          <div className="campo">
+            <label htmlFor="mes-relatorio">Mês</label>
+            <input
+              id="mes-relatorio"
+              type="month"
+              value={mes}
+              max={periodoPadrao(new Date()).inicio.slice(0, 7)}
+              onChange={(evento) => escolherMes(evento.target.value)}
+            />
           </div>
 
           <div className="campo">

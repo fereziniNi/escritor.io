@@ -29,9 +29,39 @@ function renderPainel() {
   )
 }
 
+function estatisticasComTarefas(datas: string[]) {
+  return {
+    pessoal: {
+      totalMinutosTrabalhados: 0,
+      diasTrabalhados: 0,
+      mediaMinutosPorDiaTrabalhado: 0,
+      reunioesParticipadas: 0,
+      tarefasConcluidas: datas.length,
+      tarefasConcluidasDetalhe: datas.map((concluidoEm, indice) => ({
+        cardId: indice + 1,
+        titulo: `Tarefa ${indice + 1}`,
+        nomeProjeto: 'Projeto',
+        concluidoEm,
+        descricaoConclusao: null,
+      })),
+      projetosConcluidos: 0,
+      minutosPorHoraDoDia: new Array(24).fill(0),
+    },
+    equipe: { rankingHorasTrabalhadas: [], rankingTarefasConcluidas: [], rankingReunioes: [], reunioesPorHoraDoDia: new Array(24).fill(0) },
+  }
+}
+
+function handlersAuxiliares(datasDeTarefas: string[] = [], meses: string[] = ['2026-01']) {
+  return [
+    http.get('/ponto/meses-disponiveis', () => HttpResponse.json(meses)),
+    http.get('/relatorios/estatisticas', () => HttpResponse.json(estatisticasComTarefas(datasDeTarefas))),
+  ]
+}
+
 describe('EspelhoMesPainel', () => {
   it('lista os dias do mês com saldo e o total acumulado', async () => {
     server.use(
+      ...handlersAuxiliares(),
       http.get('/ponto/espelho-do-mes', () =>
         HttpResponse.json({
           dias: [
@@ -46,13 +76,14 @@ describe('EspelhoMesPainel', () => {
     renderPainel()
 
     // exibido em dd/mm/aaaa, não a data ISO crua que a API devolve (pedido do usuário)
-    expect(await screen.findByText('12/01/2026')).toBeInTheDocument()
-    expect(screen.getByText('13/01/2026')).toBeInTheDocument()
+    expect(await screen.findByText('12/01/2026', { selector: 'td' })).toBeInTheDocument()
+    expect(screen.getByText('13/01/2026', { selector: 'td' })).toBeInTheDocument()
     expect(screen.getByText('Saldo acumulado no período: +1h')).toBeInTheDocument()
   })
 
   it('mês sem nenhum dia mostra mensagem vazia', async () => {
     server.use(
+      ...handlersAuxiliares(),
       http.get('/ponto/espelho-do-mes', () => HttpResponse.json({ dias: [], saldoAcumuladoNoPeriodo: 0 })),
     )
 
@@ -63,6 +94,7 @@ describe('EspelhoMesPainel', () => {
 
   it('clica em exportar CSV e dispara o download do arquivo retornado pela API', async () => {
     server.use(
+      ...handlersAuxiliares(),
       http.get('/ponto/espelho-do-mes', ({ request }) => {
         const url = new URL(request.url)
         if (url.searchParams.get('formato') === 'csv') {
@@ -88,5 +120,68 @@ describe('EspelhoMesPainel', () => {
     await vi.waitFor(() => expect(criarObjectUrl).toHaveBeenCalledTimes(1))
     expect(cliqueSimulado).toHaveBeenCalledTimes(1)
     expect(revogarObjectUrl).toHaveBeenCalledWith('blob:fake-url')
+  })
+
+  it('troca de mês pelo seletor e busca o espelho e as tarefas do mês escolhido', async () => {
+    const periodosPedidos: string[] = []
+    server.use(
+      ...handlersAuxiliares([], ['2026-01', '2025-12']).slice(0, 1),
+      http.get('/relatorios/estatisticas', ({ request }) => {
+        periodosPedidos.push(new URL(request.url).searchParams.get('inicio') ?? '')
+        return HttpResponse.json(estatisticasComTarefas([]))
+      }),
+      http.get('/ponto/espelho-do-mes', ({ request }) => {
+        const mes = new URL(request.url).searchParams.get('mes')
+        return HttpResponse.json({
+          dias: mes === '2025-12' ? [{ data: '2025-12-10', estado: 'FECHADA', minutosTrabalhados: 360, saldoDia: -120 }] : [],
+          saldoAcumuladoNoPeriodo: 0,
+        })
+      }),
+    )
+    const user = userEvent.setup()
+    renderPainel()
+
+    await screen.findByText(/nenhuma marcação neste mês/i)
+    await user.selectOptions(screen.getByLabelText('Mês'), '2025-12')
+
+    expect(await screen.findByText('10/12/2025', { selector: 'td' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Dezembro/2025' })).toBeInTheDocument()
+    expect(periodosPedidos).toEqual([`${new Date().toISOString().slice(0, 7)}-01T00:00:00Z`, '2025-12-01T00:00:00Z'])
+  })
+
+  it('mostra os insights do mês: dia e semana que mais trabalhou, tarefas e gráfico por dia', async () => {
+    server.use(
+      ...handlersAuxiliares(['2026-01-12T14:00:00Z', '2026-01-12T16:00:00Z', '2026-01-13T10:00:00Z']),
+      http.get('/ponto/espelho-do-mes', () =>
+        HttpResponse.json({
+          dias: [
+            { data: '2026-01-12', estado: 'FECHADA', minutosTrabalhados: 540, saldoDia: 60 },
+            { data: '2026-01-13', estado: 'FECHADA', minutosTrabalhados: 300, saldoDia: -180 },
+          ],
+          saldoAcumuladoNoPeriodo: -120,
+        }),
+      ),
+    )
+
+    renderPainel()
+
+    expect(await screen.findByText('Dia que mais trabalhou')).toBeInTheDocument()
+    expect(screen.getByText('Total trabalhado').nextElementSibling).toHaveTextContent('14h')
+    expect(screen.getByText('Semana que mais trabalhou').nextElementSibling).toHaveTextContent('12/01 a 18/01')
+    expect(screen.getByText('Dia da semana mais produtivo').nextElementSibling).toHaveTextContent('segunda-feira')
+    expect(await screen.findByText('mais em 12/01/2026 (2)')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /horas trabalhadas por dia do mês/i })).toBeInTheDocument()
+  })
+
+  it('mês sem nenhum dado não mostra o bloco de insights', async () => {
+    server.use(
+      ...handlersAuxiliares(),
+      http.get('/ponto/espelho-do-mes', () => HttpResponse.json({ dias: [], saldoAcumuladoNoPeriodo: 0 })),
+    )
+
+    renderPainel()
+
+    await screen.findByText(/nenhuma marcação neste mês/i)
+    expect(screen.queryByText(/insights do mês/i)).not.toBeInTheDocument()
   })
 })

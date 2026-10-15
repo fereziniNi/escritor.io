@@ -37,3 +37,20 @@ export interface Estatisticas {
   pessoal: EstatisticasPessoais
   equipe: EstatisticasEquipe
 }
+
+/** Espelha `FechamentoMesResponse` do backend (`ponto/web`) - só ADMIN. */
+export interface FechamentoMesPessoa {
+  usuarioId: number
+  nome: string
+  cargaDiariaMinutos: number
+  diasTrabalhados: number
+  minutosTrabalhados: number
+  saldoMinutos: number
+  diasUteisSemMarcacao: number
+  diasInconsistentes: number
+}
+
+export interface FechamentoMes {
+  mes: string
+  pessoas: FechamentoMesPessoa[]
+}

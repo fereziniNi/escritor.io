@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
@@ -149,6 +149,31 @@ describe('RelatoriosPage', () => {
     await user.selectOptions(screen.getByLabelText(/projeto/i), '11')
 
     expect(await screen.findByText('Total apontado: 45 min')).toBeInTheDocument()
+  })
+
+  it('escolher um mês passado busca o saldo e as estatísticas desse mês inteiro', async () => {
+    const pedidos: { mes: string | null; inicio?: string | null; fim?: string | null }[] = []
+    server.use(
+      http.get('/projetos', () => HttpResponse.json([])),
+      http.get('/ponto/espelho-do-mes', ({ request }) => {
+        const mes = new URL(request.url).searchParams.get('mes')
+        pedidos.push({ mes })
+        return HttpResponse.json({ dias: [], saldoAcumuladoNoPeriodo: mes === '2025-12' ? -90 : 60 })
+      }),
+      http.get('/ponto/dias-inconsistentes', () => HttpResponse.json([])),
+      http.get('/relatorios/estatisticas', ({ request }) => {
+        const url = new URL(request.url)
+        pedidos.push({ mes: null, inicio: url.searchParams.get('inicio'), fim: url.searchParams.get('fim') })
+        return HttpResponse.json(ESTATISTICAS_VAZIAS)
+      }),
+    )
+    renderPagina()
+    await screen.findByText('Saldo acumulado: +1h')
+
+    fireEvent.change(screen.getByLabelText('Mês'), { target: { value: '2025-12' } })
+
+    expect(await screen.findByText('Saldo acumulado: -1h30min')).toBeInTheDocument()
+    expect(pedidos).toContainEqual({ mes: null, inicio: '2025-12-01T00:00:00Z', fim: '2026-01-01T00:00:00Z' })
   })
 
   it('digita o nome de uma pessoa cadastrada e filtra o saldo por ela', async () => {

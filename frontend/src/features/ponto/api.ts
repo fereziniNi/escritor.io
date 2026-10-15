@@ -17,11 +17,28 @@ export async function buscarJornadaDoDia(): Promise<JornadaDoDia> {
   return response.json()
 }
 
-export async function buscarEspelhoDoMes(usuarioId?: number): Promise<EspelhoMes> {
-  const query = usuarioId ? `?usuarioId=${usuarioId}` : ''
-  const response = await apiFetch(`/ponto/espelho-do-mes${query}`)
+/** `mes` no formato AAAA-MM; ausente = mês corrente. */
+function montarQuery(parametros: { usuarioId?: number; mes?: string; formato?: string }): string {
+  const partes: string[] = []
+  if (parametros.formato) partes.push(`formato=${parametros.formato}`)
+  if (parametros.usuarioId) partes.push(`usuarioId=${parametros.usuarioId}`)
+  if (parametros.mes) partes.push(`mes=${parametros.mes}`)
+  return partes.length > 0 ? `?${partes.join('&')}` : ''
+}
+
+export async function buscarEspelhoDoMes(usuarioId?: number, mes?: string): Promise<EspelhoMes> {
+  const response = await apiFetch(`/ponto/espelho-do-mes${montarQuery({ usuarioId, mes })}`)
   if (!response.ok) {
     throw new Error('Não foi possível carregar o espelho do mês')
+  }
+  return response.json()
+}
+
+/** Meses (AAAA-MM) com marcação, do mais recente ao mais antigo; o mês corrente sempre vem. */
+export async function buscarMesesDisponiveis(usuarioId?: number): Promise<string[]> {
+  const response = await apiFetch(`/ponto/meses-disponiveis${montarQuery({ usuarioId })}`)
+  if (!response.ok) {
+    throw new Error('Não foi possível carregar os meses disponíveis')
   }
   return response.json()
 }
@@ -30,9 +47,8 @@ export async function buscarEspelhoDoMes(usuarioId?: number): Promise<EspelhoMes
  * Retorna o `Blob` do CSV (não JSON) - o download em si é responsabilidade de quem chama, já que
  * um link `<a href>` puro não carrega o header `Authorization` (S5.9).
  */
-export async function baixarEspelhoDoMesCsv(usuarioId?: number): Promise<Blob> {
-  const query = usuarioId ? `&usuarioId=${usuarioId}` : ''
-  const response = await apiFetch(`/ponto/espelho-do-mes?formato=csv${query}`)
+export async function baixarEspelhoDoMesCsv(usuarioId?: number, mes?: string): Promise<Blob> {
+  const response = await apiFetch(`/ponto/espelho-do-mes${montarQuery({ usuarioId, mes, formato: 'csv' })}`)
   if (!response.ok) {
     throw new Error('Não foi possível exportar o espelho do mês')
   }

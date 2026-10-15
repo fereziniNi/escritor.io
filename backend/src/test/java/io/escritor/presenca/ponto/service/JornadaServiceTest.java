@@ -265,6 +265,91 @@ class JornadaServiceTest {
     }
 
     @Test
+    void espelhoDeMesPassadoUsaOPeriodoDoMesInteiroEMarcaDiaSemSaidaComoInconsistente() {
+        when(registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualAndMomentoLessThanOrderByMomentoAsc(
+                        usuario, Instant.parse("2025-12-01T00:00:00Z"), Instant.parse("2026-01-01T00:00:00Z")))
+                .thenReturn(List.of(
+                        registro(TipoRegistroPonto.ENTRADA, "2025-12-10T09:00:00Z"),
+                        registro(TipoRegistroPonto.SAIDA, "2025-12-10T17:00:00Z"),
+                        registro(TipoRegistroPonto.ENTRADA, "2025-12-11T09:00:00Z")));
+
+        var espelho = jornadaService.espelhoDoMes(usuario, java.time.YearMonth.of(2025, 12));
+
+        assertThat(espelho.dias()).hasSize(2);
+        assertThat(espelho.dias().get(0).estado()).isEqualTo(EstadoDia.FECHADA);
+        assertThat(espelho.dias().get(0).minutosTrabalhados()).isEqualTo(8 * 60);
+        assertThat(espelho.dias().get(1).estado()).isEqualTo(EstadoDia.INCONSISTENTE);
+    }
+
+    @Test
+    void espelhoDoMesCorrenteComMesExplicitoUsaOMesmoCaminhoDoMesCorrente() {
+        when(registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualOrderByMomentoAsc(any(), any()))
+                .thenReturn(List.of(
+                        registro(TipoRegistroPonto.ENTRADA, "2026-01-13T09:00:00Z"),
+                        registro(TipoRegistroPonto.SAIDA, "2026-01-13T17:00:00Z")));
+
+        var espelho = jornadaService.espelhoDoMes(usuario, java.time.YearMonth.of(2026, 1));
+
+        assertThat(espelho.dias()).hasSize(1);
+    }
+
+    @Test
+    void espelhoDoMesComMesNuloUsaOMesCorrente() {
+        when(registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualOrderByMomentoAsc(any(), any()))
+                .thenReturn(List.of(registro(TipoRegistroPonto.ENTRADA, "2026-01-13T09:00:00Z")));
+
+        var espelho = jornadaService.espelhoDoMes(usuario, null);
+
+        assertThat(espelho.dias()).hasSize(1);
+    }
+
+    @Test
+    void espelhoDoMesNaoPermiteMesFuturo() {
+        assertThatThrownBy(() -> jornadaService.espelhoDoMes(usuario, java.time.YearMonth.of(2026, 2)))
+                .isInstanceOf(io.escritor.presenca.ponto.domain.MesInvalidoException.class);
+    }
+
+    @Test
+    void marcacoesDoMesListaTodasAsMarcacoesComOrigemEmOrdemDeHorario() {
+        RegistroPonto ajuste = new RegistroPonto(
+                usuario, TipoRegistroPonto.SAIDA, Instant.parse("2025-12-10T17:00:00Z"), OrigemRegistroPonto.ADMIN, null, null, null);
+        when(visibilidadeUsuarioService.resolverAlvo(isNull(), eq(usuario), any())).thenReturn(usuario);
+        when(registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualAndMomentoLessThanOrderByMomentoAsc(
+                        usuario, Instant.parse("2025-12-01T00:00:00Z"), Instant.parse("2026-01-01T00:00:00Z")))
+                .thenReturn(List.of(registro(TipoRegistroPonto.ENTRADA, "2025-12-10T09:00:00Z"), ajuste));
+
+        var marcacoes = jornadaService.marcacoesDoMes(null, java.time.YearMonth.of(2025, 12), usuario);
+
+        assertThat(marcacoes).hasSize(2);
+        assertThat(marcacoes.get(0).origem()).isEqualTo(OrigemRegistroPonto.WEB);
+        assertThat(marcacoes.get(1).origem()).isEqualTo(OrigemRegistroPonto.ADMIN);
+    }
+
+    @Test
+    void marcacoesDoMesPropagaExcecaoDeAcessoNegadoDaVisibilidade() {
+        when(visibilidadeUsuarioService.resolverAlvo(eq(2L), eq(usuario), any())).thenThrow(new JornadaDeOutroUsuarioException());
+
+        assertThatThrownBy(() -> jornadaService.marcacoesDoMes(2L, java.time.YearMonth.of(2026, 1), usuario))
+                .isInstanceOf(JornadaDeOutroUsuarioException.class);
+    }
+
+    @Test
+    void mesesDisponiveisListaOsMesesComMarcacaoDoMaisRecenteAoMaisAntigoSempreComOMesCorrente() {
+        when(visibilidadeUsuarioService.resolverAlvo(isNull(), eq(usuario), any())).thenReturn(usuario);
+        when(registroPontoRepository.findByUsuarioOrderByMomentoAsc(usuario))
+                .thenReturn(List.of(
+                        registro(TipoRegistroPonto.ENTRADA, "2025-10-03T09:00:00Z"),
+                        registro(TipoRegistroPonto.SAIDA, "2025-10-03T17:00:00Z"),
+                        registro(TipoRegistroPonto.ENTRADA, "2025-12-10T09:00:00Z")));
+
+        var meses = jornadaService.mesesDisponiveis(null, usuario);
+
+        // clock fixo do setUp: 2026-01 é o mês corrente, mesmo sem marcação nele
+        assertThat(meses).containsExactly(
+                java.time.YearMonth.of(2026, 1), java.time.YearMonth.of(2025, 12), java.time.YearMonth.of(2025, 10));
+    }
+
+    @Test
     void diasInconsistentesRetornaSoOsDiasSemSaidaAposAVirada() {
         // terça-feira 2026-01-13, 20h (clock fixo do setUp) - "hoje" ainda não virou.
         Instant inicioDoPeriodo = Instant.parse("2026-01-10T00:00:00Z");

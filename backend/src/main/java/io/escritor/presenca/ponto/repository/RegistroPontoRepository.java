@@ -21,6 +21,9 @@ public interface RegistroPontoRepository extends JpaRepository<RegistroPonto, Lo
     List<RegistroPonto> findByUsuarioAndMomentoGreaterThanEqualAndMomentoLessThanOrderByMomentoAsc(
             Usuario usuario, Instant inicio, Instant fim);
 
+    /** Todos os meses em que a pessoa tem marcação (seletor de mês do espelho/relatórios). */
+    List<RegistroPonto> findByUsuarioOrderByMomentoAsc(Usuario usuario);
+
     /** "Ausências" no resumo diário (`RelatorioDiarioService`) - mais barato que trazer a lista
      * inteira só pra checar se está vazia. */
     boolean existsByUsuarioAndMomentoGreaterThanEqualAndMomentoLessThan(Usuario usuario, Instant inicio, Instant fim);

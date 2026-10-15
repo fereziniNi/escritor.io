@@ -38,3 +38,15 @@ export function periodoPadrao(agora: Date): { inicio: string; fim: string } {
   const amanha = new Date(Date.UTC(ano, mes, agora.getUTCDate() + 1))
   return { inicio: inicioDoMes.toISOString().slice(0, 10), fim: amanha.toISOString().slice(0, 10) }
 }
+
+/**
+ * Início/fim (fim exclusivo, mesma convenção de `periodoPadrao`) de um mês inteiro, a partir do
+ * valor de um `<input type="month">` (AAAA-MM) - base do seletor "Mês" de `RelatoriosPage`, que
+ * deixa ver as estatísticas de qualquer mês, não só o corrente.
+ */
+export function periodoDoMes(mes: string): { inicio: string; fim: string } {
+  const [ano, numeroDoMes] = mes.split('-').map(Number)
+  const inicio = new Date(Date.UTC(ano, numeroDoMes - 1, 1))
+  const proximoMes = new Date(Date.UTC(ano, numeroDoMes, 1))
+  return { inicio: inicio.toISOString().slice(0, 10), fim: proximoMes.toISOString().slice(0, 10) }
+}

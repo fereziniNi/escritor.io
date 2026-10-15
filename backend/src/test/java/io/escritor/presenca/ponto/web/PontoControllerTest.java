@@ -195,7 +195,7 @@ class PontoControllerTest {
     @WithMockUser
     void espelhoDoMesRetornaOsDiasEOSaldoAcumulado() throws Exception {
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
-        when(jornadaService.espelhoDoMes(any(), any()))
+        when(jornadaService.espelhoDoMes(any(), any(), any()))
                 .thenReturn(new EspelhoMesResponse(
                         java.util.List.of(
                                 new EspelhoDiaResponse(java.time.LocalDate.parse("2026-01-12"), EstadoDia.FECHADA, 540, 60),
@@ -214,7 +214,7 @@ class PontoControllerTest {
     @WithMockUser
     void espelhoDoMesComUsuarioIdRepassaOFiltroPraOServico() throws Exception {
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
-        when(jornadaService.espelhoDoMes(eq(7L), any())).thenReturn(new EspelhoMesResponse(java.util.List.of(), 0));
+        when(jornadaService.espelhoDoMes(eq(7L), any(), any())).thenReturn(new EspelhoMesResponse(java.util.List.of(), 0));
 
         mockMvc.perform(get("/ponto/espelho-do-mes").param("usuarioId", "7")).andExpect(status().isOk());
     }
@@ -223,7 +223,7 @@ class PontoControllerTest {
     @WithMockUser
     void espelhoDoMesDeUsuarioSemPermissaoRetorna403() throws Exception {
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
-        when(jornadaService.espelhoDoMes(eq(7L), any())).thenThrow(new JornadaDeOutroUsuarioException());
+        when(jornadaService.espelhoDoMes(eq(7L), any(), any())).thenThrow(new JornadaDeOutroUsuarioException());
 
         mockMvc.perform(get("/ponto/espelho-do-mes").param("usuarioId", "7")).andExpect(status().isForbidden());
     }
@@ -232,7 +232,7 @@ class PontoControllerTest {
     @WithMockUser
     void espelhoDoMesComFormatoCsvRetornaTextCsv() throws Exception {
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
-        when(jornadaService.espelhoDoMes(any(), any()))
+        when(jornadaService.espelhoDoMes(any(), any(), any()))
                 .thenReturn(new EspelhoMesResponse(
                         java.util.List.of(new EspelhoDiaResponse(java.time.LocalDate.parse("2026-01-12"), EstadoDia.FECHADA, 540, 60)), 60));
 
@@ -247,7 +247,7 @@ class PontoControllerTest {
     @WithMockUser
     void espelhoDoMesCsvComUsuarioIdRepassaOFiltroPraOServico() throws Exception {
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
-        when(jornadaService.espelhoDoMes(eq(7L), any())).thenReturn(new EspelhoMesResponse(java.util.List.of(), 0));
+        when(jornadaService.espelhoDoMes(eq(7L), any(), any())).thenReturn(new EspelhoMesResponse(java.util.List.of(), 0));
 
         mockMvc.perform(get("/ponto/espelho-do-mes").param("formato", "csv").param("usuarioId", "7")).andExpect(status().isOk());
     }
@@ -256,7 +256,7 @@ class PontoControllerTest {
     @WithMockUser
     void espelhoDoMesCsvDeUsuarioSemPermissaoRetorna403() throws Exception {
         when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
-        when(jornadaService.espelhoDoMes(eq(7L), any())).thenThrow(new JornadaDeOutroUsuarioException());
+        when(jornadaService.espelhoDoMes(eq(7L), any(), any())).thenThrow(new JornadaDeOutroUsuarioException());
 
         mockMvc.perform(get("/ponto/espelho-do-mes").param("formato", "csv").param("usuarioId", "7")).andExpect(status().isForbidden());
     }
@@ -264,6 +264,69 @@ class PontoControllerTest {
     @Test
     void espelhoDoMesCsvSemAutenticacaoRetorna401() throws Exception {
         mockMvc.perform(get("/ponto/espelho-do-mes").param("formato", "csv")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void espelhoDoMesComMesRepassaOMesPraOServico() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(jornadaService.espelhoDoMes(any(), eq(java.time.YearMonth.of(2025, 12)), any()))
+                .thenReturn(new EspelhoMesResponse(java.util.List.of(), 0));
+
+        mockMvc.perform(get("/ponto/espelho-do-mes").param("mes", "2025-12")).andExpect(status().isOk());
+
+        verify(jornadaService).espelhoDoMes(any(), eq(java.time.YearMonth.of(2025, 12)), any());
+    }
+
+    @Test
+    @WithMockUser
+    void espelhoDoMesFuturoRetorna400() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(jornadaService.espelhoDoMes(any(), any(), any())).thenThrow(new io.escritor.presenca.ponto.domain.MesInvalidoException());
+
+        mockMvc.perform(get("/ponto/espelho-do-mes").param("mes", "2099-01")).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser
+    void marcacoesDoMesRetornaAsMarcacoesComOrigem() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(jornadaService.marcacoesDoMes(any(), eq(java.time.YearMonth.of(2025, 12)), any()))
+                .thenReturn(java.util.List.of(new RegistroPontoResponse(
+                        5L, TipoRegistroPonto.SAIDA, Instant.parse("2025-12-10T17:00:00Z"), OrigemRegistroPonto.ADMIN)));
+
+        mockMvc.perform(get("/ponto/marcacoes-do-mes").param("mes", "2025-12"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].tipo").value("SAIDA"))
+                .andExpect(jsonPath("$[0].origem").value("ADMIN"));
+    }
+
+    @Test
+    @WithMockUser
+    void marcacoesDeUsuarioSemPermissaoRetorna403() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(jornadaService.marcacoesDoMes(eq(7L), any(), any())).thenThrow(new JornadaDeOutroUsuarioException());
+
+        mockMvc.perform(get("/ponto/marcacoes-do-mes").param("usuarioId", "7")).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser
+    void mesesDisponiveisRetornaOsMesesNoFormatoAnoMes() throws Exception {
+        when(contextoUsuarioAutenticado.usuarioAtual()).thenReturn(null);
+        when(jornadaService.mesesDisponiveis(any(), any()))
+                .thenReturn(java.util.List.of(java.time.YearMonth.of(2026, 1), java.time.YearMonth.of(2025, 12)));
+
+        mockMvc.perform(get("/ponto/meses-disponiveis"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value("2026-01"))
+                .andExpect(jsonPath("$[1]").value("2025-12"));
+    }
+
+    @Test
+    void marcacoesEMesesDisponiveisSemAutenticacaoRetornam401() throws Exception {
+        mockMvc.perform(get("/ponto/marcacoes-do-mes")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/ponto/meses-disponiveis")).andExpect(status().isUnauthorized());
     }
 
     @Test

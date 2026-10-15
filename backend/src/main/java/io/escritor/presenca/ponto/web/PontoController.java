@@ -7,7 +7,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -51,9 +53,26 @@ public class PontoController {
         return jornadaService.jornadaDoDia(usuarioId, contextoUsuarioAutenticado.usuarioAtual());
     }
 
+    /** `mes` (AAAA-MM) opcional: ausente = mês corrente; qualquer mês até o corrente é auditável. */
     @GetMapping("/espelho-do-mes")
-    public EspelhoMesResponse espelhoDoMes(@RequestParam(required = false) Long usuarioId) {
-        return jornadaService.espelhoDoMes(usuarioId, contextoUsuarioAutenticado.usuarioAtual());
+    public EspelhoMesResponse espelhoDoMes(
+            @RequestParam(required = false) Long usuarioId,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM") YearMonth mes) {
+        return jornadaService.espelhoDoMes(usuarioId, mes, contextoUsuarioAutenticado.usuarioAtual());
+    }
+
+    @GetMapping("/marcacoes-do-mes")
+    public List<RegistroPontoResponse> marcacoesDoMes(
+            @RequestParam(required = false) Long usuarioId,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM") YearMonth mes) {
+        return jornadaService.marcacoesDoMes(usuarioId, mes, contextoUsuarioAutenticado.usuarioAtual());
+    }
+
+    @GetMapping("/meses-disponiveis")
+    public List<String> mesesDisponiveis(@RequestParam(required = false) Long usuarioId) {
+        return jornadaService.mesesDisponiveis(usuarioId, contextoUsuarioAutenticado.usuarioAtual()).stream()
+                .map(YearMonth::toString)
+                .toList();
     }
 
     /**
@@ -61,8 +80,10 @@ public class PontoController {
      * mesma URL/query params do endpoint JSON, sem negociação de conteúdo via `Accept`.
      */
     @GetMapping(value = "/espelho-do-mes", params = "formato=csv")
-    public ResponseEntity<String> espelhoDoMesCsv(@RequestParam(required = false) Long usuarioId) {
-        EspelhoMesResponse espelho = jornadaService.espelhoDoMes(usuarioId, contextoUsuarioAutenticado.usuarioAtual());
+    public ResponseEntity<String> espelhoDoMesCsv(
+            @RequestParam(required = false) Long usuarioId,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM") YearMonth mes) {
+        EspelhoMesResponse espelho = jornadaService.espelhoDoMes(usuarioId, mes, contextoUsuarioAutenticado.usuarioAtual());
         return ResponseEntity.ok().contentType(MediaType.valueOf("text/csv")).body(EspelhoMesCsv.gerar(espelho));
     }
 
