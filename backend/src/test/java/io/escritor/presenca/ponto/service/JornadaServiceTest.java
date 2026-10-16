@@ -18,6 +18,7 @@ import io.escritor.presenca.ponto.repository.RegistroPontoRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +34,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -395,5 +397,49 @@ class JornadaServiceTest {
         assertThatThrownBy(() -> jornadaService.diasInconsistentes(
                         2L, Instant.parse("2026-01-01T00:00:00Z"), Instant.parse("2026-02-01T00:00:00Z"), usuario))
                 .isInstanceOf(JornadaDeOutroUsuarioException.class);
+    }
+
+    private JornadaService jornadaEmBrasilia(String agoraIso) {
+        return new JornadaService(
+                registroPontoRepository, sessaoTrabalhoRepository, visibilidadeUsuarioService,
+                Clock.fixed(Instant.parse(agoraIso), ZoneId.of("America/Sao_Paulo")));
+    }
+
+    @Test
+    void cronometroNaoZeraAsVinteEUmaHorasDeBrasilia() {
+        // bug real: entrada 13:00 de Brasília (16:00Z); às 21:30 de Brasília já é dia seguinte em
+        // UTC e o cronômetro zerava - no fuso da empresa ainda é o mesmo dia, 8h30 de trabalho
+        when(registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualOrderByMomentoAsc(any(), any()))
+                .thenReturn(List.of(registro(TipoRegistroPonto.ENTRADA, "2026-10-15T16:00:00Z")));
+
+        long segundos = jornadaEmBrasilia("2026-10-16T00:30:00Z").segundosTrabalhadosAteAgora(usuario);
+
+        assertThat(segundos).isEqualTo(8 * 3600 + 30 * 60);
+    }
+
+    @Test
+    void jornadaQuePassaDasVinteEUmaHorasFicaInteiraNoMesmoDia() {
+        // 13:00 às 22:00 de Brasília: em UTC a SAIDA cairia no dia 16 e o dia 15 ficaria inconsistente
+        when(registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualOrderByMomentoAsc(any(), any()))
+                .thenReturn(List.of(
+                        registro(TipoRegistroPonto.ENTRADA, "2026-10-15T16:00:00Z"),
+                        registro(TipoRegistroPonto.SAIDA, "2026-10-16T01:00:00Z")));
+
+        var espelho = jornadaEmBrasilia("2026-10-16T01:30:00Z").espelhoDoMes(usuario);
+
+        assertThat(espelho.dias()).hasSize(1);
+        assertThat(espelho.dias().get(0).data()).isEqualTo(LocalDate.of(2026, 10, 15));
+        assertThat(espelho.dias().get(0).estado()).isEqualTo(EstadoDia.FECHADA);
+        assertThat(espelho.dias().get(0).minutosTrabalhados()).isEqualTo(9 * 60);
+    }
+
+    @Test
+    void mesCorrenteComecaAMeiaNoiteDeBrasilia() {
+        when(registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualOrderByMomentoAsc(any(), any())).thenReturn(List.of());
+
+        jornadaEmBrasilia("2026-10-16T01:30:00Z").espelhoDoMes(usuario);
+
+        verify(registroPontoRepository)
+                .findByUsuarioAndMomentoGreaterThanEqualOrderByMomentoAsc(usuario, Instant.parse("2026-10-01T03:00:00Z"));
     }
 }

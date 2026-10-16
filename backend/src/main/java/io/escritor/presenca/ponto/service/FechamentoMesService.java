@@ -15,7 +15,6 @@ import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
@@ -42,18 +41,18 @@ public class FechamentoMesService {
         this.clock = clock;
     }
 
-    /** `mes` nulo = mês corrente (UTC, como o resto do ponto); mês futuro é rejeitado. */
+    /** `mes` nulo = mês corrente (no fuso do `Clock`, como o resto do ponto); mês futuro é rejeitado. */
     public FechamentoMesResponse fechamento(YearMonth mes) {
         Instant agora = Instant.now(clock);
-        YearMonth mesCorrente = YearMonth.from(agora.atZone(ZoneOffset.UTC));
+        YearMonth mesCorrente = YearMonth.from(agora.atZone(clock.getZone()));
         YearMonth mesConsultado = mes == null ? mesCorrente : mes;
         if (mesConsultado.isAfter(mesCorrente)) {
             throw new MesInvalidoException();
         }
 
-        Instant inicio = mesConsultado.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant();
-        Instant fim = mesConsultado.plusMonths(1).atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant();
-        LocalDate hoje = agora.atZone(ZoneOffset.UTC).toLocalDate();
+        Instant inicio = mesConsultado.atDay(1).atStartOfDay(clock.getZone()).toInstant();
+        Instant fim = mesConsultado.plusMonths(1).atDay(1).atStartOfDay(clock.getZone()).toInstant();
+        LocalDate hoje = agora.atZone(clock.getZone()).toLocalDate();
 
         List<FechamentoMesPessoaResponse> pessoas = usuarioRepository.findByAtivoTrueOrderByNomeAsc().stream()
                 .map(usuario -> fechamentoDaPessoa(usuario, mesConsultado, inicio, fim, hoje, agora))
@@ -65,7 +64,8 @@ public class FechamentoMesService {
     private FechamentoMesPessoaResponse fechamentoDaPessoa(
             Usuario usuario, YearMonth mes, Instant inicio, Instant fim, LocalDate hoje, Instant agora) {
         Map<LocalDate, List<Marcacao>> marcacoesPorDia = JornadaService.agruparPorDia(
-                registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualAndMomentoLessThanOrderByMomentoAsc(usuario, inicio, fim));
+                registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualAndMomentoLessThanOrderByMomentoAsc(usuario, inicio, fim),
+                clock.getZone());
         int cargaDiariaMinutos = usuario.getCargaDiariaMinutos();
 
         long minutosTrabalhados = 0;
@@ -77,7 +77,7 @@ public class FechamentoMesService {
             if (minutosDoDia > 0) {
                 diasTrabalhados++;
             }
-            Instant fimDoDia = dia.getKey().plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+            Instant fimDoDia = dia.getKey().plusDays(1).atStartOfDay(clock.getZone()).toInstant();
             if (EstadoDia.calcular(dia.getValue(), fimDoDia, agora) == EstadoDia.INCONSISTENTE) {
                 diasInconsistentes++;
             }
@@ -98,9 +98,9 @@ public class FechamentoMesService {
      * Dias úteis já encerrados (antes de hoje) sem nenhuma marcação - hoje ainda pode ser marcado,
      * e dia anterior ao cadastro da pessoa não é falta dela.
      */
-    private static int diasUteisSemMarcacao(
+    private int diasUteisSemMarcacao(
             Usuario usuario, YearMonth mes, LocalDate hoje, Map<LocalDate, List<Marcacao>> marcacoesPorDia) {
-        LocalDate cadastro = usuario.getCriadoEm() == null ? null : usuario.getCriadoEm().atZone(ZoneOffset.UTC).toLocalDate();
+        LocalDate cadastro = usuario.getCriadoEm() == null ? null : usuario.getCriadoEm().atZone(clock.getZone()).toLocalDate();
         int dias = 0;
         for (LocalDate data = mes.atDay(1); !data.isAfter(mes.atEndOfMonth()) && data.isBefore(hoje); data = data.plusDays(1)) {
             boolean diaUtil = data.getDayOfWeek() != DayOfWeek.SATURDAY && data.getDayOfWeek() != DayOfWeek.SUNDAY;

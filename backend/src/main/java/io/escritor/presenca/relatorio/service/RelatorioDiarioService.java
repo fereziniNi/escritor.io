@@ -16,7 +16,6 @@ import io.escritor.presenca.reuniao.repository.ReuniaoRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -77,9 +76,9 @@ public class RelatorioDiarioService {
 
     public String montarResumoDoDia(PreferenciasConteudoRelatorioDiario preferencias) {
         Instant agora = Instant.now(clock);
-        LocalDate hoje = agora.atZone(ZoneOffset.UTC).toLocalDate();
-        Instant inicioDoDia = hoje.atStartOfDay(ZoneOffset.UTC).toInstant();
-        Instant fimDoDia = hoje.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        LocalDate hoje = agora.atZone(clock.getZone()).toLocalDate();
+        Instant inicioDoDia = hoje.atStartOfDay(clock.getZone()).toInstant();
+        Instant fimDoDia = hoje.plusDays(1).atStartOfDay(clock.getZone()).toInstant();
 
         List<Usuario> usuarios = usuarioRepository.findByAtivoTrueOrderByNomeAsc();
         StringBuilder texto = new StringBuilder("📋 Resumo do dia - ").append(FORMATO_DATA.format(hoje)).append('\n');

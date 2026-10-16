@@ -1,7 +1,7 @@
 /**
  * Aritmética de data pura pro módulo de escala inteiro (mês/semana/dia + escala da equipe) -
  * `Date.UTC`/`getUTC*` em vez de construtor/getters locais, mesma disciplina de
- * `limitesDoDiaUtc.ts` e `construirGradeDoMes.ts`: evita qualquer desvio de fuso horário na
+ * `construirGradeDoMes.ts`: evita qualquer desvio de fuso horário na
  * aritmética de data pura (uma data sem hora não deve depender do fuso do navegador).
  */
 

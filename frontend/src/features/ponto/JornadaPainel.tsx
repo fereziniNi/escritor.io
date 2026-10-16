@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { listarTotalApontadoPorCard } from '../kanban/api'
 import { buscarJornadaDoDia } from './api'
 import { formatarMinutos } from './formatarMinutos'
-import { calcularLimitesDoDiaUtc } from './limitesDoDiaUtc'
+import { calcularLimitesDoDia } from './limitesDoDia'
 
 /**
  * Pedido do usuário: "remova o estado do dia... o total apontado... apontado vs trabalhando
@@ -15,7 +15,7 @@ import { calcularLimitesDoDiaUtc } from './limitesDoDiaUtc'
 export function JornadaPainel() {
   const jornadaQuery = useQuery({ queryKey: ['ponto', 'jornada-do-dia'], queryFn: buscarJornadaDoDia })
 
-  const limites = calcularLimitesDoDiaUtc(new Date())
+  const limites = calcularLimitesDoDia(new Date())
   const porTarefaQuery = useQuery({
     queryKey: ['apontamentos', 'por-card', 'hoje'],
     queryFn: () => listarTotalApontadoPorCard(limites),

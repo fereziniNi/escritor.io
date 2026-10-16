@@ -22,3 +22,7 @@ return agora.isBefore(fimDoDia) ? ABERTA : INCONSISTENTE;
 - Nenhuma migração nova, nenhum scheduler, nenhum teste de integração com tempo — `EstadoDiaTest` roda em milissegundos como teste de unidade puro, mesmo estilo de `JornadaDiariaTest`.
 - O estado é sempre a verdade *agora*: não existe janela em que o dia mostra um status desatualizado por causa de um job que não rodou. O custo é recalcular a cada leitura, mas a entrada é só a lista de marcações do dia (já teria que ser buscada de qualquer forma pra calcular `JornadaDiaria`).
 - Quem consumir isso (S2.9 `GET /ponto/jornada-do-dia`, S2.14 espelho do mês) precisa fornecer o "fim do dia" e o "agora" explicitamente — normalmente `ZonedDateTime`/`Clock` já usados no resto do domínio de ponto (mesmo `Clock` injetado em `PontoService`, ver S2.4).
+
+## Atualização (2026-10-15): "dia" no fuso da empresa
+
+O "dia" era o dia civil em UTC. Às 21h de Brasília o dia virava: o cronômetro de quem ainda estava trabalhando zerava e uma jornada que passava das 21h ficava partida em dois dias (ENTRADA num, SAIDA no outro, os dois inconsistentes). Agora o `Clock` da aplicação está em `America/Sao_Paulo` (`ClockConfig.FUSO_EMPRESA`) e jornada, espelho, fechamento mensal e estatísticas usam `clock.getZone()`; o frontend segue o mesmo fuso (`shared/fusoEmpresa.ts`). Como o estado e as horas são calculados a cada leitura (esta ADR), a correção vale retroativamente para todos os dias já registrados, sem migração.

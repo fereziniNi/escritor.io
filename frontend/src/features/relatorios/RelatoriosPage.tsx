@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { CampoPessoa } from '../../shared/CampoPessoa'
 import { encontrarPessoaPorNome, existeSugestaoPara } from '../../shared/encontrarPessoaPorNome'
 import { formatarDataBr, formatarDataHoraBr } from '../../shared/formatarData'
+import { inicioDoDiaNaEmpresa } from '../../shared/fusoEmpresa'
 import { buscarTotalApontadoPorProjeto } from '../kanban/api'
 import { listarPessoas, listarProjetos } from '../organizacao/api'
 import { buscarDiasInconsistentes, buscarEspelhoDoMes } from '../ponto/api'
@@ -86,8 +87,8 @@ export function RelatoriosPage() {
   const nomeNaoEncontrado = !existeSugestaoPara(pessoas, nomeUsuario)
   const usuarioId = pessoaEncontrada ? pessoaEncontrada.id : null
   const periodoCompleto = inicio !== '' && fim !== ''
-  const inicioInstante = `${inicio}T00:00:00Z`
-  const fimInstante = `${fim}T00:00:00Z`
+  const inicioInstante = periodoCompleto ? inicioDoDiaNaEmpresa(inicio) : ''
+  const fimInstante = periodoCompleto ? inicioDoDiaNaEmpresa(fim) : ''
 
   const projetosQuery = useQuery({ queryKey: ['projetos'], queryFn: listarProjetos })
 

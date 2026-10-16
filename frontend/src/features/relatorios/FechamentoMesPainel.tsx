@@ -1,14 +1,15 @@
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { dispararDownload } from '../../shared/dispararDownload'
+import { mesAtualNaEmpresa } from '../../shared/fusoEmpresa'
 import { formatarMesAno } from '../ponto/formatarMarcacao'
 import { formatarMinutos, formatarSaldo } from '../ponto/formatarMinutos'
 import { baixarFechamentoMesXlsx, buscarFechamentoMes } from './api'
 import './relatorios.css'
 
-/** Mês corrente em UTC (AAAA-MM), como o backend. */
+/** Mês corrente no fuso da empresa (AAAA-MM), como o backend. */
 function mesCorrente(): string {
-  return new Date().toISOString().slice(0, 7)
+  return mesAtualNaEmpresa()
 }
 
 function inicialDoNome(nome: string): string {

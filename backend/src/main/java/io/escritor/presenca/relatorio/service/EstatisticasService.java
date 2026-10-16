@@ -23,9 +23,9 @@ import io.escritor.presenca.relatorio.web.TarefaConcluidaResponse;
 import io.escritor.presenca.reuniao.domain.Reuniao;
 import io.escritor.presenca.reuniao.domain.ReuniaoParticipante;
 import io.escritor.presenca.reuniao.repository.ReuniaoRepository;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -52,6 +52,8 @@ public class EstatisticasService {
     private final ReuniaoRepository reuniaoRepository;
     private final MembroProjetoRepository membroProjetoRepository;
     private final VisibilidadeUsuarioService visibilidadeUsuarioService;
+    /** Só o fuso importa aqui: define o dia e a hora do dia (fuso da empresa, `ClockConfig`). */
+    private final Clock clock;
 
     public EstatisticasService(
             RegistroPontoRepository registroPontoRepository,
@@ -59,13 +61,15 @@ public class EstatisticasService {
             CardRepository cardRepository,
             ReuniaoRepository reuniaoRepository,
             MembroProjetoRepository membroProjetoRepository,
-            VisibilidadeUsuarioService visibilidadeUsuarioService) {
+            VisibilidadeUsuarioService visibilidadeUsuarioService,
+            Clock clock) {
         this.registroPontoRepository = registroPontoRepository;
         this.sessaoTrabalhoRepository = sessaoTrabalhoRepository;
         this.cardRepository = cardRepository;
         this.reuniaoRepository = reuniaoRepository;
         this.membroProjetoRepository = membroProjetoRepository;
         this.visibilidadeUsuarioService = visibilidadeUsuarioService;
+        this.clock = clock;
     }
 
     /**
@@ -79,11 +83,11 @@ public class EstatisticasService {
                 visibilidadeUsuarioService.resolverAlvo(usuarioIdFiltro, usuarioAutenticado, EstatisticasDeOutroUsuarioException::new);
         List<Usuario> usuariosVisiveis = visibilidadeUsuarioService.listarUsuariosVisiveis(usuarioAutenticado);
 
-        LocalDate inicioData = inicio.atZone(ZoneOffset.UTC).toLocalDate();
+        LocalDate inicioData = inicio.atZone(clock.getZone()).toLocalDate();
         // `fim` é exclusivo, mesma convenção de sempre (frontend manda meia-noite do próprio dia
         // "fim" - ver `RelatoriosPage`) - mas `Reuniao.data` é `LocalDate` e a consulta é
         // inclusiva nos dois limites, então o último dia de fato incluído é um antes.
-        LocalDate fimDataInclusive = fim.atZone(ZoneOffset.UTC).toLocalDate().minusDays(1);
+        LocalDate fimDataInclusive = fim.atZone(clock.getZone()).toLocalDate().minusDays(1);
 
         return new EstatisticasResponse(
                 calcularPessoal(usuarioAlvo, inicio, fim, inicioData, fimDataInclusive),
@@ -190,21 +194,21 @@ public class EstatisticasService {
      * pra hora seguinte (ex. sessão de 13:50 às 14:20 conta inteira às 13h) - dividir a duração
      * entre horas é complexidade desproporcional pro que é, no fim, um gráfico ilustrativo de "que
      * horas costuma trabalhar". */
-    private static List<Integer> histogramaDeMinutosPorHora(List<SessaoTrabalho> sessoes) {
+    private List<Integer> histogramaDeMinutosPorHora(List<SessaoTrabalho> sessoes) {
         List<Integer> minutosPorHora = new ArrayList<>(Collections.nCopies(24, 0));
         for (SessaoTrabalho sessao : sessoes) {
-            int hora = sessao.getInicio().atZone(ZoneOffset.UTC).getHour();
+            int hora = sessao.getInicio().atZone(clock.getZone()).getHour();
             minutosPorHora.set(hora, minutosPorHora.get(hora) + sessao.getMinutos().intValue());
         }
         return minutosPorHora;
     }
 
     /** Mesma técnica de {@code JornadaService#agruparPorDia} - não dá pra reusar de lá porque é
-     * `private static` naquela classe. */
-    private static Map<LocalDate, List<Marcacao>> agruparPorDia(List<RegistroPonto> registros) {
+     * package-private (outro pacote). */
+    private Map<LocalDate, List<Marcacao>> agruparPorDia(List<RegistroPonto> registros) {
         return registros.stream()
                 .collect(Collectors.groupingBy(
-                        registro -> registro.getMomento().atZone(ZoneOffset.UTC).toLocalDate(),
+                        registro -> registro.getMomento().atZone(clock.getZone()).toLocalDate(),
                         LinkedHashMap::new,
                         Collectors.mapping(
                                 registro -> new Marcacao(registro.getTipo(), registro.getMomento()),

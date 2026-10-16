@@ -17,7 +17,7 @@ function formatarData(ano: number, mes: number, dia: number): string {
 
 /**
  * Sem biblioteca de calendário nova (nenhuma no projeto ainda) - `Date.UTC`/`getUTC*` em vez de
- * `new Date(ano, mes, dia)`/`getDate()` locais, mesma disciplina de `limitesDoDiaUtc.ts`: evita
+ * `new Date(ano, mes, dia)`/`getDate()` locais, mesma disciplina de `estatisticasUtils.ts`: evita
  * qualquer desvio de fuso horário na aritmética de data pura.
  */
 function diasNoMes(ano: number, mes: number): number {

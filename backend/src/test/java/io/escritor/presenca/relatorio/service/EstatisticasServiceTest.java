@@ -22,6 +22,7 @@ import io.escritor.presenca.relatorio.web.RankingPessoaResponse;
 import io.escritor.presenca.relatorio.web.TarefaConcluidaResponse;
 import io.escritor.presenca.reuniao.domain.Reuniao;
 import io.escritor.presenca.reuniao.repository.ReuniaoRepository;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -96,7 +97,7 @@ class EstatisticasServiceTest {
     void setUp() {
         service = new EstatisticasService(
                 registroPontoRepository, sessaoTrabalhoRepository, cardRepository, reuniaoRepository, membroProjetoRepository,
-                visibilidadeUsuarioService);
+                visibilidadeUsuarioService, Clock.systemUTC());
         usuario = usuarioComId(1L, "Ana Souza");
         projeto = new Projeto("Site novo", "Cliente Teste", StatusProjeto.CONCLUIDO, LocalDate.of(2025, 1, 1), null);
         ReflectionTestUtils.setField(projeto, "id", 5L);

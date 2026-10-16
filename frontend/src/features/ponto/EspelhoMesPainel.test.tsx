@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { mesAtualNaEmpresa } from '../../shared/fusoEmpresa'
 import { useAuthStore } from '../auth/authStore'
 import { EspelhoMesPainel } from './EspelhoMesPainel'
 
@@ -146,7 +147,8 @@ describe('EspelhoMesPainel', () => {
 
     expect(await screen.findByText('10/12/2025', { selector: 'td' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Dezembro/2025' })).toBeInTheDocument()
-    expect(periodosPedidos).toEqual([`${new Date().toISOString().slice(0, 7)}-01T00:00:00Z`, '2025-12-01T00:00:00Z'])
+    // meia-noite de Brasília = 03:00 UTC (fuso da empresa, `shared/fusoEmpresa`)
+    expect(periodosPedidos).toEqual([`${mesAtualNaEmpresa()}-01T03:00:00.000Z`, '2025-12-01T03:00:00.000Z'])
   })
 
   it('mostra os insights do mês: dia e semana que mais trabalhou, tarefas e gráfico por dia', async () => {

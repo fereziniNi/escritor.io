@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { dispararDownload } from '../../shared/dispararDownload'
+import { inicioDoDiaNaEmpresa, mesAtualNaEmpresa } from '../../shared/fusoEmpresa'
 import { formatarDataBr } from '../../shared/formatarData'
 import { buscarEstatisticas } from '../relatorios/api'
 import { periodoDoMes } from '../relatorios/estatisticasUtils'
@@ -40,14 +41,14 @@ export function EspelhoMesPainel() {
     // ao trocar de mês, mantém o seletor/tabela na tela até o novo mês chegar (sem piscar "Carregando")
     placeholderData: keepPreviousData,
   })
-  // o mês corrente (UTC, como no backend) é sempre o primeiro da lista de meses disponíveis
-  const mesEfetivo = mes ?? new Date().toISOString().slice(0, 7)
+  // o mês corrente (fuso da empresa, como no backend) é sempre o primeiro da lista de meses disponíveis
+  const mesEfetivo = mes ?? mesAtualNaEmpresa()
   // tarefas concluídas do mês (o espelho só tem horas) - falha aqui não derruba o resto do painel
   const tarefasQuery = useQuery({
     queryKey: ['ponto', 'insights-tarefas', mesEfetivo],
     queryFn: () => {
       const periodo = periodoDoMes(mesEfetivo)
-      return buscarEstatisticas({ usuarioId: null, inicio: `${periodo.inicio}T00:00:00Z`, fim: `${periodo.fim}T00:00:00Z` })
+      return buscarEstatisticas({ usuarioId: null, inicio: inicioDoDiaNaEmpresa(periodo.inicio), fim: inicioDoDiaNaEmpresa(periodo.fim) })
     },
     placeholderData: keepPreviousData,
   })

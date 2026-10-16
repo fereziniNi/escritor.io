@@ -1,3 +1,5 @@
+import { hojeNaEmpresa } from '../../shared/fusoEmpresa'
+
 /**
  * A hora (0-23) com o maior valor do histograma - "horário que mais trabalhou"/"horário
  * preferido de reuniões" (pedido do usuário). `null` quando tudo é zero (sem dado nenhum no
@@ -27,15 +29,15 @@ export function formatarFaixaDeHora(hora: number): string {
  * alguma coisa; o filtro continua existindo pra quem quiser outro período.
  *
  * `fim` é o dia SEGUINTE a hoje, não hoje - o resto do sistema trata `fim` como exclusivo (a API
- * é chamada com `${fim}T00:00:00Z`, ver `RelatoriosPage`), então sem isso o próprio dia de hoje
- * ficaria de fora de um período que deveria ir "até hoje". Data civil em UTC, mesma convenção do
- * resto do app (sem fuso horário da empresa ainda, ver ADR 0010).
+ * é chamada com a meia-noite de `fim`, ver `RelatoriosPage`), então sem isso o próprio dia de hoje
+ * ficaria de fora de um período que deveria ir "até hoje". "Hoje" é o dia no fuso da empresa
+ * (`hojeNaEmpresa`), igual ao backend.
  */
 export function periodoPadrao(agora: Date): { inicio: string; fim: string } {
-  const ano = agora.getUTCFullYear()
-  const mes = agora.getUTCMonth()
+  const [ano, numeroDoMes, dia] = hojeNaEmpresa(agora).split('-').map(Number)
+  const mes = numeroDoMes - 1
   const inicioDoMes = new Date(Date.UTC(ano, mes, 1))
-  const amanha = new Date(Date.UTC(ano, mes, agora.getUTCDate() + 1))
+  const amanha = new Date(Date.UTC(ano, mes, dia + 1))
   return { inicio: inicioDoMes.toISOString().slice(0, 10), fim: amanha.toISOString().slice(0, 10) }
 }
 

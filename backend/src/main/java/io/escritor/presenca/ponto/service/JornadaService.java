@@ -20,7 +20,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,9 +32,9 @@ import org.springframework.stereotype.Service;
 
 /**
  * Período (tanto de "saldo acumulado" quanto do espelho do mês, S2.14) é sempre mês corrente até
- * hoje (dia 1 às 00:00 UTC até agora) - período arbitrário/mês passado fica pra depois do MVP.
- * "Dia" é sempre o dia civil em UTC: o sistema ainda não tem noção de fuso horário da empresa
- * (ver ADR 0010).
+ * hoje (dia 1 à meia-noite até agora). "Dia" é o dia civil no fuso do `Clock` - o da empresa,
+ * America/Sao_Paulo (`ClockConfig`); antes era UTC e uma jornada que passava das 21h ficava partida
+ * em dois dias (ver ADR 0010).
  */
 @Service
 public class JornadaService {
@@ -101,7 +101,7 @@ public class JornadaService {
         Set<YearMonth> meses = new TreeSet<>(Comparator.reverseOrder());
         meses.add(mesCorrente());
         registroPontoRepository.findByUsuarioOrderByMomentoAsc(alvo)
-                .forEach(registro -> meses.add(YearMonth.from(registro.getMomento().atZone(ZoneOffset.UTC))));
+                .forEach(registro -> meses.add(YearMonth.from(registro.getMomento().atZone(clock.getZone()))));
         return List.copyOf(meses);
     }
 
@@ -112,12 +112,12 @@ public class JornadaService {
      */
     public JornadaDoDiaResponse jornadaDoDia(Usuario usuario) {
         Instant agora = Instant.now(clock);
-        LocalDate hoje = agora.atZone(ZoneOffset.UTC).toLocalDate();
+        LocalDate hoje = agora.atZone(clock.getZone()).toLocalDate();
         Map<LocalDate, List<Marcacao>> marcacoesPorDia = marcacoesPorDiaNoMesCorrente(usuario, hoje);
 
         List<Marcacao> marcacoesDeHoje = marcacoesPorDia.getOrDefault(hoje, List.of());
-        Instant inicioDoDia = hoje.atStartOfDay(ZoneOffset.UTC).toInstant();
-        Instant fimDoDia = hoje.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant inicioDoDia = hoje.atStartOfDay(clock.getZone()).toInstant();
+        Instant fimDoDia = hoje.plusDays(1).atStartOfDay(clock.getZone()).toInstant();
         int cargaDiariaMinutos = usuario.getCargaDiariaMinutos();
 
         EstadoDia estado = EstadoDia.calcular(marcacoesDeHoje, fimDoDia, agora);
@@ -142,7 +142,7 @@ public class JornadaService {
      */
     public long segundosTrabalhadosAteAgora(Usuario usuario) {
         Instant agora = Instant.now(clock);
-        LocalDate hoje = agora.atZone(ZoneOffset.UTC).toLocalDate();
+        LocalDate hoje = agora.atZone(clock.getZone()).toLocalDate();
         Map<LocalDate, List<Marcacao>> marcacoesPorDia = marcacoesPorDiaNoMesCorrente(usuario, hoje);
         List<Marcacao> marcacoesDeHoje = marcacoesPorDia.getOrDefault(hoje, List.of());
         return JornadaDiaria.segundosTrabalhadosAteAgora(marcacoesDeHoje, agora);
@@ -154,7 +154,7 @@ public class JornadaService {
      */
     public EspelhoMesResponse espelhoDoMes(Usuario usuario) {
         Instant agora = Instant.now(clock);
-        LocalDate hoje = agora.atZone(ZoneOffset.UTC).toLocalDate();
+        LocalDate hoje = agora.atZone(clock.getZone()).toLocalDate();
         return montarEspelho(usuario, marcacoesPorDiaNoMesCorrente(usuario, hoje), agora);
     }
 
@@ -166,7 +166,8 @@ public class JornadaService {
         }
         Map<LocalDate, List<Marcacao>> marcacoesPorDia = agruparPorDia(
                 registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualAndMomentoLessThanOrderByMomentoAsc(
-                        usuario, inicioDoMes(mesConsultado), inicioDoMes(mesConsultado.plusMonths(1))));
+                        usuario, inicioDoMes(mesConsultado), inicioDoMes(mesConsultado.plusMonths(1))),
+                clock.getZone());
         return montarEspelho(usuario, marcacoesPorDia, Instant.now(clock));
     }
 
@@ -178,7 +179,7 @@ public class JornadaService {
                 .map(entrada -> {
                     LocalDate data = entrada.getKey();
                     List<Marcacao> marcacoesDoDia = entrada.getValue();
-                    Instant fimDoDia = data.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+                    Instant fimDoDia = data.plusDays(1).atStartOfDay(clock.getZone()).toInstant();
                     EstadoDia estado = EstadoDia.calcular(marcacoesDoDia, fimDoDia, agora);
                     long minutosTrabalhados = JornadaDiaria.minutosTrabalhados(marcacoesDoDia);
                     long saldoDia = JornadaDiaria.saldo(marcacoesDoDia, cargaDiariaMinutos);
@@ -205,11 +206,12 @@ public class JornadaService {
 
         Map<LocalDate, List<Marcacao>> marcacoesPorDia = agruparPorDia(
                 registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualAndMomentoLessThanOrderByMomentoAsc(
-                        usuarioAlvo, inicio, fim));
+                        usuarioAlvo, inicio, fim),
+                clock.getZone());
 
         return marcacoesPorDia.entrySet().stream()
                 .filter(entrada -> {
-                    Instant fimDoDia = entrada.getKey().plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+                    Instant fimDoDia = entrada.getKey().plusDays(1).atStartOfDay(clock.getZone()).toInstant();
                     return EstadoDia.calcular(entrada.getValue(), fimDoDia, agora) == EstadoDia.INCONSISTENTE;
                 })
                 .map(Map.Entry::getKey)
@@ -218,7 +220,7 @@ public class JornadaService {
     }
 
     private YearMonth mesCorrente() {
-        return YearMonth.from(Instant.now(clock).atZone(ZoneOffset.UTC));
+        return YearMonth.from(Instant.now(clock).atZone(clock.getZone()));
     }
 
     /** Mês nulo vira o corrente; mês depois do corrente não tem o que mostrar. */
@@ -233,24 +235,24 @@ public class JornadaService {
         return mes;
     }
 
-    private static Instant inicioDoMes(YearMonth mes) {
-        return mes.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+    private Instant inicioDoMes(YearMonth mes) {
+        return mes.atDay(1).atStartOfDay(clock.getZone()).toInstant();
     }
 
     private Map<LocalDate, List<Marcacao>> marcacoesPorDiaNoMesCorrente(Usuario usuario, LocalDate hoje) {
-        Instant inicioDoPeriodo = hoje.withDayOfMonth(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant inicioDoPeriodo = hoje.withDayOfMonth(1).atStartOfDay(clock.getZone()).toInstant();
 
         List<RegistroPonto> registrosDoPeriodo = registroPontoRepository
                 .findByUsuarioAndMomentoGreaterThanEqualOrderByMomentoAsc(usuario, inicioDoPeriodo);
 
-        return agruparPorDia(registrosDoPeriodo);
+        return agruparPorDia(registrosDoPeriodo, clock.getZone());
     }
 
     /** Package-private: o fechamento mensal (`FechamentoMesService`) agrupa do mesmo jeito. */
-    static Map<LocalDate, List<Marcacao>> agruparPorDia(List<RegistroPonto> registros) {
+    static Map<LocalDate, List<Marcacao>> agruparPorDia(List<RegistroPonto> registros, ZoneId fuso) {
         return registros.stream()
                 .collect(Collectors.groupingBy(
-                        registro -> registro.getMomento().atZone(ZoneOffset.UTC).toLocalDate(),
+                        registro -> registro.getMomento().atZone(fuso).toLocalDate(),
                         LinkedHashMap::new,
                         Collectors.mapping(
                                 registro -> new Marcacao(registro.getTipo(), registro.getMomento()),

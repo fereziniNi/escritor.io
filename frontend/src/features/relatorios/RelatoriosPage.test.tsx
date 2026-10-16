@@ -173,7 +173,7 @@ describe('RelatoriosPage', () => {
     fireEvent.change(screen.getByLabelText('Mês'), { target: { value: '2025-12' } })
 
     expect(await screen.findByText('Saldo acumulado: -1h30min')).toBeInTheDocument()
-    expect(pedidos).toContainEqual({ mes: null, inicio: '2025-12-01T00:00:00Z', fim: '2026-01-01T00:00:00Z' })
+    expect(pedidos).toContainEqual({ mes: null, inicio: '2025-12-01T03:00:00.000Z', fim: '2026-01-01T03:00:00.000Z' })
   })
 
   it('digita o nome de uma pessoa cadastrada e filtra o saldo por ela', async () => {

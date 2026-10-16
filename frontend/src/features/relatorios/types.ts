@@ -22,7 +22,7 @@ export interface EstatisticasPessoais {
   tarefasConcluidasDetalhe: TarefaConcluida[]
   /** Não filtrado pelo período - ver comentário do DTO no backend. */
   projetosConcluidos: number
-  /** Sempre 24 posições, índice = hora do dia (UTC), 0-23. */
+  /** Sempre 24 posições, índice = hora do dia (fuso da empresa), 0-23. */
   minutosPorHoraDoDia: number[]
 }
 
