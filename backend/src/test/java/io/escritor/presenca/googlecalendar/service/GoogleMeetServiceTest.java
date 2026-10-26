@@ -100,6 +100,26 @@ class GoogleMeetServiceTest {
     }
 
     @Test
+    void acessoRevogadoNoGoogleViraGoogleNaoConectado() {
+        // bug de produção (26/10): "invalid_grant" na renovação do token virava 500 genérico
+        Ambiente ambiente = montar();
+        Usuario criador = usuarioComId(1L, "chefe@escritor.io");
+        when(ambiente.contaRepository().findByUsuario(criador))
+                .thenReturn(Optional.of(new ContaGoogleCalendar(criador, "refresh-revogado", AGORA)));
+        Reuniao reuniao = reuniaoComId(42L, criador, List.of(usuarioComId(2L, "colega@escritor.io")));
+        ambiente.servidor()
+                .expect(requestTo(URL_TOKEN))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("""
+                                {"error":"invalid_grant","error_description":"Token has been expired or revoked."}
+                                """));
+
+        assertThatThrownBy(() -> ambiente.servico().criarEventoComMeet(criador, reuniao))
+                .isInstanceOf(GoogleNaoConectadoException.class);
+    }
+
+    @Test
     void criarEventoSemContaConectadaLancaGoogleNaoConectado() {
         Ambiente ambiente = montar();
         Usuario criador = usuarioComId(1L, "chefe@escritor.io");

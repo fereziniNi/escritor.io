@@ -173,13 +173,24 @@ public class GoogleMeetService {
         corpo.add("refresh_token", conta.getRefreshToken());
         corpo.add("grant_type", "refresh_token");
 
-        RespostaToken resposta = restClient
-                .post()
-                .uri(URL_TOKEN)
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                .body(corpo)
-                .retrieve()
-                .body(RespostaToken.class);
+        RespostaToken resposta;
+        try {
+            resposta = restClient
+                    .post()
+                    .uri(URL_TOKEN)
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .body(corpo)
+                    .retrieve()
+                    .body(RespostaToken.class);
+        } catch (HttpClientErrorException.BadRequest erro) {
+            // "invalid_grant": a pessoa revogou o acesso ou o refresh token expirou - visto em
+            // produção (26/10) virando 500 genérico ao marcar reunião. Pra quem usa, é o mesmo que
+            // não ter conectado: precisa conectar o Google Agenda de novo (428 + mensagem na tela).
+            if (erro.getResponseBodyAsString().contains("invalid_grant")) {
+                throw new GoogleNaoConectadoException();
+            }
+            throw erro;
+        }
         if (resposta == null || resposta.accessToken() == null) {
             throw new IllegalStateException("Google não devolveu um access token na renovação");
         }

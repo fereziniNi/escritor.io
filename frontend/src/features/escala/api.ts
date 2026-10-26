@@ -142,7 +142,9 @@ export async function criarReuniao(dados: CriarReuniaoInput): Promise<Reuniao> {
     // backend dizendo especificamente isso (`GoogleNaoConectadoException`), distinto de um erro
     // de horário/validação comum.
     if (response.status === 428) {
-      throw new Error('Conecte sua conta do Google Agenda antes de marcar uma reunião com Meet')
+      throw new Error(
+        'Conecte sua conta do Google Agenda antes de marcar uma reunião com Meet. Se ela já está conectada, o acesso expirou: desconecte e conecte de novo.',
+      )
     }
     // pedido do usuário: "Não consegui marcar a reunião!!" - a causa mais comum (horário fora do
     // expediente de um participante) agora é avisada antes de enviar (`consultarDisponibilidade`);

@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Pedido do usuário: "total de horas trabalhadas, quantidade de atividades feitas, o que fez,
@@ -77,7 +78,13 @@ public class EstatisticasService {
      * VisibilidadeUsuarioService#resolverAlvo}); os rankings de equipe usam {@link
      * VisibilidadeUsuarioService#listarUsuariosVisiveis} sobre quem está autenticado, não sobre o
      * alvo - pra colaborador, sempre colapsa numa lista de 1 pessoa (ele mesmo).
+     *
+     * <p>{@code readOnly} transacional porque o ranking de reuniões lê {@code Reuniao.participantes}
+     * (lazy) - sem sessão aberta ({@code open-in-view: false}) dava LazyInitializationException e a
+     * página de Relatórios inteira caía com 500 assim que havia uma reunião no período
+     * (bug de produção de 26/10, coberto por {@code EstatisticasControllerIT}).
      */
+    @Transactional(readOnly = true)
     public EstatisticasResponse calcular(Long usuarioIdFiltro, Instant inicio, Instant fim, Usuario usuarioAutenticado) {
         Usuario usuarioAlvo =
                 visibilidadeUsuarioService.resolverAlvo(usuarioIdFiltro, usuarioAutenticado, EstatisticasDeOutroUsuarioException::new);
