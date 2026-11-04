@@ -212,7 +212,12 @@ public class PresencaWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         Long usuarioId = usuarioId(session);
-        sessoesPorUsuario.remove(usuarioId);
+        // Reconexão (queda de rede, aba suspensa, 2ª aba): a sessão nova já substituiu esta em
+        // `sessoesPorUsuario` antes do close da antiga chegar. Se a antiga marcasse OFFLINE aqui,
+        // a pessoa apareceria offline para todos mesmo conectada.
+        if (!sessoesPorUsuario.remove(usuarioId, session)) {
+            return;
+        }
         rastreioPorUsuario.remove(usuarioId);
 
         estacionarComoOffline(usuarioId);

@@ -168,6 +168,23 @@ class PresencaWebSocketHandlerTest {
         assertThat(captor.getValue().getPayload()).contains("\"x\":10").contains("\"y\":20");
     }
 
+    /** Pedido do usuário: "na plataforma parece que está offline mas está trabalhando" - o close da
+     * sessão ANTIGA chegando depois da reconexão não pode marcar OFFLINE quem já tem sessão nova. */
+    @Test
+    void fechamentoTardioDaSessaoAntigaNaoMarcaOfflineQuemJaReconectou() throws Exception {
+        WebSocketSession sessaoAntiga = sessaoFalsa(1L, "Ana");
+        WebSocketSession sessaoBeto = sessaoFalsa(2L, "Beto");
+        handler.afterConnectionEstablished(sessaoAntiga);
+        handler.afterConnectionEstablished(sessaoBeto);
+        WebSocketSession sessaoNova = sessaoFalsa(1L, "Ana");
+        handler.afterConnectionEstablished(sessaoNova);
+        clearInvocations(sessaoBeto);
+
+        handler.afterConnectionClosed(sessaoAntiga, CloseStatus.GOING_AWAY);
+
+        verify(sessaoBeto, never()).sendMessage(any());
+    }
+
     /** Pedido do usuário: mesmo problema acima - a causa mais provável de reconexões desnecessárias
      * é o proxy/plataforma fechando a conexão por ela ficar "quieta" tempo demais sem tráfego (ver
      * javadoc de {@code enviarPing}). Um PING de protocolo periódico conta como tráfego real. */
