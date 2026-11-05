@@ -80,3 +80,14 @@
 .skills-editor textarea {
   font-family: monospace;
 }
+
+.diff-arquivo { margin: 0.75rem 0; }
+.diff-arquivo-caminho { display: flex; gap: 0.5rem; align-items: center; margin: 0 0 0.25rem; }
+.diff-selo { font-size: 0.75rem; padding: 0 0.4rem; border: 1px solid currentColor; border-radius: 0.5rem; }
+.diff-conteudo { margin: 0; overflow-x: auto; font-size: 0.85rem; }
+.diff-conteudo div { white-space: pre-wrap; padding-left: 1.2rem; position: relative; }
+.diff-adicionada { background: rgba(46, 160, 67, 0.2); }
+.diff-adicionada::before { content: "+"; position: absolute; left: 0.4rem; }
+.diff-removida { background: rgba(248, 81, 73, 0.2); }
+.diff-removida::before { content: "-"; position: absolute; left: 0.4rem; }
+.skills-rejeicao label { display: flex; flex-direction: column; gap: 0.25rem; }

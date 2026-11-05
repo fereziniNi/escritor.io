@@ -6,6 +6,9 @@ const ICONE_POR_TIPO: Record<TipoNotificacao, string> = {
   TAREFA_CONCLUIDA: '✅',
   NOVA_TAREFA: '📋',
   SORTEIO_HAPPY_HOUR: '🎉',
+  SKILL_PROPOSTA: '🧩',
+  SKILL_APROVADA: '🧩',
+  SKILL_REJEITADA: '🧩',
 }
 
 /**

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { buscarSkill } from './api'
+import { AprovacoesSkills } from './AprovacoesSkills'
 import { DetalheSkill } from './DetalheSkill'
 import { EditorSkill } from './EditorSkill'
 import { ListaSkills } from './ListaSkills'
@@ -77,13 +78,5 @@ export function SkillsPainel({ papel }: { papel: string | null }) {
     )
   }
 
-  // Placeholder: a tela de aprovações chega na próxima tarefa.
-  return (
-    <div>
-      <button type="button" className="botao-secundario" onClick={() => setTela({ tipo: 'lista' })}>
-        Voltar
-      </button>
-      <p className="mensagem-vazia">Em breve.</p>
-    </div>
-  )
+  return <AprovacoesSkills aoVoltar={() => setTela({ tipo: 'lista' })} />
 }
