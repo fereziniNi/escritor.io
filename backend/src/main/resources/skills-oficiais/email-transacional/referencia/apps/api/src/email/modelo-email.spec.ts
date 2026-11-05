@@ -34,6 +34,13 @@ describe('montarEmail', () => {
     expect(m.html).toContain('&lt;img');
   });
 
+  it('valor de usuário escapado no corpo aparece literal na versão texto (não é tratado como tag)', () => {
+    const nome = '<b>Ana</b> & Cia';
+    const r = montarEmail('Oi', `<p>Olá, ${escaparHtml(nome)}!</p>`);
+    expect(r.html).not.toContain('<b>Ana</b>');
+    expect(r.texto).toContain('Olá, <b>Ana</b> & Cia!');
+  });
+
   it('escaparHtml cobre & < > " e apóstrofo', () => {
     expect(escaparHtml(`<a href="x">'&'</a>`)).toBe('&lt;a href=&quot;x&quot;&gt;&#39;&amp;&#39;&lt;/a&gt;');
   });

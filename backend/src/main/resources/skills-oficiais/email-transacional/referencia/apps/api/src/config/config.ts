@@ -78,6 +78,10 @@ export const esquemaConfig = esquemaBase.superRefine((c, ctx) => {
   if (c.MAIL_MODE === 'smtp') {
     if (c.SMTP_HOST === undefined) problema('SMTP_HOST', 'obrigatória com MAIL_MODE=smtp');
     if (c.EMAIL_REMETENTE === undefined) problema('EMAIL_REMETENTE', 'obrigatória com MAIL_MODE=smtp');
+    if (c.SMTP_PORT === 465 && !c.SMTP_SEGURO) problema('SMTP_SEGURO', 'a porta 465 usa TLS direto: defina SMTP_SEGURO=true (com false a conexão trava)');
+    if (c.NODE_ENV === 'production' && c.SMTP_PORT === 25 && !c.SMTP_SEGURO) {
+      problema('SMTP_PORT', 'a porta 25 sem TLS não é aceita em produção; use 587 (STARTTLS) ou 465 com SMTP_SEGURO=true');
+    }
   }
   if (c.SMTP_USUARIO !== undefined && c.SMTP_SENHA === undefined) problema('SMTP_SENHA', 'obrigatória quando SMTP_USUARIO está definido');
   if (c.SMTP_SENHA !== undefined && c.SMTP_USUARIO === undefined) problema('SMTP_USUARIO', 'obrigatória quando SMTP_SENHA está definida');

@@ -84,6 +84,16 @@ describe('configuração de e-mail', () => {
     expect(() => carregarConfig(base({ ...smtp, EMAIL_REMETENTE: 'a@exemplo.com.br\nBcc: x@y.com' }))).toThrow(/EMAIL_REMETENTE/);
   });
 
+  it('porta 465 com SMTP_SEGURO=false lança (TLS direto é obrigatório nela)', () => {
+    expect(() => carregarConfig(base({ ...smtp, SMTP_PORT: '465' }))).toThrow(/SMTP_SEGURO/);
+    expect(carregarConfig(base({ ...smtp, SMTP_PORT: '465', SMTP_SEGURO: 'true' })).SMTP_SEGURO).toBe(true);
+  });
+
+  it('porta 25 sem TLS é recusada em produção, mas aceita em desenvolvimento', () => {
+    expect(() => carregarConfig(base({ NODE_ENV: 'production', ...smtp, SMTP_PORT: '25' }))).toThrow(/SMTP_PORT/);
+    expect(carregarConfig(base({ ...smtp, SMTP_PORT: '25' })).SMTP_PORT).toBe(25);
+  });
+
   it('SMTP_SEGURO só aceita true ou false', () => {
     expect(() => carregarConfig(base({ ...smtp, SMTP_SEGURO: 'sim' }))).toThrow(/SMTP_SEGURO/);
   });

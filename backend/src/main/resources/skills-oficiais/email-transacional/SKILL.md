@@ -25,22 +25,28 @@ Comitê (`MailService`) e Conta Gráfica.
    `SMTP_SEGURO` (`true`|`false`, padrão `false`: `true` = TLS direto na 465; `false` = STARTTLS), `SMTP_USUARIO`,
    `SMTP_SENHA` (**`Segredo`**; em produção `SMTP_SENHA_ARQUIVO=/run/secrets/smtp_senha`), `EMAIL_REMETENTE`
    (obrigatória com `smtp`; `Sistema <nao-responda@exemplo.com.br>`, uma linha só). `SMTP_USUARIO` e `SMTP_SENHA` andam juntos.
+   Recusados no boot: porta **465** com `SMTP_SEGURO=false` (a conexão travaria; na 465 é `true`) e, em produção, porta **25**
+   sem TLS.
 5. **A senha do SMTP nunca vaza**: é `Segredo` (`[REDACTED]` em JSON, `String()` e `inspect`); só o `EnviadorSmtp` chama
    `revelar()`, ao criar o transporte. Com usuário e `SMTP_SEGURO=false`, o transporte usa `requireTLS: true` (a senha
-   nunca vai em claro por STARTTLS opcional).
+   nunca vai em claro por STARTTLS opcional). Sem usuário (relay anônimo de rede interna, Mailpit) o STARTTLS é
+   **oportunista**: usa TLS se o servidor oferecer e segue sem ele se não; relay anônimo só com a TI do cliente, em rede interna, nunca pela internet.
 6. **Log e erro sem dado pessoal**: nunca o corpo da mensagem; destinatário sempre mascarado com `mascararEmail`
    (`ana.silva@exemplo.com.br` -> `a***@exemplo.com.br`), inclusive dentro de mensagens de erro do servidor SMTP. O erro
    lançado não leva `cause` (o original traz o endereço completo). **Nunca ponha código, link de login ou dado pessoal
    no assunto**: o assunto aparece em log, em notificação de celular e na lista de e-mails.
 7. **Anti-injeção de cabeçalho**: `para` é um único endereço (sem nome, vírgula, espaço ou quebra de linha),
-   `assunto` sem quebra de linha, `EMAIL_REMETENTE` sem quebra de linha. Quebra = `ErroEmailPermanente` (não repete).
+   `assunto` sem quebra de linha, `EMAIL_REMETENTE` sem quebra de linha. Quebra = `ErroEmailPermanente` (não repete). Vale também no `EnviadorLog`: o erro de endereço ou assunto
+   aparece já em desenvolvimento, e o log nunca recebe quebra de linha.
 8. **Funciona sozinho, sem fila** (`email/enviar-com-retry.ts`): até **3 tentativas**, espera de 500 ms e 1,5 s entre elas;
    prazos do SMTP de 5 s (conexão e saudação) e 10 s (socket), então o pior caso é de algumas dezenas de segundos.
    `ErroEmailPermanente` (endereço inválido, SMTP respondeu 5xx) não repete.
 9. **Nunca segure uma requisição HTTP no SMTP**: dentro de rota/handler use `ServicoEmail.disparar(m)` (devolve na hora,
    envia em segundo plano com o retry, só loga a falha mascarada, **nunca lança**). `ServicoEmail.enviar(m)` espera o
    resultado e lança se esgotar: use em rotinas e scripts. Resposta ao usuário nunca depende do SMTP (e não revela se o
-   e-mail existe: skill `seguranca`, regra 10).
+   e-mail existe: skill `seguranca`, regra 10). **Limite**: enquanto a skill `fila-de-tarefas` não for aplicada, o e-mail
+   de um `disparar` ainda em andamento se perde se o processo for encerrado (deploy, reinício); para e-mail que não pode
+   se perder, use `enviar` numa rotina que registre o resultado.
 10. **Quando a skill `fila-de-tarefas` for aplicada**, o envio passa pela fila (a fila repete com backoff e alerta em
     falha definitiva) e o retry de `enviar-com-retry.ts` deixa de ser usado; a tarefa de fila atualiza esta skill. Até lá, vale o que está aqui.
 11. **Mailpit no compose de dev** (`docker-compose.yml`, serviço `mailpit`): imagem `axllent/mailpit:v1.31.6` (versão

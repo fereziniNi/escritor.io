@@ -104,6 +104,12 @@ export class EnviadorLog implements EnviadorEmail {
   private readonly logger = new Logger('Email');
 
   enviar(m: MensagemEmail): Promise<void> {
+    // Mesmas recusas do SMTP: um erro de endereço ou assunto aparece já em desenvolvimento, não só em produção.
+    try {
+      validar(m);
+    } catch (erro) {
+      return Promise.reject(erro instanceof Error ? erro : new Error(String(erro)));
+    }
     this.logger.log(`MAIL_MODE=log, e-mail NÃO enviado: para=${mascararEmail(m.para)} assunto="${m.assunto}" texto=${m.texto.length} caracteres`);
     return Promise.resolve();
   }

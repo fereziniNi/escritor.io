@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import { createTransport } from 'nodemailer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Segredo } from '../config/segredo';
-import { EnviadorLog, EnviadorSmtp, mascararEmail, type MensagemEmail } from './enviador-email';
+import { EnviadorLog, EnviadorSmtp, ErroEmailPermanente, mascararEmail, type MensagemEmail } from './enviador-email';
 
 const mensagem: MensagemEmail = {
   para: 'ana.silva@exemplo.com.br',
@@ -30,6 +30,18 @@ describe('EnviadorLog', () => {
     expect(saida).toContain('a***@exemplo.com.br');
     expect(saida).not.toContain('ana.silva');
     expect(saida).not.toContain('CORPO-SECRETO-123');
+  });
+});
+
+describe('EnviadorLog validação', () => {
+  it.each([
+    ['para com quebra de linha', { para: 'a@exemplo.com.br\nBcc: x@y.com' }],
+    ['assunto com quebra de linha', { assunto: 'oi\r\nBcc: x@y.com' }],
+    ['destinatário sem @', { para: 'sem-arroba' }],
+  ])('recusa %s como o SMTP e não loga', async (_nome, parcial) => {
+    const log = vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    await expect(new EnviadorLog().enviar({ ...mensagem, ...parcial })).rejects.toBeInstanceOf(ErroEmailPermanente);
+    expect(log).not.toHaveBeenCalled();
   });
 });
 
