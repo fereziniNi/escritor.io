@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
-import { Activity, LayoutDashboard, Users } from 'lucide-react';
+import { Activity, LayoutDashboard, ShieldCheck, Users } from 'lucide-react';
 import { Outlet, RouterProvider, createBrowserRouter, useNavigate } from 'react-router';
 import { AppShell, type GrupoMenu } from '@/componentes/AppShell';
 import { buscarSaude } from '@/lib/api';
@@ -8,6 +8,7 @@ import { TelaFormulario } from '@/telas/modelo/TelaFormulario';
 import { TelaListagem } from '@/telas/modelo/TelaListagem';
 import { TelaLogin } from '@/telas/modelo/TelaLogin';
 import { TelaPainel } from '@/telas/modelo/TelaPainel';
+import { TelaUsuarios } from '@/telas/TelaUsuarios';
 
 const clienteConsultas = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
@@ -23,7 +24,13 @@ const grupos: GrupoMenu[] = [
       { rotulo: 'Cedentes', para: '/cedentes', icone: <Users className="size-4" /> },
     ],
   },
-  { titulo: 'Admin', itens: [{ rotulo: 'Estado do sistema', para: '/sistema', icone: <Activity className="size-4" /> }] },
+  {
+    titulo: 'Admin',
+    itens: [
+      { rotulo: 'Usuários', para: '/usuarios', icone: <ShieldCheck className="size-4" /> },
+      { rotulo: 'Estado do sistema', para: '/sistema', icone: <Activity className="size-4" /> },
+    ],
+  },
 ];
 
 /** Telas logadas: sidebar navy com a versão que a API informa em /api/health. */
@@ -56,6 +63,7 @@ const roteador = createBrowserRouter([
       { path: '/', element: <TelaPainel /> },
       { path: '/cedentes', element: <TelaListagem /> },
       { path: '/cedentes/novo', element: <PaginaNovoCedente /> },
+      { path: '/usuarios', element: <TelaUsuarios /> },
       { path: '/sistema', element: <Inicio /> },
     ],
   },

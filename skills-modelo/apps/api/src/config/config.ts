@@ -66,6 +66,13 @@ const esquemaBase = z.object({
     .string()
     .regex(/^[^\r\n<>]*<?[^\s@<>]+@[^\s@<>]+>?$/,'deve ser um endereço ou "Nome <endereco@dominio>", numa linha só')
     .optional(),
+  /**
+   * Usuários (src/usuarios/). ADMIN_INICIAL_EMAIL: se não existir nenhum ADMIN ativo, a API cria (ou reativa) este
+   * usuário como ADMIN ao subir. Guardado em minúsculas e sem espaços. NOME_SISTEMA: nome que aparece nos e-mails
+   * (convite). Uma linha só.
+   */
+  ADMIN_INICIAL_EMAIL: z.string().trim().toLowerCase().pipe(z.email().max(254)).optional(),
+  NOME_SISTEMA: z.string().regex(/^[^\r\n]{1,80}$/, 'uma linha de até 80 caracteres').default('Sistema'),
 });
 
 /** Regras entre variáveis: log nunca em produção; smtp exige servidor e remetente; usuário e senha andam juntos. */

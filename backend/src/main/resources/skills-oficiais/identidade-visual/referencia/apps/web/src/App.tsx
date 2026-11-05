@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/web/src/App.tsx
+// origem: skills-modelo/estagios/identidade-visual/apps/web/src/App.tsx
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { Activity, LayoutDashboard, Users } from 'lucide-react';
 import { Outlet, RouterProvider, createBrowserRouter, useNavigate } from 'react-router';

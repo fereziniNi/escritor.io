@@ -9,6 +9,7 @@ import { FiltroErros } from './http/filtro-erros';
 import { LogModule } from './log/log.module';
 import { SaudeModule } from './saude/saude.module';
 import { SegurancaModule } from './seguranca/seguranca.module';
+import { UsuariosModule } from './usuarios/usuarios.module';
 
 export interface OpcoesApp {
   /** Destino dos logs (testes); padrão: stdout. */
@@ -28,6 +29,7 @@ export class AppModule {
         SegurancaModule,
         BancoModule.registrar(config),
         EmailModule,
+        UsuariosModule,
         SaudeModule,
       ],
       // Erros sempre em JSON padrão ({ status, erro, requestId }), inclusive o 404 de /api/* desconhecido.

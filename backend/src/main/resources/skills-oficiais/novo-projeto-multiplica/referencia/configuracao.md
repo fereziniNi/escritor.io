@@ -183,7 +183,7 @@ dependência do Nest); `module`/`moduleResolution` `nodenext` com o pacote em Co
 
 `apps/api/drizzle/meta/_journal.json` — diário vazio de migrações (o `db:generate` acrescenta as entradas):
 
-<!-- arquivo: skills-modelo/apps/api/drizzle/meta/_journal.json -->
+<!-- arquivo: skills-modelo/estagios/novo-projeto-multiplica/apps/api/drizzle/meta/_journal.json -->
 ```json
 {
   "version": "7",

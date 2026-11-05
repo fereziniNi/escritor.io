@@ -1,0 +1,3 @@
+nome: Usuários e papéis
+descricao: Cria a tabela de usuários com papéis ADMIN, GESTOR e USUARIO, o guard por papel, a checagem de escopo no serviço, o convite por e-mail, o primeiro administrador e a tela de administração de usuários.
+categoria: SEGURANCA
