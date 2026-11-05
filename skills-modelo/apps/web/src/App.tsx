@@ -1,6 +1,6 @@
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Papel, ROTULO_PAPEL } from 'contratos';
-import { Activity, LayoutDashboard, ShieldCheck, Users } from 'lucide-react';
+import { Activity, LayoutDashboard, ScrollText, ShieldCheck, Users } from 'lucide-react';
 import { useState } from 'react';
 import { Navigate, Outlet, RouterProvider, createBrowserRouter, useNavigate } from 'react-router';
 import { AppShell, type GrupoMenu } from '@/componentes/AppShell';
@@ -8,6 +8,7 @@ import { Carregando, ErroCarregar } from '@/componentes/estados';
 import { ErroApi, buscarSaude } from '@/lib/api';
 import { buscarEu, sair } from '@/lib/auth-api';
 import { Inicio } from '@/telas/Inicio';
+import { TelaAuditoria } from '@/telas/TelaAuditoria';
 import { TelaEntrar } from '@/telas/TelaEntrar';
 import { TelaFormulario } from '@/telas/modelo/TelaFormulario';
 import { TelaListagem } from '@/telas/modelo/TelaListagem';
@@ -46,6 +47,7 @@ function gruposDo(papel: Papel): GrupoMenu[] {
       titulo: 'Admin',
       itens: [
         { rotulo: 'Usuários', para: '/usuarios', icone: <ShieldCheck className="size-4" /> },
+        { rotulo: 'Auditoria', para: '/admin/auditoria', icone: <ScrollText className="size-4" /> },
         { rotulo: 'Estado do sistema', para: '/sistema', icone: <Activity className="size-4" /> },
       ],
     });
@@ -121,6 +123,7 @@ const roteador = createBrowserRouter([
       { path: '/cedentes', element: <TelaListagem /> },
       { path: '/cedentes/novo', element: <PaginaNovoCedente /> },
       { path: '/usuarios', element: <TelaUsuarios /> },
+      { path: '/admin/auditoria', element: <TelaAuditoria /> },
       { path: '/sistema', element: <Inicio /> },
     ],
   },

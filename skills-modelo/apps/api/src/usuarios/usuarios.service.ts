@@ -1,5 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, eq } from 'drizzle-orm';
+import { AuditoriaService } from '../auditoria/auditoria.service';
+import { mascararEmail } from '../auditoria/sanitizar';
 import { BANCO, type Db } from '../banco/banco';
 import { usuario } from '../banco/esquema';
 import { type Config } from '../config/config';
@@ -51,6 +53,7 @@ export class UsuariosService {
     @Inject(BANCO) private readonly db: Db,
     @Inject(CONFIG) private readonly config: Config,
     private readonly email: ServicoEmail,
+    private readonly auditoria: AuditoriaService,
   ) {}
 
   /** Todos os usuários, ativos e desativados. Só ADMIN (checado aqui e também no @Papeis da rota). */
@@ -80,7 +83,16 @@ export class UsuariosService {
     const nome = dados.nome.trim();
     let criada: Linha | undefined;
     try {
-      [criada] = await this.db.insert(usuario).values({ email, nome, papel: dados.papel, ativo: true }).returning();
+      // O usuário e o evento de auditoria nascem na mesma transação: sem trilha, não há convite.
+      criada = await this.db.transaction(async (tx) => {
+        const [nova] = await tx.insert(usuario).values({ email, nome, papel: dados.papel, ativo: true }).returning();
+        await this.auditoria.registrar(
+          // Nome nunca vai para a trilha; e-mail só mascarado.
+          { acao: 'usuario.convidar', atorId: ator.id, alvoTipo: 'usuario', alvoId: nova!.id, depois: { email: mascararEmail(email), papel: nova!.papel, ativo: nova!.ativo } },
+          tx,
+        );
+        return nova;
+      });
     } catch (e) {
       if (violouUnicidade(e)) throw new ConflictException('Já existe um usuário com este e-mail (se estiver desativado, reative-o)');
       throw e;
@@ -91,26 +103,34 @@ export class UsuariosService {
 
   async alterarPapel(ator: UsuarioAtual, id: string, papel: Papel): Promise<UsuarioPublico> {
     exigirPapel(ator, 'ADMIN');
-    return this.mudar(id, { papel }, papel !== 'ADMIN');
+    return this.mudar(ator, 'usuario.alterar_papel', id, { papel }, papel !== 'ADMIN');
   }
 
   /** Nunca apaga: só marca `ativo = false`. Não desativa o último ADMIN ativo. */
   async desativar(ator: UsuarioAtual, id: string): Promise<UsuarioPublico> {
     exigirPapel(ator, 'ADMIN');
-    return this.mudar(id, { ativo: false }, true);
+    return this.mudar(ator, 'usuario.desativar', id, { ativo: false }, true);
   }
 
   async reativar(ator: UsuarioAtual, id: string): Promise<UsuarioPublico> {
     exigirPapel(ator, 'ADMIN');
-    return this.mudar(id, { ativo: true }, false);
+    return this.mudar(ator, 'usuario.reativar', id, { ativo: true }, false);
   }
 
   /**
    * Altera a linha numa transação. Quando a mudança pode tirar um ADMIN do conjunto de ADMIN ativos (`tiraAdmin`),
    * trava os ADMIN ativos (FOR UPDATE, em ordem de id, sem deadlock) e recusa se não sobrar outro: duas requisições
    * simultâneas desativando um ao outro não deixam o sistema sem administrador.
+   * O evento de auditoria (antes e depois de papel e ativo) é gravado na mesma transação: se a mudança é recusada ou desfeita,
+   * não sobra evento; se o evento não puder ser gravado, a mudança não acontece.
    */
-  private mudar(id: string, alteracao: Partial<Pick<Linha, 'papel' | 'ativo'>>, tiraAdmin: boolean): Promise<UsuarioPublico> {
+  private mudar(
+    ator: UsuarioAtual,
+    acao: 'usuario.alterar_papel' | 'usuario.desativar' | 'usuario.reativar',
+    id: string,
+    alteracao: Partial<Pick<Linha, 'papel' | 'ativo'>>,
+    tiraAdmin: boolean,
+  ): Promise<UsuarioPublico> {
     return this.db.transaction(async (tx) => {
       const admins = tiraAdmin
         ? await tx
@@ -127,6 +147,17 @@ export class UsuariosService {
         throw new ConflictException('Não é possível remover o último administrador ativo');
       }
       const [nova] = await tx.update(usuario).set(alteracao).where(eq(usuario.id, id)).returning();
+      await this.auditoria.registrar(
+        {
+          acao,
+          atorId: ator.id,
+          alvoTipo: 'usuario',
+          alvoId: id,
+          antes: { papel: atual.papel, ativo: atual.ativo },
+          depois: { papel: nova!.papel, ativo: nova!.ativo },
+        },
+        tx,
+      );
       return publico(nova!);
     });
   }

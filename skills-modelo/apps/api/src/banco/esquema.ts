@@ -2,3 +2,4 @@
 // com `pnpm --filter api db:generate`. Nunca editar o SQL gerado em drizzle/ à mão.
 export * from '../usuarios/usuario.tabela';
 export * from '../auth/auth.tabelas';
+export * from '../auditoria/evento-auditoria.tabela';

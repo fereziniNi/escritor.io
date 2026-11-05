@@ -27,6 +27,15 @@ const esquemaBase = z.object({
     .string(obrigatoria)
     .regex(/^postgres(ql)?:\/\/\S+$/, 'deve ser uma URL postgres:// ou postgresql://')
     .transform((v) => new Segredo(v)),
+  /**
+   * Papel de banco SÓ de runtime (trilha-auditoria): sem UPDATE/DELETE na trilha. Com ela definida, a API conecta por aqui e
+   * DATABASE_URL (o dono do esquema) fica só para as migrações. Opcional em dev; em produção a API avisa se faltar.
+   */
+  DATABASE_URL_RUNTIME: z
+    .string()
+    .regex(/^postgres(ql)?:\/\/\S+$/, 'deve ser uma URL postgres:// ou postgresql://')
+    .transform((v) => new Segredo(v))
+    .optional(),
   /** Versão e commit gravados no build da imagem (build-args); aparecem no /api/health. */
   APP_VERSAO: z.string().regex(IDENTIFICADOR_DE_BUILD, 'só letras, números e . _ + -').default('dev'),
   APP_COMMIT: z.string().regex(IDENTIFICADOR_DE_BUILD, 'só letras, números e . _ + -').default('desconhecido'),

@@ -1,6 +1,7 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { type DestinationStream } from 'pino';
+import { AuditoriaModule } from './auditoria/auditoria.module';
 import { AuthModule } from './auth/auth.module';
 import { BancoModule } from './banco/banco.module';
 import { type Config } from './config/config';
@@ -30,6 +31,7 @@ export class AppModule {
         LogModule.registrar(config, opcoes.destinoLog),
         SegurancaModule,
         BancoModule.registrar(config),
+        AuditoriaModule,
         EmailModule,
         UsuariosModule,
         AuthModule,

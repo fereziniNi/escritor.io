@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/web/src/App.tsx
+// origem: skills-modelo/estagios/login-codigo-email/apps/web/src/App.tsx
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Papel, ROTULO_PAPEL } from 'contratos';
 import { Activity, LayoutDashboard, ShieldCheck, Users } from 'lucide-react';

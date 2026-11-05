@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/src/auth/auth.module.ts
+// origem: skills-modelo/estagios/login-codigo-email/apps/api/src/auth/auth.module.ts
 import { type MiddlewareConsumer, Module, type NestModule, RequestMethod } from '@nestjs/common';
 import { EmailModule } from '../email/email.module';
 import { AuthController } from './auth.controller';

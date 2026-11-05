@@ -35,6 +35,11 @@ pnpm exec playwright test -c e2e/login-real.config.ts
 Rodar local: `docker compose up -d postgres`, `cp .env.example .env`, `pnpm --filter api db:migrate`, `pnpm dev`
 (API em http://localhost:3000/api/health, web em http://localhost:5173).
 
+Dois papéis de banco (skill `trilha-auditoria`): `DATABASE_URL` é o **dono** (só migrações) e `DATABASE_URL_RUNTIME` o papel `app_runtime`
+(o que a API usa; sem UPDATE/DELETE na trilha de auditoria). Em dev, depois de migrar:
+`docker compose exec postgres psql -U app -d app -c "ALTER ROLE app_runtime LOGIN PASSWORD 'app_runtime'"` e descomente
+`DATABASE_URL_RUNTIME` no `.env`. Sem a variável a API usa o dono (ok em dev; o gatilho do banco continua protegendo a trilha).
+
 ## Regra das referências
 
 Cada arquivo em `skills-oficiais/<slug>/referencia/` começa com um comentário na sintaxe dele contendo

@@ -10,7 +10,8 @@ export class BancoModule implements OnApplicationShutdown {
   static registrar(config: Config): DynamicModule {
     return {
       module: BancoModule,
-      providers: [{ provide: BANCO, useFactory: () => criarBanco(config.DATABASE_URL.revelar()) }],
+      // A API usa o papel de runtime (DATABASE_URL_RUNTIME) quando definido; só as migrações usam o dono (DATABASE_URL).
+      providers: [{ provide: BANCO, useFactory: () => criarBanco((config.DATABASE_URL_RUNTIME ?? config.DATABASE_URL).revelar()) }],
       exports: [BANCO],
     };
   }

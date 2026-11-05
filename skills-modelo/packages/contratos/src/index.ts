@@ -6,3 +6,4 @@ import './sem-eval.js';
 export * from './saude.js';
 export * from './usuarios.js';
 export * from './auth.js';
+export * from './auditoria.js';

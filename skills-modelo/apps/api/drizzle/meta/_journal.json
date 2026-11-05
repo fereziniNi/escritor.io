@@ -22,6 +22,20 @@
       "when": 1793918857142,
       "tag": "0002_revogar_sessoes",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793920284385,
+      "tag": "0003_evento_auditoria",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793920285771,
+      "tag": "0004_imutabilidade_auditoria",
+      "breakpoints": true
     }
   ]
 }

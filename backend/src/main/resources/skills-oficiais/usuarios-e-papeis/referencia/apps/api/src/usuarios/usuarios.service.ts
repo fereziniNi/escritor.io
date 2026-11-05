@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/src/usuarios/usuarios.service.ts
+// origem: skills-modelo/estagios/usuarios-e-papeis/apps/api/src/usuarios/usuarios.service.ts
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, eq } from 'drizzle-orm';
 import { BANCO, type Db } from '../banco/banco';
