@@ -85,6 +85,28 @@ class ImportadorSkillsOficiaisTest {
     }
 
     @Test
+    void fimDeLinhaCrlfEBomNaoAlteramHashNemConteudo(@TempDir Path tmp) throws IOException {
+        Path copia = copiarFixture(tmp);
+        importadorSobre(tmp).importarTudo();
+        try (Stream<Path> s = Files.walk(copia)) {
+            for (Path p : (Iterable<Path>) s::iterator) {
+                if (Files.isRegularFile(p)) {
+                    String lf = Files.readString(p).replace("\r\n", "\n");
+                    Files.writeString(p, "﻿" + lf.replace("\n", "\r\n"));
+                }
+            }
+        }
+        importadorSobre(tmp).importarTudo();
+
+        ArgumentCaptor<DadosVersao> dados = ArgumentCaptor.forClass(DadosVersao.class);
+        ArgumentCaptor<String> hash = ArgumentCaptor.forClass(String.class);
+        verify(skillService, times(2)).importar(eq("exemplo-teste"), dados.capture(), hash.capture());
+        assertThat(hash.getAllValues().get(0)).isEqualTo(hash.getAllValues().get(1));
+        assertThat(dados.getAllValues().get(1)).isEqualTo(dados.getAllValues().get(0));
+        assertThat(dados.getAllValues().get(1).tutorialInstalacao()).doesNotContain("\r");
+    }
+
+    @Test
     void skillQuebradaNaoImpedeAsOutras(@TempDir Path tmp) throws IOException {
         copiarFixture(tmp);
         Path ruim = tmp.resolve(RAIZ + "/ruim-demais");

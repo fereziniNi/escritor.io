@@ -209,10 +209,16 @@ public class ImportadorSkillsOficiais {
             if (caminho.equals(ARQUIVO_VAZIO)) {
                 continue;
             }
-            String conteudo = new String(res.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            String conteudo = normalizar(new String(res.getInputStream().readAllBytes(), StandardCharsets.UTF_8));
             r.computeIfAbsent(slug, k -> new TreeMap<>(Comparator.naturalOrder())).put(caminho, conteudo);
         }
         return r;
+    }
+
+    /** Tira BOM inicial e unifica fim de linha em \n, para o hash não depender do checkout. */
+    static String normalizar(String texto) {
+        String t = texto.startsWith("﻿") ? texto.substring(1) : texto;
+        return t.replace("\r\n", "\n").replace('\r', '\n');
     }
 
     private String relativo(String url, List<String> prefixos) {

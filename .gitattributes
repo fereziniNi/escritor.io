@@ -1,2 +1,3 @@
 # O Maven wrapper roda no builder Linux do Railway: com CRLF o sh falha (Illegal option -)
 mvnw text eol=lf
+backend/src/main/resources/skills-oficiais/** text eol=lf
