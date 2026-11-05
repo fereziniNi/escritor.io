@@ -61,7 +61,8 @@ describe('ListaSkills', () => {
     )
     renderLista()
     await userEvent.type(screen.getByLabelText('Buscar skills'), 'login')
-    await waitFor(() => expect(buscas).toContain('login'))
+    await waitFor(() => expect(buscas).toContain('login'), { timeout: 2000 })
+    expect(buscas).not.toContain('l')
   })
 
   it('filtro "Só oficiais" envia oficial=true', async () => {
@@ -101,6 +102,14 @@ describe('ListaSkills', () => {
     unmount()
     renderLista(true)
     expect(screen.getByRole('button', { name: /Aprovações/ })).toBeInTheDocument()
+  })
+
+  it('mostra o rótulo "Segurança" no cartão e no select', async () => {
+    server.use(http.get('/skills', () => HttpResponse.json([skill({ categoria: 'SEGURANCA' })])))
+    renderLista()
+    expect(await screen.findByText(/Segurança · v1/)).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Segurança' })).toBeInTheDocument()
+    expect(screen.queryByText(/SEGURANCA/)).not.toBeInTheDocument()
   })
 
   it('mostra estado vazio', async () => {

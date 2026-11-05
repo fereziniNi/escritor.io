@@ -1,8 +1,8 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
 import { baixarOficiais, listarSkills } from './api'
 import './skills.css'
-import { CATEGORIAS, type Categoria } from './types'
+import { CATEGORIAS, ROTULO_CATEGORIA, type Categoria } from './types'
 
 /**
  * Lista do catálogo de Skills: busca, filtro por categoria, "Só oficiais" e download em lote das
@@ -20,12 +20,17 @@ export function ListaSkills({
   podeAprovar: boolean
 }) {
   const [busca, setBusca] = useState('')
+  const [buscaDebounced, setBuscaDebounced] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setBuscaDebounced(busca), 300)
+    return () => clearTimeout(t)
+  }, [busca])
   const [categoria, setCategoria] = useState<Categoria | ''>('')
   const [soOficiais, setSoOficiais] = useState(false)
   const [arquivadas, setArquivadas] = useState(false)
 
-  const filtro = { busca: busca.trim() || undefined, categoria: categoria || undefined, soOficiais, arquivadas }
-  const query = useQuery({ queryKey: ['skills', filtro], queryFn: () => listarSkills(filtro) })
+  const filtro = { busca: buscaDebounced.trim() || undefined, categoria: categoria || undefined, soOficiais, arquivadas }
+  const query = useQuery({ queryKey: ['skills', filtro], queryFn: () => listarSkills(filtro), placeholderData: keepPreviousData })
   const download = useMutation({ mutationFn: baixarOficiais })
 
   return (
@@ -50,7 +55,7 @@ export function ListaSkills({
           <option value="">Todas as categorias</option>
           {CATEGORIAS.map((c) => (
             <option key={c} value={c}>
-              {c}
+              {ROTULO_CATEGORIA[c]}
             </option>
           ))}
         </select>
@@ -79,7 +84,7 @@ export function ListaSkills({
                 </span>
                 <span className="cartao-item-corpo">{s.descricao}</span>
                 <span className="cartao-item-meta">
-                  {s.categoria} · v{s.versaoVigente}
+                  {ROTULO_CATEGORIA[s.categoria]} · v{s.versaoVigente}
                 </span>
               </button>
             </li>

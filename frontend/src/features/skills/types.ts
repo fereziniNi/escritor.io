@@ -95,3 +95,13 @@ export interface FiltroSkills {
   soOficiais?: boolean
   arquivadas?: boolean
 }
+
+export const ROTULO_CATEGORIA: Record<Categoria, string> = {
+  FUNDACAO: 'Fundação',
+  SEGURANCA: 'Segurança',
+  INTERFACE: 'Interface',
+  IA: 'IA',
+  INFRA: 'Infraestrutura',
+  DADOS: 'Dados',
+  OUTRAS: 'Outras',
+}
