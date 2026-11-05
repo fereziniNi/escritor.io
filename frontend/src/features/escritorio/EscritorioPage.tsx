@@ -10,6 +10,7 @@ import { RelatoriosPage } from '../relatorios/RelatoriosPage'
 import { HappyHourPainel } from '../happyhour/HappyHourPainel'
 import { buscarNotificacoes, marcarNotificacoesComoLidas } from '../notificacoes/api'
 import { NotificacoesPainel } from '../notificacoes/NotificacoesPainel'
+import { SkillsPainel } from '../skills/SkillsPainel'
 import { buscarMapaAtivo } from './api'
 import { APARENCIA_PADRAO } from './avatar/aparenciaAvatar'
 import { ConfiguracoesPessoaisPage } from './ConfiguracoesPessoaisPage'
@@ -54,6 +55,7 @@ const TITULO_PAINEL: Record<PainelId, string> = {
   whatsapp: '📱 WhatsApp',
   happyHour: '🎉 Happy Hour',
   notificacoes: '🔔 Notificações',
+  skills: '🧩 Skills',
 }
 
 /**
@@ -462,6 +464,7 @@ export function EscritorioPage() {
           {painelAberto === 'colaboradores' && <ColaboradoresPage />}
           {painelAberto === 'whatsapp' && <IntegracaoWhatsAppPage />}
           {painelAberto === 'happyHour' && <HappyHourPainel />}
+          {painelAberto === 'skills' && <SkillsPainel papel={papel} />}
           {painelAberto === 'notificacoes' && <NotificacoesPainel itens={notificacoesQuery.data?.itens ?? []} />}
         </PainelFlutuante>
       )}
