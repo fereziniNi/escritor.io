@@ -52,7 +52,7 @@ public class SkillController {
     @GetMapping("/skills/propostas")
     @PreAuthorize("hasAnyRole('GESTOR','ADMIN')")
     public List<PropostaResponse> propostas() {
-        return fachada.propostas();
+        return fachada.propostas(contexto.usuarioAtual());
     }
 
     @GetMapping("/skills/oficiais.zip")

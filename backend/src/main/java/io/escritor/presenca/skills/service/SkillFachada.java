@@ -58,7 +58,8 @@ public class SkillFachada {
     }
 
     @Transactional(readOnly = true)
-    public List<PropostaResponse> propostas() {
+    public List<PropostaResponse> propostas(Usuario usuario) {
+        skillService.exigirGestorParaPropostas(usuario);
         return consulta.propostasPendentes().stream().map(PropostaResponse::de).toList();
     }
 

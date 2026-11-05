@@ -197,6 +197,14 @@ public class TratamentoErroGlobal {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(Map.of("mensagem", "Já existe uma proposta pendente para esta skill."));
         }
+        if (detalhe != null && detalhe.contains("uk_skill_versao_numero")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("mensagem", "Outra alteração foi salva ao mesmo tempo. Tente de novo."));
+        }
+        if (detalhe != null && detalhe.contains("skill_slug_key")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("mensagem", "Já existe uma skill com esse slug."));
+        }
         throw e;
     }
 

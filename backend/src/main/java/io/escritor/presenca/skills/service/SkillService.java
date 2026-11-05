@@ -24,6 +24,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +39,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class SkillService {
 
+    private static final Logger log = LoggerFactory.getLogger(SkillService.class);
+
+    static final String MOTIVO_SELO_REMOVIDO = "Selo oficial removido";
     static final int MAX_NOME = 120;
     static final String MOTIVO_SUBSTITUIDA = "Substituída pelo autor";
     static final String MENSAGEM_IMPORTACAO_INICIAL = "Importada do repositório";
@@ -100,6 +105,9 @@ public class SkillService {
     public SkillVersao aprovar(String slug, int numero, Usuario aprovador) {
         exigirGestor(aprovador, "aprovar propostas");
         Skill skill = buscar(slug);
+        if (!skill.isOficial()) {
+            throw new ConflitoSkillException("A skill não é mais oficial; não há proposta a aprovar");
+        }
         SkillVersao versao = buscarPropostaPendente(skill, numero);
         versao.aprovar(aprovador, agora());
         skill.definirVigente(versao);
@@ -128,6 +136,15 @@ public class SkillService {
             return;
         }
         skill.marcarOficial(oficial);
+        if (!oficial) {
+            // sem selo não há aprovação: uma proposta pendente ficaria órfã
+            versaoRepository.findFirstBySkillAndEstado(skill, EstadoVersao.PROPOSTA).ifPresent(pendente -> {
+                pendente.rejeitar(por, agora(), MOTIVO_SELO_REMOVIDO);
+                notificarAutor(pendente, por, TipoNotificacao.SKILL_REJEITADA,
+                        "Sua proposta na skill \"" + pendente.getNome() + "\" foi rejeitada: "
+                                + MOTIVO_SELO_REMOVIDO);
+            });
+        }
         eventoRepository.save(new SkillEvento(skill,
                 oficial ? TipoEventoSkill.OFICIALIZADA : TipoEventoSkill.OFICIAL_REMOVIDO, por, agora(), null));
     }
@@ -154,7 +171,7 @@ public class SkillService {
         if (dados == null) {
             throw new SkillInvalidaException("Informe os dados da skill");
         }
-        Skill existente = skillRepository.findBySlug(slug).orElse(null);
+        Skill existente = skillRepository.findComLockBySlug(slug).orElse(null);
         if (existente == null) {
             DadosVersao inicial = comMensagem(dados, MENSAGEM_IMPORTACAO_INICIAL);
             validar(slug, inicial);
@@ -164,7 +181,11 @@ public class SkillService {
             skillRepository.save(skill);
             return publicar(skill, inicial, null);
         }
-        if (!existente.isOficial() || Objects.equals(hash, existente.getHashImportado())) {
+        if (!existente.isOficial()) {
+            log.warn("Skill oficial '{}' não importada: já existe uma skill não oficial com esse slug", slug);
+            return existente.getVersaoVigente();
+        }
+        if (Objects.equals(hash, existente.getHashImportado())) {
             return existente.getVersaoVigente();
         }
         DadosVersao atualizacao = comMensagem(dados, MENSAGEM_IMPORTACAO_ATUALIZACAO);
@@ -244,7 +265,7 @@ public class SkillService {
     }
 
     private Skill buscar(String slug) {
-        return skillRepository.findBySlug(slug)
+        return skillRepository.findComLockBySlug(slug)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Skill não encontrada: " + slug));
     }
 
@@ -260,6 +281,11 @@ public class SkillService {
             throw new ConflitoSkillException("A versão " + numero + " não está mais pendente de decisão");
         }
         return versao;
+    }
+
+    /** Checagem de gestor para consultas restritas (fila de propostas), além do {@code @PreAuthorize}. */
+    public void exigirGestorParaPropostas(Usuario usuario) {
+        exigirGestor(usuario, "ver a fila de propostas");
     }
 
     private static void exigirGestor(Usuario usuario, String acao) {

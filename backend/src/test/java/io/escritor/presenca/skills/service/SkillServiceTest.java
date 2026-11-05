@@ -99,7 +99,7 @@ class SkillServiceTest {
         SkillVersao v1 = new SkillVersao(skill, 1, EstadoVersao.PUBLICADA, "Segurança", "d", CategoriaSkill.SEGURANCA,
                 "p", "t", "Primeira", ana, AGORA, List.of(new ArquivoSkill("SKILL.md", SKILL_MD)));
         skill.definirVigente(v1);
-        lenient().when(skillRepository.findBySlug(SLUG)).thenReturn(Optional.of(skill));
+        lenient().when(skillRepository.findComLockBySlug(SLUG)).thenReturn(Optional.of(skill));
         return skill;
     }
 
@@ -258,7 +258,7 @@ class SkillServiceTest {
 
     @Test
     void salvarSkillInexistenteLancaNaoEncontrado() {
-        when(skillRepository.findBySlug(SLUG)).thenReturn(Optional.empty());
+        when(skillRepository.findComLockBySlug(SLUG)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.salvar(SLUG, dados(), ana))
                 .isInstanceOf(RecursoNaoEncontradoException.class);
@@ -426,7 +426,7 @@ class SkillServiceTest {
 
     @Test
     void importarCriaOficialComAutorNuloEHash() {
-        when(skillRepository.findBySlug(SLUG)).thenReturn(Optional.empty());
+        when(skillRepository.findComLockBySlug(SLUG)).thenReturn(Optional.empty());
         when(versaoRepository.proximoNumero(any())).thenReturn(1);
 
         SkillVersao v = service.importar(SLUG, dados(), "h1");
@@ -494,5 +494,95 @@ class SkillServiceTest {
         assertThat(pendente.getEstado()).isEqualTo(EstadoVersao.PROPOSTA);
         assertThat(skill.getHashImportado()).isEqualTo("h1");
         verify(versaoRepository, never()).save(any());
+    }
+
+    // ---------- travamento da linha da skill / selo / fila ----------
+
+    @Test
+    void comandosTravamALinhaDaSkillEnuncaUsamALeituraSemLock() {
+        Skill skill = skillComVigente(false);
+        when(versaoRepository.findBySkillAndNumero(skill, 1)).thenReturn(Optional.of(skill.getVersaoVigente()));
+        gestoresAtivos();
+
+        service.salvar(SLUG, dados(), ana);
+        service.restaurar(SLUG, 1, ana);
+        service.definirArquivada(SLUG, true, gestor);
+        service.definirOficial(SLUG, true, gestor);
+        service.importar(SLUG, dados(), "h");
+
+        verify(skillRepository, never()).findBySlug(any());
+        verify(skillRepository, times(5)).findComLockBySlug(SLUG);
+    }
+
+    @Test
+    void aprovarTravaALinhaDaSkill() {
+        Skill skill = skillComVigente(true);
+        proposta(skill, ana, 2);
+
+        service.aprovar(SLUG, 2, gestor);
+
+        verify(skillRepository).findComLockBySlug(SLUG);
+        verify(skillRepository, never()).findBySlug(any());
+    }
+
+    @Test
+    void rejeitarTravaALinhaDaSkill() {
+        Skill skill = skillComVigente(true);
+        proposta(skill, ana, 2);
+
+        service.rejeitar(SLUG, 2, gestor, "não");
+
+        verify(skillRepository).findComLockBySlug(SLUG);
+        verify(skillRepository, never()).findBySlug(any());
+    }
+
+    @Test
+    void aprovarEmSkillNaoOficialLancaConflito() {
+        Skill skill = skillComVigente(false);
+        proposta(skill, ana, 2);
+
+        assertThatThrownBy(() -> service.aprovar(SLUG, 2, gestor)).isInstanceOf(ConflitoSkillException.class);
+        assertThat(skill.getVersaoVigente().getNumero()).isEqualTo(1);
+    }
+
+    @Test
+    void removerSeloRejeitaPropostaPendenteENotificaAutor() {
+        Skill skill = skillComVigente(true);
+        SkillVersao p = proposta(skill, ana, 2);
+
+        service.definirOficial(SLUG, false, gestor);
+
+        assertThat(p.getEstado()).isEqualTo(EstadoVersao.REJEITADA);
+        assertThat(p.getMotivoRejeicao()).isEqualTo("Selo oficial removido");
+        assertThat(p.getDecididaPor()).isSameAs(gestor);
+        verify(notificacaoService).registrar(ana, TipoNotificacao.SKILL_REJEITADA,
+                "Sua proposta na skill \"Segurança 2\" foi rejeitada: Selo oficial removido", null);
+    }
+
+    @Test
+    void importarSkillNaoOficialExistenteRegistraAviso() {
+        skillComVigente(false);
+        var appender = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        appender.start();
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(SkillService.class);
+        logger.addAppender(appender);
+        try {
+            service.importar(SLUG, dados(), "h");
+        } finally {
+            logger.detachAppender(appender);
+        }
+
+        assertThat(appender.list).anySatisfy(e -> {
+            assertThat(e.getLevel()).isEqualTo(ch.qos.logback.classic.Level.WARN);
+            assertThat(e.getFormattedMessage()).isEqualTo(
+                    "Skill oficial 'seguranca' não importada: já existe uma skill não oficial com esse slug");
+        });
+    }
+
+    @Test
+    void colaboradorNaoPodeVerFilaDePropostas() {
+        assertThatThrownBy(() -> service.exigirGestorParaPropostas(ana))
+                .isInstanceOf(AcaoSkillNaoPermitidaException.class);
+        service.exigirGestorParaPropostas(gestor);
     }
 }

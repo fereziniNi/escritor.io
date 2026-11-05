@@ -77,6 +77,18 @@ class SkillRepositoryIT {
     }
 
     @Test
+    void buscaComLockPorSlugDevolveASkillTravada() {
+        Usuario autor = usuario();
+        skillRepository.saveAndFlush(new Skill("com-lock", autor, Instant.now()));
+        em.clear();
+
+        Skill lida = skillRepository.findComLockBySlug("com-lock").orElseThrow();
+
+        assertThat(em.getLockMode(lida)).isEqualTo(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+        assertThat(skillRepository.findComLockBySlug("nao-existe")).isEmpty();
+    }
+
+    @Test
     void slugDuplicadoViolaUnicidade() {
         Usuario autor = usuario();
         skillRepository.saveAndFlush(new Skill("duplicada", autor, Instant.now()));

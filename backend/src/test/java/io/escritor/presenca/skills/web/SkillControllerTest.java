@@ -61,7 +61,7 @@ class SkillControllerTest {
 
     private static SkillVersaoResponse versao() {
         return new SkillVersaoResponse(1, EstadoVersao.PUBLICADA, "Minha skill", "d", CategoriaSkill.IA, "p", "t",
-                "primeira", "Ana", Instant.parse("2026-01-01T00:00:00Z"), null, null, null,
+                "primeira", 7L, "Ana", Instant.parse("2026-01-01T00:00:00Z"), null, null, null,
                 List.of(new ArquivoResponse("SKILL.md", "x")));
     }
 
@@ -145,7 +145,7 @@ class SkillControllerTest {
     @Test
     @WithMockUser(roles = "GESTOR")
     void propostasNaoECapturadaPorSlug() throws Exception {
-        when(fachada.propostas()).thenReturn(List.of(new PropostaResponse("minha-skill", "Minha skill", 3, "Ana",
+        when(fachada.propostas(any())).thenReturn(List.of(new PropostaResponse("minha-skill", "Minha skill", 3, "Ana",
                 Instant.parse("2026-01-01T00:00:00Z"), "msg")));
 
         mockMvc.perform(get("/skills/propostas"))
@@ -251,6 +251,17 @@ class SkillControllerTest {
         mockMvc.perform(post("/skills/minha-skill/versoes").contentType(MediaType.APPLICATION_JSON).content(CORPO))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.mensagem").value("Já existe uma proposta pendente para esta skill."));
+    }
+
+    @Test
+    @WithMockUser
+    void numeroDeVersaoDuplicadoNoBancoVira409() throws Exception {
+        when(fachada.salvar(any(), any(), any())).thenThrow(new DataIntegrityViolationException("x",
+                new RuntimeException("duplicate key value violates unique constraint \"uk_skill_versao_numero\"")));
+
+        mockMvc.perform(post("/skills/minha-skill/versoes").contentType(MediaType.APPLICATION_JSON).content(CORPO))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.mensagem").value("Outra alteração foi salva ao mesmo tempo. Tente de novo."));
     }
 
     @Test
