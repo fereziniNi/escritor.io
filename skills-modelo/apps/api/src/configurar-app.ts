@@ -4,6 +4,7 @@ import { type INestApplication } from '@nestjs/common';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { Logger } from 'nestjs-pino';
 import { type Config } from './config/config';
+import { aplicarSeguranca } from './seguranca/seguranca.module';
 
 export const PREFIXO_API = 'api';
 
@@ -39,6 +40,8 @@ function servirSpa(app: INestApplication, pasta: string): void {
 /** Configuração comum à aplicação real (main.ts) e aos testes e2e. */
 export function configurarApp(app: INestApplication, config: Config): INestApplication {
   app.useLogger(app.get(Logger));
+  // Antes do SPA e das rotas: sem X-Powered-By, proxies confiáveis, cabeçalhos e CORS valem para toda resposta.
+  aplicarSeguranca(app, config);
   app.setGlobalPrefix(PREFIXO_API);
   if (config.WEB_DIST) servirSpa(app, path.resolve(config.WEB_DIST));
   app.enableShutdownHooks();

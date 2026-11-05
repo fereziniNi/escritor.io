@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/web/vite.config.ts
+// origem: skills-modelo/estagios/novo-projeto-multiplica/apps/web/vite.config.ts
 import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';

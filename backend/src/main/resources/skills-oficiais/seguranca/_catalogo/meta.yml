@@ -1,0 +1,3 @@
+nome: Segurança
+descricao: Aplica a linha de base de segurança Multiplica (cabeçalhos e CSP, CORS por lista, proteção contra CSRF, limite de requisições, proxy confiável, CI com gitleaks, pnpm audit, CodeQL e Dependabot) e o checklist de pentest a qualquer sistema novo.
+categoria: SEGURANCA

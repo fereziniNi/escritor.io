@@ -4,7 +4,10 @@ import { Segredo, lerSegredo } from './segredo';
 /** Só caracteres de tag/sha (letras, números, . _ + -): um valor estranho no ambiente não vai para o /api/health. */
 const IDENTIFICADOR_DE_BUILD = /^[A-Za-z0-9._+-]{1,64}$/;
 
-const obrigatoria = { error: (issue: { input: unknown }) => (issue.input === undefined ? 'obrigatória' : 'valor inválido') };
+/** Origem web: esquema + host (+ porta), sem caminho nem curinga. */
+const ORIGEM = /^https?:\/\/[A-Za-z0-9.-]+(:\d{1,5})?$/;
+
+const obrigatoria ={ error: (issue: { input: unknown }) => (issue.input === undefined ? 'obrigatória' : 'valor inválido') };
 
 /**
  * Schema de TODAS as variáveis de ambiente da API. Regras:
@@ -26,6 +29,19 @@ export const esquemaConfig = z.object({
   APP_COMMIT: z.string().regex(IDENTIFICADOR_DE_BUILD, 'só letras, números e . _ + -').default('desconhecido'),
   /** Pasta do build da web (apps/web/dist). Definida: a API serve o SPA. Vazia: só a API (dev usa o Vite). */
   WEB_DIST: z.string().min(1).optional(),
+  /**
+   * Segurança (src/seguranca/). CORS_ORIGENS: origens de OUTROS sites que podem chamar a API com cookie, separadas por
+   * vírgula (`https://painel.exemplo.com.br`). Vazia (padrão): CORS desligado, front e API no mesmo endereço.
+   */
+  CORS_ORIGENS: z
+    .string()
+    .default('')
+    .transform((v) => v.split(',').map((o) => o.trim()).filter(Boolean))
+    .pipe(z.array(z.string().regex(ORIGEM, 'cada item deve ser uma origem sem caminho, ex.: https://painel.exemplo.com.br'))),
+  /** Requisições por minuto por IP em /api (janela fixa, por instância). Acima disso: 429 com Retry-After. */
+  LIMITE_REQ_POR_IP: z.coerce.number().int().min(1).default(300),
+  /** Quantos proxies confiáveis estão na frente da API (Caddy = 1). Define o IP real, o https e o host vistos. */
+  PROXIES_CONFIAVEIS: z.coerce.number().int().min(0).max(10).default(0),
 });
 
 export type Config = Readonly<z.infer<typeof esquemaConfig>>;

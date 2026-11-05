@@ -1,0 +1,30 @@
+# origem: skills-modelo/deploy/caddy/seguranca.caddy
+# Cabeçalhos de segurança e CSP do SPA, para o Caddy na frente da API.
+# Uso no Caddyfile (skill instalacao-docker-compose):
+#   import seguranca.caddy        <- no topo do arquivo (define o snippet)
+#   sistema.exemplo.com.br {
+#       import seguranca          <- dentro do site
+#       reverse_proxy api:3000
+#   }
+# A API manda os mesmos cabeçalhos (apps/api/src/seguranca/cabecalhos.middleware.ts); aqui eles valem também para
+# o que o Caddy responde sozinho (erro 502, redirecionamento). A CSP usa "?": só entra se a resposta ainda não tiver
+# uma, então a /api mantém a CSP "default-src 'none'" da API e as telas do SPA recebem esta.
+# Fontes são auto-hospedadas (@fontsource), por isso font-src 'self'; script só de arquivo do próprio sistema (nada
+# de script inline nem CDN); style 'unsafe-inline' por causa dos atributos style do React/Radix.
+(seguranca) {
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "same-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		# Navegador só respeita por HTTPS (por HTTP é ignorado); 1 ano.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		?Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
+		# Não anuncia servidor nem framework.
+		-Server
+		-X-Powered-By
+		-Via
+	}
+}

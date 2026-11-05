@@ -1,0 +1,80 @@
+# origem: skills-modelo/.github/workflows/ci.yml
+# CI padrão Multiplica (skill seguranca). Qualquer job com falha bloqueia o merge:
+# - qualidade: lint, typecheck, testes (Postgres real via Testcontainers; o runner já tem Docker) e build;
+# - segredos: gitleaks no histórico inteiro;
+# - dependencias: vulnerabilidade alta/crítica em dependência de produção;
+# - codeql: análise estática de segurança do TypeScript.
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualidade:
+    name: lint · typecheck · testes · build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+      # Versão do pnpm vem do "packageManager" do package.json raiz.
+      - uses: pnpm/action-setup@v6.1.0
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+  segredos:
+    name: gitleaks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      # Binário oficial em container (a gitleaks-action pede licença paga em repositório de organização).
+      # Achou segredo: troque a credencial (ela vazou) e só depois limpe o código; falso positivo vai para .gitleaksignore.
+      - name: gitleaks (histórico inteiro)
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.28.0 git /repo --redact --no-banner --verbose
+
+  dependencias:
+    name: pnpm audit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Alta/crítica em dependência de produção (o que vai para a imagem) bloqueia.
+      - run: pnpm audit --prod --audit-level high
+      # As de desenvolvimento ficam no relatório, sem bloquear (não entram em produção).
+      - run: pnpm audit --audit-level high || true
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - uses: github/codeql-action/analyze@v4

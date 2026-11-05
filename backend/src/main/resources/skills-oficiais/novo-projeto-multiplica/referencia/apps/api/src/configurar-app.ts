@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/src/configurar-app.ts
+// origem: skills-modelo/estagios/novo-projeto-multiplica/apps/api/src/configurar-app.ts
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { type INestApplication } from '@nestjs/common';

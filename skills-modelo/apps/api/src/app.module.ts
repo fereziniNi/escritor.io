@@ -7,6 +7,7 @@ import { ConfigModule } from './config/config.module';
 import { FiltroErros } from './http/filtro-erros';
 import { LogModule } from './log/log.module';
 import { SaudeModule } from './saude/saude.module';
+import { SegurancaModule } from './seguranca/seguranca.module';
 
 export interface OpcoesApp {
   /** Destino dos logs (testes); padrão: stdout. */
@@ -19,7 +20,14 @@ export class AppModule {
   static registrar(config: Config, opcoes: OpcoesApp = {}): DynamicModule {
     return {
       module: AppModule,
-      imports: [ConfigModule.registrar(config), LogModule.registrar(config, opcoes.destinoLog), BancoModule.registrar(config), SaudeModule],
+      // SegurancaModule logo depois do LogModule: limite e checagem de origem já com request-id e log.
+      imports: [
+        ConfigModule.registrar(config),
+        LogModule.registrar(config, opcoes.destinoLog),
+        SegurancaModule,
+        BancoModule.registrar(config),
+        SaudeModule,
+      ],
       // Erros sempre em JSON padrão ({ status, erro, requestId }), inclusive o 404 de /api/* desconhecido.
       providers: [{ provide: APP_FILTER, useClass: FiltroErros }],
     };
