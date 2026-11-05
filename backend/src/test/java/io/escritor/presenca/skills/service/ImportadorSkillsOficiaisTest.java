@@ -165,4 +165,18 @@ class ImportadorSkillsOficiaisTest {
         }
         return destino;
     }
+
+    @Test
+    void extraiCaminhoRelativoDeUrlJarNestedDoFatJar() {
+        var importador = new ImportadorSkillsOficiais("skills-oficiais", true, skillService);
+        String prefixo = "jar:nested:/app/presenca.jar/!BOOT-INF/classes/!/skills-oficiais/";
+
+        assertThat(importador.relativo(prefixo + "minha-skill/ref%20erencia/a.ts", java.util.List.of(prefixo)))
+                .isEqualTo("minha-skill/ref erencia/a.ts");
+        // sem o prefixo conhecido, cai na marca "/skills-oficiais/"
+        assertThat(importador.relativo(prefixo + "minha-skill/SKILL.md", java.util.List.of()))
+                .isEqualTo("minha-skill/SKILL.md");
+        assertThat(importador.relativo("jar:nested:/app/presenca.jar/!BOOT-INF/lib/outra.jar!/skills-oficiais/x/SKILL.md",
+                java.util.List.of())).isEqualTo("x/SKILL.md");
+    }
 }

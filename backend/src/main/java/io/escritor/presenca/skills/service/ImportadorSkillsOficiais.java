@@ -221,7 +221,8 @@ public class ImportadorSkillsOficiais {
         return t.replace("\r\n", "\n").replace('\r', '\n');
     }
 
-    private String relativo(String url, List<String> prefixos) {
+    /** Caminho relativo à raiz das skills; funciona com {@code file:}, {@code jar:file:} e {@code jar:nested:}. */
+    String relativo(String url, List<String> prefixos) {
         String achado = null;
         for (String p : prefixos) {
             if (url.startsWith(p)) {
