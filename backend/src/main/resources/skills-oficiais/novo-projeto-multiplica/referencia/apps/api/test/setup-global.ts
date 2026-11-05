@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/test/setup-global.ts
+// origem: skills-modelo/estagios/novo-projeto-multiplica/apps/api/test/setup-global.ts
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { type TestProject } from 'vitest/node';
 

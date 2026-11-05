@@ -1,10 +1,12 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { and, count, eq, sql } from 'drizzle-orm';
+import { AuditoriaService } from '../auditoria/auditoria.service';
 import { BANCO, type Db } from '../banco/banco';
 import { usuario } from '../banco/esquema';
 import { type Config } from '../config/config';
 import { CONFIG } from '../config/config.module';
 import { mascararEmail } from '../email/enviador-email';
+import { mascararEmail as mascararEmailAuditoria } from '../auditoria/sanitizar';
 
 /** Número fixo da trava de aconselhamento do Postgres: duas instâncias subindo juntas não criam o admin duas vezes. */
 const TRAVA_ADMIN_INICIAL = 727_001;
@@ -21,6 +23,7 @@ export class AdminInicial implements OnApplicationBootstrap {
   constructor(
     @Inject(BANCO) private readonly db: Db,
     @Inject(CONFIG) private readonly config: Config,
+    private readonly auditoria: AuditoriaService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -33,9 +36,15 @@ export class AdminInicial implements OnApplicationBootstrap {
         .from(usuario)
         .where(and(eq(usuario.papel, 'ADMIN'), eq(usuario.ativo, true)));
       if ((contagem?.total ?? 0) > 0) return false;
-      await tx.execute(sql`
+      const gravado = await tx.execute<{ id: string }>(sql`
         insert into usuario (email, nome, papel, ativo) values (${email}, 'Administrador', 'ADMIN', true)
-        on conflict (lower(email)) do update set papel = 'ADMIN', ativo = true`);
+        on conflict (lower(email)) do update set papel = 'ADMIN', ativo = true
+        returning id`);
+      // Sem ator (é o sistema, na subida): quem concedeu o primeiro acesso de ADMIN fica na trilha, na mesma transação.
+      await this.auditoria.registrar(
+        { acao: 'usuario.admin_inicial', alvoTipo: 'usuario', alvoId: gravado.rows[0]!.id, depois: { email: mascararEmailAuditoria(email), papel: 'ADMIN', ativo: true } },
+        tx,
+      );
       return true;
     });
     if (criado) this.logger.log(`administrador inicial criado: ${mascararEmail(email)}`);

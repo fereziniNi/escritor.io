@@ -38,7 +38,7 @@ Rodar local: `docker compose up -d postgres`, `cp .env.example .env`, `pnpm --fi
 Dois papéis de banco (skill `trilha-auditoria`): `DATABASE_URL` é o **dono** (só migrações) e `DATABASE_URL_RUNTIME` o papel `app_runtime`
 (o que a API usa; sem UPDATE/DELETE na trilha de auditoria). Em dev, depois de migrar:
 `docker compose exec postgres psql -U app -d app -c "ALTER ROLE app_runtime LOGIN PASSWORD 'app_runtime'"` e descomente
-`DATABASE_URL_RUNTIME` no `.env`. Sem a variável a API usa o dono (ok em dev; o gatilho do banco continua protegendo a trilha).
+`DATABASE_URL_RUNTIME` no `.env`. Sem a variável a API só sobe com `NODE_ENV=development` ou `test` (usa o dono; o gatilho continua protegendo a trilha); em produção ela é obrigatória.
 
 ## Regra das referências
 

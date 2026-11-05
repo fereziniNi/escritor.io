@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { type ConsultaAuditoria, type EventoAuditoria, FORMATO_ACAO, type PaginaAuditoria, esquemaPaginaAuditoria } from 'contratos';
 import { and, desc, eq, gte, lt, lte } from 'drizzle-orm';
 import { BANCO, type Db } from '../banco/banco';
@@ -7,6 +7,7 @@ import { type Config } from '../config/config';
 import { CONFIG } from '../config/config.module';
 import { exigirPapel, type UsuarioAtual } from '../usuarios/usuario-atual';
 import { contextoDaRequisicao } from './contexto-requisicao';
+import { exigirPapelRuntime } from './papel-runtime';
 import { montarCsv } from './csv';
 import { sanitizarDetalhes } from './sanitizar';
 
@@ -54,18 +55,12 @@ function emBrasilia(d: Date): Record<string, string> {
  */
 @Injectable()
 export class AuditoriaService {
-  private readonly logger = new Logger('Auditoria');
-
   constructor(
     @Inject(BANCO) private readonly db: Db,
     @Inject(CONFIG) config: Config,
   ) {
-    if (config.NODE_ENV === 'production' && config.DATABASE_URL_RUNTIME === undefined) {
-      this.logger.warn(
-        'DATABASE_URL_RUNTIME não definida: a API está usando o mesmo usuário do banco que roda as migrações, e a auditoria só ' +
-          'está protegida pelo gatilho. Defina o papel de runtime (app_runtime) em produção.',
-      );
-    }
+    // Fora de desenvolvimento sem o papel de runtime lança: a API não sobe (ver papel-runtime.ts).
+    exigirPapelRuntime(config);
   }
 
   /**

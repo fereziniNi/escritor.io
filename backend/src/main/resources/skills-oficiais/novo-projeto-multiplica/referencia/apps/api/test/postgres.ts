@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/test/postgres.ts
+// origem: skills-modelo/estagios/novo-projeto-multiplica/apps/api/test/postgres.ts
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { inject } from 'vitest';

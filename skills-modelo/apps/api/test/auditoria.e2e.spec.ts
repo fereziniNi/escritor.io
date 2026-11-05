@@ -16,7 +16,6 @@ import { comoUsuario, exporUsuarioDeTeste } from './usuario-de-teste';
 
 const PAINEL = 'https://painel.exemplo.com.br';
 const SEGREDO = 'segredo-do-codigo-de-teste-com-mais-de-32-caracteres';
-const SENHA_RUNTIME = 'senha-runtime-de-teste';
 
 let urlDono: string;
 let urlRuntime: string;
@@ -60,14 +59,9 @@ async function semear(linhas: { atorId: string | null; acao: string; quando: str
 }
 
 beforeAll(async () => {
-  ({ url: urlDono, parar } = await subirPostgres());
+  ({ url: urlDono, urlRuntime, parar } = await subirPostgres());
   dono = new Pool({ connectionString: urlDono, max: 2 });
-  // A migração cria app_runtime sem login; quem instala define a senha (aqui, o teste faz o papel do instalador).
-  await dono.query(`ALTER ROLE app_runtime LOGIN PASSWORD '${SENHA_RUNTIME}'`);
-  const u = new URL(urlDono);
-  u.username = 'app_runtime';
-  u.password = SENHA_RUNTIME;
-  urlRuntime = u.toString();
+  // O papel app_runtime ganha login uma vez por servidor em test/setup-global.ts; as migrações dão os privilégios.
   runtime = new Pool({ connectionString: urlRuntime, max: 2 });
 
   const config = carregarConfig({
@@ -238,6 +232,34 @@ describe('ações de administração de usuários ficam na trilha com antes e de
     const desativar = await total('usuario.desativar');
     await request(app.getHttpServer()).post(`/api/usuarios/${admin.id}/desativar`).set(h).expect(409);
     expect(await total('usuario.desativar')).toBe(desativar);
+  });
+});
+
+describe('o administrador inicial também fica na trilha', () => {
+  it('cria o ADMIN, grava usuario.admin_inicial sem ator (e-mail mascarado) e não repete ao reiniciar', async () => {
+    const banco = await subirPostgres();
+    const sonda = new Pool({ connectionString: banco.url, max: 1 });
+    const config = carregarConfig({
+      DATABASE_URL: banco.url,
+      DATABASE_URL_RUNTIME: banco.urlRuntime,
+      NODE_ENV: 'test',
+      LOG_LEVEL: 'silent',
+      ADMIN_INICIAL_EMAIL: 'primeira@exemplo.com.br',
+    });
+    try {
+      for (let i = 0; i < 2; i++) {
+        const a = await criarApp(config);
+        await a.init();
+        await a.close();
+      }
+      const eventos = (await sonda.query("select * from evento_auditoria where acao = 'usuario.admin_inicial'")).rows as Record<string, unknown>[];
+      expect(eventos).toHaveLength(1);
+      const [u] = (await sonda.query("select id from usuario where email = 'primeira@exemplo.com.br'")).rows as { id: string }[];
+      expect(eventos[0]).toMatchObject({ ator_id: null, alvo_tipo: 'usuario', alvo_id: u!.id, antes: null, depois: { email: 'p***@exemplo.com.br', papel: 'ADMIN', ativo: true } });
+    } finally {
+      await sonda.end();
+      await banco.parar();
+    }
   });
 });
 

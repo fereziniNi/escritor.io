@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/src/usuarios/admin-inicial.ts
+// origem: skills-modelo/estagios/usuarios-e-papeis/apps/api/src/usuarios/admin-inicial.ts
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { and, count, eq, sql } from 'drizzle-orm';
 import { BANCO, type Db } from '../banco/banco';

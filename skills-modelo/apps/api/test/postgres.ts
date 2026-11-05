@@ -6,6 +6,8 @@ import { migrarBanco } from '../src/banco/migrar';
 export interface PostgresDeTeste {
   /** URL do banco novo, já com as migrações aplicadas. */
   url: string;
+  /** Mesma base, conectando como o papel de runtime app_runtime (sem poder de dono; skill trilha-auditoria). */
+  urlRuntime: string;
   /** Apaga o banco (chame no afterAll). */
   parar: () => Promise<void>;
 }
@@ -30,8 +32,12 @@ export async function subirPostgres(): Promise<PostgresDeTeste> {
   const url = new URL(urlAdmin);
   url.pathname = `/${nome}`;
   await migrarBanco(url.toString());
+  const runtime = new URL(url.toString());
+  runtime.username = 'app_runtime';
+  runtime.password = 'runtime-de-teste';
   return {
     url: url.toString(),
+    urlRuntime: runtime.toString(),
     parar: () => executar(urlAdmin, `DROP DATABASE IF EXISTS ${nome} WITH (FORCE)`),
   };
 }

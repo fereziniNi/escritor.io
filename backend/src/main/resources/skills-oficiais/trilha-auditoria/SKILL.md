@@ -30,8 +30,10 @@ abaixo é fixo**; mudar um deles é decisão registrada no `CLAUDE.md`.
    (`INSERT` e `SELECT` só). Motivo: o dono ignora `REVOKE` contra si mesmo, então o `REVOKE` só vale para um papel que
    não é dono (ADR 0009). A migração cria `app_runtime` **sem login e sem senha** se ele não existir, dá os privilégios
    (`GRANT` nas tabelas e sequências existentes e `ALTER DEFAULT PRIVILEGES` para as futuras) e quem instala define a senha
-   uma vez. `BancoModule` usa `DATABASE_URL_RUNTIME ?? DATABASE_URL`: sem a variável a API roda como o dono (aceito **só em
-   desenvolvimento**, onde o gatilho segue protegendo); em produção sem ela o `AuditoriaService` **avisa no log** a cada subida.
+   uma vez. `BancoModule` usa `DATABASE_URL_RUNTIME ?? DATABASE_URL`. **Falha fechada** (como o `AUTH_SEGREDO_CODIGO` do login): só com
+   `NODE_ENV=development` ou `test` **declarados** a API pode rodar sem `DATABASE_URL_RUNTIME` (como o dono, com o gatilho protegendo);
+   em produção, com `NODE_ENV` ausente ou vazio, **a API não sobe** (`exigirPapelRuntime`, chamado no `AuditoriaService`). E
+   `DATABASE_URL_RUNTIME` com o **mesmo usuário** de `DATABASE_URL` é recusada já no `carregarConfig` (o REVOKE não valeria).
    O gatilho continua sendo a segunda camada, não um substituto: o dono pode `ALTER TABLE ... DISABLE TRIGGER`, por isso o
    dono nunca atende requisição.
 5. **Gravar só por `AuditoriaService.registrar(evento, executor?)`**, a única porta de escrita (não existe método nem rota para
@@ -50,7 +52,8 @@ abaixo é fixo**; mudar um deles é decisão registrada no `CLAUDE.md`.
    `login-codigo-email` (`auth.login`, `auth.logout`, `auth.falha_login`, `auth.codigo_bloqueado`, `auth.limite_codigo`; o
    `AuthModule` troca o `RegistroEventosNulo` pelo `RegistroEventosAuditoria`); administração de usuários da skill
    `usuarios-e-papeis` (`usuario.convidar`, `usuario.alterar_papel`, `usuario.desativar`, `usuario.reativar`, com
-   `antes`/`depois` de `{ papel, ativo }`; no convite `antes` é nulo e `depois` leva e-mail mascarado, papel e ativo);
+   `antes`/`depois` de `{ papel, ativo }`; no convite `antes` é nulo e `depois` leva e-mail mascarado, papel e ativo; mais
+   `usuario.admin_inicial`, sem ator, quando a API cria o primeiro ADMIN por `ADMIN_INICIAL_EMAIL`);
    a exportação da própria trilha (`auditoria.exportar`).
 9. **Leitura** `GET /api/admin/auditoria`, **só ADMIN** (`@Papeis('ADMIN')` na rota **e** `exigirPapel` no serviço; sem sessão
    401, GESTOR/USUARIO 403). Filtros: `de` e `ate` (instantes ISO **com fuso**, inclusivos), `atorId` (uuid), `acao`
@@ -66,11 +69,14 @@ abaixo é fixo**; mudar um deles é decisão registrada no `CLAUDE.md`.
 11. **Tela** `TelaAuditoria` (`/admin/auditoria`, menu Admin "Auditoria"): filtros De, Até, Ator (lista de usuários), Ação (com
     sugestões) e botões Filtrar/Limpar; tabela com data e hora de Brasília, ator, ação, alvo, IP e "Detalhes" (antes, depois,
     request-id); "Carregar mais"; botão **Exportar CSV** (usa os filtros aplicados). Somente leitura: sem botão de editar ou apagar.
-12. **Retenção**: a trilha não tem "apagar". Se a política (ex.: LGPD, prazo de guarda) exigir expurgo, é decisão registrada no
-    `CLAUDE.md`, feita por **migração do dono** que desabilita o gatilho só durante o expurgo e o reabilita na mesma migração, nunca pela API.
+12. **Retenção e expurgo (LGPD)**: a trilha não tem "apagar", nem pela API nem pelo `app_runtime` (sem `DELETE`). Se a política de
+    guarda exigir expurgo ou anonimização, é decisão registrada no `CLAUDE.md` e feita **fora da API**, por uma **migração do dono** (ou
+    por um papel de manutenção separado, usado só nessa janela e nunca em `DATABASE_URL_RUNTIME`) que no mesmo script desabilita o
+    gatilho (`ALTER TABLE evento_auditoria DISABLE TRIGGER evento_auditoria_sem_alteracao`), apaga ou anonimiza só o que a política
+    manda (ex.: `ip` e e-mails mascarados com mais de N anos), registra o expurgo como um evento `auditoria.expurgo` e reabilita o
+    gatilho. A skill `lgpd` detalha o procedimento; até lá, ninguém expurga.
 13. **Riscos que sobram (aceitos)**: quem é superusuário do Postgres (ou o dono) ainda consegue burlar o gatilho e `DROP TABLE`;
-    o `IP` é dado pessoal e fica guardado em claro; a criação do primeiro administrador (`ADMIN_INICIAL_EMAIL`, subida da
-    API) não gera evento; ações feitas direto no banco não passam por aqui. Para a trilha valer contra o dono, a cópia
+    o `IP` é dado pessoal e fica guardado em claro; ações feitas direto no banco não passam por aqui. Para a trilha valer contra o dono, a cópia
     externa (backup/exportação periódica guardada fora do servidor) é decisão do projeto.
 
 ## Como aplicar
@@ -83,7 +89,7 @@ Ao copiar um arquivo de `referencia/`, mantenha o mesmo caminho relativo e **apa
 
 1. TDD, API — copie **primeiro** os testes: `apps/api/src/auditoria/sanitizar.spec.ts`, `csv.spec.ts`, `config-auditoria.spec.ts`,
    `apps/api/test/auditoria.e2e.spec.ts` e `packages/contratos/src/auditoria.spec.ts`. Rode `pnpm test`: tem de falhar (módulos
-   inexistentes). O e2e usa `test/postgres.ts` (`novo-projeto-multiplica`) e `test/usuario-de-teste.ts` (`usuarios-e-papeis`).
+   inexistentes). O e2e usa `test/postgres.ts`, que agora devolve também `urlRuntime` (e `test/setup-global.ts`, que dá login ao `app_runtime` uma vez por servidor de teste) — substitua os dois pelos da referência — e `test/usuario-de-teste.ts` (`usuarios-e-papeis`). Todo teste que sobe a API com `NODE_ENV=production` (ou sem `NODE_ENV`) passa `DATABASE_URL_RUNTIME: urlRuntime` (ex.: `test/auth.e2e.spec.ts`).
 2. Contratos: copie `packages/contratos/src/auditoria.ts`; no `index.ts` acrescente `export * from './auditoria.js';` no fim.
 3. Código da API: copie `apps/api/src/auditoria/` inteiro (`sanitizar.ts`, `csv.ts`, `evento-auditoria.tabela.ts`,
    `contexto-requisicao.ts`, `auditoria.service.ts`, `auditoria.controller.ts`, `registro-eventos-auditoria.ts`, `auditoria.module.ts`).
@@ -96,6 +102,7 @@ Ao copiar um arquivo de `referencia/`, mantenha o mesmo caminho relativo e **apa
    - `apps/api/src/auth/auth.module.ts`: `{ provide: REGISTRO_EVENTOS, useExisting: RegistroEventosAuditoria }` no lugar do `RegistroEventosNulo`.
    - `apps/api/src/usuarios/usuarios.service.ts`: injeta `AuditoriaService`; `convidar` e `mudar` gravam o evento **dentro da transação**
      (`convidar` agora abre uma; `mudar` recebe `ator` e a `acao`).
+   - `apps/api/src/usuarios/admin-inicial.ts`: injeta `AuditoriaService` e grava `usuario.admin_inicial` na transação.
    - `.env.example` e `deploy/.env.example`: o bloco "Trilha de auditoria" do fim.
 5. Migrações: `pnpm --filter api exec drizzle-kit generate --name=evento_auditoria` (cria a tabela e os 4 índices; confira e não edite). Depois a
    migração à mão, como manda `referencia/migracao-imutabilidade-auditoria.md` (`drizzle-kit generate --custom
@@ -139,6 +146,7 @@ Tudo que um arquivo de `referencia/` importa está em `referencia/` ou nas skill
 
 - `referencia/apps/api/src/auditoria/auditoria.service.ts` — `registrar`, `listar`, `exportarCsv` (regras 5, 6, 9, 10); passo 3 e para entender o desenho.
 - `referencia/apps/api/src/auditoria/evento-auditoria.tabela.ts` — a tabela e os índices (regra 1); passos 3 e 5.
+- `referencia/apps/api/src/auditoria/papel-runtime.ts` — `exigirPapelRuntime`, a falha fechada (regra 4); passo 3.
 - `referencia/apps/api/src/auditoria/contexto-requisicao.ts` — IP e request-id da requisição (regra 5); passo 3.
 - `referencia/apps/api/src/auditoria/sanitizar.ts` — `sanitizarDetalhes` e `mascararEmail` (regra 7); passo 3 e em toda ação nova.
 - `referencia/apps/api/src/auditoria/csv.ts` — CSV com BOM, `;` e proteção de fórmula (regra 10); passo 3.
@@ -147,7 +155,7 @@ Tudo que um arquivo de `referencia/` importa está em `referencia/` ou nas skill
 - `referencia/apps/api/src/auditoria/sanitizar.spec.ts`, `csv.spec.ts`, `config-auditoria.spec.ts`, `referencia/apps/api/test/auditoria.e2e.spec.ts`,
   `referencia/packages/contratos/src/auditoria.spec.ts` — todos os comportamentos acima contra Postgres real, com os dois papéis; passo 1.
 - `referencia/migracao-imutabilidade-auditoria.md` — gatilho, papel `app_runtime`, privilégios e como dar login a ele (regras 3 e 4); passo 5.
-- `referencia/apps/api/src/banco/esquema.ts`, `banco/banco.module.ts`, `config/config.ts`, `app.module.ts`, `auth/auth.module.ts`,
+- `referencia/apps/api/test/postgres.ts`, `test/setup-global.ts`, `test/auth.e2e.spec.ts`, `referencia/apps/api/src/banco/esquema.ts`, `banco/banco.module.ts`, `usuarios/admin-inicial.ts`, `config/config.ts`, `app.module.ts`, `auth/auth.module.ts`,
   `usuarios/usuarios.service.ts`, `referencia/.env.example`, `referencia/deploy/.env.example` — os arquivos de skills anteriores alterados; passo 4.
 - `referencia/packages/contratos/src/auditoria.ts`, `index.ts` — esquemas do evento, da página e dos filtros; passo 2.
 - `referencia/apps/web/src/lib/auditoria-api.ts`, `telas/TelaAuditoria.tsx`, `telas/TelaAuditoria.test.tsx`, `App.tsx` — a tela (regra 11); passo 6.
@@ -158,7 +166,7 @@ Tudo que um arquivo de `referencia/` importa está em `referencia/` ou nas skill
 - [ ] A migração cria `evento_auditoria` com os 4 índices, o gatilho (UPDATE/DELETE/TRUNCATE) e o papel `app_runtime`.
 - [ ] Como `app_runtime`: `UPDATE`, `DELETE` e `TRUNCATE` na trilha dão `permission denied`; `INSERT` e `SELECT` funcionam; as outras tabelas continuam graváveis.
 - [ ] Como dono: `UPDATE`, `DELETE` e `TRUNCATE` na trilha dão "evento_auditoria é imutável".
-- [ ] A API conecta como `app_runtime` (`select current_user`); `DATABASE_URL_RUNTIME` definida em produção (sem ela o log avisa).
+- [ ] A API conecta como `app_runtime` (`select current_user`); `DATABASE_URL_RUNTIME` definida em produção (sem ela, ou com o mesmo usuário do dono, a API não sobe).
 - [ ] O serviço de migração usa o dono e a API só recebe a senha do runtime.
 - [ ] `registrar` grava `request_id` (o mesmo do cabeçalho `X-Request-Id`), `ip` e `ator_id`; `registrar` na transação some junto com a mudança desfeita.
 - [ ] Login, logout e falha de login geram evento; convidar, trocar papel, desativar e reativar geram evento com `antes` e `depois`.

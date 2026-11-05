@@ -31,10 +31,10 @@ quem administra o sistema. Senhas, códigos de acesso e e-mails completos nunca 
 
 | Nome | Obrigatória | Exemplo | Para que serve |
 |---|---|---|---|
-| `DATABASE_URL_RUNTIME` ou `DATABASE_URL_RUNTIME_ARQUIVO` | **sim em produção** (sem ela a API sobe, mas avisa no log a cada início); em desenvolvimento pode faltar | `DATABASE_URL_RUNTIME_ARQUIVO=/run/secrets/database_url_runtime` | endereço do banco com o usuário `app_runtime`, que **não pode** alterar nem apagar a auditoria. É o que a API usa. Tem senha: em produção, só em arquivo de segredo, nunca no git nem no chat |
+| `DATABASE_URL_RUNTIME` ou `DATABASE_URL_RUNTIME_ARQUIVO` | **sim em produção: sem ela a API não sobe**; em desenvolvimento (`NODE_ENV=development`) pode faltar | `DATABASE_URL_RUNTIME_ARQUIVO=/run/secrets/database_url_runtime` | endereço do banco com o usuário `app_runtime`, que **não pode** alterar nem apagar a auditoria. É o que a API usa. Tem senha: em produção, só em arquivo de segredo, nunca no git nem no chat |
 | `DATABASE_URL` | sim (já existia) | `postgres://app:...@postgres:5432/app` | passa a ser o usuário **dono** do banco, usado só pelo serviço de migração (cria tabelas); a API em produção não precisa mais dele |
 
-O usuário `app_runtime` é criado pela migração **sem senha e sem login**. Quem instala dá o login uma vez (veja "Como verificar").
+O usuário dela tem de ser **diferente** do de `DATABASE_URL` (senão a API também não sobe). O usuário `app_runtime` é criado pela migração **sem senha e sem login**. Quem instala dá o login uma vez (veja "Como verificar").
 Em desenvolvimento, a senha pode ser de brinquedo (`app_runtime`). Em produção gere uma forte: `openssl rand -hex 24` (bash) ou, no
 PowerShell, `$b = New-Object byte[] 24; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); ($b | ForEach-Object { $_.ToString('x2') }) -join ''`
 (nunca `Get-Random`).
@@ -83,8 +83,8 @@ Nenhum pacote novo. Cria uma tabela (`evento_auditoria`), um gatilho e o papel d
 - **`role "app_runtime" does not exist`** ao conectar: a migração ainda não rodou (`pnpm --filter api db:migrate`).
 - **A migração falha com `permission denied to create role`**: o usuário dono do banco não pode criar papéis. Peça à TI para criar o
   papel antes (`CREATE ROLE app_runtime NOLOGIN`) e rode a migração de novo.
-- **Na API em produção o log diz "DATABASE_URL_RUNTIME não definida"**: a API está usando o usuário dono. Defina a variável (tabela
-  acima): sem isso a auditoria só fica protegida pelo gatilho do banco.
+- **A API não sobe e o erro cita `DATABASE_URL_RUNTIME`**: em produção (ou com `NODE_ENV` ausente) ela é obrigatória, e o usuário
+  tem de ser o `app_runtime`, não o dono. Defina a variável (tabela acima). Em desenvolvimento, falta `NODE_ENV=development` no `.env`.
 - **A tela de Auditoria dá 403**: só administradores (papel ADMIN) enxergam. Peça a um administrador para mudar seu papel em **Usuários**.
 - **O CSV abre com acentos quebrados ou numa coluna só**: abra pelo Excel normal (não importe como texto); o arquivo já vem com
   marca UTF-8 e separador `;`. Se o Excel estiver configurado com outro separador, use Dados → De Texto/CSV e escolha ponto e vírgula.

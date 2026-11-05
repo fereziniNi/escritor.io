@@ -32,6 +32,7 @@ const PRODUCAO: Record<string, string> = {
 };
 
 let urlBanco: string;
+let urlRuntime: string;
 let parar: () => Promise<void>;
 const apps: INestApplication[] = [];
 
@@ -43,7 +44,7 @@ interface Api {
 }
 
 async function subirApi(extra: Record<string, string> = {}): Promise<Api> {
-  const config = carregarConfig({ DATABASE_URL: urlBanco, LOG_LEVEL: 'silent', CORS_ORIGENS: PAINEL, ...PRODUCAO, ...extra });
+  const config = carregarConfig({ DATABASE_URL: urlBanco, DATABASE_URL_RUNTIME: urlRuntime, LOG_LEVEL: 'silent', CORS_ORIGENS: PAINEL, ...PRODUCAO, ...extra });
   const app = await criarApp(config);
   await app.init();
   apps.push(app);
@@ -98,7 +99,7 @@ async function logar(api: Api, email: string): Promise<string> {
 const eu = (api: Api, cookie: string) => request(api.app.getHttpServer()).get('/api/auth/eu').set('Cookie', cookie);
 
 beforeAll(async () => {
-  ({ url: urlBanco, parar } = await subirPostgres());
+  ({ url: urlBanco, urlRuntime, parar } = await subirPostgres());
 });
 
 afterAll(async () => {

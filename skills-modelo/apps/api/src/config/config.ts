@@ -10,6 +10,15 @@ const ORIGEM = /^(https:\/\/[A-Za-z0-9.-]+|http:\/\/(localhost|127\.0\.0\.1))(:\
 /** Domínio de e-mail: rótulos de letras, números e hífen separados por ponto (ao menos um ponto). */
 const DOMINIO = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
 
+/** Usuário de uma URL postgres (decodificado); texto vazio se não der para ler. */
+const usuarioDaUrl = (url: string): string => {
+  try {
+    return decodeURIComponent(new URL(url).username);
+  } catch {
+    return '';
+  }
+};
+
 const obrigatoria ={ error: (issue: { input: unknown }) => (issue.input === undefined ? 'obrigatória' : 'valor inválido') };
 
 /**
@@ -29,7 +38,8 @@ const esquemaBase = z.object({
     .transform((v) => new Segredo(v)),
   /**
    * Papel de banco SÓ de runtime (trilha-auditoria): sem UPDATE/DELETE na trilha. Com ela definida, a API conecta por aqui e
-   * DATABASE_URL (o dono do esquema) fica só para as migrações. Opcional em dev; em produção a API avisa se faltar.
+   * DATABASE_URL (o dono do esquema) fica só para as migrações. Opcional só com NODE_ENV=development/test declarado: fora
+   * disso a API não sobe sem ela (auditoria/papel-runtime.ts) e o usuário dela tem de ser outro que o de DATABASE_URL.
    */
   DATABASE_URL_RUNTIME: z
     .string()
@@ -124,6 +134,9 @@ export const esquemaConfig = esquemaBase.superRefine((c, ctx) => {
   }
   if (c.SMTP_USUARIO !== undefined && c.SMTP_SENHA === undefined) problema('SMTP_SENHA', 'obrigatória quando SMTP_USUARIO está definido');
   if (c.SMTP_SENHA !== undefined && c.SMTP_USUARIO === undefined) problema('SMTP_USUARIO', 'obrigatória quando SMTP_SENHA está definida');
+  if (c.DATABASE_URL_RUNTIME !== undefined && usuarioDaUrl(c.DATABASE_URL_RUNTIME.revelar()) === usuarioDaUrl(c.DATABASE_URL.revelar())) {
+    problema('DATABASE_URL_RUNTIME', 'não pode usar o mesmo usuário de DATABASE_URL: o dono ignora o REVOKE da auditoria (use o papel app_runtime)');
+  }
   if (c.AUTH_SESSAO_OCIOSA_MIN > c.AUTH_SESSAO_ABSOLUTA_H * 60) {
     problema('AUTH_SESSAO_OCIOSA_MIN', 'não pode ser maior que AUTH_SESSAO_ABSOLUTA_H (em minutos)');
   }
