@@ -26,6 +26,11 @@ import io.escritor.presenca.ponto.domain.JornadaDeOutroUsuarioException;
 import io.escritor.presenca.ponto.domain.MesInvalidoException;
 import io.escritor.presenca.ponto.service.SequenciaInvalidaException;
 import io.escritor.presenca.relatorio.domain.EstatisticasDeOutroUsuarioException;
+import io.escritor.presenca.skills.domain.AcaoSkillNaoPermitidaException;
+import io.escritor.presenca.skills.domain.ConflitoSkillException;
+import io.escritor.presenca.skills.domain.SkillInvalidaException;
+import java.util.Map;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -162,6 +167,37 @@ public class TratamentoErroGlobal {
     @ExceptionHandler(EstatisticasDeOutroUsuarioException.class)
     ResponseEntity<Void> tratarEstatisticasDeOutroUsuario() {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
+
+    /** Catálogo de skills: erro de validação exibido no editor (corpo {@code {"mensagem": ...}}). */
+    @ExceptionHandler(SkillInvalidaException.class)
+    ResponseEntity<Map<String, String>> tratarSkillInvalida(SkillInvalidaException e) {
+        return ResponseEntity.badRequest().body(Map.of("mensagem", e.getMessage()));
+    }
+
+    @ExceptionHandler(ConflitoSkillException.class)
+    ResponseEntity<Map<String, String>> tratarConflitoSkill(ConflitoSkillException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("mensagem", e.getMessage()));
+    }
+
+    @ExceptionHandler(AcaoSkillNaoPermitidaException.class)
+    ResponseEntity<Void> tratarAcaoSkillNaoPermitida() {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
+
+    /**
+     * Duas propostas simultâneas na mesma skill passam pela checagem do serviço e esbarram no índice
+     * único parcial do banco: vira 409 com mensagem. Qualquer outra violação de integridade continua
+     * como antes (sem tratamento, 500).
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ResponseEntity<Map<String, String>> tratarIntegridade(DataIntegrityViolationException e) {
+        String detalhe = e.getMostSpecificCause().getMessage();
+        if (detalhe != null && detalhe.contains("uq_skill_versao_proposta_pendente")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("mensagem", "Já existe uma proposta pendente para esta skill."));
+        }
+        throw e;
     }
 
 }
