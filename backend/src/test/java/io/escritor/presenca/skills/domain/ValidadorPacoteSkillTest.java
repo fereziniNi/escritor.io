@@ -129,4 +129,16 @@ class ValidadorPacoteSkillTest {
         invalido("seguranca", List.of(new ArquivoSkill("SKILL.md",
                 "---\nname: !!java.net.URL \"http://x\"\ndescription: d\n---\n")), "rontmatter");
     }
+
+    @Test
+    void frontmatterToleraEspacosNoFimDasCercas() {
+        assertThatCode(() -> ValidadorPacoteSkill.validarArquivos("seguranca", List.of(new ArquivoSkill("SKILL.md",
+                "--- \nname: seguranca\ndescription: d\n---\t\n# Corpo\n")))).doesNotThrowAnyException();
+    }
+
+    @Test
+    void frontmatterToleraBomUtf8() {
+        assertThatCode(() -> ValidadorPacoteSkill.validarArquivos("seguranca", List.of(new ArquivoSkill("SKILL.md",
+                "\uFEFF---\nname: seguranca\ndescription: d\n---\n# Corpo\n")))).doesNotThrowAnyException();
+    }
 }

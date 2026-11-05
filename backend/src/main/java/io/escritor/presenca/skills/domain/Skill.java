@@ -39,8 +39,8 @@ public class Skill {
     @JoinColumn(name = "versao_vigente_id")
     private SkillVersao versaoVigente;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "criada_por_id", nullable = false, updatable = false)
+    @ManyToOne
+    @JoinColumn(name = "criada_por_id", updatable = false)
     private Usuario criadaPor;
 
     @Column(name = "criada_em", nullable = false, updatable = false)

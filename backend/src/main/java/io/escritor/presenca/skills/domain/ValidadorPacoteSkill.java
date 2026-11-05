@@ -105,14 +105,16 @@ public final class ValidadorPacoteSkill {
         if (skillMd == null) {
             return Collections.emptyMap();
         }
-        String[] linhas = skillMd.split("\r?\n", -1);
-        if (linhas.length == 0 || !linhas[0].equals("---")) {
+        // editores do Windows costumam gravar BOM e deixar espaço depois das cercas ---
+        String texto = skillMd.startsWith("\uFEFF") ? skillMd.substring(1) : skillMd;
+        String[] linhas = texto.split("\r?\n", -1);
+        if (linhas.length == 0 || !linhas[0].stripTrailing().equals("---")) {
             return Collections.emptyMap();
         }
         StringBuilder bloco = new StringBuilder();
         boolean fechou = false;
         for (int i = 1; i < linhas.length; i++) {
-            if (linhas[i].equals("---")) {
+            if (linhas[i].stripTrailing().equals("---")) {
                 fechou = true;
                 break;
             }
