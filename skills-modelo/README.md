@@ -27,7 +27,8 @@ pnpm build
 pnpm --filter api test        # só um app
 node scripts/verificar-referencias.mjs   # referencia/ das skills == código daqui
 pnpm --filter web e2e         # Playwright com a API simulada (depois de pnpm build)
-# Login de verdade (API + Postgres + Mailpit, banco novo): docker compose up -d postgres mailpit && pnpm build, e em apps/web:
+# Login de verdade (API + Postgres + Mailpit DESCARTÁVEIS: o teste apaga a caixa do Mailpit). Comandos dos
+# contêineres e das variáveis E2E_* no topo de apps/web/e2e/login-real.config.ts; depois de pnpm build, em apps/web:
 pnpm exec playwright test -c e2e/login-real.config.ts
 ```
 

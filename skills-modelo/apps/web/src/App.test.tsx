@@ -9,7 +9,7 @@ const vazio = (status: number) => new Response(null, { status });
 const ANA = { id: '2c8a8f3e-6f5b-4c5e-9d0f-6a1a3f7b9c11', email: 'ana@exemplo.com.br', nome: 'Ana Souza', papel: 'GESTOR' };
 
 /** API falsa com estado: só responde /api/auth/eu com 200 depois do POST /api/auth/entrar, até o POST /api/auth/sair. */
-function apiFalsa() {
+function apiFalsa(cenario: { sairFalha?: boolean } = {}) {
   let logado = false;
   const chamadas: string[] = [];
   vi.stubGlobal(
@@ -25,6 +25,7 @@ function apiFalsa() {
         return Promise.resolve(vazio(204));
       }
       if (chave === 'POST /api/auth/sair') {
+        if (cenario.sairFalha) return Promise.resolve(json({ status: 500, erro: 'Erro interno' }, 500));
         logado = false;
         return Promise.resolve(vazio(204));
       }
@@ -63,5 +64,20 @@ describe('App: login de verdade no lugar do usuário fixo', () => {
     await waitFor(() => expect(window.location.pathname).toBe('/entrar'));
     expect(chamadas).toContain('POST /api/auth/sair');
     expect(screen.queryByText('Ana Souza')).not.toBeInTheDocument();
+  });
+
+  it('Sair que falha no servidor: mostra o erro e não finge que saiu', async () => {
+    window.history.replaceState(null, '', '/entrar');
+    apiFalsa({ sairFalha: true });
+    render(<App />);
+    await userEvent.type(await screen.findByLabelText('E-mail'), 'ana@exemplo.com.br');
+    await userEvent.click(screen.getByRole('button', { name: 'Receber código' }));
+    await userEvent.type(await screen.findByLabelText('Código'), '123456');
+    await userEvent.click(screen.getByRole('button', { name: 'Entrar' }));
+    expect(await screen.findByText('Ana Souza')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Sair' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível sair');
+    expect(screen.getByText('Ana Souza')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/');
   });
 });

@@ -402,13 +402,41 @@ describe('sessão', () => {
     await eu(api, cookie).expect(401);
   });
 
-  it('papel relido do banco a cada requisição: promover vale na hora (sem novo login)', async () => {
+  it('usuário relido do banco a cada requisição: mudar o nome aparece na hora (sem novo login)', async () => {
     const u = await criarUsuario(api.db, 'sara@exemplo.com.br');
     const cookie = await logar(api, 'sara@exemplo.com.br');
-    await request(api.app.getHttpServer()).get('/api/usuarios').set('Cookie', cookie).expect(403);
+    await api.db.update(usuario).set({ nome: 'Sara Lima' }).where(eq(usuario.id, u.id));
+    expect((await eu(api, cookie).expect(200)).body).toMatchObject({ nome: 'Sara Lima', papel: 'USUARIO' });
+  });
+
+  it('trocar o papel (mesmo direto no banco) revoga todas as sessões do usuário; o novo login já vem com o papel novo', async () => {
+    const u = await criarUsuario(api.db, 'sueli@exemplo.com.br');
+    const cookie1 = await logar(api, 'sueli@exemplo.com.br');
+    const cookie2 = await logar(api, 'sueli@exemplo.com.br');
     await api.db.update(usuario).set({ papel: 'ADMIN' }).where(eq(usuario.id, u.id));
-    await request(api.app.getHttpServer()).get('/api/usuarios').set('Cookie', cookie).expect(200);
-    expect((await eu(api, cookie).expect(200)).body.papel).toBe('ADMIN');
+    await eu(api, cookie1).expect(401);
+    await eu(api, cookie2).expect(401);
+    const novo = await logar(api, 'sueli@exemplo.com.br');
+    await request(api.app.getHttpServer()).get('/api/usuarios').set('Cookie', novo).expect(200);
+  });
+
+  it('pela tela de usuários: rebaixar revoga; desativar e reativar não ressuscita a sessão antiga', async () => {
+    const admin = await criarUsuario(api.db, 'chefe@exemplo.com.br', { papel: 'ADMIN' });
+    const cookieAdmin = await logar(api, 'chefe@exemplo.com.br');
+    const alvo = await criarUsuario(api.db, 'teo@exemplo.com.br', { papel: 'GESTOR' });
+    const cookieAlvo = await logar(api, 'teo@exemplo.com.br');
+    const srv = api.app.getHttpServer();
+    await request(srv).patch(`/api/usuarios/${alvo.id}/papel`).set('Origin', PAINEL).set('Cookie', cookieAdmin).send({ papel: 'USUARIO' }).expect(200);
+    await eu(api, cookieAlvo).expect(401);
+
+    const cookieAlvo2 = await logar(api, 'teo@exemplo.com.br');
+    await request(srv).post(`/api/usuarios/${alvo.id}/desativar`).set('Origin', PAINEL).set('Cookie', cookieAdmin).expect(200);
+    await request(srv).post(`/api/usuarios/${alvo.id}/reativar`).set('Origin', PAINEL).set('Cookie', cookieAdmin).expect(200);
+    await eu(api, cookieAlvo2).expect(401);
+    const sessoes = await api.db.select().from(sessao).where(eq(sessao.usuarioId, alvo.id));
+    expect(sessoes.every((s) => s.revogada)).toBe(true);
+    // A sessão de quem fez as mudanças continua valendo.
+    expect((await eu(api, cookieAdmin).expect(200)).body.id).toBe(admin.id);
   });
 
   it('sair revoga a sessão no banco, apaga o cookie e registra o logout', async () => {
@@ -434,6 +462,18 @@ describe('sessão', () => {
     const cookie = await logar(api, 'ugo@exemplo.com.br');
     await request(api.app.getHttpServer()).post('/api/auth/sair').set('Cookie', cookie).expect(403);
     await eu(api, cookie).expect(200);
+  });
+});
+
+describe('NODE_ENV não definido (falha fechada)', () => {
+  it('cookie __Host-sessao com Secure, como em produção', async () => {
+    const api = await subirApi({ NODE_ENV: '' });
+    await criarUsuario(api.db, 'wal@exemplo.com.br');
+    await pedirCodigo(api, 'wal@exemplo.com.br').expect(202);
+    const res = await entrar(api, 'wal@exemplo.com.br', ultimoCodigo(api)).expect(204);
+    const linha = ([] as string[]).concat(res.headers['set-cookie'] ?? []).find((l) => l.startsWith('__Host-sessao='))!;
+    expect(linha).toMatch(/; Secure/);
+    expect(linha).toMatch(/; HttpOnly/);
   });
 });
 

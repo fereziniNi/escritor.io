@@ -2,6 +2,7 @@
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Papel, ROTULO_PAPEL } from 'contratos';
 import { Activity, LayoutDashboard, ShieldCheck, Users } from 'lucide-react';
+import { useState } from 'react';
 import { Navigate, Outlet, RouterProvider, createBrowserRouter, useNavigate } from 'react-router';
 import { AppShell, type GrupoMenu } from '@/componentes/AppShell';
 import { Carregando, ErroCarregar } from '@/componentes/estados';
@@ -59,13 +60,20 @@ function Layout() {
   const cliente = useQueryClient();
   const eu = useQuery({ queryKey: CHAVE_EU, queryFn: buscarEu });
   const saude = useQuery({ queryKey: ['saude'], queryFn: buscarSaude, enabled: Boolean(eu.data) });
+  const [erroSair, setErroSair] = useState<string | null>(null);
 
   if (eu.isPending) return <Carregando />;
   if (eu.isError) return <ErroCarregar mensagem={eu.error.message} aoTentarDeNovo={() => void eu.refetch()} />;
   if (!eu.data) return <Navigate to="/entrar" replace />;
 
   async function encerrar() {
-    await sair().catch(() => undefined);
+    try {
+      await sair();
+    } catch (e) {
+      // A sessão pode continuar valendo no servidor: não finge que saiu.
+      setErroSair(`Não foi possível sair: ${e instanceof Error ? e.message : 'erro desconhecido'}. Tente de novo.`);
+      return;
+    }
     cliente.clear();
     await navegar('/entrar', { replace: true });
   }
@@ -78,6 +86,11 @@ function Layout() {
       versao={saude.data?.versao}
       aoSair={() => void encerrar()}
     >
+      {erroSair && (
+        <p role="alert" className="mb-4 rounded-md bg-perigo-suave px-3 py-2 text-13 text-perigo">
+          {erroSair}
+        </p>
+      )}
       <Outlet />
     </AppShell>
   );

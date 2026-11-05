@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { carregarConfig } from '../config/config';
 import { Segredo } from '../config/segredo';
 import { cookieSessao, lerCookie } from './cookie-sessao';
-import { dominioPermitido, segredoDoCodigo } from './regras-auth';
+import { avisoNodeEnv, dominioPermitido, modoDesenvolvimento, segredoDoCodigo } from './regras-auth';
 
 const base = (extra: Record<string, string | undefined> = {}): NodeJS.ProcessEnv => ({
   DATABASE_URL: 'postgres://app:senha-de-teste@localhost:5432/app',
@@ -15,6 +15,7 @@ const base = (extra: Record<string, string | undefined> = {}): NodeJS.ProcessEnv
 });
 
 const SEGREDO = 'um-segredo-de-teste-com-mais-de-32-caracteres';
+const smtp = { MAIL_MODE: 'smtp', SMTP_HOST: 'smtp.exemplo.com.br', EMAIL_REMETENTE: 'nao-responda@exemplo.com.br' };
 
 describe('configuração do login', () => {
   it('padrões: sessão ociosa 30 min, absoluta 12 h, sem restrição de domínio, sem segredo', () => {
@@ -78,10 +79,44 @@ describe('segredo do código', () => {
     expect(() => segredoDoCodigo(producao)).toThrow(/AUTH_SEGREDO_CODIGO/);
   });
 
-  it('fora de produção, sem a variável, gera um segredo aleatório por processo (códigos não sobrevivem ao reinício)', () => {
-    const a = segredoDoCodigo(carregarConfig(base()));
-    expect(a.length).toBeGreaterThanOrEqual(32);
-    expect(segredoDoCodigo(carregarConfig(base()))).not.toBe(a);
+  it('NODE_ENV não definido (ou vazio) conta como produção: sem AUTH_SEGREDO_CODIGO a API não sobe', () => {
+    expect(() => segredoDoCodigo(carregarConfig(base()))).toThrow(/AUTH_SEGREDO_CODIGO.*NODE_ENV/s);
+    expect(() => segredoDoCodigo(carregarConfig(base({ NODE_ENV: '' })))).toThrow(/AUTH_SEGREDO_CODIGO/);
+  });
+
+  it('só com NODE_ENV=development ou test declarado, sem a variável, gera um segredo aleatório por processo', () => {
+    for (const NODE_ENV of ['development', 'test']) {
+      const a = segredoDoCodigo(carregarConfig(base({ NODE_ENV })));
+      expect(a.length).toBeGreaterThanOrEqual(32);
+      expect(segredoDoCodigo(carregarConfig(base({ NODE_ENV })))).not.toBe(a);
+    }
+  });
+});
+
+describe('ambiente (falha fechada)', () => {
+  it('modo desenvolvimento só com NODE_ENV declarado development ou test; ausente, vazio ou production não', () => {
+    expect(modoDesenvolvimento(carregarConfig(base({ NODE_ENV: 'development' })))).toBe(true);
+    expect(modoDesenvolvimento(carregarConfig(base({ NODE_ENV: 'test' })))).toBe(true);
+    expect(modoDesenvolvimento(carregarConfig(base()))).toBe(false);
+    expect(modoDesenvolvimento(carregarConfig(base({ NODE_ENV: '' })))).toBe(false);
+    expect(modoDesenvolvimento(carregarConfig(base({ NODE_ENV: 'production', ...smtp })))).toBe(false);
+  });
+
+  it('o padrão de NODE_ENV do esqueleto não muda (development), mas o valor declarado fica registrado à parte', () => {
+    const c = carregarConfig(base());
+    expect(c.NODE_ENV).toBe('development');
+    expect(c.NODE_ENV_DECLARADO).toBeUndefined();
+    expect(carregarConfig(base({ NODE_ENV: 'test' })).NODE_ENV_DECLARADO).toBe('test');
+  });
+
+  it('valor desconhecido ("staging") nem sobe: a configuração recusa', () => {
+    expect(() => carregarConfig(base({ NODE_ENV: 'staging' }))).toThrow(/NODE_ENV/);
+  });
+
+  it('aviso alto no boot quando NODE_ENV não está definido; nenhum quando está', () => {
+    expect(avisoNodeEnv(carregarConfig(base()))).toMatch(/NODE_ENV.*produção/);
+    expect(avisoNodeEnv(carregarConfig(base({ NODE_ENV: 'development' })))).toBeNull();
+    expect(avisoNodeEnv(carregarConfig(base({ NODE_ENV: 'production', ...smtp })))).toBeNull();
   });
 });
 
@@ -110,7 +145,15 @@ describe('cookie de sessão', () => {
     expect(opcoes).toEqual({ httpOnly: true, secure: true, sameSite: 'lax', path: '/' });
   });
 
-  it('fora de produção (http://localhost): "sessao" sem Secure, o resto igual', () => {
+  it('NODE_ENV não definido ou vazio: __Host-sessao com Secure (falha fechada)', () => {
+    for (const env of [base(), base({ NODE_ENV: '' })]) {
+      const { nome, opcoes } = cookieSessao(carregarConfig(env));
+      expect(nome).toBe('__Host-sessao');
+      expect(opcoes.secure).toBe(true);
+    }
+  });
+
+  it('só com NODE_ENV=development ou test declarado (http://localhost): "sessao" sem Secure, o resto igual', () => {
     for (const NODE_ENV of ['development', 'test']) {
       const { nome, opcoes } = cookieSessao(carregarConfig(base({ NODE_ENV })));
       expect(nome).toBe('sessao');

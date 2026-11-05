@@ -5,7 +5,8 @@ import { type APIRequestContext, expect, test } from '@playwright/test';
 test.skip(!process.env['E2E_LOGIN_REAL'], 'precisa de API, Postgres e Mailpit: pnpm exec playwright test -c e2e/login-real.config.ts');
 
 const EMAIL = process.env['E2E_EMAIL'] ?? 'admin@exemplo.com.br';
-const MAILPIT = process.env['E2E_URL_MAILPIT'] ?? 'http://localhost:8025';
+// Obrigatória (o login-real.config.ts recusa rodar sem ela): o teste apaga esta caixa.
+const MAILPIT = process.env['E2E_URL_MAILPIT'] ?? '';
 
 interface MensagemMailpit {
   ID: string;

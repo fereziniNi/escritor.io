@@ -42,12 +42,18 @@ fixo**; mudar um deles é decisão de segurança registrada no `CLAUDE.md`, não
    criada_em, ultimo_uso_em, revogada)` guarda o **SHA-256** (`hash_token`, índice único). Expira parada
    **`AUTH_SESSAO_OCIOSA_MIN` = 30 min** ou **`AUTH_SESSAO_ABSOLUTA_H` = 12 h** depois do login, o que vier primeiro;
    `ultimo_uso_em` regravado no máximo 1 vez por minuto. `POST /api/auth/sair` marca `revogada = true`, apaga o cookie e
-   responde 204 (também sem sessão). Banco nunca contém o código nem o token (teste dedicado).
-9. **Cookie** em produção (`NODE_ENV=production`): **`__Host-sessao`**, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`,
-   sem `Domain`, `Max-Age` = 12 h. Fora de produção o nome é `sessao` e sem `Secure` (o resto igual): em
-   `http://localhost` o Safari recusa cookie `Secure`/`__Host-`, e HTTPS no Vite quebraria a checagem de origem do
-   proxy. A decisão é pelo `NODE_ENV`, **nunca** por `req.secure` (proxy mal configurado não derruba o `Secure`); o
-   teste prova que produção sempre usa `__Host-sessao` + `Secure` e que o cookie `sessao` não vale em produção.
+   responde 204 (também sem sessão). Banco nunca contém o código nem o token (teste dedicado). Mudar `papel` ou
+   `ativo` de um usuário **revoga todas as sessões dele** (gatilho `usuario_revoga_sessoes` no Postgres, migração de
+   `referencia/migracao-revogar-sessoes.md`): vale para a tela de usuários, o admin inicial e `UPDATE` direto, e
+   reativar não ressuscita sessão antiga.
+9. **Cookie, falha fechada**: por padrão **`__Host-sessao`**, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, sem
+   `Domain`, `Max-Age` = `AUTH_SESSAO_ABSOLUTA_H`. Só quando o ambiente **declara** `NODE_ENV=development` ou `test`
+   (`config.NODE_ENV_DECLARADO`, o valor cru, sem o padrão `development` do esqueleto) o nome vira `sessao` sem `Secure`
+   (em `http://localhost` o Safari recusa `Secure`/`__Host-`, e HTTPS no Vite quebraria a guarda de origem do proxy).
+   `NODE_ENV` ausente ou vazio conta como **produção** (e a API avisa alto no boot); valor desconhecido (`staging`) nem
+   sobe. Nunca por `req.secure` (proxy mal configurado não derruba o `Secure`). A imagem de produção **define
+   `NODE_ENV=production`** (a skill `instalacao-docker-compose` grava no Dockerfile). Testes provam: ausente →
+   `__Host-sessao` + `Secure`; `development`/`test` → `sessao`; o cookie `sessao` não vale em produção.
 10. **`req.usuario` a cada requisição** (contrato da skill `usuarios-e-papeis`): o `SessaoMiddleware` (toda a `/api`)
     lê o cookie, valida a sessão (não revogada, dentro das duas validades) **e** o usuário na tabela `usuario` com
     `ativo = true`, e preenche `req.usuario = { id, email, nome, papel }` com o papel **da tabela**. Desativar ou trocar o
@@ -60,13 +66,20 @@ fixo**; mudar um deles é decisão de segurança registrada no `CLAUDE.md`, não
     `registrarEvento` (`auth/registro-eventos.ts`, token `REGISTRO_EVENTOS`). Sem a skill `trilha-auditoria` o provedor é
     o `RegistroEventosNulo` (não grava); ela troca o provedor no `AuthModule`. Falha ao registrar nunca derruba o login.
 13. **Segredo**: `AUTH_SEGREDO_CODIGO` (ou `AUTH_SEGREDO_CODIGO_ARQUIVO`), `Segredo` com no mínimo 32 caracteres
-    (`openssl rand -hex 32`), o mesmo em todas as instâncias. Em produção é obrigatória: sem ela a API **não sobe**
-    (`segredoDoCodigo` lança no `AuthService`). Fora de produção, ausente, a API gera uma por processo.
-14. **Tela** (`apps/web/src/telas/TelaEntrar.tsx`, rota `/entrar`): o visual da tela-modelo `TelaLogin` da skill
+    (gerador criptográfico: `openssl rand -hex 32`), o mesmo em todas as instâncias. Obrigatória salvo com
+    `NODE_ENV=development`/`test` declarados: sem ela a API **não sobe** (`segredoDoCodigo` lança no `AuthService`;
+    `NODE_ENV` ausente também exige). Em dev, ausente, a API gera uma por processo. **Trocar o segredo** invalida só os
+    códigos pendentes (no máximo 10 min); sessões abertas continuam (o token não depende dele).
+14. **Riscos que sobram (aceitos)**: quem troca de IP ainda tenta cerca de 15 códigos por e-mail a cada 10 min
+    (3 códigos x 5 tentativas, chance de 1 em 66 mil por janela); e qualquer um pode gastar os 3 pedidos de um e-mail
+    conhecido e atrasar o login dessa pessoa por até 10 min. Os eventos `auth.codigo_bloqueado` e `auth.limite_codigo`
+    da auditoria mostram as duas coisas.
+15. **Tela** (`apps/web/src/telas/TelaEntrar.tsx`, rota `/entrar`): o visual da tela-modelo `TelaLogin` da skill
     `identidade-visual` (cartão centralizado com a marca) em dois passos: e-mail → "Receber código"; código (campo
     `inputMode="numeric"`, `autoComplete="one-time-code"`, só 6 dígitos) → "Entrar", e "Usar outro e-mail". O `Layout` do
     `App.tsx` busca `GET /api/auth/eu`: sem sessão vai para `/entrar`; com sessão mostra nome e papel da API no `AppShell`
-    (botão **Sair**, prop `aoSair`), menu Admin só para `ADMIN`; 401 em qualquer chamada relê `/eu` e volta ao login.
+    (botão **Sair**, prop `aoSair`; se o servidor falhar ao sair, mostra o erro e não finge que saiu), menu Admin só
+    para `ADMIN`; 401 em qualquer chamada relê `/eu` e volta ao login.
     Nenhum usuário fixo no código da web.
 
 ## Como aplicar
@@ -86,13 +99,16 @@ npm. Ao copiar um arquivo de `referencia/`, mantenha o mesmo caminho relativo e 
 4. Arquivos do esqueleto — se ainda são os da etapa anterior, **substitua** pelos da referência; se outra skill mexeu
    neles, faça **só** a mudança descrita:
    - `apps/api/src/banco/esquema.ts`: a linha `export * from '../auth/auth.tabelas';`.
-   - `apps/api/src/config/config.ts`: a constante `DOMINIO`, as quatro variáveis `AUTH_*` no fim do `esquemaBase` e a
-     regra "ociosa não maior que a absoluta" no `superRefine`.
+   - `apps/api/src/config/config.ts`: a constante `DOMINIO`, as quatro variáveis `AUTH_*` no fim do `esquemaBase`, a
+     regra "ociosa não maior que a absoluta" no `superRefine` e o `NODE_ENV_DECLARADO` (tipo `Config` e o `return` do
+     `carregarConfig`; o padrão `development` de `NODE_ENV` não muda).
    - `apps/api/src/app.module.ts`: `AuthModule` nos `imports`, depois do `UsuariosModule` (e depois do `SegurancaModule`).
    - `.env.example` e `deploy/.env.example`: o bloco "Login por código no e-mail" do fim.
 5. Migração: `pnpm --filter api db:generate`. O SQL novo tem de criar `codigo_login` e `sessao`, a FK
    `sessao.usuario_id → usuario.id` e os índices `codigo_login_email_criado`, `sessao_hash_token_unico` (único) e
-   `sessao_usuario`; confira e não edite à mão. Rode `pnpm --filter api test`: passa (precisa do Docker).
+   `sessao_usuario`; confira e não edite à mão. Depois a migração do gatilho, como manda
+   `referencia/migracao-revogar-sessoes.md` (`drizzle-kit generate --custom --name=revogar_sessoes` + o SQL de lá).
+   Rode `pnpm --filter api test`: passa (precisa do Docker).
 6. TDD, web — copie `apps/web/src/telas/TelaEntrar.test.tsx` e `apps/web/src/App.test.tsx`; `pnpm --filter web test`
    falha. Copie `apps/web/src/lib/auth-api.ts`, `telas/TelaEntrar.tsx`, e: no `AppShell.tsx` a prop `aoSair` e o botão
    Sair (referência = arquivo depois da skill `identidade-visual`); no `App.tsx` o `Layout` com `/api/auth/eu`, o
@@ -101,11 +117,12 @@ npm. Ao copiar um arquivo de `referencia/`, mantenha o mesmo caminho relativo e 
 7. Playwright: substitua `apps/web/e2e/inicio.spec.ts` (agora simula `/api/auth/eu`) e copie `e2e/login-real.spec.ts` e
    `e2e/login-real.config.ts` (o login de verdade; no `pnpm e2e` comum ele fica de fora).
 8. Rode `pnpm lint && pnpm typecheck && pnpm test && pnpm build` e `pnpm --filter web e2e`: tudo limpo.
-9. Veja funcionando, de verdade: `docker compose up -d postgres mailpit`, `.env` com `ADMIN_INICIAL_EMAIL` e
-   `MAIL_MODE=smtp` para o Mailpit, `pnpm --filter api db:migrate`, `pnpm dev`; abra http://localhost:5173, peça o código,
-   leia em http://localhost:8025 e entre. Ou automático (banco novo): `pnpm build` e, em `apps/web`,
-   `pnpm exec playwright test -c e2e/login-real.config.ts`.
-10. Produção: `AUTH_SEGREDO_CODIGO_ARQUIVO` (segredo do compose), `NODE_ENV=production`, HTTPS no Caddy,
+9. Veja funcionando, de verdade: `docker compose up -d postgres mailpit`, `.env` copiado do `.env.example` (traz
+   `NODE_ENV=development`, `ADMIN_INICIAL_EMAIL` e `MAIL_MODE=smtp` para o Mailpit), `pnpm --filter api db:migrate`,
+   `pnpm dev`; abra http://localhost:5173, peça o código, leia em http://localhost:8025 e entre. Ou automático:
+   `e2e/login-real.config.ts` só roda com `E2E_DATABASE_URL`, `E2E_SMTP_PORTA` e `E2E_URL_MAILPIT` apontando para
+   contêineres **descartáveis** (o teste apaga a caixa do Mailpit; os comandos estão no topo do arquivo), depois de `pnpm build`.
+10. Produção: `NODE_ENV=production` na imagem, `AUTH_SEGREDO_CODIGO_ARQUIVO` (segredo do compose), HTTPS no Caddy,
     `PROXIES_CONFIAVEIS=1` (IP real para o limite) e, se a empresa quiser, `AUTH_DOMINIOS_PERMITIDOS`.
 11. Testes de outros módulos: continue usando `test/usuario-de-teste.ts` (skill `usuarios-e-papeis`) para simular o
     usuário; o `SessaoMiddleware` só escreve `req.usuario` quando há sessão válida, então os dois convivem.
@@ -145,9 +162,10 @@ Tudo que um arquivo de `referencia/` importa está em `referencia/` ou nas skill
 - `referencia/apps/api/src/auth/cripto-auth.spec.ts`, `config-auth.spec.ts`, `referencia/apps/api/test/auth.e2e.spec.ts` — todos os comportamentos acima, contra Postgres real; passo 1.
 - `referencia/apps/api/src/banco/esquema.ts`, `config/config.ts`, `app.module.ts`, `referencia/.env.example`, `referencia/deploy/.env.example` — os arquivos do esqueleto alterados; passo 4.
 - `referencia/packages/contratos/src/auth.ts`, `auth.spec.ts`, `index.ts` — esquemas de pedir código, entrar e `eu`; passo 3.
-- `referencia/apps/web/src/lib/auth-api.ts`, `telas/TelaEntrar.tsx`, `telas/TelaEntrar.test.tsx` — a tela de login (regra 14); passo 6.
-- `referencia/apps/web/src/App.tsx`, `App.test.tsx`, `componentes/AppShell.tsx` — usuário real, redirecionamento e Sair (regra 14); passo 6.
+- `referencia/apps/web/src/lib/auth-api.ts`, `telas/TelaEntrar.tsx`, `telas/TelaEntrar.test.tsx` — a tela de login (regra 15); passo 6.
+- `referencia/apps/web/src/App.tsx`, `App.test.tsx`, `componentes/AppShell.tsx` — usuário real, redirecionamento e Sair (regra 15); passo 6.
 - `referencia/apps/web/e2e/inicio.spec.ts`, `login-real.spec.ts`, `login-real.config.ts` — Playwright simulado e o login de verdade com Mailpit; passos 7 e 9.
+- `referencia/migracao-revogar-sessoes.md` — gatilho que revoga as sessões ao mudar papel ou ativo (regra 8); passo 5.
 
 ## Checklist de pronto
 
@@ -158,7 +176,9 @@ Tudo que um arquivo de `referencia/` importa está em `referencia/` ou nas skill
 - [ ] E-mail fora do domínio, inexistente e válido recebem o mesmo 202, o mesmo corpo e levam ≥ 600 ms; só o válido recebe e-mail.
 - [ ] 6ª tentativa com o código certo é recusada; código de 11 min é recusado; o 4º pedido em 10 min não envia; o 2º código invalida o 1º.
 - [ ] Sessão parada 31 min → 401; sessão com 12 h → 401; usuário desativado com sessão aberta → 401 na próxima requisição.
-- [ ] Em produção o cookie é `__Host-sessao; HttpOnly; Secure; SameSite=Lax; Path=/`, sem `Domain`.
+- [ ] Em produção (e com `NODE_ENV` ausente) o cookie é `__Host-sessao; HttpOnly; Secure; SameSite=Lax; Path=/`, sem `Domain`.
+- [ ] A imagem de produção define `NODE_ENV=production`; o `.env` de desenvolvimento define `NODE_ENV=development`.
+- [ ] Trocar papel ou desativar alguém derruba as sessões dele (migração do gatilho aplicada).
 - [ ] `AUTH_SEGREDO_CODIGO_ARQUIVO` definida em produção (a API não sobe sem ela), igual em todas as instâncias.
 - [ ] Nenhum usuário fixo na web: nome e papel vêm de `GET /api/auth/eu`; o botão Sair revoga a sessão.
 - [ ] Assunto do e-mail fixo ("Seu código de acesso"), sem o código; conferido no Mailpit.

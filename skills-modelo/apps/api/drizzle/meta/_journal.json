@@ -15,6 +15,13 @@
       "when": 1793916965805,
       "tag": "0001_gifted_mephistopheles",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793918857142,
+      "tag": "0002_revogar_sessoes",
+      "breakpoints": true
     }
   ]
 }

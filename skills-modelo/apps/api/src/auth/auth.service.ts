@@ -14,6 +14,7 @@ import {
   MAX_PEDIDOS_POR_EMAIL,
   MAX_TENTATIVAS_POR_CODIGO,
   VALIDADE_CODIGO_MIN,
+  avisoNodeEnv,
   dominioPermitido,
   segredoDoCodigo,
 } from './regras-auth';
@@ -40,7 +41,9 @@ export class AuthService {
     private readonly email: ServicoEmail,
     @Inject(REGISTRO_EVENTOS) private readonly eventos: RegistroEventos,
   ) {
-    // Em produção sem AUTH_SEGREDO_CODIGO lança aqui: a API não sobe.
+    const aviso = avisoNodeEnv(config);
+    if (aviso) this.logger.warn(aviso);
+    // Fora de desenvolvimento (inclusive NODE_ENV ausente) sem AUTH_SEGREDO_CODIGO lança aqui: a API não sobe.
     this.segredo = segredoDoCodigo(config);
   }
 
@@ -56,6 +59,8 @@ export class AuthService {
     if (!dono) return;
     const codigo = gerarCodigo();
     const criado = await this.db.transaction(async (tx) => {
+      // Trava por e-mail exatamente como no Padrão (hashtext(email), sem prefixo). Colide em teoria com outra trava
+      // de aconselhamento de mesmo número (ex.: a do admin inicial); o efeito seria só uma espera curta, nunca erro.
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${email}))`);
       await tx.delete(codigoLogin).where(and(eq(codigoLogin.email, email), lt(codigoLogin.criadoEm, sql`now() - interval '1 day'`)));
       const [recentes] = await tx

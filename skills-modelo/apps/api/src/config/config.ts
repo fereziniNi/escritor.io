@@ -120,7 +120,15 @@ export const esquemaConfig = esquemaBase.superRefine((c, ctx) => {
   }
 });
 
-export type Config = Readonly<z.infer<typeof esquemaConfig>>;
+export type Config = Readonly<
+  z.infer<typeof esquemaConfig> & {
+    /**
+     * NODE_ENV como veio do ambiente, sem o padrão `development`: undefined quando não foi definido. Regras de segurança
+     * que precisam falhar fechado (cookie e segredo do login) só relaxam com `development` ou `test` DECLARADOS.
+     */
+    NODE_ENV_DECLARADO: 'development' | 'test' | 'production' | undefined;
+  }
+>;
 
 /** Configuração inválida: `problemas` lista cada variável com o motivo, nunca o valor recebido. */
 export class ErroConfiguracao extends Error {
@@ -155,5 +163,5 @@ export function carregarConfig(env: NodeJS.ProcessEnv = process.env): Config {
     }
   }
   if (problemas.length > 0 || !resultado.success) throw new ErroConfiguracao(problemas);
-  return Object.freeze(resultado.data);
+  return Object.freeze({ ...resultado.data, NODE_ENV_DECLARADO: entrada['NODE_ENV'] === undefined ? undefined : resultado.data.NODE_ENV });
 }
