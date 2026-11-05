@@ -213,6 +213,9 @@ dependência do Nest); `module`/`moduleResolution` `nodenext` com o pacote em Co
     "e2e": "playwright test"
   },
   "dependencies": {
+    "@fontsource/inter": "5.3.0",
+    "@fontsource/jetbrains-mono": "5.3.0",
+    "@fontsource/space-grotesk": "5.3.0",
     "@radix-ui/react-slot": "1.5.0",
     "@tanstack/react-query": "5.106.1",
     "class-variance-authority": "0.7.1",

@@ -1,0 +1,106 @@
+/* origem: skills-modelo/apps/web/src/tema/tokens.css */
+/* Identidade visual Multiplica: TODAS as cores do sistema vivem aqui. Regra: nunca cor solta (#hex, rgb(), classes
+   como bg-blue-500) fora deste arquivo; use o token (bg-primaria, text-texto-2, var(--borda)).
+   Claro em :root; escuro por escolha em [data-theme="dark"] e pelo sistema quando não há escolha. */
+
+:root {
+  --primaria: #2F6FED;
+  --primaria-hover: #1F5AD6;
+  --primaria-suave: #EAF1FE;
+  --sobre-primaria: #FFFFFF;
+  --navy: #001A33;
+  --navy-hover: #0D2B46;
+  --navy-texto: #C2CEDD;
+  --ciano: #00E1FF;
+  --fundo: #F5F7FA;
+  --superficie: #FFFFFF;
+  --borda: #DEE6EF;
+  --texto: #172B43;
+  --texto-2: #5B6B80;
+  --texto-3: #8A97A8;
+  --sucesso: #059669;
+  --sucesso-suave: #E6F6F0;
+  --alerta: #D97706;
+  --alerta-suave: #FEF3E2;
+  --perigo: #DC2626;
+  --perigo-suave: #FDECEC;
+  --info: #0284C7;
+  --info-suave: #E6F3FA;
+
+  /* Variáveis do shadcn/ui derivadas dos tokens (os componentes do shadcn usam estes nomes). */
+  --background: var(--fundo);
+  --foreground: var(--texto);
+  --card: var(--superficie);
+  --card-foreground: var(--texto);
+  --popover: var(--superficie);
+  --popover-foreground: var(--texto);
+  --primary: var(--primaria);
+  --primary-foreground: var(--sobre-primaria);
+  --secondary: var(--superficie);
+  --secondary-foreground: var(--texto);
+  --muted: var(--fundo);
+  --muted-foreground: var(--texto-2);
+  --accent: var(--primaria-suave);
+  --accent-foreground: var(--primaria);
+  --destructive: var(--perigo);
+  --border: var(--borda);
+  --input: var(--borda);
+  --ring: var(--primaria);
+  --sidebar: var(--navy);
+  --sidebar-foreground: var(--navy-texto);
+  --sidebar-primary: var(--primaria);
+  --sidebar-primary-foreground: var(--sobre-primaria);
+  --sidebar-accent: var(--navy-hover);
+  --sidebar-accent-foreground: var(--sobre-primaria);
+  --sidebar-border: var(--navy-hover);
+  --sidebar-ring: var(--ciano);
+}
+
+:root[data-theme="dark"] {
+  --primaria: #5B8DEF;
+  --primaria-hover: #7BA3F3;
+  --primaria-suave: #16264A;
+  --navy: #000E1C;
+  --navy-hover: #0A1E33;
+  --navy-texto: #9FB0C5;
+  --fundo: #0B1120;
+  --superficie: #111A2E;
+  --borda: #1F2A40;
+  --texto: #E6ECF5;
+  --texto-2: #A3B1C6;
+  --texto-3: #6B7A90;
+  --sucesso: #34D399;
+  --sucesso-suave: #0D2A22;
+  --alerta: #FBBF24;
+  --alerta-suave: #2B2210;
+  --perigo: #F87171;
+  --perigo-suave: #2E1414;
+  --info: #38BDF8;
+  --info-suave: #0C2433;
+}
+
+/* Mesmos valores do bloco acima, para quem ainda não escolheu e usa o sistema escuro (mantenha os dois iguais). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --primaria: #5B8DEF;
+    --primaria-hover: #7BA3F3;
+    --primaria-suave: #16264A;
+    --navy: #000E1C;
+    --navy-hover: #0A1E33;
+    --navy-texto: #9FB0C5;
+    --fundo: #0B1120;
+    --superficie: #111A2E;
+    --borda: #1F2A40;
+    --texto: #E6ECF5;
+    --texto-2: #A3B1C6;
+    --texto-3: #6B7A90;
+    --sucesso: #34D399;
+    --sucesso-suave: #0D2A22;
+    --alerta: #FBBF24;
+    --alerta-suave: #2B2210;
+    --perigo: #F87171;
+    --perigo-suave: #2E1414;
+    --info: #38BDF8;
+    --info-suave: #0C2433;
+  }
+}
