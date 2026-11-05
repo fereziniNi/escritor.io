@@ -137,10 +137,16 @@ class ImportadorSkillsOficiaisTest {
     }
 
     @Test
-    void raizInexistenteOuSoComGitkeepNaoFalha() {
+    void raizInexistenteOuSoComGitkeepNaoFalha(@TempDir Path tmp) throws IOException {
         new ImportadorSkillsOficiais("nao-existe-mesmo", true, skillService).importarTudo();
         verify(skillService, never()).importar(any(), any(), any());
-        assertThat(new ImportadorSkillsOficiais("skills-oficiais", true, skillService).listarSlugs()).isEmpty();
+        // A raiz real (skills-oficiais) já tem conteúdo; aqui uma raiz só com .gitkeep.
+        Files.createDirectories(tmp.resolve(RAIZ));
+        Files.writeString(tmp.resolve(RAIZ).resolve(".gitkeep"), "");
+        ImportadorSkillsOficiais soGitkeep = importadorSobre(tmp);
+        assertThat(soGitkeep.listarSlugs()).isEmpty();
+        soGitkeep.importarTudo();
+        verify(skillService, never()).importar(any(), any(), any());
     }
 
     private ImportadorSkillsOficiais importadorSobre(Path tmp) throws IOException {
