@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/web/src/componentes/AppShell.tsx
+// origem: skills-modelo/estagios/identidade-visual/apps/web/src/componentes/AppShell.tsx
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router';
 import { AlternarTema } from '@/componentes/AlternarTema';

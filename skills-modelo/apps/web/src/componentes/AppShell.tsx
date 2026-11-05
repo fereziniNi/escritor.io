@@ -1,3 +1,4 @@
+import { LogOut } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router';
 import { AlternarTema } from '@/componentes/AlternarTema';
@@ -20,11 +21,13 @@ interface Props {
   usuario?: { nome: string; papel?: string };
   /** Versão mostrada no rodapé como v{versao} (vem de /api/health). */
   versao?: string;
+  /** Mostra o botão "Sair" no rodapé da sidebar (a skill de login liga ao POST /api/auth/sair). */
+  aoSair?: () => void;
   children: ReactNode;
 }
 
 /** Estrutura das telas logadas: sidebar navy de 256px (marca, grupos, rodapé) + área de conteúdo. */
-export function AppShell({ nomeSistema, grupos, usuario, versao, children }: Props) {
+export function AppShell({ nomeSistema, grupos, usuario, versao, aoSair, children }: Props) {
   return (
     <div className="flex min-h-screen bg-fundo text-texto">
       <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col bg-navy px-2.5 py-4 text-navy-texto">
@@ -77,6 +80,17 @@ export function AppShell({ nomeSistema, grupos, usuario, versao, children }: Pro
             {versao && <div className="font-mono opacity-60">{`v${versao}`}</div>}
           </div>
           <AlternarTema className="text-navy-texto hover:bg-navy-hover hover:text-white focus-visible:border-ciano focus-visible:ring-2 focus-visible:ring-ciano" />
+          {aoSair && (
+            <button
+              type="button"
+              onClick={aoSair}
+              aria-label="Sair"
+              title="Sair"
+              className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-navy-texto outline-none transition-colors hover:bg-navy-hover hover:text-white focus-visible:ring-2 focus-visible:ring-ciano"
+            >
+              <LogOut className="size-4" aria-hidden="true" />
+            </button>
+          )}
         </div>
       </aside>
       <main className="min-w-0 flex-1 p-6">{children}</main>

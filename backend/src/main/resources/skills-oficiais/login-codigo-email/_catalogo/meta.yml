@@ -1,0 +1,3 @@
+nome: Login por código no e-mail
+descricao: Cria o login padrão Multiplica sem senha, com código de 6 dígitos enviado por e-mail, sessão em cookie seguro que expira por inatividade e por tempo, logout, a ligação com usuários e papéis e a tela de login.
+categoria: SEGURANCA

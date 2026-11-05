@@ -1,6 +1,7 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { type DestinationStream } from 'pino';
+import { AuthModule } from './auth/auth.module';
 import { BancoModule } from './banco/banco.module';
 import { type Config } from './config/config';
 import { ConfigModule } from './config/config.module';
@@ -23,6 +24,7 @@ export class AppModule {
     return {
       module: AppModule,
       // SegurancaModule logo depois do LogModule: limite e checagem de origem já com request-id e log.
+      // AuthModule depois do SegurancaModule: a sessão só é consultada no banco depois do limite e da origem.
       imports: [
         ConfigModule.registrar(config),
         LogModule.registrar(config, opcoes.destinoLog),
@@ -30,6 +32,7 @@ export class AppModule {
         BancoModule.registrar(config),
         EmailModule,
         UsuariosModule,
+        AuthModule,
         SaudeModule,
       ],
       // Erros sempre em JSON padrão ({ status, erro, requestId }), inclusive o 404 de /api/* desconhecido.

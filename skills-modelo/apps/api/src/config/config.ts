@@ -7,7 +7,10 @@ const IDENTIFICADOR_DE_BUILD = /^[A-Za-z0-9._+-]{1,64}$/;
 /** Origem web: https + host (+ porta), sem caminho nem curinga; http só para localhost e 127.0.0.1 (dev). */
 const ORIGEM = /^(https:\/\/[A-Za-z0-9.-]+|http:\/\/(localhost|127\.0\.0\.1))(:\d{1,5})?$/;
 
-const obrigatoria = { error: (issue: { input: unknown }) => (issue.input === undefined ? 'obrigatória' : 'valor inválido') };
+/** Domínio de e-mail: rótulos de letras, números e hífen separados por ponto (ao menos um ponto). */
+const DOMINIO = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
+
+const obrigatoria ={ error: (issue: { input: unknown }) => (issue.input === undefined ? 'obrigatória' : 'valor inválido') };
 
 /**
  * Schema de TODAS as variáveis de ambiente da API. Regras:
@@ -73,9 +76,30 @@ const esquemaBase = z.object({
    */
   ADMIN_INICIAL_EMAIL: z.string().trim().toLowerCase().pipe(z.email().max(254)).optional(),
   NOME_SISTEMA: z.string().regex(/^[^\r\n]{1,80}$/, 'uma linha de até 80 caracteres').default('Sistema'),
+  /**
+   * Login por código (src/auth/). AUTH_DOMINIOS_PERMITIDOS: domínios de e-mail que podem pedir código, separados por
+   * vírgula, comparados exatamente (vazia: qualquer domínio; quem decide é a tabela usuario). AUTH_SEGREDO_CODIGO: chave
+   * do HMAC dos códigos (Segredo, mínimo 32 caracteres; obrigatória em produção, a API não sobe sem ela).
+   * Sessão: expira parada AUTH_SESSAO_OCIOSA_MIN minutos ou AUTH_SESSAO_ABSOLUTA_H horas depois do login.
+   */
+  AUTH_DOMINIOS_PERMITIDOS: z
+    .string()
+    .default('')
+    .transform((v) => v.split(',').map((d) => d.trim().toLowerCase()).filter(Boolean))
+    .pipe(z.array(z.string().regex(DOMINIO, 'cada item deve ser um domínio sem @ nem curinga, ex.: grupomultiplica.com.br'))),
+  AUTH_SEGREDO_CODIGO: z
+    .string()
+    .min(32, 'mínimo 32 caracteres (gere com: openssl rand -hex 32)')
+    .transform((v) => new Segredo(v))
+    .optional(),
+  AUTH_SESSAO_OCIOSA_MIN: z.coerce.number().int().min(1).max(1440).default(30),
+  AUTH_SESSAO_ABSOLUTA_H: z.coerce.number().int().min(1).max(720).default(12),
 });
 
-/** Regras entre variáveis: log nunca em produção; smtp exige servidor e remetente; usuário e senha andam juntos. */
+/**
+ * Regras entre variáveis: log nunca em produção; smtp exige servidor e remetente; usuário e senha andam juntos; sessão
+ * ociosa não maior que a absoluta. (AUTH_SEGREDO_CODIGO em produção é cobrado pelo AuthModule ao subir.)
+ */
 export const esquemaConfig = esquemaBase.superRefine((c, ctx) => {
   const problema = (path: string, message: string) => ctx.addIssue({ code: 'custom', path: [path], message });
   if (c.MAIL_MODE === 'log' && c.NODE_ENV === 'production') {
@@ -91,6 +115,9 @@ export const esquemaConfig = esquemaBase.superRefine((c, ctx) => {
   }
   if (c.SMTP_USUARIO !== undefined && c.SMTP_SENHA === undefined) problema('SMTP_SENHA', 'obrigatória quando SMTP_USUARIO está definido');
   if (c.SMTP_SENHA !== undefined && c.SMTP_USUARIO === undefined) problema('SMTP_USUARIO', 'obrigatória quando SMTP_SENHA está definida');
+  if (c.AUTH_SESSAO_OCIOSA_MIN > c.AUTH_SESSAO_ABSOLUTA_H * 60) {
+    problema('AUTH_SESSAO_OCIOSA_MIN', 'não pode ser maior que AUTH_SESSAO_ABSOLUTA_H (em minutos)');
+  }
 });
 
 export type Config = Readonly<z.infer<typeof esquemaConfig>>;

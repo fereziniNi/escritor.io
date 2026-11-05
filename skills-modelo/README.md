@@ -26,6 +26,9 @@ pnpm typecheck
 pnpm build
 pnpm --filter api test        # só um app
 node scripts/verificar-referencias.mjs   # referencia/ das skills == código daqui
+pnpm --filter web e2e         # Playwright com a API simulada (depois de pnpm build)
+# Login de verdade (API + Postgres + Mailpit, banco novo): docker compose up -d postgres mailpit && pnpm build, e em apps/web:
+pnpm exec playwright test -c e2e/login-real.config.ts
 ```
 
 Rodar local: `docker compose up -d postgres`, `cp .env.example .env`, `pnpm --filter api db:migrate`, `pnpm dev`
