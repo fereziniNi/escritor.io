@@ -19,3 +19,6 @@ Thumbs.db
 # Env
 .env
 .env.local
+
+# Brainstorm companion
+.superpowers/
