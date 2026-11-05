@@ -27,22 +27,27 @@ de memória. Vem da união de BeyondCredit, Conta Gráfica, CONECTA e dos achado
    zod em modo `jitless` (`packages/contratos/src/sem-eval.ts`, **primeiro** import do `index.ts` dos contratos), senão
    o zod testa `Function()` e toda tela registra violação de CSP. Teste: `apps/web/src/build-csp.test.ts`.
 4. **CORS desligado por padrão** (`seguranca/cors.ts`). `CORS_ORIGENS` (lista separada por vírgula de origens
-   `https://host[:porta]`, sem caminho nem curinga; inválida = erro no boot) liga o CORS só para essas origens, com
+   `https://host[:porta]`, sem caminho nem curinga; `http://` só `localhost`/`127.0.0.1`; inválida = erro no boot) liga o CORS só para essas origens, com
    credenciais. Origem fora da lista: resposta **sem** `Access-Control-Allow-Origin` e **nunca 500** (a função de
    origem nunca devolve erro).
 5. **CSRF** (`seguranca/origem.guard.ts`): `POST`, `PUT`, `PATCH` e `DELETE` em `/api` só com `Origin` (ou, sem ele,
-   `Referer`) igual à própria origem (`req.protocol://Host`) ou a uma de `CORS_ORIGENS`; `Origin: null` é recusado;
-   sem `Origin` e sem `Referer`, recusa se `Sec-Fetch-Site` for `cross-site`/`same-site` (cliente que não é navegador
-   passa: não carrega cookie de vítima). Recusa = **403** JSON padrão. GET que altera algo (baixar arquivo que registra,
+   `Referer`) igual à própria origem (`req.protocol://Host`, comparada normalizada: minúsculas, sem porta padrão) ou a
+   uma de `CORS_ORIGENS`; `Origin: null` é recusado. Sem `Origin` e sem `Referer`: recusa se `Sec-Fetch-Site` for
+   `cross-site`/`same-site`; sem nenhum dos três, recusa **se houver `Cookie`** (navegador antigo ou página que tirou
+   o Referer) e deixa passar sem cookie (integração com chave, curl: não carrega cookie de vítima). Recusa = **403** JSON padrão. GET que altera algo (baixar arquivo que registra,
    confirmar por link) leva `@MesmaOrigem()`: `Sec-Fetch-Site` `cross-site`/`same-site` → 403, salvo `Origin` de
    `CORS_ORIGENS`. Cookie de sessão sempre `HttpOnly; Secure; SameSite=Lax` (skill `login-codigo-email`).
 6. **Limite por IP** (`seguranca/limitador.ts`): `LIMITE_REQ_POR_IP` requisições por minuto por IP em `/api/*`
    (padrão **300**, janela fixa de 60 s, em memória por instância). Acima: **429** JSON padrão com `Retry-After` em
-   segundos. Limite **por chave** (e-mail, usuário, código) com `new LimitadorJanelaFixa(limite, janelaMs)` e chave
+   segundos. IPv6 conta pelo prefixo **/64**. Memória limitada: no máximo 10.000 chaves; acima disso saem as janelas
+   vencidas e depois as mais antigas, sem varrer o mapa inteiro. Limite **por chave** (e-mail, usuário, código) com `new LimitadorJanelaFixa(limite, janelaMs)` e chave
    própria (`email:${email}`); limite que precisa valer entre réplicas vai para o banco.
 7. **Proxy confiável**: `PROXIES_CONFIAVEIS` (padrão `0`; **`1` na instalação**, atrás do Caddy) vira o
    `trust proxy` do Express. Sem ele, atrás do Caddy, o limite vale para o Caddy inteiro, o HSTS não sai e toda
    mutação leva 403 (o Origin é `https://` e a API se vê em `http://`). Com `0`, `X-Forwarded-*` é ignorado.
+   **Modelo de confiança**: com `1` a API acredita no `X-Forwarded-For` que recebe, então ela **não publica porta**
+   no host (sem `ports:` no serviço da API do compose) e só é alcançável pelo Caddy, cujo `reverse_proxy` padrão
+   reescreve o `X-Forwarded-For` com o IP real (sem `trusted_proxies` no Caddy).
 8. **Ordem**: `aplicarSeguranca(app, config)` logo depois de `app.useLogger(...)` no `configurarApp` (antes do SPA);
    `SegurancaModule` importado no `AppModule` **logo depois do `LogModule`**, para a recusa (403/429) já ter
    `X-Request-Id`, sair no log e no formato `{ status, erro, requestId }`.
@@ -53,11 +58,14 @@ de memória. Vem da união de BeyondCredit, Conta Gráfica, CONECTA e dos achado
     para e-mail/CPF existente ou não; o aviso real vai por e-mail ao dono. Limite por IP **e** por e-mail.
 11. **Erro sem detalhe**: 5xx responde só `"Erro interno"` + `requestId` (detalhe só no log); `/api/*` desconhecida é
     404 JSON, nunca o `index.html` (skill `novo-projeto-multiplica`, regras 8 e 9).
-12. **CI** (`.github/workflows/ci.yml`), todos bloqueantes: `qualidade` (`pnpm install --frozen-lockfile`, `lint`,
+12. **CI** (`.github/workflows/ci.yml`): `qualidade` (`pnpm install --frozen-lockfile`, `lint`,
     `typecheck`, `test`, `build`); `segredos` (gitleaks `v8.28.0` em container, histórico inteiro com
     `fetch-depth: 0`); `dependencias` (`pnpm audit --prod --audit-level high` bloqueia; o audit completo só informa);
-    `codeql` (`javascript-typescript`, `security-extended`, permissão `security-events: write`). `permissions:
-    contents: read` no topo; actions com versão fixa.
+    `codeql` (`javascript-typescript`, `security-extended`, permissões `actions: read`, `contents: read`,
+    `security-events: write`). `permissions: contents: read` no topo. Toda action fixada pelo **SHA do commit** com a
+    versão em comentário (`actions/checkout@<sha> # v7.0.1`); a imagem do gitleaks por digest. Obrigatórios na proteção
+    da branch: `qualidade`, `segredos` e `dependencias` sempre; `codeql` só quando o repositório tem o GitHub Code
+    Security (GHAS) ou é público — em repositório privado sem GHAS o job falha no upload: fica fora das obrigatórias.
 13. **Dependabot** (`.github/dependabot.yml`): `npm` e `github-actions` semanais, dependências de desenvolvimento
     agrupadas, `versioning-strategy: increase` (mantém versão exata). Com Dockerfile, acrescente `docker`.
 14. **Checklist de pentest** (`referencia/checklist-pentest.md`): as 8 classes conferidas e marcadas antes da
@@ -91,8 +99,8 @@ Pré-requisito: esqueleto da skill `novo-projeto-multiplica` (e, pela ordem, `id
    `import seguranca.caddy` no topo e `import seguranca` dentro do site. Para validar sem a instalação, copie também
    `deploy/caddy/teste/Caddyfile` e rode o comando escrito nele (`caddy validate`, Docker).
 6. CI: copie `.github/workflows/ci.yml` e `.github/dependabot.yml`. No GitHub do repositório: Settings → Code security →
-   ligue Dependabot alerts, Dependabot security updates, Secret scanning e Code scanning; em Branches, exija os 4 jobs
-   da CI para o merge na `main`.
+   ligue Dependabot alerts, Dependabot security updates, Secret scanning e Code scanning (se houver GHAS); em Branches,
+   exija `qualidade`, `segredos` e `dependencias` para o merge na `main` (e `codeql` quando houver GHAS, regra 12).
 7. No código das próximas telas e rotas: `@MesmaOrigem()` em todo GET que altera algo; `LimitadorJanelaFixa` com
    chave própria em login, envio de código e qualquer rota cara; mensagens que não revelam se a conta existe.
 8. Verifique (checklist abaixo) e preencha `referencia/checklist-pentest.md` antes da homologação.
@@ -133,11 +141,12 @@ e os `package.json` de `referencia/configuracao.md`: `@nestjs/*`, `express`, `zo
 
 - [ ] `pnpm lint`, `pnpm typecheck`, `pnpm test` e `pnpm build` saem limpos (inclui `seguranca.e2e.spec.ts`, `build-csp.test.ts` e `csp.spec.ts`).
 - [ ] `curl -sI http://localhost:3000/api/health` mostra os 6 cabeçalhos da regra 1, `Cache-Control: no-store` e a CSP `default-src 'none'`; sem `X-Powered-By`.
-- [ ] `curl -s -o /dev/null -w "%{http_code}" -X POST -H "Origin: https://malicioso.exemplo" http://localhost:3000/api/health` → `403`.
+- [ ] `curl -s -o /dev/null -w "%{http_code}" -X POST -H "Origin: https://malicioso.exemplo" http://localhost:3000/api/health` → `403`; idem só com `-H "Cookie: x=1"` → `403`.
 - [ ] Origem fora de `CORS_ORIGENS` → sem `Access-Control-Allow-Origin` e status diferente de 500 (GET e OPTIONS).
 - [ ] Rajada acima de `LIMITE_REQ_POR_IP` → `429` com `Retry-After`.
 - [ ] `deploy/.env.example` com `PROXIES_CONFIAVEIS=1`; `CORS_ORIGENS` vazio salvo necessidade real.
 - [ ] `caddy validate` aceita o Caddyfile com `import seguranca`; no navegador (F12 → Console) nenhuma violação de CSP nas telas.
-- [ ] `.github/workflows/ci.yml` e `.github/dependabot.yml` no repositório; CI verde com os 4 jobs exigidos para o merge.
+- [ ] `.github/workflows/ci.yml` e `.github/dependabot.yml` no repositório; actions fixadas por SHA; CI verde com os jobs da regra 12 exigidos no merge.
+- [ ] Na instalação, a API não publica porta: só o Caddy a alcança (`PROXIES_CONFIAVEIS=1`).
 - [ ] Nenhuma mensagem revela se e-mail/CPF existe; GET que altera algo tem `@MesmaOrigem()`.
 - [ ] `referencia/checklist-pentest.md` preenchido; `seguranca` listada em "Skills Multiplica aplicadas" no `CLAUDE.md`.

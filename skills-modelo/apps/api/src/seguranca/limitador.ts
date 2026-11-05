@@ -1,3 +1,4 @@
+import { isIPv6 } from 'node:net';
 import { HttpException, HttpStatus, Inject, Injectable, type NestMiddleware } from '@nestjs/common';
 import { type NextFunction, type Request, type Response } from 'express';
 import { type Config } from '../config/config';
@@ -18,30 +19,59 @@ export class LimitadorJanelaFixa {
     private readonly limite: number,
     private readonly janelaMs: number,
     private readonly agora: () => number = Date.now,
-    /** Acima de tantas chaves, as janelas vencidas são descartadas (memória limitada sob varredura de IPs). */
+    /** Máximo de chaves em memória (varredura de IPs não esgota a memória nem a CPU). */
     private readonly tetoChaves = 10_000,
   ) {}
 
   /** Conta uma requisição de `chave`. Devolve null dentro do limite; acima dele, os segundos até a janela virar. */
   registrar(chave: string): number | null {
     const t = this.agora();
-    if (this.#contagens.size >= this.tetoChaves) {
-      for (const [k, v] of this.#contagens) if (t - v.inicio >= this.janelaMs) this.#contagens.delete(k);
-    }
     const atual = this.#contagens.get(chave);
-    if (!atual || t - atual.inicio >= this.janelaMs) {
-      this.#contagens.set(chave, { inicio: t, total: 1 });
-      return null;
+    if (atual && t - atual.inicio < this.janelaMs) {
+      atual.total += 1;
+      if (atual.total <= this.limite) return null;
+      return Math.max(1, Math.ceil((atual.inicio + this.janelaMs - t) / 1000));
     }
-    atual.total += 1;
-    if (atual.total <= this.limite) return null;
-    return Math.max(1, Math.ceil((atual.inicio + this.janelaMs - t) / 1000));
+    // Janela nova: a chave vai para o fim do Map, que fica ordenado pelo início da janela (mais antiga na frente).
+    this.#contagens.delete(chave);
+    this.#abrirEspaco(t);
+    this.#contagens.set(chave, { inicio: t, total: 1 });
+    return null;
+  }
+
+  /**
+   * Custo proporcional só ao que sai: descarta da frente as janelas vencidas e, se ainda estiver no teto, as mais
+   * antigas (perder a contagem de uma chave antiga só a deixa recomeçar; o mapa nunca passa de tetoChaves).
+   */
+  #abrirEspaco(t: number): void {
+    for (const [k, v] of this.#contagens) {
+      const vencida = t - v.inicio >= this.janelaMs;
+      if (!vencida && this.#contagens.size < this.tetoChaves) break;
+      this.#contagens.delete(k);
+    }
   }
 
   /** Quantas chaves estão em memória (testes). */
   get tamanho(): number {
     return this.#contagens.size;
   }
+}
+
+/**
+ * Chave de limite de um IP: IPv4 como está (inclusive o mapeado "::ffff:a.b.c.d"); IPv6 pelo prefixo /64, que é o
+ * que um único cliente costuma ter inteiro (trocar o endereço dentro dele não escapa do limite).
+ */
+export function chaveDeIp(ip: string | undefined): string {
+  if (!ip) return 'desconhecido';
+  const mapeado = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(ip);
+  if (mapeado) return mapeado[1]!;
+  if (!isIPv6(ip)) return ip;
+  const [esquerda = '', direita] = ip.toLowerCase().split('::');
+  const partes = (texto: string) => (texto ? texto.split(':').flatMap((g) => (g.includes('.') ? ['0', '0'] : [g])) : []);
+  const a = partes(esquerda);
+  const b = direita === undefined ? [] : partes(direita);
+  const grupos = direita === undefined ? a : [...a, ...Array<string>(8 - a.length - b.length).fill('0'), ...b];
+  return `${grupos.slice(0, 4).map((g) => parseInt(g, 16).toString(16)).join(':')}::/64`;
 }
 
 /** Responde 429 (formato padrão do FiltroErros) com Retry-After. */
@@ -52,7 +82,8 @@ export function recusarPorLimite(res: Response, segundos: number): never {
 
 /**
  * LIMITE_REQ_POR_IP requisições por minuto por IP em /api/*. O IP é o `req.ip` do Express, que só considera o
- * X-Forwarded-For quando PROXIES_CONFIAVEIS > 0 (senão qualquer cliente trocaria de IP mudando o cabeçalho).
+ * X-Forwarded-For quando PROXIES_CONFIAVEIS > 0 (senão qualquer cliente trocaria de IP mudando o cabeçalho); IPv6
+ * conta por /64 (chaveDeIp).
  */
 @Injectable()
 export class LimitePorIpMiddleware implements NestMiddleware {
@@ -63,7 +94,7 @@ export class LimitePorIpMiddleware implements NestMiddleware {
   }
 
   use(req: Request, res: Response, next: NextFunction): void {
-    const espera = this.#limitador.registrar(`ip:${req.ip ?? 'desconhecido'}`);
+    const espera = this.#limitador.registrar(`ip:${chaveDeIp(req.ip)}`);
     if (espera !== null) recusarPorLimite(res, espera);
     next();
   }

@@ -134,6 +134,11 @@ describe('CSRF: origem da requisição', () => {
     expect(res.status).toBe(404);
   });
 
+  it('POST com Cookie e sem Origin, Referer e Sec-Fetch-Site → 403; o mesmo sem cookie (integração, curl) segue para a rota', async () => {
+    await request(app.getHttpServer()).post('/api/health').set('Cookie', 'sessao=abc').expect(403);
+    await request(app.getHttpServer()).post('/api/health').expect(404);
+  });
+
   it('GET com Origin de outro site não é bloqueado por esta regra (só métodos que alteram estado)', async () => {
     await request(app.getHttpServer()).get('/api/health').set('Origin', MALICIOSO).expect(200);
   });

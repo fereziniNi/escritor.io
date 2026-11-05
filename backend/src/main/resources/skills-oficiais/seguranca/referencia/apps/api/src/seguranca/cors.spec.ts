@@ -13,13 +13,13 @@ describe('variáveis de segurança na configuração', () => {
     expect(config.PROXIES_CONFIAVEIS).toBe(0);
   });
 
-  it('CORS_ORIGENS aceita lista separada por vírgula de origens (esquema + host [+ porta])', () => {
-    const config = carregarConfig(env({ CORS_ORIGENS: 'https://painel.exemplo.com.br, http://localhost:5173' }));
-    expect(config.CORS_ORIGENS).toEqual(['https://painel.exemplo.com.br', 'http://localhost:5173']);
+  it('CORS_ORIGENS aceita lista separada por vírgula de origens https (http só para localhost e 127.0.0.1)', () => {
+    const config = carregarConfig(env({ CORS_ORIGENS: 'https://painel.exemplo.com.br, http://localhost:5173,http://127.0.0.1:8080' }));
+    expect(config.CORS_ORIGENS).toEqual(['https://painel.exemplo.com.br', 'http://localhost:5173', 'http://127.0.0.1:8080']);
   });
 
-  it('CORS_ORIGENS com caminho, curinga ou sem esquema é recusado no boot', () => {
-    for (const valor of ['https://painel.exemplo.com.br/app', '*', 'painel.exemplo.com.br', 'https://*.exemplo.com.br']) {
+  it('CORS_ORIGENS com caminho, curinga, sem esquema ou http fora de localhost é recusado no boot', () => {
+    for (const valor of ['https://painel.exemplo.com.br/app', '*', 'painel.exemplo.com.br', 'https://*.exemplo.com.br', 'http://painel.exemplo.com.br', 'http://localhost.exemplo.com.br']) {
       expect(() => carregarConfig(env({ CORS_ORIGENS: valor }))).toThrow(ErroConfiguracao);
       expect(() => carregarConfig(env({ CORS_ORIGENS: valor }))).toThrow(/CORS_ORIGENS/);
     }

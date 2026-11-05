@@ -24,9 +24,9 @@
 
 | Nome | Obrigatória | Exemplo | Para que serve |
 |---|---|---|---|
-| `PROXIES_CONFIAVEIS` | sim na instalação (atrás do Caddy); não em dev | `1` | quantos proxies ficam na frente da API; sem isso, atrás do Caddy, todo salvamento dá "Acesso negado" |
+| `PROXIES_CONFIAVEIS` | sim na instalação (atrás do Caddy); não em dev | `1` | quantos proxies ficam na frente da API; sem isso, atrás do Caddy, todo salvamento dá "Acesso negado". Com `1`, a API não pode ter porta aberta no servidor: só o Caddy fala com ela |
 | `LIMITE_REQ_POR_IP` | não (padrão 300) | `300` | requisições por minuto por endereço IP; acima disso o sistema pede para esperar (erro 429) |
-| `CORS_ORIGENS` | não (padrão: vazio, desligado) | `https://painel.exemplo.com.br` | só se OUTRO sistema, em outro endereço, chamar esta API pelo navegador |
+| `CORS_ORIGENS` | não (padrão: vazio, desligado) | `https://painel.exemplo.com.br` | só se OUTRO sistema, em outro endereço, chamar esta API pelo navegador (sempre `https://`; `http://` só para `localhost`) |
 
 ### Dependências
 
@@ -51,7 +51,9 @@ Nenhum pacote npm novo: usa o NestJS, o Express, o zod e o Vite do esqueleto. Na
    - bash: `docker run --rm -v "$PWD/deploy/caddy:/etc/caddy" caddy:2 caddy validate --config /etc/caddy/teste/Caddyfile --adapter caddyfile`
    - PowerShell: `docker run --rm -v "${PWD}/deploy/caddy:/etc/caddy" caddy:2 caddy validate --config /etc/caddy/teste/Caddyfile --adapter caddyfile`
 6. Depois de enviar ao GitHub: aba **Actions** → a CI aparece com os jobs `lint · typecheck · testes · build`,
-   `gitleaks`, `pnpm audit` e `CodeQL`, todos verdes. Em Settings → Code security, ligue Dependabot e Code scanning.
+   `gitleaks`, `pnpm audit` e `CodeQL`. Em Settings → Code security, ligue o Dependabot. Repositório privado: o
+   `CodeQL` só funciona com o GitHub Code Security (GHAS) contratado; sem ele, esse job falha e não deve ser exigido
+   no merge (os outros três sim).
 7. Antes da homologação, abra `.claude/skills/seguranca/referencia/checklist-pentest.md` e marque cada item testado.
 
 Próximo passo: seguir a ordem de skills indicada pelo Claude Code (a próxima é `email-transacional`).

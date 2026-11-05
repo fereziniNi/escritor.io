@@ -8,10 +8,11 @@ import { MesmaOrigemGuard, getDeOutroSite, origemRecusada } from './origem.guard
 const PROPRIA = 'https://sistema.exemplo.com.br';
 const LISTA = ['https://painel.grupomultiplica.com.br'];
 
-/** Requisição falsa: só o que o guard lê (método, cabeçalhos, protocolo e host). */
+/** Requisição falsa: só o que o guard lê (método, cabeçalhos, protocolo e host; Host padrão sistema.exemplo.com.br). */
 function req(method: string, headers: Record<string, string> = {}): Request {
-  const h = Object.fromEntries(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]));
-  return { method, protocol: 'https', get: (nome: string) => (nome.toLowerCase() === 'host' ? 'sistema.exemplo.com.br' : h[nome.toLowerCase()]) } as unknown as Request;
+  const h: Record<string, string> = { host: 'sistema.exemplo.com.br' };
+  for (const [k, v] of Object.entries(headers)) h[k.toLowerCase()] = v;
+  return { method, protocol: 'https', get: (nome: string) => h[nome.toLowerCase()] } as unknown as Request;
 }
 
 describe('origemRecusada (CSRF em métodos que alteram estado)', () => {
@@ -38,7 +39,22 @@ describe('origemRecusada (CSRF em métodos que alteram estado)', () => {
     expect(origemRecusada(req('POST', { origin: 'https://malicioso.exemplo', referer: `${PROPRIA}/` }), [])).toBe(true);
   });
 
-  it('sem Origin e sem Referer: navegador de outro site (Sec-Fetch-Site) é recusado; cliente que não é navegador passa', () => {
+  it('Host em maiúsculas ou com a porta padrão explícita continua sendo a própria origem', () => {
+    expect(origemRecusada(req('POST', { origin: PROPRIA, host: 'SISTEMA.Exemplo.com.br' }), [])).toBe(false);
+    expect(origemRecusada(req('POST', { origin: PROPRIA, host: 'sistema.exemplo.com.br:443' }), [])).toBe(false);
+    expect(origemRecusada(req('POST', { origin: 'https://SISTEMA.exemplo.com.br:443' }), [])).toBe(false);
+    expect(origemRecusada(req('POST', { origin: PROPRIA, host: 'sistema.exemplo.com.br:8443' }), [])).toBe(true);
+  });
+
+  it('com cookie e sem Origin, Referer e Sec-Fetch-Site é recusado (navegador antigo ou página que tirou o Referer)', () => {
+    expect(origemRecusada(req('POST', { cookie: 'sessao=abc' }), [])).toBe(true);
+    expect(origemRecusada(req('DELETE', { cookie: 'sessao=abc' }), [])).toBe(true);
+    // Com cookie, mas com sinal do próprio navegador de que veio do próprio sistema: passa.
+    expect(origemRecusada(req('POST', { cookie: 'sessao=abc', origin: PROPRIA }), [])).toBe(false);
+    expect(origemRecusada(req('POST', { cookie: 'sessao=abc', 'sec-fetch-site': 'same-origin' }), [])).toBe(false);
+  });
+
+  it('sem Origin e sem Referer: navegador de outro site (Sec-Fetch-Site) é recusado; cliente sem cookie que não é navegador passa', () => {
     expect(origemRecusada(req('POST', { 'sec-fetch-site': 'cross-site' }), [])).toBe(true);
     expect(origemRecusada(req('POST', { 'sec-fetch-site': 'same-site' }), [])).toBe(true);
     expect(origemRecusada(req('POST', { 'sec-fetch-site': 'same-origin' }), [])).toBe(false);

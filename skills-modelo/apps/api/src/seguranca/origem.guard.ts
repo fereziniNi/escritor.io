@@ -13,11 +13,13 @@ import { CONFIG } from '../config/config.module';
 
 // Proteção contra requisição forjada entre sites (CSRF), em duas partes:
 // 1. VerificarOrigemMiddleware (toda a /api): POST, PUT, PATCH e DELETE só com Origin (ou, sem ele, Referer) da
-//    própria origem ou de CORS_ORIGENS. Navegador sempre manda Origin nesses métodos; sem Origin, Referer nem
-//    Sec-Fetch-Site é cliente que não é navegador (integração, curl), que não carrega cookie de vítima: passa.
+//    própria origem ou de CORS_ORIGENS. Sem Origin e sem Referer: recusa se Sec-Fetch-Site disser outro site, ou se
+//    houver Cookie sem nenhum sinal do navegador (navegador antigo, página que tirou o Referer); sem cookie e sem
+//    esses cabeçalhos é cliente que não é navegador (integração com chave, curl), que não carrega cookie de vítima.
 // 2. @MesmaOrigem() em GET com efeito colateral (baixar arquivo que registra algo, confirmar por link): recusa
 //    navegação vinda de outro site pelo Sec-Fetch-Site, que o cookie SameSite=Lax ainda deixaria passar.
-// "Própria origem" = req.protocol + Host; atrás do Caddy, PROXIES_CONFIAVEIS=1 faz o Express ler o https real.
+// "Própria origem" = req.protocol + Host, normalizada (minúsculas, sem porta padrão); atrás do Caddy,
+// PROXIES_CONFIAVEIS=1 faz o Express ler o https real. Origens da lista também são comparadas normalizadas.
 
 const METODOS_SEGUROS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const MENSAGEM = 'Origem da requisição não permitida';
@@ -33,7 +35,11 @@ function origemDe(valor: string | undefined): string | null {
   }
 }
 
-const propriaOrigem = (req: Request) => `${req.protocol}://${req.get('host') ?? ''}`;
+const propriaOrigem = (req: Request) => origemDe(`${req.protocol}://${req.get('host') ?? ''}`);
+
+/** A origem (já normalizada) é a própria ou uma de CORS_ORIGENS. */
+const origemAceita = (req: Request, origem: string, permitidas: readonly string[]) =>
+  origem === propriaOrigem(req) || permitidas.some((p) => origemDe(p) === origem);
 
 /** Sec-Fetch-Site de navegador vindo de outro site ("same-site" inclui subdomínio irmão, também recusado). */
 const outroSite = (req: Request) => {
@@ -46,10 +52,15 @@ export function origemRecusada(req: Request, permitidas: readonly string[]): boo
   if (METODOS_SEGUROS.has(req.method)) return false;
   const origin = req.get('origin');
   const referer = req.get('referer');
-  if (origin === undefined && referer === undefined) return outroSite(req);
+  if (origin === undefined && referer === undefined) {
+    const site = req.get('sec-fetch-site');
+    if (site !== undefined) return outroSite(req);
+    // Nenhum sinal do navegador: com cookie pode ser a sessão de uma vítima, recusa; sem cookie, passa.
+    return req.get('cookie') !== undefined;
+  }
   // Origin presente decide sozinho (inclusive "null", que é recusado); Referer só vale quando não há Origin.
   const origem = origin !== undefined ? origemDe(origin) : origemDe(referer);
-  return !(origem && (origem === propriaOrigem(req) || permitidas.includes(origem)));
+  return !(origem && origemAceita(req, origem, permitidas));
 }
 
 /**
@@ -59,7 +70,7 @@ export function origemRecusada(req: Request, permitidas: readonly string[]): boo
 export function getDeOutroSite(req: Request, permitidas: readonly string[]): boolean {
   if (!outroSite(req)) return false;
   const origem = origemDe(req.get('origin'));
-  return !(origem && permitidas.includes(origem));
+  return !(origem && permitidas.some((p) => origemDe(p) === origem));
 }
 
 /** Aplicado a toda a /api pelo SegurancaModule. */

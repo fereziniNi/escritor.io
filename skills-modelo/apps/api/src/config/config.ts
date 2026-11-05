@@ -4,10 +4,10 @@ import { Segredo, lerSegredo } from './segredo';
 /** Só caracteres de tag/sha (letras, números, . _ + -): um valor estranho no ambiente não vai para o /api/health. */
 const IDENTIFICADOR_DE_BUILD = /^[A-Za-z0-9._+-]{1,64}$/;
 
-/** Origem web: esquema + host (+ porta), sem caminho nem curinga. */
-const ORIGEM = /^https?:\/\/[A-Za-z0-9.-]+(:\d{1,5})?$/;
+/** Origem web: https + host (+ porta), sem caminho nem curinga; http só para localhost e 127.0.0.1 (dev). */
+const ORIGEM = /^(https:\/\/[A-Za-z0-9.-]+|http:\/\/(localhost|127\.0\.0\.1))(:\d{1,5})?$/;
 
-const obrigatoria ={ error: (issue: { input: unknown }) => (issue.input === undefined ? 'obrigatória' : 'valor inválido') };
+const obrigatoria = { error: (issue: { input: unknown }) => (issue.input === undefined ? 'obrigatória' : 'valor inválido') };
 
 /**
  * Schema de TODAS as variáveis de ambiente da API. Regras:
@@ -37,7 +37,7 @@ export const esquemaConfig = z.object({
     .string()
     .default('')
     .transform((v) => v.split(',').map((o) => o.trim()).filter(Boolean))
-    .pipe(z.array(z.string().regex(ORIGEM, 'cada item deve ser uma origem sem caminho, ex.: https://painel.exemplo.com.br'))),
+    .pipe(z.array(z.string().regex(ORIGEM, 'cada item deve ser uma origem https sem caminho (http só localhost), ex.: https://painel.exemplo.com.br'))),
   /** Requisições por minuto por IP em /api (janela fixa, por instância). Acima disso: 429 com Retry-After. */
   LIMITE_REQ_POR_IP: z.coerce.number().int().min(1).default(300),
   /** Quantos proxies confiáveis estão na frente da API (Caddy = 1). Define o IP real, o https e o host vistos. */

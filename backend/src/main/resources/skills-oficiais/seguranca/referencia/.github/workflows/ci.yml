@@ -3,7 +3,10 @@
 # - qualidade: lint, typecheck, testes (Postgres real via Testcontainers; o runner já tem Docker) e build;
 # - segredos: gitleaks no histórico inteiro;
 # - dependencias: vulnerabilidade alta/crítica em dependência de produção;
-# - codeql: análise estática de segurança do TypeScript.
+# - codeql: análise estática de segurança do TypeScript. Em repositório PRIVADO o CodeQL exige o GitHub Code Security
+#   (GHAS): sem ele o job falha no upload; aí deixe-o fora das verificações obrigatórias do merge (ou remova o job).
+#   Em repositório público ou com GHAS, ele é obrigatório na proteção da branch.
+# Actions fixadas pelo SHA do commit (o comentário diz a versão); o Dependabot (github-actions) atualiza os dois.
 name: CI
 
 on:
@@ -24,10 +27,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Versão do pnpm vem do "packageManager" do package.json raiz.
-      - uses: pnpm/action-setup@v6.1.0
-      - uses: actions/setup-node@v7.0.0
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
           cache: pnpm
@@ -41,21 +44,21 @@ jobs:
     name: gitleaks
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      # Binário oficial em container (a gitleaks-action pede licença paga em repositório de organização).
+      # Binário oficial em container, fixado por digest (a gitleaks-action pede licença paga em repositório de organização).
       # Achou segredo: troque a credencial (ela vazou) e só depois limpe o código; falso positivo vai para .gitleaksignore.
       - name: gitleaks (histórico inteiro)
-        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.28.0 git /repo --redact --no-banner --verbose
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.28.0@sha256:cdbb7c955abce02001a9f6c9f602fb195b7fadc1e812065883f695d1eeaba854 git /repo --redact --no-banner --verbose
 
   dependencias:
     name: pnpm audit
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: pnpm/action-setup@v6.1.0
-      - uses: actions/setup-node@v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
           cache: pnpm
@@ -69,12 +72,13 @@ jobs:
     name: CodeQL
     runs-on: ubuntu-24.04
     permissions:
+      actions: read
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: github/codeql-action/init@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           languages: javascript-typescript
           queries: security-extended
-      - uses: github/codeql-action/analyze@v4
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
