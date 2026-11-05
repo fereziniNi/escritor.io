@@ -32,6 +32,11 @@ class GeradorZipSkillTest {
         return skill;
     }
 
+    private static GeradorZipSkill.PacoteZip pacote(Skill s) {
+        SkillVersao v = s.getVersaoVigente();
+        return new GeradorZipSkill.PacoteZip(s.getSlug(), v.arquivosComoValor(), v.getTutorialInstalacao());
+    }
+
     private static Map<String, String> ler(byte[] zip) throws IOException {
         Map<String, String> r = new LinkedHashMap<>();
         try (ZipInputStream in = new ZipInputStream(new ByteArrayInputStream(zip), StandardCharsets.UTF_8)) {
@@ -49,7 +54,7 @@ class GeradorZipSkillTest {
                 new ArquivoSkill("referencia/headers.ts", "export const x = 1;"),
                 new ArquivoSkill("SKILL.md", "ação")), "Copie a pasta");
 
-        Map<String, String> zip = ler(gerador.gerar("seguranca", s.getVersaoVigente()));
+        Map<String, String> zip = ler(gerador.gerar("seguranca", s.getVersaoVigente().arquivosComoValor(), s.getVersaoVigente().getTutorialInstalacao()));
 
         assertThat(zip.keySet()).containsExactly("seguranca/SKILL.md", "seguranca/referencia/headers.ts",
                 "seguranca/TUTORIAL.md");
@@ -65,7 +70,7 @@ class GeradorZipSkillTest {
                 new ArquivoSkill("SKILL.md", "s"),
                 new ArquivoSkill("A.md", "a")), "t");
 
-        Map<String, String> zip = ler(gerador.gerar("ordem", s.getVersaoVigente()));
+        Map<String, String> zip = ler(gerador.gerar("ordem", s.getVersaoVigente().arquivosComoValor(), s.getVersaoVigente().getTutorialInstalacao()));
 
         assertThat(zip.keySet()).containsExactly("ordem/A.md", "ordem/SKILL.md", "ordem/b.md", "ordem/TUTORIAL.md");
     }
@@ -76,7 +81,7 @@ class GeradorZipSkillTest {
                 new ArquivoSkill("SKILL.md", "x"),
                 new ArquivoSkill("TUTORIAL.md", "meu tutorial")), "gerado");
 
-        Map<String, String> zip = ler(gerador.gerar("seguranca", s.getVersaoVigente()));
+        Map<String, String> zip = ler(gerador.gerar("seguranca", s.getVersaoVigente().arquivosComoValor(), s.getVersaoVigente().getTutorialInstalacao()));
 
         assertThat(zip.keySet()).containsExactly("seguranca/SKILL.md", "seguranca/TUTORIAL.md");
         assertThat(zip.get("seguranca/TUTORIAL.md")).isEqualTo("meu tutorial");
@@ -87,10 +92,18 @@ class GeradorZipSkillTest {
         Skill a = skill("alfa", List.of(new ArquivoSkill("SKILL.md", "A")), "ta");
         Skill b = skill("beta", List.of(new ArquivoSkill("SKILL.md", "B")), "tb");
 
-        Map<String, String> zip = ler(gerador.gerarVarias(List.of(a, b)));
+        Map<String, String> zip = ler(gerador.gerarVarias(List.of(pacote(a), pacote(b))));
 
         assertThat(zip.keySet()).containsExactly("alfa/SKILL.md", "alfa/TUTORIAL.md",
                 "beta/SKILL.md", "beta/TUTORIAL.md");
         assertThat(zip.get("beta/SKILL.md")).isEqualTo("B");
+    }
+
+    @Test
+    void caminhoMaliciosoNuncaChegaAoZip() {
+        for (String caminho : List.of("../../etc/x", "a/../../b", "/abs", "C:\\x")) {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> gerador.gerar("s",
+                    List.of(new ArquivoSkill(caminho, "x")), "t")).isInstanceOf(IllegalArgumentException.class);
+        }
     }
 }

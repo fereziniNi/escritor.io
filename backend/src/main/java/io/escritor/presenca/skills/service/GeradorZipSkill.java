@@ -1,8 +1,6 @@
 package io.escritor.presenca.skills.service;
 
 import io.escritor.presenca.skills.domain.ArquivoSkill;
-import io.escritor.presenca.skills.domain.Skill;
-import io.escritor.presenca.skills.domain.SkillVersao;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -23,23 +21,23 @@ public class GeradorZipSkill {
 
     static final String TUTORIAL = "TUTORIAL.md";
 
-    public byte[] gerar(String slug, SkillVersao versao) {
-        return empacotar(List.of(new Pasta(slug, versao)));
+    /** Pacote já em valores simples: nunca toca entidades JPA (sem lazy loading fora da transação). */
+    public record PacoteZip(String slug, List<ArquivoSkill> arquivos, String tutorial) {
     }
 
-    /** Usa a versão vigente de cada skill, cada uma na sua pasta. */
-    public byte[] gerarVarias(List<Skill> skills) {
-        return empacotar(skills.stream().map(s -> new Pasta(s.getSlug(), s.getVersaoVigente())).toList());
+    public byte[] gerar(String slug, List<ArquivoSkill> arquivos, String tutorial) {
+        return empacotar(List.of(new PacoteZip(slug, arquivos, tutorial)));
     }
 
-    private record Pasta(String slug, SkillVersao versao) {
+    public byte[] gerarVarias(List<PacoteZip> pacotes) {
+        return empacotar(pacotes);
     }
 
-    private byte[] empacotar(List<Pasta> pastas) {
+    private byte[] empacotar(List<PacoteZip> pastas) {
         try {
             ByteArrayOutputStream saida = new ByteArrayOutputStream();
             try (ZipOutputStream zip = new ZipOutputStream(saida, StandardCharsets.UTF_8)) {
-                for (Pasta pasta : pastas) {
+                for (PacoteZip pasta : pastas) {
                     escrever(zip, pasta);
                 }
             }
@@ -49,17 +47,30 @@ public class GeradorZipSkill {
         }
     }
 
-    private void escrever(ZipOutputStream zip, Pasta pasta) throws IOException {
-        List<ArquivoSkill> arquivos = pasta.versao().arquivosComoValor().stream()
+    private void escrever(ZipOutputStream zip, PacoteZip pasta) throws IOException {
+        List<ArquivoSkill> arquivos = pasta.arquivos().stream()
                 .sorted(Comparator.comparing(ArquivoSkill::caminho))
                 .toList();
         boolean temTutorial = false;
         for (ArquivoSkill arquivo : arquivos) {
+            validarNome(pasta.slug());
+            validarNome(arquivo.caminho());
             entrada(zip, pasta.slug() + "/" + arquivo.caminho(), arquivo.conteudo());
             temTutorial |= TUTORIAL.equals(arquivo.caminho());
         }
         if (!temTutorial) {
-            entrada(zip, pasta.slug() + "/" + TUTORIAL, pasta.versao().getTutorialInstalacao());
+            entrada(zip, pasta.slug() + "/" + TUTORIAL, pasta.tutorial());
+        }
+    }
+
+    /**
+     * Defesa em profundidade (o validador já barra no salvar): nenhum nome com {@code ..} ou
+     * absoluto chega ao zip, evitando zip-slip em quem extrai.
+     */
+    private static void validarNome(String nome) {
+        if (nome.startsWith("/") || nome.startsWith("\\") || nome.contains("\\")
+                || java.util.Arrays.asList(nome.split("/")).contains("..")) {
+            throw new IllegalArgumentException("Nome de entrada inválido no zip: " + nome);
         }
     }
 

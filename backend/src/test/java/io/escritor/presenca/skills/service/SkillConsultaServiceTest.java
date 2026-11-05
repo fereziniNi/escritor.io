@@ -50,7 +50,7 @@ class SkillConsultaServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SkillConsultaService(skillRepository, versaoRepository);
+        service = new SkillConsultaService(skillRepository, versaoRepository, new GeradorZipSkill());
         seguranca = skill("seguranca", "Segurança", "Revisa headers", CategoriaSkill.SEGURANCA, true, false);
         interfaceSkill = skill("ui", "Interface", "Botões e telas", CategoriaSkill.INTERFACE, false, false);
         arquivada = skill("velha", "Velha", "Segurança antiga", CategoriaSkill.SEGURANCA, true, true);
