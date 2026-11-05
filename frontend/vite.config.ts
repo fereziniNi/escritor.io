@@ -29,6 +29,7 @@ export default defineConfig({
           '/mapas',
           '/relatorios',
           '/notificacoes',
+          '/skills',
         ].map((path) => [path, process.env.VITE_BACKEND_URL ?? 'http://localhost:8080']),
       ),
       // /ws precisa de ws: true - é upgrade de conexão (S3.11), não request HTTP normal como
