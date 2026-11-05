@@ -2,6 +2,7 @@ package io.escritor.presenca.skills.web;
 
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
 import io.escritor.presenca.skills.domain.CategoriaSkill;
+import io.escritor.presenca.skills.domain.SkillInvalidaException;
 import io.escritor.presenca.skills.service.SkillConsultaService;
 import io.escritor.presenca.skills.service.SkillFachada;
 import java.util.List;
@@ -105,28 +106,43 @@ public class SkillController {
     @PostMapping("/skills/{slug}/versoes/{numero}/rejeitar")
     @PreAuthorize("hasAnyRole('GESTOR','ADMIN')")
     public SkillVersaoResponse rejeitar(@PathVariable String slug, @PathVariable int numero,
-            @RequestBody DecisaoRequest request) {
-        return fachada.rejeitar(slug, numero, contexto.usuarioAtual(), request.motivo());
+            @RequestBody(required = false) DecisaoRequest request) {
+        return fachada.rejeitar(slug, numero, contexto.usuarioAtual(), motivoObrigatorio(request));
     }
 
     @PutMapping("/skills/{slug}/oficial")
     @PreAuthorize("hasAnyRole('GESTOR','ADMIN')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void oficial(@PathVariable String slug, @RequestBody FlagRequest request) {
-        fachada.definirOficial(slug, request.valor(), contexto.usuarioAtual());
+    public void oficial(@PathVariable String slug, @RequestBody(required = false) FlagRequest request) {
+        fachada.definirOficial(slug, valorObrigatorio(request), contexto.usuarioAtual());
     }
 
     @PutMapping("/skills/{slug}/arquivada")
     @PreAuthorize("hasAnyRole('GESTOR','ADMIN')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void arquivada(@PathVariable String slug, @RequestBody FlagRequest request) {
-        fachada.definirArquivada(slug, request.valor(), contexto.usuarioAtual());
+    public void arquivada(@PathVariable String slug, @RequestBody(required = false) FlagRequest request) {
+        fachada.definirArquivada(slug, valorObrigatorio(request), contexto.usuarioAtual());
     }
 
     private static ResponseEntity<byte[]> zip(byte[] bytes, String nomeArquivo) {
         return ResponseEntity.ok()
                 .contentType(ZIP)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nomeArquivo + ".zip\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nomeArquivo.replaceAll("[^a-z0-9-]", "-") + ".zip\"")
                 .body(bytes);
+    }
+
+    /** Corpo sem o campo (ou com outro nome) não pode virar "false" em silêncio. */
+    private static boolean valorObrigatorio(FlagRequest request) {
+        if (request == null || request.valor() == null) {
+            throw new SkillInvalidaException("Informe o campo \"valor\" (true ou false).");
+        }
+        return request.valor();
+    }
+
+    private static String motivoObrigatorio(DecisaoRequest request) {
+        if (request == null || request.motivo() == null || request.motivo().isBlank()) {
+            throw new SkillInvalidaException("Informe o motivo da rejeição");
+        }
+        return request.motivo();
     }
 }

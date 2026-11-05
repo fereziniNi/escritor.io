@@ -5,6 +5,7 @@ import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.service.ContextoUsuarioAutenticado;
 import io.escritor.presenca.seguranca.JwtService;
 import io.escritor.presenca.seguranca.SecurityConfig;
+import io.escritor.presenca.skills.domain.AcaoSkillNaoPermitidaException;
 import io.escritor.presenca.skills.domain.CategoriaSkill;
 import io.escritor.presenca.skills.domain.ConflitoSkillException;
 import io.escritor.presenca.skills.domain.EstadoVersao;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -199,5 +201,75 @@ class SkillControllerTest {
 
     private static int anyInt() {
         return org.mockito.ArgumentMatchers.anyInt();
+    }
+
+    @Test
+    @WithMockUser(roles = "GESTOR")
+    void flagSemOCampoValorRetorna400ESemChamarOServico() throws Exception {
+        String msg = "Informe o campo \"valor\" (true ou false).";
+        for (String rota : List.of("oficial", "arquivada")) {
+            for (String corpo : List.of("{\"oficial\":true}", "{}", "{\"valor\":null}")) {
+                mockMvc.perform(put("/skills/s-s/" + rota).contentType(MediaType.APPLICATION_JSON).content(corpo))
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.mensagem").value(msg));
+            }
+            mockMvc.perform(put("/skills/s-s/" + rota)).andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.mensagem").value(msg));
+        }
+        verify(fachada, never()).definirOficial(any(), anyBoolean(), any());
+        verify(fachada, never()).definirArquivada(any(), anyBoolean(), any());
+    }
+
+    @Test
+    @WithMockUser(roles = "GESTOR")
+    void rejeitarSemMotivoOuSemCorpoRetorna400() throws Exception {
+        for (String corpo : List.of("{}", "{\"motivo\":null}", "{\"motivo\":\"  \"}")) {
+            mockMvc.perform(post("/skills/s-s/versoes/2/rejeitar").contentType(MediaType.APPLICATION_JSON)
+                    .content(corpo)).andExpect(status().isBadRequest()).andExpect(jsonPath("$.mensagem").exists());
+        }
+        mockMvc.perform(post("/skills/s-s/versoes/2/rejeitar")).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem").exists());
+        verify(fachada, never()).rejeitar(any(), anyInt(), any(), any());
+    }
+
+    @Test
+    @WithMockUser
+    void nomeDoArquivoZipESanitizado() throws Exception {
+        when(consulta.zipDaSkill("Ab_c\"x", null)).thenReturn(new byte[] {1});
+
+        mockMvc.perform(get("/skills/{s}/zip", "Ab_c\"x"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition", "attachment; filename=\"-b-c-x.zip\""));
+    }
+
+    @Test
+    @WithMockUser
+    void propostaPendenteConcorrenteNoBancoVira409() throws Exception {
+        when(fachada.salvar(any(), any(), any())).thenThrow(new DataIntegrityViolationException("x",
+                new RuntimeException("duplicate key value violates unique constraint \"uq_skill_versao_proposta_pendente\"")));
+
+        mockMvc.perform(post("/skills/minha-skill/versoes").contentType(MediaType.APPLICATION_JSON).content(CORPO))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.mensagem").value("Já existe uma proposta pendente para esta skill."));
+    }
+
+    @Test
+    @WithMockUser
+    void outraViolacaoDeIntegridadeNaoViraConflito() throws Exception {
+        when(fachada.salvar(any(), any(), any())).thenThrow(new DataIntegrityViolationException("x",
+                new RuntimeException("violates constraint \"outra_constraint\"")));
+
+        org.junit.jupiter.api.Assertions.assertThrows(jakarta.servlet.ServletException.class,
+                () -> mockMvc.perform(post("/skills/minha-skill/versoes").contentType(MediaType.APPLICATION_JSON)
+                        .content(CORPO)));
+    }
+
+    @Test
+    @WithMockUser
+    void acaoNaoPermitidaVira403() throws Exception {
+        when(fachada.salvar(any(), any(), any())).thenThrow(new AcaoSkillNaoPermitidaException("não pode"));
+
+        mockMvc.perform(post("/skills/minha-skill/versoes").contentType(MediaType.APPLICATION_JSON).content(CORPO))
+                .andExpect(status().isForbidden());
     }
 }
