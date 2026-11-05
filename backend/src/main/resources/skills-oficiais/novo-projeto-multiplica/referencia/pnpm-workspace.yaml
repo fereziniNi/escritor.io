@@ -1,0 +1,4 @@
+# origem: skills-modelo/pnpm-workspace.yaml
+packages:
+  - "apps/*"
+  - "packages/*"
