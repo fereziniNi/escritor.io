@@ -49,8 +49,8 @@ server {
     resolver ${NGINX_LOCAL_RESOLVERS} valid=10s;
 
     # Auditoria de segurança (VULN-07, MEDIUM): nenhum header de segurança era enviado antes
-    # disto. Nenhuma das 3 locations abaixo define seu próprio `add_header`, então estes valem
-    # pras três (regra do Nginx: `add_header` só deixa de herdar do contexto pai quando o filho
+    # disto. Nenhuma das locations abaixo (skills, API, /ws/ e SPA) define seu próprio
+    # `add_header`, então estes valem pra todas (regra do Nginx: `add_header` só deixa de herdar do contexto pai quando o filho
     # também declara o seu - se isso mudar no futuro, repetir estes headers em cada location).
     #
     # - X-Content-Type-Options/X-Frame-Options/Referrer-Policy/Permissions-Policy: padrão, sem
@@ -91,7 +91,7 @@ server {
     add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ws: wss: stun: turn: turns: https://escritorio-io.metered.live; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'" always;
 
     # Skills: o corpo do PUT pode chegar a ~2 MB de JSON (multi-arquivo); o default do Nginx e 1m.
-    location ~ ^/skills {
+    location ~ ^/skills(/|$) {
         client_max_body_size 4m;
         set $backend_upstream http://${BACKEND_HOST}:${BACKEND_PORT};
         proxy_pass $backend_upstream;
