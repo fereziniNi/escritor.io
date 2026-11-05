@@ -1,4 +1,4 @@
-# origem: skills-modelo/docker-compose.yml
+# origem: skills-modelo/estagios/novo-projeto-multiplica/docker-compose.yml
 # Desenvolvimento local: só a infraestrutura (a API e a web rodam com `pnpm dev`).
 # Instalação no cliente é outra coisa: deploy/docker-compose.yml (skill instalacao-docker-compose).
 services:

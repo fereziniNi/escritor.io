@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/src/config/config.ts
+// origem: skills-modelo/estagios/seguranca/apps/api/src/config/config.ts
 import { z } from 'zod';
 import { Segredo, lerSegredo } from './segredo';
 

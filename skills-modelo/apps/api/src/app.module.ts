@@ -4,6 +4,7 @@ import { type DestinationStream } from 'pino';
 import { BancoModule } from './banco/banco.module';
 import { type Config } from './config/config';
 import { ConfigModule } from './config/config.module';
+import { EmailModule } from './email/email.module';
 import { FiltroErros } from './http/filtro-erros';
 import { LogModule } from './log/log.module';
 import { SaudeModule } from './saude/saude.module';
@@ -26,6 +27,7 @@ export class AppModule {
         LogModule.registrar(config, opcoes.destinoLog),
         SegurancaModule,
         BancoModule.registrar(config),
+        EmailModule,
         SaudeModule,
       ],
       // Erros sempre em JSON padrão ({ status, erro, requestId }), inclusive o 404 de /api/* desconhecido.

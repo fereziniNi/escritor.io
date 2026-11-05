@@ -1,0 +1,3 @@
+nome: E-mail transacional
+descricao: Envia e-mail de sistema por SMTP com uma interface única (EnviadorEmail), modo log só para desenvolvimento, retry simples, Mailpit no compose de dev e modelo HTML/texto com a identidade visual Multiplica.
+categoria: INFRA

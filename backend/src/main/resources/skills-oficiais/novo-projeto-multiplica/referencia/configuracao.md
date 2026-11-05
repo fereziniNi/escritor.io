@@ -84,7 +84,7 @@ playwright-report/
 
 `apps/api/package.json`. `db:generate` gera a migração a partir de `src/banco/esquema.ts`; `db:migrate` aplica.
 
-<!-- arquivo: skills-modelo/apps/api/package.json -->
+<!-- arquivo: skills-modelo/estagios/novo-projeto-multiplica/apps/api/package.json -->
 ```json
 {
   "name": "api",

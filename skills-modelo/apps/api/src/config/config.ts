@@ -15,7 +15,7 @@ const obrigatoria = { error: (issue: { input: unknown }) => (issue.input === und
  * - segredo (senha, chave, URL com senha) vira `Segredo` com `.transform((v) => new Segredo(v))`;
  * - toda variável também pode vir de arquivo: `NOME_ARQUIVO=/run/secrets/nome` (ver segredo.ts).
  */
-export const esquemaConfig = z.object({
+const esquemaBase = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
@@ -42,6 +42,44 @@ export const esquemaConfig = z.object({
   LIMITE_REQ_POR_IP: z.coerce.number().int().min(1).default(300),
   /** Quantos proxies confiáveis estão na frente da API (Caddy = 1). Define o IP real, o https e o host vistos. */
   PROXIES_CONFIAVEIS: z.coerce.number().int().min(0).max(10).default(0),
+  /**
+   * E-mail (src/email/). `smtp` envia de verdade; `log` só registra o envio (desenvolvimento e testes) e é RECUSADO em
+   * produção. O padrão é `log`, então produção precisa declarar `MAIL_MODE=smtp` e o servidor.
+   */
+  MAIL_MODE: z.enum(['smtp', 'log']).default('log'),
+  SMTP_HOST: z.string().min(1).optional(),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+  /** true = TLS direto (porta 465); false = STARTTLS quando o servidor oferece (587, 25 e o Mailpit de dev). */
+  SMTP_SEGURO: z
+    .enum(['true', 'false'], { error: 'deve ser true ou false' })
+    .default('false')
+    .transform((v) => v === 'true'),
+  SMTP_USUARIO: z.string().min(1).optional(),
+  /** Senha do SMTP: Segredo (em produção use SMTP_SENHA_ARQUIVO). */
+  SMTP_SENHA: z
+    .string()
+    .min(1)
+    .transform((v) => new Segredo(v))
+    .optional(),
+  /** Remetente: `Sistema <nao-responda@exemplo.com.br>` ou só o endereço. Sem quebra de linha (injeção de cabeçalho). */
+  EMAIL_REMETENTE: z
+    .string()
+    .regex(/^[^\r\n<>]*<?[^\s@<>]+@[^\s@<>]+>?$/,'deve ser um endereço ou "Nome <endereco@dominio>", numa linha só')
+    .optional(),
+});
+
+/** Regras entre variáveis: log nunca em produção; smtp exige servidor e remetente; usuário e senha andam juntos. */
+export const esquemaConfig = esquemaBase.superRefine((c, ctx) => {
+  const problema = (path: string, message: string) => ctx.addIssue({ code: 'custom', path: [path], message });
+  if (c.MAIL_MODE === 'log' && c.NODE_ENV === 'production') {
+    problema('MAIL_MODE', 'log não é aceito em produção (nenhum e-mail seria enviado); use MAIL_MODE=smtp');
+  }
+  if (c.MAIL_MODE === 'smtp') {
+    if (c.SMTP_HOST === undefined) problema('SMTP_HOST', 'obrigatória com MAIL_MODE=smtp');
+    if (c.EMAIL_REMETENTE === undefined) problema('EMAIL_REMETENTE', 'obrigatória com MAIL_MODE=smtp');
+  }
+  if (c.SMTP_USUARIO !== undefined && c.SMTP_SENHA === undefined) problema('SMTP_SENHA', 'obrigatória quando SMTP_USUARIO está definido');
+  if (c.SMTP_SENHA !== undefined && c.SMTP_USUARIO === undefined) problema('SMTP_USUARIO', 'obrigatória quando SMTP_SENHA está definida');
 });
 
 export type Config = Readonly<z.infer<typeof esquemaConfig>>;
