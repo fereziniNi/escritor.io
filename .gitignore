@@ -22,3 +22,11 @@ Thumbs.db
 
 # Brainstorm companion
 .superpowers/
+
+# Projeto-modelo das skills (pnpm, fora do build do escritor.io)
+skills-modelo/**/node_modules/
+skills-modelo/**/dist/
+skills-modelo/**/coverage/
+skills-modelo/**/test-results/
+skills-modelo/**/playwright-report/
+skills-modelo/**/*.tsbuildinfo
