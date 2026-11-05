@@ -35,10 +35,10 @@ de memória. Vem da união de BeyondCredit, BeyondComitê, FinAnalytics e Conta 
    | `--perigo` (+ `-suave`) | `#DC2626` (`#FDECEC`) | `#F87171` (`#2E1414`) | erro, exclusão |
    | `--info` (+ `-suave`) | `#0284C7` (`#E6F3FA`) | `#38BDF8` (`#0C2433`) | informativo |
 
-   `--sobre-primaria` (`#FFFFFF`) é o texto sobre a primária.
+   `--sobre-primaria` é o texto sobre a primária: `#FFFFFF` no claro e `#000E1C` (navy) no escuro, porque branco sobre a primária escura `#5B8DEF` dá só ~3,3:1 de contraste.
 3. **Modo escuro** com os mesmos nomes: valores da tabela em `:root[data-theme="dark"]` (escolha da pessoa) **e**
    repetidos em `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { ... } }` (sistema escuro sem
-   escolha). Os dois blocos têm de ficar idênticos.
+   escolha). Os dois blocos têm de ficar idênticos (inclusive `--sobre-primaria: #000E1C`).
 4. **Tema sem piscar**: `public/tema-inicial.js` (arquivo externo, sem script inline, serve com CSP) é carregado no
    `<head>` antes do CSS e grava `data-theme` na raiz a partir da chave `multiplica:tema` (`claro` | `escuro`) ou do
    sistema. `src/tema/tema.ts` (`aplicarTema`, `alternarTema`, `temaEfetivo`) usa a mesma chave. Nunca outra chave.
@@ -72,7 +72,7 @@ de memória. Vem da união de BeyondCredit, BeyondComitê, FinAnalytics e Conta 
 14. **Telas-modelo** (`telas/modelo/`): `TelaLogin` (cartão centralizado), `TelaListagem` (filtros acima + tabela
     densa + vazio), `TelaFormulario` (validação com mensagem por campo), `TelaPainel` (indicadores + gráfico). São
     ponto de partida: copie a que se parece com a tela pedida, troque os dados de exemplo por `useQuery`.
-15. **Acessibilidade mínima**: foco visível em tudo que clica, contraste dos tokens preservado (não use `texto-3` para
+15. **Acessibilidade mínima**: foco visível em tudo que clica (links da sidebar e botão de tema usam anel ciano), contraste dos tokens preservado (não use `texto-3` para
     texto essencial), todo campo com `label`, gráfico com `aria-label` descrevendo os dados, ícone sem texto com `aria-label`.
 
 ## Como aplicar
@@ -91,28 +91,14 @@ existe e `pnpm --filter web test` passa. Ao copiar um arquivo de `referencia/`, 
    — e rode `pnpm --filter web test`: tem de falhar (módulos inexistentes).
 3. Copie o código: `src/lib/formatos.ts`, `src/tema/tokens.css`, `src/tema/tema.ts`, `public/tema-inicial.js`,
    `src/componentes/*.tsx`, `src/telas/modelo/*.tsx`. Rode de novo: passa.
-4. **Substitua `src/index.css`** pelo `referencia/apps/web/src/index.css` (ele importa fontes, Tailwind, `tw-animate-css`
-   e `./tema/tokens.css`, e traz o `@theme inline`). `src/main.tsx` continua importando `./index.css`.
-5. Em `apps/web/index.html`, no `<head>` e **antes** de qualquer CSS, acrescente `<script src="/tema-inicial.js"></script>`.
-6. Troque o nome: nas telas-modelo e no `AppShell`, `nomeSistema` é o nome curto do sistema (ex.: "Crédito" → marca
-   "BeyondCrédito"). Ajuste o título do `index.html`.
-7. Use o `AppShell` no roteador (`src/App.tsx`): rotas logadas dentro de um layout, a de login fora.
-
-   ```tsx
-   const grupos = [{ titulo: 'Operação', itens: [{ rotulo: 'Painel', para: '/' }] }];
-   function Layout() {
-     const saude = useQuery({ queryKey: ['saude'], queryFn: buscarSaude });
-     return (
-       <AppShell nomeSistema="Crédito" grupos={grupos} usuario={{ nome: 'Ana Souza' }} versao={saude.data?.versao}>
-         <Outlet />
-       </AppShell>
-     );
-   }
-   const roteador = createBrowserRouter([
-     { path: '/entrar', element: <TelaLogin nomeSistema="Crédito" aoEntrar={entrar} /> },
-     { element: <Layout />, children: [{ path: '/', element: <TelaPainel /> }] },
-   ]);
-   ```
+4. **Substitua `src/index.css`** pelo `referencia/apps/web/src/index.css` (importa fontes, Tailwind, `tw-animate-css` e
+   `./tema/tokens.css`, e traz o `@theme inline`). `src/main.tsx` continua importando `./index.css`.
+5. **Substitua `apps/web/index.html`** pelo da referência (é o do esqueleto com
+   `<script src="/tema-inicial.js"></script>` no `<head>`, antes de qualquer CSS). Ajuste o título.
+6. Troque o nome do sistema: `NOME_SISTEMA` no `src/App.tsx` (ex.: "Crédito" → marca "BeyondCrédito") e a lista `grupos` do menu.
+7. **Substitua `src/App.tsx`, `src/telas/Inicio.tsx` e `e2e/inicio.spec.ts`** pelos da referência: o `App.tsx` põe as rotas
+   logadas dentro do `AppShell` (`Layout`, com a versão vinda de `/api/health`) e a tela de entrada fora dele; "/" passa a ser o
+   painel e a tela de saúde do esqueleto vai para `/sistema` (o e2e acompanha). Troque as telas-modelo pelas reais aos poucos.
 8. Verifique: `pnpm lint && pnpm typecheck && pnpm test && pnpm build`; `pnpm dev`, abra http://localhost:5173, alterne o
    tema no rodapé da sidebar, recarregue (deve manter, sem piscar) e confira no DevTools que `localStorage["multiplica:tema"]` existe.
 
@@ -132,6 +118,7 @@ Tudo que um arquivo de `referencia/` importa está em `referencia/` ou no esquel
 
 - `referencia/apps/web/src/tema/tokens.css` — todas as cores, claro e escuro, e a ligação com as variáveis do shadcn; passo 3, e ao criar ou mudar uma cor.
 - `referencia/apps/web/src/index.css` — entrada do CSS (fontes, `@theme inline`, escala, raios, base); substitui o do esqueleto, passo 4.
+- `referencia/apps/web/index.html`, `src/App.tsx`, `src/telas/Inicio.tsx`, `e2e/inicio.spec.ts` — versões do esqueleto já com a identidade (script do tema, AppShell e rotas); passos 5 e 7.
 - `referencia/apps/web/src/tema/tema.ts`, `public/tema-inicial.js` — troca de tema e aplicação antes da pintura; ao mexer no tema.
 - `referencia/apps/web/src/lib/formatos.ts` — moeda, data, CPF, CNPJ; sempre que mostrar valor ou documento.
 - `referencia/apps/web/src/componentes/AppShell.tsx`, `AlternarTema.tsx` — sidebar, marca, menu, rodapé; passo 7.

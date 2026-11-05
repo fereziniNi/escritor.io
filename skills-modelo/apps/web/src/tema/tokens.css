@@ -50,7 +50,7 @@
   --sidebar-primary: var(--primaria);
   --sidebar-primary-foreground: var(--sobre-primaria);
   --sidebar-accent: var(--navy-hover);
-  --sidebar-accent-foreground: var(--sobre-primaria);
+  --sidebar-accent-foreground: var(--sidebar-foreground);
   --sidebar-border: var(--navy-hover);
   --sidebar-ring: var(--ciano);
 }
@@ -59,6 +59,7 @@
   --primaria: #5B8DEF;
   --primaria-hover: #7BA3F3;
   --primaria-suave: #16264A;
+  --sobre-primaria: #000E1C;
   --navy: #000E1C;
   --navy-hover: #0A1E33;
   --navy-texto: #9FB0C5;
@@ -84,6 +85,7 @@
     --primaria: #5B8DEF;
     --primaria-hover: #7BA3F3;
     --primaria-suave: #16264A;
+    --sobre-primaria: #000E1C;
     --navy: #000E1C;
     --navy-hover: #0A1E33;
     --navy-texto: #9FB0C5;

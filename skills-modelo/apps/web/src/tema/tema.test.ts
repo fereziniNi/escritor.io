@@ -22,6 +22,20 @@ describe('tokens.css', () => {
     expect(css).toContain('--navy: #000E1C');
   });
 
+  it('no escuro o texto sobre a primária é navy (contraste), nos dois blocos escuros idênticos', () => {
+    const porEscolha = /:root\[data-theme="dark"\]\s*\{([^}]*)\}/.exec(css)?.[1];
+    const pelaMedia = /:root:not\(\[data-theme="light"\]\)\s*\{([^}]*)\}/.exec(css)?.[1];
+    expect(porEscolha).toContain('--sobre-primaria: #000E1C');
+    const normalizar = (bloco: string) =>
+      bloco
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .join('\n');
+    expect(porEscolha).toBeTruthy();
+    expect(normalizar(pelaMedia ?? '')).toBe(normalizar(porEscolha ?? ''));
+  });
+
   it('liga as variáveis do shadcn aos tokens (nunca cor solta)', () => {
     expect(css).toContain('--primary: var(--primaria)');
     expect(css).toContain('--background: var(--fundo)');

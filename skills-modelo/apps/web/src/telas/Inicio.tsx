@@ -7,7 +7,7 @@ export function Inicio() {
   const saude = useQuery({ queryKey: ['saude'], queryFn: buscarSaude });
 
   return (
-    <main className="mx-auto max-w-xl p-8">
+    <div className="mx-auto max-w-xl p-8">
       <h1 className="text-2xl font-semibold">Sistema Multiplica</h1>
       {saude.isPending && <p className="mt-4 text-sm text-muted-foreground">Verificando a API…</p>}
       {saude.isError && (
@@ -24,6 +24,6 @@ export function Inicio() {
           </li>
         </ul>
       )}
-    </main>
+    </div>
   );
 }

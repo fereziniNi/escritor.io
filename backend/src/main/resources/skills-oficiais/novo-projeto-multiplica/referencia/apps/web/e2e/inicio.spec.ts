@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/web/e2e/inicio.spec.ts
+// origem: skills-modelo/estagios/novo-projeto-multiplica/apps/web/e2e/inicio.spec.ts
 import { expect, test } from '@playwright/test';
 
 test('a tela inicial mostra a versão que a API informa', async ({ page }) => {

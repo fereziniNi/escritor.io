@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/web/src/telas/Inicio.tsx
+// origem: skills-modelo/estagios/novo-projeto-multiplica/apps/web/src/telas/Inicio.tsx
 import { useQuery } from '@tanstack/react-query';
 import { buscarSaude } from '@/lib/api';
 

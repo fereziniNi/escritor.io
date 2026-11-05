@@ -51,7 +51,7 @@ export function AppShell({ nomeSistema, grupos, usuario, versao, children }: Pro
                       end={item.para === '/'}
                       className={({ isActive }) =>
                         cn(
-                          'flex items-center gap-2 rounded-md px-2.5 py-[7px] text-13 transition-colors',
+                          'flex items-center gap-2 rounded-md px-2.5 py-[7px] text-13 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ciano',
                           isActive
                             ? 'bg-primaria text-sobre-primaria shadow-[inset_3px_0_0_var(--ciano)]'
                             : 'hover:bg-navy-hover',
@@ -77,7 +77,7 @@ export function AppShell({ nomeSistema, grupos, usuario, versao, children }: Pro
             )}
             {versao && <div className="font-mono opacity-60">{`v${versao}`}</div>}
           </div>
-          <AlternarTema className="text-navy-texto hover:bg-navy-hover hover:text-white" />
+          <AlternarTema className="text-navy-texto hover:bg-navy-hover hover:text-white focus-visible:border-ciano focus-visible:ring-2 focus-visible:ring-ciano" />
         </div>
       </aside>
       <main className="min-w-0 flex-1 p-6">{children}</main>

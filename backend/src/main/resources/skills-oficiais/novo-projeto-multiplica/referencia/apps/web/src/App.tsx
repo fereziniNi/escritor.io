@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/web/src/App.tsx
+// origem: skills-modelo/estagios/novo-projeto-multiplica/apps/web/src/App.tsx
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider, createBrowserRouter } from 'react-router';
 import { Inicio } from '@/telas/Inicio';
