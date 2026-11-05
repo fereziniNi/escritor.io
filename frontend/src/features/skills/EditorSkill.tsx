@@ -29,7 +29,8 @@ function bytes(texto: string): number {
 
 /** Modelo inicial do SKILL.md de uma skill nova. */
 function modeloSkillMd(slug: string, nome: string): string {
-  return `---\nname: ${slug}\ndescription: \n---\n\n# ${nome}`
+  return `---\nname: ${slug}\ndescription: \n---\n\n# ${nome}
+`
 }
 
 function erroSlug(slug: string): string | null {
@@ -102,6 +103,9 @@ export function EditorSkill({
       ? inicial.arquivos.map((a) => ({ id: gerarId(), ...a }))
       : [{ id: gerarId(), caminho: ARQUIVO_PRINCIPAL, conteudo: modeloSkillMd('', '') }],
   )
+  // O SKILL.md principal é identificado pelo id (não pelo caminho): assim, outro arquivo digitado como
+  // "SKILL.md" continua editável/removível e o usuário consegue corrigir o duplicado.
+  const [principalId] = useState(() => arquivos.find((a) => a.caminho === ARQUIVO_PRINCIPAL)?.id ?? null)
   const [novoCaminho, setNovoCaminho] = useState('')
   const [enviada, setEnviada] = useState<{ versao: SkillVersao; slug: string } | null>(null)
 
@@ -117,7 +121,7 @@ export function EditorSkill({
   function atualizarModelo(novoSlug: string, novoNome: string) {
     if (!criacao || skillMdEditado) return
     setArquivos((atual) =>
-      atual.map((a) => (a.caminho === ARQUIVO_PRINCIPAL ? { ...a, conteudo: modeloSkillMd(novoSlug, novoNome) } : a)),
+      atual.map((a) => (a.id === principalId ? { ...a, conteudo: modeloSkillMd(novoSlug, novoNome) } : a)),
     )
   }
 
@@ -173,6 +177,7 @@ export function EditorSkill({
   return (
     <form
       className="skills-editor"
+      onChange={() => salvar.isError && salvar.reset()}
       onSubmit={(e) => {
         e.preventDefault()
         if (!bloqueado) salvar.mutate()
@@ -233,7 +238,7 @@ export function EditorSkill({
       <fieldset>
         <legend>Arquivos</legend>
         {arquivos.map((a) => {
-          const principal = a.caminho === ARQUIVO_PRINCIPAL
+          const principal = a.id === principalId
           return (
             <div key={a.id} className="skills-editor-arquivo">
               <input
@@ -277,8 +282,8 @@ export function EditorSkill({
         <input value={mensagem} onChange={(e) => setMensagem(e.target.value)} />
       </label>
 
-      {erros.map((e) => (
-        <p key={e} className="mensagem-erro">
+      {erros.map((e, i) => (
+        <p key={`${i}-${e}`} className="mensagem-erro">
           {e}
         </p>
       ))}

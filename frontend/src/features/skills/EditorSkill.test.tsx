@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
@@ -10,7 +10,10 @@ import type { SkillVersao } from './types'
 
 const server = setupServer()
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
-afterEach(() => server.resetHandlers())
+afterEach(() => {
+  vi.useRealTimers()
+  server.resetHandlers()
+})
 afterAll(() => server.close())
 
 const inicial: SkillVersao = {
@@ -102,7 +105,46 @@ describe('EditorSkill', () => {
     expect(botaoSalvar()).toBeDisabled()
   })
 
+  it('arquivo renomeado para SKILL.md continua editável e dá para corrigir e salvar', async () => {
+    server.use(http.post('*/skills/login-seguro/versoes', () => HttpResponse.json({ ...inicial, numero: 3 })))
+    const { aoSalvar } = renderizar()
+    await userEvent.type(screen.getByLabelText('Mensagem da alteração'), 'ajuste')
+    const caminho = screen.getByLabelText('Caminho de ref/dicas.md')
+    await userEvent.clear(caminho)
+    await userEvent.type(caminho, 'SKILL.md')
+    expect(screen.getByText('Caminho duplicado: SKILL.md')).toBeInTheDocument()
+    expect(botaoSalvar()).toBeDisabled()
+    expect(screen.getAllByRole('button', { name: 'Remover SKILL.md' })).toHaveLength(1)
+    const duplicado = screen.getAllByLabelText('Caminho de SKILL.md')[1]
+    await userEvent.clear(duplicado)
+    await userEvent.type(duplicado, 'ref/ok.md')
+    expect(botaoSalvar()).toBeEnabled()
+    await userEvent.click(botaoSalvar())
+    await waitFor(() => expect(aoSalvar).toHaveBeenCalled())
+  })
+
+  it('arquivo adicionado como SKILL.md pode ser removido e o salvar volta', async () => {
+    renderizar()
+    await userEvent.type(screen.getByLabelText('Mensagem da alteração'), 'ajuste')
+    await userEvent.type(screen.getByLabelText('Novo arquivo'), 'SKILL.md')
+    await userEvent.click(screen.getByRole('button', { name: 'Adicionar arquivo' }))
+    expect(botaoSalvar()).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Remover SKILL.md' }))
+    expect(botaoSalvar()).toBeEnabled()
+  })
+
+  it('editar depois de um erro do servidor limpa a mensagem de erro', async () => {
+    server.use(http.post('*/skills/login-seguro/versoes', () => HttpResponse.json({ mensagem: 'Deu ruim' }, { status: 400 })))
+    renderizar()
+    await userEvent.type(screen.getByLabelText('Mensagem da alteração'), 'ajuste')
+    await userEvent.click(botaoSalvar())
+    expect(await screen.findByText('Deu ruim')).toBeInTheDocument()
+    await userEvent.type(screen.getByLabelText('Mensagem da alteração'), '!')
+    expect(screen.queryByText('Deu ruim')).not.toBeInTheDocument()
+  })
+
   it('skill oficial mostra o aviso e, ao receber PROPOSTA, confirma o envio', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
     server.use(
       http.post('*/skills/login-seguro/versoes', () => HttpResponse.json({ ...inicial, numero: 3, estado: 'PROPOSTA' })),
     )
@@ -111,7 +153,11 @@ describe('EditorSkill', () => {
     await userEvent.type(screen.getByLabelText('Mensagem da alteração'), 'ajuste')
     await userEvent.click(botaoSalvar())
     expect(await screen.findByText('Proposta enviada para aprovação')).toBeInTheDocument()
-    await waitFor(() => expect(aoSalvar).toHaveBeenCalledWith(expect.objectContaining({ estado: 'PROPOSTA' }), 'login-seguro'), { timeout: 3000 })
+    expect(aoSalvar).not.toHaveBeenCalled()
+    await act(async () => {
+      vi.advanceTimersByTime(1600)
+    })
+    expect(aoSalvar).toHaveBeenCalledWith(expect.objectContaining({ estado: 'PROPOSTA' }), 'login-seguro')
   })
 
   it('publicada invalida o cache e chama aoSalvar', async () => {
@@ -145,7 +191,7 @@ describe('EditorSkill', () => {
     const { aoSalvar } = renderizar({ slug: undefined, inicial: undefined })
     await userEvent.type(screen.getByLabelText('Slug'), 'minha-skill')
     await userEvent.type(screen.getByLabelText('Nome'), 'Minha')
-    expect(screen.getByLabelText('Conteúdo de SKILL.md')).toHaveValue('---\nname: minha-skill\ndescription: \n---\n\n# Minha')
+    expect(screen.getByLabelText('Conteúdo de SKILL.md')).toHaveValue('---\nname: minha-skill\ndescription: \n---\n\n# Minha\n')
     await userEvent.type(screen.getByLabelText('Descrição'), 'desc')
     await userEvent.type(screen.getByLabelText('Mensagem da alteração'), 'primeira')
     await userEvent.click(botaoSalvar())
