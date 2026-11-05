@@ -54,6 +54,10 @@
   overflow: auto;
 }
 
+.skills-arquivo-markdown {
+  overflow: auto;
+}
+
 .skills-markdown img {
   max-width: 100%;
 }

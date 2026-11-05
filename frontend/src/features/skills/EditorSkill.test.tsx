@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
@@ -25,7 +25,7 @@ const inicial: SkillVersao = {
   promptUso: 'use',
   tutorialInstalacao: 'tut',
   mensagem: null,
-  autorNome: 'Ana',
+  autorId: 1, autorNome: 'Ana',
   criadaEm: '2026-11-05T10:00:00Z',
   decididaPorNome: null,
   decididaEm: null,
@@ -218,5 +218,19 @@ describe('EditorSkill', () => {
     const { aoCancelar } = renderizar()
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
     expect(aoCancelar).toHaveBeenCalled()
+  })
+
+  it('valida o frontmatter do SKILL.md: name igual ao slug e description preenchida', () => {
+    renderizar()
+    const area = screen.getByLabelText('Conteúdo de SKILL.md')
+    const definir = (texto: string) => fireEvent.change(area, { target: { value: texto } })
+    definir('sem frontmatter')
+    expect(screen.getByText('O SKILL.md precisa começar com um frontmatter YAML válido entre linhas ---')).toBeInTheDocument()
+    definir('---\nname: outro\ndescription: x\n---\n')
+    expect(screen.getByText('O campo name do frontmatter deve ser igual ao slug (login-seguro)')).toBeInTheDocument()
+    definir('---\nname: login-seguro\ndescription:   \n---\n')
+    expect(screen.getByText('O campo description do frontmatter é obrigatório')).toBeInTheDocument()
+    definir('---\nname: login-seguro\ndescription: ok\n---\n')
+    expect(screen.queryByText(/frontmatter/)).toBeNull()
   })
 })

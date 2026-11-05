@@ -20,7 +20,7 @@ const proposta: Proposta = {
 function versao(numero: number, estado: 'PUBLICADA' | 'PROPOSTA', arquivos: { caminho: string; conteudo: string }[], extra: Partial<SkillVersao> = {}): SkillVersao {
   return {
     numero, estado, nome: 'Login seguro', descricao: 'd', categoria: 'SEGURANCA', promptUso: 'p', tutorialInstalacao: 't',
-    mensagem: null, autorNome: 'Ana', criadaEm: '2026-11-05T10:00:00Z', decididaPorNome: null, decididaEm: null, motivoRejeicao: null,
+    mensagem: null, autorId: 1, autorNome: 'Ana', criadaEm: '2026-11-05T10:00:00Z', decididaPorNome: null, decididaEm: null, motivoRejeicao: null,
     arquivos, ...extra,
   }
 }
@@ -129,5 +129,44 @@ describe('AprovacoesSkills', () => {
     await userEvent.click(await screen.findByRole('button', { name: /Login seguro/ }))
     await userEvent.click(await screen.findByRole('button', { name: 'Aprovar' }))
     expect(await within(await screen.findByRole('alert')).findByText('Já decidida')).toBeInTheDocument()
+  })
+
+  it('409 ao aprovar invalida a fila e as skills para atualizar a tela', async () => {
+    usarServidor()
+    server.use(http.post('/skills/login-seguro/versoes/3/aprovar', () => HttpResponse.json({ mensagem: 'Já decidida' }, { status: 409 })))
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const spy = vi.spyOn(queryClient, 'invalidateQueries')
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AprovacoesSkills aoVoltar={vi.fn()} />
+      </QueryClientProvider>,
+    )
+    await userEvent.click(await screen.findByRole('button', { name: /Login seguro/ }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Aprovar' }))
+    await screen.findByText('Já decidida')
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['skills', 'propostas'] })
+    expect(spy).toHaveBeenCalledWith({ queryKey: ['skills'] })
+  })
+
+  it('alternar entre aprovar e rejeitar limpa o erro anterior', async () => {
+    usarServidor()
+    server.use(http.post('/skills/login-seguro/versoes/3/aprovar', () => HttpResponse.json({ mensagem: 'Já decidida' }, { status: 409 })))
+    renderizar()
+    await userEvent.click(await screen.findByRole('button', { name: /Login seguro/ }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Aprovar' }))
+    await screen.findByText('Já decidida')
+    await userEvent.click(screen.getByRole('button', { name: 'Rejeitar' }))
+    expect(screen.queryByText('Já decidida')).toBeNull()
+  })
+
+  it('o erro de motivo some ao digitar', async () => {
+    usarServidor()
+    renderizar()
+    await userEvent.click(await screen.findByRole('button', { name: /Login seguro/ }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Rejeitar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Confirmar rejeição' }))
+    await screen.findByText('Informe o motivo da rejeição.')
+    await userEvent.type(screen.getByLabelText('Motivo da rejeição'), 'x')
+    expect(screen.queryByText('Informe o motivo da rejeição.')).toBeNull()
   })
 })

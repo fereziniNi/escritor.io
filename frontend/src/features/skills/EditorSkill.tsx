@@ -28,8 +28,9 @@ function bytes(texto: string): number {
 }
 
 /** Modelo inicial do SKILL.md de uma skill nova. */
-function modeloSkillMd(slug: string, nome: string): string {
-  return `---\nname: ${slug}\ndescription: \n---\n\n# ${nome}
+function modeloSkillMd(slug: string, nome: string, descricao = ''): string {
+  const valor = /[:#"'[\]{}&*!|>%@`]/.test(descricao) ? JSON.stringify(descricao) : descricao
+  return `---\nname: ${slug}\ndescription: ${valor}\n---\n\n# ${nome}
 `
 }
 
@@ -42,6 +43,38 @@ function erroSlug(slug: string): string | null {
 
 function caminhoValido(caminho: string): boolean {
   return caminho.length <= MAX_CAMINHO && CAMINHO.test(caminho) && caminho.split('/').every((s) => s !== '.' && s !== '..')
+}
+
+/** Lê `chave: valor` do frontmatter do SKILL.md (entre a primeira linha --- e a próxima); nulo se ausente. */
+function lerFrontmatter(skillMd: string): Map<string, string> | null {
+  const texto = skillMd.charCodeAt(0) === 0xfeff ? skillMd.slice(1) : skillMd
+  const linhas = texto.split(String.fromCharCode(10))
+  if (linhas[0]?.trimEnd() !== '---') return null
+  const campos = new Map<string, string>()
+  for (let i = 1; i < linhas.length; i++) {
+    if (linhas[i].trimEnd() === '---') return campos
+    const m = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(linhas[i])
+    if (m) campos.set(m[1], tirarAspas(m[2].trim()))
+  }
+  return null
+}
+
+function tirarAspas(valor: string): string {
+  const aspas = valor.charAt(0)
+  if (valor.length >= 2 && (aspas === '"' || aspas === "'") && valor.endsWith(aspas)) return valor.slice(1, -1)
+  return valor
+}
+
+/** Frontmatter do SKILL.md: name igual ao slug e description preenchida (mesmas mensagens do backend). */
+function errosDoFrontmatter(arquivos: ArquivoEditavel[], slug: string | undefined): string[] {
+  const principal = arquivos.find((a) => a.caminho === ARQUIVO_PRINCIPAL)
+  if (!principal) return []
+  const fm = lerFrontmatter(principal.conteudo)
+  if (fm === null) return ['O SKILL.md precisa começar com um frontmatter YAML válido entre linhas ---']
+  const erros: string[] = []
+  if (slug && fm.get('name') !== slug) erros.push(`O campo name do frontmatter deve ser igual ao slug (${slug})`)
+  if (!fm.get('description')) erros.push('O campo description do frontmatter é obrigatório')
+  return erros
 }
 
 /** Espelha as regras de ValidadorPacoteSkill (caminho, duplicados, quantidade e limites de tamanho). */
@@ -118,10 +151,10 @@ export function EditorSkill({
 
   const slugEfetivo = criacao ? slugDigitado : slug
 
-  function atualizarModelo(novoSlug: string, novoNome: string) {
+  function atualizarModelo(novoSlug: string, novoNome: string, novaDescricao: string) {
     if (!criacao || skillMdEditado) return
     setArquivos((atual) =>
-      atual.map((a) => (a.id === principalId ? { ...a, conteudo: modeloSkillMd(novoSlug, novoNome) } : a)),
+      atual.map((a) => (a.id === principalId ? { ...a, conteudo: modeloSkillMd(novoSlug, novoNome, novaDescricao) } : a)),
     )
   }
 
@@ -166,7 +199,8 @@ export function EditorSkill({
   }
   if (nome.trim().length > MAX_NOME) errosCampos.push(`O nome da skill pode ter no máximo ${MAX_NOME} caracteres`)
   const errosArquivos = errosDosArquivos(arquivos)
-  const erros = [...errosCampos, ...errosArquivos]
+  const errosFrontmatter = errosDoFrontmatter(arquivos, slugEfetivo || undefined)
+  const erros = [...errosCampos, ...errosArquivos, ...errosFrontmatter]
   const incompleto =
     (criacao && erroSlug(slugDigitado) !== null) || !nome.trim() || !descricao.trim() || !mensagem.trim()
   const bloqueado = incompleto || erros.length > 0 || salvar.isPending || enviada !== null
@@ -197,7 +231,7 @@ export function EditorSkill({
             value={slugDigitado}
             onChange={(e) => {
               setSlugDigitado(e.target.value)
-              atualizarModelo(e.target.value, nome)
+              atualizarModelo(e.target.value, nome, descricao)
             }}
           />
         </label>
@@ -208,13 +242,19 @@ export function EditorSkill({
           value={nome}
           onChange={(e) => {
             setNome(e.target.value)
-            atualizarModelo(slugDigitado, e.target.value)
+            atualizarModelo(slugDigitado, e.target.value, descricao)
           }}
         />
       </label>
       <label>
         Descrição
-        <input value={descricao} onChange={(e) => setDescricao(e.target.value)} />
+        <input
+          value={descricao}
+          onChange={(e) => {
+            setDescricao(e.target.value)
+            atualizarModelo(slugDigitado, nome, e.target.value)
+          }}
+        />
       </label>
       <label>
         Categoria

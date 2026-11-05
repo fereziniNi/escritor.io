@@ -27,6 +27,8 @@ export interface VersaoResumo {
   descricao: string
   categoria: Categoria
   mensagem: string | null
+  /** Nulo quando o autor é o Sistema (importação do repositório). */
+  autorId: number | null
   autorNome: string
   criadaEm: string
   decididaPorNome: string | null
@@ -43,6 +45,8 @@ export interface SkillVersao {
   promptUso: string | null
   tutorialInstalacao: string | null
   mensagem: string | null
+  /** Nulo quando o autor é o Sistema (importação do repositório). */
+  autorId: number | null
   autorNome: string
   criadaEm: string
   decididaPorNome: string | null

@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { buscarSkill } from './api'
+import { buscarSkill, buscarVersao } from './api'
 import { AprovacoesSkills } from './AprovacoesSkills'
 import { DetalheSkill } from './DetalheSkill'
 import { EditorSkill } from './EditorSkill'
 import { ListaSkills } from './ListaSkills'
+import { propostaDeOutro, useUsuarioId } from './usuarioAtual'
 
 type Tela = { tipo: 'lista' } | { tipo: 'detalhe'; slug: string } | { tipo: 'editor'; slug?: string } | { tipo: 'aprovacoes' }
 
@@ -14,6 +15,16 @@ function EditorDaSkill({ slug, aoSalvar, aoCancelar }: { slug?: string; aoSalvar
     queryKey: ['skills', 'detalhe', slug],
     queryFn: () => buscarSkill(slug!),
     enabled: slug !== undefined,
+  })
+  const meuId = useUsuarioId()
+  const pendente = detalheQuery.data?.propostaPendente ?? null
+  // Skill oficial com proposta minha pendente: o editor abre a proposta (não a vigente), para o novo
+  // envio, que substitui a anterior, não descartar as mudanças já feitas.
+  const editaMinhaProposta = pendente !== null && !!detalheQuery.data?.oficial && !propostaDeOutro(detalheQuery.data, meuId)
+  const propostaQuery = useQuery({
+    queryKey: ['skills', 'versao', slug, pendente?.numero],
+    queryFn: () => buscarVersao(slug!, pendente!.numero),
+    enabled: editaMinhaProposta,
   })
   if (slug === undefined) {
     return <EditorSkill oficial={false} aoSalvar={(_v, novoSlug) => aoSalvar(novoSlug)} aoCancelar={aoCancelar} />
@@ -29,14 +40,44 @@ function EditorDaSkill({ slug, aoSalvar, aoCancelar }: { slug?: string; aoSalvar
       </div>
     )
   }
+  if (propostaDeOutro(detalheQuery.data, meuId)) {
+    return (
+      <div>
+        <button type="button" className="botao-secundario" onClick={aoCancelar}>
+          Voltar
+        </button>
+        <p className="mensagem-aviso" role="status">
+          Há uma proposta de {pendente?.autorNome} aguardando aprovação. Aguarde a decisão de um gestor antes de editar.
+        </p>
+      </div>
+    )
+  }
+  if (editaMinhaProposta && propostaQuery.isPending) return <p className="mensagem-carregando">Carregando...</p>
+  if (editaMinhaProposta && propostaQuery.isError) {
+    return (
+      <div>
+        <button type="button" className="botao-secundario" onClick={aoCancelar}>
+          Voltar
+        </button>
+        <p className="mensagem-erro">Não foi possível carregar sua proposta.</p>
+      </div>
+    )
+  }
   return (
-    <EditorSkill
-      slug={slug}
-      oficial={detalheQuery.data.oficial}
-      inicial={detalheQuery.data.vigente}
-      aoSalvar={() => aoSalvar(slug)}
-      aoCancelar={aoCancelar}
-    />
+    <>
+      {editaMinhaProposta && (
+        <p className="mensagem-aviso" role="status">
+          Você está editando sua proposta pendente (v{pendente.numero})
+        </p>
+      )}
+      <EditorSkill
+        slug={slug}
+        oficial={detalheQuery.data.oficial}
+        inicial={editaMinhaProposta ? propostaQuery.data : detalheQuery.data.vigente}
+        aoSalvar={() => aoSalvar(slug)}
+        aoCancelar={aoCancelar}
+      />
+    </>
   )
 }
 

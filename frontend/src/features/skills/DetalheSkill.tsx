@@ -1,9 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
-import { baixarZip, buscarSkill, definirArquivada, definirOficial, ErroSkill, listarVersoes, restaurarVersao } from './api'
+import { baixarZip, buscarSkill, buscarVersao, definirArquivada, definirOficial, ErroSkill, listarVersoes, restaurarVersao } from './api'
+import { ArquivosVersao } from './ArquivosVersao'
+import { DiffProposta } from './DiffProposta'
 import { Markdown } from './Markdown'
 import './skills.css'
 import { ROTULO_CATEGORIA, type EstadoVersao } from './types'
+import { propostaDeOutro, useUsuarioId } from './usuarioAtual'
 
 type Aba = 'geral' | 'arquivos' | 'historico'
 
@@ -36,7 +39,9 @@ export function DetalheSkill({
   const queryClient = useQueryClient()
   const [aba, setAba] = useState<Aba>('geral')
   const [avisoCopia, setAvisoCopia] = useState<string | null>(null)
-  const [caminhoAberto, setCaminhoAberto] = useState<string | null>(null)
+  const [verProposta, setVerProposta] = useState(false)
+  const [versaoVista, setVersaoVista] = useState<number | null>(null)
+  const meuId = useUsuarioId()
   const promptRef = useRef<HTMLPreElement>(null)
 
   const detalheQuery = useQuery({ queryKey: ['skills', 'detalhe', slug], queryFn: () => buscarSkill(slug) })
@@ -44,6 +49,18 @@ export function DetalheSkill({
     queryKey: ['skills', 'versoes', slug],
     queryFn: () => listarVersoes(slug),
     enabled: aba === 'historico',
+  })
+
+  const numeroProposta = detalheQuery.data?.propostaPendente?.numero
+  const propostaQuery = useQuery({
+    queryKey: ['skills', 'versao', slug, numeroProposta],
+    queryFn: () => buscarVersao(slug, numeroProposta!),
+    enabled: verProposta && numeroProposta !== undefined,
+  })
+  const versaoVistaQuery = useQuery({
+    queryKey: ['skills', 'versao', slug, versaoVista],
+    queryFn: () => buscarVersao(slug, versaoVista!),
+    enabled: versaoVista !== null,
   })
 
   const aoConcluir = () => queryClient.invalidateQueries({ queryKey: ['skills'] })
@@ -67,7 +84,8 @@ export function DetalheSkill({
   }
 
   const { vigente, propostaPendente } = detalheQuery.data
-  const arquivoAberto = vigente.arquivos.find((a) => a.caminho === caminhoAberto) ?? null
+  const bloqueadaPorProposta = propostaDeOutro(detalheQuery.data, meuId)
+  const motivoBloqueio = propostaPendente ? `Há uma proposta de ${propostaPendente.autorNome} aguardando aprovação` : undefined
 
   async function copiarPrompt() {
     const texto = vigente.promptUso ?? ''
@@ -94,7 +112,7 @@ export function DetalheSkill({
         <button type="button" className="botao-secundario" onClick={aoVoltar}>
           Voltar
         </button>
-        <button type="button" onClick={aoEditar}>
+        <button type="button" onClick={aoEditar} disabled={bloqueadaPorProposta} title={bloqueadaPorProposta ? motivoBloqueio : undefined}>
           Editar
         </button>
         <button type="button" className="botao-secundario" onClick={() => zip.mutate(undefined)} disabled={zip.isPending}>
@@ -121,9 +139,20 @@ export function DetalheSkill({
       <p>{vigente.descricao}</p>
 
       {propostaPendente && (
-        <p className="mensagem-aviso" role="status">
-          Há uma proposta de {propostaPendente.autorNome} aguardando aprovação
-        </p>
+        <div className="mensagem-aviso" role="status">
+          <p>Há uma proposta de {propostaPendente.autorNome} aguardando aprovação</p>
+          <button type="button" className="botao-secundario" onClick={() => setVerProposta((v) => !v)}>
+            {verProposta ? 'Ocultar proposta' : 'Ver proposta'}
+          </button>
+        </div>
+      )}
+      {propostaPendente && verProposta && (
+        <div className="skills-proposta-vista">
+          <h2>Proposta v{propostaPendente.numero}</h2>
+          {propostaQuery.isPending && <p className="mensagem-carregando">Carregando...</p>}
+          {propostaQuery.isError && <p className="mensagem-erro">Não foi possível carregar a proposta.</p>}
+          {propostaQuery.data && <DiffProposta vigente={vigente} proposta={propostaQuery.data} />}
+        </div>
       )}
       {erroAcao && <p className="mensagem-erro">{mensagemDoErro(erroAcao)}</p>}
       {zip.isError && <p className="mensagem-erro">Não foi possível baixar o arquivo.</p>}
@@ -158,17 +187,8 @@ export function DetalheSkill({
       )}
 
       {aba === 'arquivos' && (
-        <div role="tabpanel" className="skills-arquivos">
-          <ul>
-            {vigente.arquivos.map((a) => (
-              <li key={a.caminho}>
-                <button type="button" className="botao-secundario" onClick={() => setCaminhoAberto(a.caminho)}>
-                  {a.caminho}
-                </button>
-              </li>
-            ))}
-          </ul>
-          <pre className="skills-arquivo-conteudo">{arquivoAberto ? arquivoAberto.conteudo : 'Selecione um arquivo.'}</pre>
+        <div role="tabpanel">
+          <ArquivosVersao arquivos={vigente.arquivos} />
         </div>
       )}
 
@@ -188,16 +208,33 @@ export function DetalheSkill({
                 {v.mensagem && <span className="cartao-item-corpo">{v.mensagem}</span>}
                 {v.motivoRejeicao && <span className="cartao-item-corpo">Motivo: {v.motivoRejeicao}</span>}
                 <span className="linha-botoes">
+                  <button type="button" className="botao-secundario" onClick={() => setVersaoVista(v.numero)}>
+                    Ver v{v.numero}
+                  </button>
                   <button type="button" className="botao-secundario" onClick={() => zip.mutate(v.numero)}>
                     Baixar v{v.numero}
                   </button>
-                  <button type="button" className="botao-secundario" onClick={() => restaurar.mutate(v.numero)} disabled={restaurar.isPending}>
+                  <button type="button" className="botao-secundario" onClick={() => restaurar.mutate(v.numero)}
+                    disabled={restaurar.isPending || bloqueadaPorProposta}
+                    title={bloqueadaPorProposta ? motivoBloqueio : undefined}
+                  >
                     Restaurar v{v.numero}
                   </button>
                 </span>
               </li>
             ))}
           </ul>
+          {versaoVista !== null && (
+            <div className="skills-versao-vista">
+              <h2>Versão v{versaoVista}</h2>
+              {versaoVistaQuery.isPending && <p className="mensagem-carregando">Carregando...</p>}
+              {versaoVistaQuery.isError && <p className="mensagem-erro">Não foi possível carregar a versão.</p>}
+              {versaoVistaQuery.data && <ArquivosVersao key={versaoVista} arquivos={versaoVistaQuery.data.arquivos} />}
+              <button type="button" className="botao-secundario" onClick={() => setVersaoVista(null)}>
+                Fechar versão
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

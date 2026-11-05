@@ -30,6 +30,7 @@ function detalhe(sobrescreve: Partial<SkillDetalhe> = {}): SkillDetalhe {
       promptUso: 'Use a skill login-seguro',
       tutorialInstalacao: '# Instalar\n\npasso a passo\n\n<script id="x">alert(1)</script>',
       mensagem: null,
+      autorId: 1,
       autorNome: 'Ana',
       criadaEm: '2026-11-05T10:00:00Z',
       decididaPorNome: null,
@@ -47,11 +48,11 @@ function detalhe(sobrescreve: Partial<SkillDetalhe> = {}): SkillDetalhe {
 const versoes: VersaoResumo[] = [
   {
     numero: 2, estado: 'PUBLICADA', nome: 'Login seguro', descricao: 'd', categoria: 'SEGURANCA', mensagem: 'ajuste',
-    autorNome: 'Ana', criadaEm: '2026-11-05T10:00:00Z', decididaPorNome: null, decididaEm: null, motivoRejeicao: null,
+    autorId: 1, autorNome: 'Ana', criadaEm: '2026-11-05T10:00:00Z', decididaPorNome: null, decididaEm: null, motivoRejeicao: null,
   },
   {
     numero: 1, estado: 'REJEITADA', nome: 'Login seguro', descricao: 'd', categoria: 'SEGURANCA', mensagem: null,
-    autorNome: 'Bia', criadaEm: '2026-11-04T10:00:00Z', decididaPorNome: 'Gil', decididaEm: '2026-11-04T11:00:00Z', motivoRejeicao: 'ruim',
+    autorId: 2, autorNome: 'Bia', criadaEm: '2026-11-04T10:00:00Z', decididaPorNome: 'Gil', decididaEm: '2026-11-04T11:00:00Z', motivoRejeicao: 'ruim',
   },
 ]
 
