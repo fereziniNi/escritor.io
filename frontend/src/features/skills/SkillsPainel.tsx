@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { DetalheSkill } from './DetalheSkill'
 import { ListaSkills } from './ListaSkills'
 
 type Tela = { tipo: 'lista' } | { tipo: 'detalhe'; slug: string } | { tipo: 'editor'; slug?: string } | { tipo: 'aprovacoes' }
@@ -19,7 +20,19 @@ export function SkillsPainel({ papel }: { papel: string | null }) {
     )
   }
 
-  // Placeholder: as telas de detalhe, editor e aprovações chegam nas próximas tarefas.
+  if (tela.tipo === 'detalhe') {
+    const slug = tela.slug
+    return (
+      <DetalheSkill
+        slug={slug}
+        podeAprovar={podeAprovar}
+        aoVoltar={() => setTela({ tipo: 'lista' })}
+        aoEditar={() => setTela({ tipo: 'editor', slug })}
+      />
+    )
+  }
+
+  // Placeholder: as telas de editor, editor e aprovações chegam nas próximas tarefas.
   return (
     <div>
       <button type="button" className="botao-secundario" onClick={() => setTela({ tipo: 'lista' })}>
