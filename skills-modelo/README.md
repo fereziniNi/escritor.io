@@ -33,5 +33,12 @@ Rodar local: `docker compose up -d postgres`, `cp .env.example .env`, `pnpm --fi
 
 Cada arquivo em `skills-oficiais/<slug>/referencia/` começa com um comentário na sintaxe dele contendo
 `origem: skills-modelo/<caminho>` e o resto é idêntico ao arquivo daqui. Mudou o código aqui? Rode
-`node scripts/verificar-referencias.mjs --atualizar` e revise o diff das skills. Arquivo de `referencia/` sem essa
-linha é modelo/documento (ex.: o `CLAUDE.md` modelo) e não é conferido. Não use `.json` em `referencia/`.
+`node scripts/verificar-referencias.mjs --atualizar` e revise o diff das skills.
+
+- Sem essa linha só é aceito `.md` (modelo/documento, ex.: `CLAUDE.modelo.md`). Num `.md`, cada bloco de código
+  precedido de `<!-- arquivo: skills-modelo/<caminho> -->` é conferido com o arquivo: é assim que `package.json`,
+  `tsconfig.json` e outros JSON entram numa skill (ex.: `referencia/configuracao.md`). `.json` em `referencia/` é
+  recusado.
+- Nenhum arquivo de skill se chama `CLAUDE.md` (o Claude Code o carregaria como memória do projeto).
+- `referencia/` é autossuficiente: todo arquivo que uma cópia importa também está em `referencia/` (ou na
+  `referencia/` de uma skill anterior, dito explicitamente no SKILL.md).

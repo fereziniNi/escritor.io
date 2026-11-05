@@ -87,11 +87,51 @@ test('arquivo .json em referencia/ é recusado (JSON não tem comentário para a
   assert.match(r.saida, /\.json/);
 });
 
-test('arquivo sem linha origem (modelo/documento, não cópia) é ignorado e citado', () => {
-  escrever(`${SKILLS}/s/referencia/CLAUDE.md`, '# CLAUDE.md modelo\n');
+test('arquivo .md sem linha origem (modelo/documento, não cópia) é aceito e citado', () => {
+  escrever(`${SKILLS}/s/referencia/CLAUDE.modelo.md`, '# CLAUDE.md modelo\n');
   const r = rodar();
   assert.equal(r.codigo, 0, r.saida);
-  assert.match(r.saida, /sem origem.*CLAUDE\.md/s);
+  assert.match(r.saida, /sem origem.*CLAUDE\.modelo\.md/s);
+});
+
+test('arquivo que não é .md sem linha origem é recusado', () => {
+  escrever(`${SKILLS}/s/referencia/a.ts`, 'export const a = 1;\n');
+  const r = rodar();
+  assert.equal(r.codigo, 1, r.saida);
+  assert.match(r.saida, /a\.ts.*sem a linha origem/s);
+});
+
+test('arquivo chamado CLAUDE.md dentro da skill é recusado (o Claude Code o carregaria como memória)', () => {
+  escrever(`${SKILLS}/s/referencia/CLAUDE.md`, '# modelo\n');
+  const r = rodar();
+  assert.equal(r.codigo, 1, r.saida);
+  assert.match(r.saida, /CLAUDE\.md/);
+});
+
+/** configuracao.md com um bloco marcado; o bloco deve ser igual ao arquivo do modelo. */
+const DOC = (bloco) =>
+  `# Configuração\n\n<!-- arquivo: skills-modelo/apps/api/tsconfig.json -->\n\`\`\`json\n${bloco}\`\`\`\n\nTexto livre.\n`;
+
+test('bloco de .md marcado com <!-- arquivo: skills-modelo/... --> é conferido com o arquivo', () => {
+  escrever('skills-modelo/apps/api/tsconfig.json', '{\r\n  "a": 1\r\n}\r\n');
+  escrever(`${SKILLS}/s/referencia/configuracao.md`, DOC('{\n  "a": 1\n}\n'));
+  const r = rodar();
+  assert.equal(r.codigo, 0, r.saida);
+  assert.match(r.saida, /1 referência/);
+});
+
+test('bloco de .md divergente do arquivo sai com código 1', () => {
+  escrever('skills-modelo/apps/api/tsconfig.json', '{\n  "a": 1\n}\n');
+  escrever(`${SKILLS}/s/referencia/configuracao.md`, DOC('{\n  "a": 2\n}\n'));
+  const r = rodar();
+  assert.equal(r.codigo, 1, r.saida);
+  assert.match(r.saida, /configuracao\.md.*tsconfig\.json/s);
+});
+
+test('marcador arquivo sem bloco de código logo depois é divergência', () => {
+  escrever('skills-modelo/x.json', '{}\n');
+  escrever(`${SKILLS}/s/referencia/configuracao.md`, '<!-- arquivo: skills-modelo/x.json -->\nsem bloco\n');
+  assert.equal(rodar().codigo, 1);
 });
 
 test('--atualizar reescreve a cópia divergente a partir da origem', () => {

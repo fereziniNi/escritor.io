@@ -23,7 +23,8 @@ O Docker é usado pelo banco de desenvolvimento e pelos testes (o Testcontainers
 
 ### Variáveis de ambiente
 
-Em desenvolvimento, copie `.env.example` para `.env` (o Claude Code cria os dois). Na instalação no cliente, use
+O Claude Code cria o `.env.example` (versionado, sem segredos reais); **você** cria o `.env` a partir dele (passo 3
+de "Como verificar") e nunca o envia para o git. Na instalação no cliente, use
 `deploy/.env.example`. Qualquer variável pode vir de arquivo com `NOME_ARQUIVO=/caminho` (ex.: Docker secret).
 
 | Nome | Obrigatória | Exemplo |
@@ -45,11 +46,19 @@ Instaladas pelo `pnpm install` com versões fixas. Principais: `@nestjs/common`,
 
 ### Como verificar que funcionou
 
-1. `pnpm lint`, `pnpm typecheck`, `pnpm test` e `pnpm build` terminam sem erro.
-2. `docker compose up -d postgres`, depois `pnpm --filter api db:migrate` e `pnpm dev`.
-3. Abra http://localhost:3000/api/health: deve aparecer `{"status":"ok","banco":"ok",...}`.
-4. Abra http://localhost:3000/api/qualquer-coisa: deve aparecer um erro 404 em JSON (não uma página).
-5. Abra http://localhost:5173: a tela mostra "API no ar" e "Banco ok".
-6. Existe um `CLAUDE.md` na raiz do projeto, sem trechos `<...>` sobrando.
+1. Abra um terminal **na pasta do projeto** (no VS Code: menu Terminal → Novo terminal; no Windows também serve o
+   PowerShell, depois `cd <caminho-do-projeto>`).
+2. Instale as dependências: `pnpm install`.
+3. Crie o seu `.env` a partir do exemplo:
+   - bash / Git Bash / macOS / Linux: `cp .env.example .env`
+   - PowerShell: `Copy-Item .env.example .env`
+4. `pnpm lint`, `pnpm typecheck`, `pnpm test` e `pnpm build` terminam sem erro (o Docker precisa estar ligado).
+5. Teste no navegador de verdade (fora do `pnpm test`): `pnpm --filter web e2e`. Na primeira vez rode antes
+   `pnpm --filter web exec playwright install chromium`.
+6. Suba o banco e o sistema: `docker compose up -d postgres`, depois `pnpm --filter api db:migrate` e `pnpm dev`.
+7. Abra http://localhost:3000/api/health: deve aparecer `{"status":"ok","banco":"ok",...}`.
+8. Abra http://localhost:3000/api/qualquer-coisa: deve aparecer um erro 404 em JSON (não uma página).
+9. Abra http://localhost:5173: a tela mostra "API no ar" e "Banco ok".
+10. Existe um `CLAUDE.md` na raiz do projeto, sem trechos `<...>` sobrando.
 
 Próximo passo: aplicar `identidade-visual` e seguir a ordem indicada no fim da resposta do Claude Code.

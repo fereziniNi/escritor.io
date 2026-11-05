@@ -30,6 +30,13 @@ export class FiltroErros implements ExceptionFilter {
     const req = http.getRequest<Request & { id?: string }>();
     const res = http.getResponse<Response>();
     const status = excecao instanceof HttpException ? excecao.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
+    if (res.headersSent) {
+      // A resposta já começou (ex.: download em streaming): não dá para trocar status nem escrever JSON. Registra e
+      // encerra a conexão; o cliente percebe a resposta incompleta.
+      this.log.error({ err: excecao }, 'erro depois de a resposta começar');
+      if (!res.writableEnded) res.end();
+      return;
+    }
     if (status >= 500) {
       // Detalhe só no log (com o request-id); o cliente recebe a mensagem genérica.
       this.log.error({ err: excecao }, 'erro não tratado');
