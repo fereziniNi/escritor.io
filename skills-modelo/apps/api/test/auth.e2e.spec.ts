@@ -32,6 +32,8 @@ const PRODUCAO: Record<string, string> = {
   // Chaves de dados pessoais (skill lgpd-dados-pessoais): obrigatórias em produção.
   DADOS_CHAVES: `k1:${randomBytes(32).toString('base64')}`,
   DADOS_CHAVE_INDICE: randomBytes(32).toString('base64'),
+  // Link assinado do armazenamento local (skill upload-armazenamento): obrigatório em produção.
+  ARMAZENAMENTO_SEGREDO_URL: randomBytes(32).toString('hex'),
 };
 
 let urlBanco: string;

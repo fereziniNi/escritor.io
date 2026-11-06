@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/src/config/config.ts
+// origem: skills-modelo/estagios/exportacao-excel-pdf-csv/apps/api/src/config/config.ts
 import { z } from 'zod';
 import { conferirChavesDistintas, lerChaveIndice, lerChavesDados } from '../lgpd/chaveiro';
 import { Segredo, lerSegredo } from './segredo';

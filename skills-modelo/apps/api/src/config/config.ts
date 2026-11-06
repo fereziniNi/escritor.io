@@ -139,6 +139,51 @@ const esquemaBase = z.object({
    */
   EXPORTACAO_MAX_LINHAS: z.coerce.number().int().min(1).max(100_000).default(10_000),
   EXPORTACAO_LOGO: z.string().min(1).optional(),
+  /**
+   * Upload e armazenamento (src/armazenamento/). ARMAZENAMENTO_TIPO: onde os arquivos ficam (local = pasta ARMAZENAMENTO_PASTA do
+   * servidor, monte um volume; s3 = S3 ou compatível; azure = Azure Blob). UPLOAD_MAX_MB: tamanho máximo de um arquivo (acima:
+   * 413 sem gravar nada; o proxy na frente precisa aceitar pelo menos isto: ver o SKILL.md). UPLOAD_LIMITE_POR_MIN: uploads por
+   * minuto por usuário (acima: 429). URL_ASSINADA_SEGUNDOS: validade do link de download. ARMAZENAMENTO_SEGREDO_URL: chave do
+   * HMAC do link do armazenamento local (Segredo, mínimo 32 caracteres; obrigatória em produção com `local`, a API não sobe sem ela).
+   */
+  ARMAZENAMENTO_TIPO: z.enum(['local', 's3', 'azure'], { error: 'deve ser local, s3 ou azure' }).default('local'),
+  ARMAZENAMENTO_PASTA: z.string().min(1).default('dados/arquivos'),
+  ARMAZENAMENTO_SEGREDO_URL: z
+    .string()
+    .min(32, 'mínimo 32 caracteres (gere com: openssl rand -hex 32)')
+    .transform((v) => new Segredo(v))
+    .optional(),
+  UPLOAD_MAX_MB: z.coerce.number().int().min(1).max(500).default(10),
+  UPLOAD_LIMITE_POR_MIN: z.coerce.number().int().min(1).max(10_000).default(20),
+  URL_ASSINADA_SEGUNDOS: z.coerce.number().int().min(10).max(3600).default(300),
+  /** S3 (ARMAZENAMENTO_TIPO=s3). S3_ENDPOINT só para compatíveis (MinIO, R2); S3_PATH_STYLE=true no MinIO. */
+  S3_ENDPOINT: z.url({ error: 'deve ser uma URL (http:// ou https://)' }).optional(),
+  S3_REGION: z.string().min(1).default('us-east-1'),
+  S3_BUCKET: z.string().min(3).max(63).optional(),
+  S3_ACCESS_KEY: z.string().min(1).optional(),
+  S3_SECRET_KEY: z
+    .string()
+    .min(1)
+    .transform((v) => new Segredo(v))
+    .optional(),
+  S3_PATH_STYLE: z
+    .enum(['true', 'false'], { error: 'deve ser true ou false' })
+    .default('false')
+    .transform((v) => v === 'true'),
+  /** Azure Blob (ARMAZENAMENTO_TIPO=azure). A connection string leva a chave da conta: é Segredo (AZURE_CONNECTION_STRING_ARQUIVO). */
+  AZURE_CONNECTION_STRING: z
+    .string()
+    .min(1)
+    .transform((v) => new Segredo(v))
+    .optional(),
+  AZURE_CONTAINER: z.string().min(3).max(63).optional(),
+  /** Antivírus ClamAV (profile `antivirus` do compose). Ligado: todo arquivo é varrido antes de existir; ClamAV fora do ar = upload recusado (503). */
+  ANTIVIRUS_HABILITADO: z
+    .enum(['true', 'false'], { error: 'deve ser true ou false' })
+    .default('false')
+    .transform((v) => v === 'true'),
+  CLAMAV_HOST: z.string().min(1).default('clamav'),
+  CLAMAV_PORTA: z.coerce.number().int().min(1).max(65535).default(3310),
 });
 
 /** Mensagem de um erro de validação de chave (nunca contém o valor da chave). */
@@ -175,6 +220,15 @@ export const esquemaConfig = esquemaBase.superRefine((c, ctx) => {
   }
   if (c.AUTH_SESSAO_OCIOSA_MIN > c.AUTH_SESSAO_ABSOLUTA_H * 60) {
     problema('AUTH_SESSAO_OCIOSA_MIN', 'não pode ser maior que AUTH_SESSAO_ABSOLUTA_H (em minutos)');
+  }
+  if (c.ARMAZENAMENTO_TIPO === 's3') {
+    if (c.S3_BUCKET === undefined) problema('S3_BUCKET', 'obrigatória com ARMAZENAMENTO_TIPO=s3');
+    if (c.S3_ACCESS_KEY === undefined) problema('S3_ACCESS_KEY', 'obrigatória com ARMAZENAMENTO_TIPO=s3');
+    if (c.S3_SECRET_KEY === undefined) problema('S3_SECRET_KEY', 'obrigatória com ARMAZENAMENTO_TIPO=s3');
+  }
+  if (c.ARMAZENAMENTO_TIPO === 'azure') {
+    if (c.AZURE_CONNECTION_STRING === undefined) problema('AZURE_CONNECTION_STRING', 'obrigatória com ARMAZENAMENTO_TIPO=azure');
+    if (c.AZURE_CONTAINER === undefined) problema('AZURE_CONTAINER', 'obrigatória com ARMAZENAMENTO_TIPO=azure');
   }
   const chaves = c.DADOS_CHAVES?.revelar();
   const indice = c.DADOS_CHAVE_INDICE?.revelar();

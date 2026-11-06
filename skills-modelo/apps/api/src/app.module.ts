@@ -1,6 +1,7 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { type DestinationStream } from 'pino';
+import { ArmazenamentoModule } from './armazenamento/armazenamento.module';
 import { AuditoriaModule } from './auditoria/auditoria.module';
 import { AuthModule } from './auth/auth.module';
 import { BancoModule } from './banco/banco.module';
@@ -28,6 +29,7 @@ export class AppModule {
       module: AppModule,
       // SegurancaModule logo depois do LogModule: limite e checagem de origem já com request-id e log.
       // AuthModule depois do SegurancaModule: a sessão só é consultada no banco depois do limite e da origem.
+      // ArmazenamentoModule (upload): depois do AuthModule, usa a sessão, a auditoria e o limite por usuário.
       // LgpdModule (global): chaves da criptografia de campo e máscara de CPF/e-mail por papel em toda resposta.
       imports: [
         ConfigModule.registrar(config),
@@ -40,6 +42,7 @@ export class AppModule {
         UsuariosModule,
         AuthModule,
         ClientesModule,
+        ArmazenamentoModule,
         SaudeModule,
       ],
       // Erros sempre em JSON padrão ({ status, erro, requestId }), inclusive o 404 de /api/* desconhecido.

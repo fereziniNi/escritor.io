@@ -1,0 +1,3 @@
+nome: Upload e armazenamento de arquivos
+descricao: Recebe arquivos em fluxo com limite de tamanho, tipo conferido pelo conteúdo, nome gerado no servidor, armazenamento local, S3 ou Azure, link de download assinado, controle de dono e antivírus ClamAV opcional.
+categoria: INFRA

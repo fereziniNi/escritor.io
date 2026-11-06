@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/test/auth.e2e.spec.ts
+// origem: skills-modelo/estagios/lgpd-dados-pessoais/apps/api/test/auth.e2e.spec.ts
 import { createHash, randomBytes } from 'node:crypto';
 import { type INestApplication } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';

@@ -50,6 +50,13 @@
       "when": 1793956699175,
       "tag": "0006_indice_cliente_exportacao",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793972867689,
+      "tag": "0007_arquivo",
+      "breakpoints": true
     }
   ]
 }
