@@ -195,6 +195,38 @@ const esquemaBase = z.object({
   ROLE: z.enum(['api', 'worker', 'tudo', 'migrar'], { error: 'deve ser api, worker, tudo ou migrar' }).optional(),
   ALERTA_EMAIL: z.string().trim().toLowerCase().pipe(z.email().max(254)).optional(),
   FILA_ENCERRAR_TIMEOUT_S: z.coerce.number().int().min(1).max(600).default(30),
+  /**
+   * IA e observabilidade (src/ia/). IA_HABILITADA=false (padrão): qualquer chamada ao modelo falha com "IA desabilitada neste ambiente".
+   * Ligada em produção, ANTHROPIC_API_KEY é obrigatória (a API não sobe sem ela). LITELLM_URL: base do gateway LiteLLM (o cliente manda
+   * as chamadas para ela; a chave de ANTHROPIC_API_KEY passa a ser a chave virtual do LiteLLM). LLM_MODELO_PADRAO e LLM_MODELO_RAPIDO:
+   * modelos das tarefas; LLM_MODELO_<TAREFA> (ex.: LLM_MODELO_RESUMO) troca o de uma tarefa e é lida direto do ambiente por modeloPara().
+   * IA_LIMITE_POR_MIN: pedidos de IA por minuto por usuário. LANGFUSE_*: rastreio opcional (as três primeiras juntas; sem elas, nada é enviado);
+   * LANGFUSE_CAPTURAR_CONTEUDO=false (padrão) envia só metadados; true envia prompt e resposta com CPF, CNPJ, e-mail e chaves mascarados.
+   */
+  IA_HABILITADA: z
+    .enum(['true', 'false'], { error: 'deve ser true ou false' })
+    .default('false')
+    .transform((v) => v === 'true'),
+  ANTHROPIC_API_KEY: z
+    .string()
+    .min(1)
+    .transform((v) => new Segredo(v))
+    .optional(),
+  LITELLM_URL: z.url({ error: 'deve ser uma URL (http:// ou https://)' }).optional(),
+  LLM_MODELO_PADRAO: z.string().regex(/^[A-Za-z0-9._:/-]{1,100}$/, 'id de modelo inválido').default('claude-sonnet-5-5'),
+  LLM_MODELO_RAPIDO: z.string().regex(/^[A-Za-z0-9._:/-]{1,100}$/, 'id de modelo inválido').default('claude-haiku-5-5'),
+  IA_LIMITE_POR_MIN: z.coerce.number().int().min(1).max(10_000).default(10),
+  LANGFUSE_PUBLIC_KEY: z.string().min(1).optional(),
+  LANGFUSE_SECRET_KEY: z
+    .string()
+    .min(1)
+    .transform((v) => new Segredo(v))
+    .optional(),
+  LANGFUSE_URL: z.url({ error: 'deve ser uma URL (http:// ou https://)' }).optional(),
+  LANGFUSE_CAPTURAR_CONTEUDO: z
+    .enum(['true', 'false'], { error: 'deve ser true ou false' })
+    .default('false')
+    .transform((v) => v === 'true'),
 });
 
 /** Mensagem de um erro de validação de chave (nunca contém o valor da chave). */

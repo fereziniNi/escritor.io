@@ -1,0 +1,157 @@
+# origem: skills-modelo/deploy/langfuse.compose.yml
+# Langfuse self-host (skill ia-langfuse): painel de custo, latência e traços das chamadas de IA. Só sobe com o profile `langfuse`.
+#
+#   docker compose -f docker-compose.yml -f deploy/langfuse.compose.yml --env-file langfuse.env --profile langfuse up -d
+#
+# Este arquivo é um complemento (nenhum serviço do sistema depende dele). Quando existir o compose de instalação
+# (deploy/docker-compose.yml, skill instalacao-docker-compose), os serviços e volumes abaixo são copiados para lá, com
+# `profiles: ["langfuse"]`, e este arquivo deixa de ser usado.
+#
+# Variáveis (arquivo langfuse.env; SEM valor padrão para segredo: gere cada um com `openssl rand -hex 32`):
+#   LANGFUSE_NEXTAUTH_SECRET, LANGFUSE_SALT, LANGFUSE_ENCRYPTION_KEY (64 hex), LANGFUSE_DB_PASSWORD, LANGFUSE_CLICKHOUSE_PASSWORD,
+#   LANGFUSE_REDIS_PASSWORD, LANGFUSE_MINIO_PASSWORD, LANGFUSE_INIT_USER_EMAIL, LANGFUSE_INIT_USER_PASSWORD (primeiro acesso:
+#   o cadastro aberto fica desligado), LANGFUSE_URL_PUBLICA (endereço pelo qual o painel é aberto; em dev http://localhost:3100).
+# O painel escuta só em 127.0.0.1:3100: para acesso da equipe, ponha o Caddy na frente (ver a skill instalacao-docker-compose).
+# Dentro da rede do compose a API fala com http://langfuse-web:3000 (LANGFUSE_URL); da máquina do dev, com http://127.0.0.1:3100.
+x-langfuse-comum: &langfuse-comum
+  environment: &langfuse-env
+    DATABASE_URL: postgresql://langfuse:${LANGFUSE_DB_PASSWORD:?defina LANGFUSE_DB_PASSWORD}@langfuse-db:5432/langfuse
+    SALT: ${LANGFUSE_SALT:?defina LANGFUSE_SALT}
+    ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?defina LANGFUSE_ENCRYPTION_KEY (64 caracteres hexadecimais)}
+    TELEMETRY_ENABLED: "false"
+    CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+    CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+    CLICKHOUSE_USER: clickhouse
+    CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:?defina LANGFUSE_CLICKHOUSE_PASSWORD}
+    CLICKHOUSE_CLUSTER_ENABLED: "false"
+    REDIS_HOST: langfuse-redis
+    REDIS_PORT: "6379"
+    REDIS_AUTH: ${LANGFUSE_REDIS_PASSWORD:?defina LANGFUSE_REDIS_PASSWORD}
+    LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+    LANGFUSE_S3_EVENT_UPLOAD_REGION: us-east-1
+    LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+    LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:?defina LANGFUSE_MINIO_PASSWORD}
+    LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+    LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+    LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+    LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+    LANGFUSE_S3_MEDIA_UPLOAD_REGION: us-east-1
+    LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
+    LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD}
+    LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+    LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+    LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+
+services:
+  langfuse-web:
+    image: langfuse/langfuse:3.227.0
+    profiles: ["langfuse"]
+    depends_on:
+      langfuse-db: { condition: service_healthy }
+      langfuse-clickhouse: { condition: service_healthy }
+      langfuse-redis: { condition: service_healthy }
+      langfuse-minio: { condition: service_started }
+    # 127.0.0.1: só esta máquina alcança o painel (sem isso o Docker publica em todas as interfaces).
+    ports:
+      - "127.0.0.1:3100:3000"
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_URL: ${LANGFUSE_URL_PUBLICA:?defina LANGFUSE_URL_PUBLICA}
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:?defina LANGFUSE_NEXTAUTH_SECRET}
+      # Sem cadastro aberto: só entra quem já tem usuário. O primeiro vem de LANGFUSE_INIT_*; os demais, convidados no painel.
+      AUTH_DISABLE_SIGNUP: "true"
+      LANGFUSE_INIT_ORG_ID: multiplica
+      LANGFUSE_INIT_ORG_NAME: Multiplica
+      LANGFUSE_INIT_PROJECT_ID: sistema
+      LANGFUSE_INIT_PROJECT_NAME: Sistema
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:?defina LANGFUSE_INIT_USER_EMAIL}
+      LANGFUSE_INIT_USER_NAME: Administrador
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:?defina LANGFUSE_INIT_USER_PASSWORD}
+    restart: unless-stopped
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3.227.0
+    profiles: ["langfuse"]
+    depends_on:
+      langfuse-db: { condition: service_healthy }
+      langfuse-clickhouse: { condition: service_healthy }
+      langfuse-redis: { condition: service_healthy }
+      langfuse-minio: { condition: service_started }
+    environment: *langfuse-env
+    restart: unless-stopped
+
+  # Banco próprio do Langfuse (não é o do sistema): perder um não afeta o outro.
+  langfuse-db:
+    image: postgres:16-alpine
+    profiles: ["langfuse"]
+    environment:
+      POSTGRES_DB: langfuse
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: ${LANGFUSE_DB_PASSWORD:?defina LANGFUSE_DB_PASSWORD}
+    volumes:
+      - langfuse_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse -d langfuse"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  langfuse-clickhouse:
+    image: clickhouse/clickhouse-server:25.8-alpine
+    profiles: ["langfuse"]
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:?defina LANGFUSE_CLICKHOUSE_PASSWORD}
+    volumes:
+      - langfuse_clickhouse_data:/var/lib/clickhouse
+      - langfuse_clickhouse_logs:/var/log/clickhouse-server
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:8123/ping || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  langfuse-redis:
+    image: redis:7.4.2-alpine
+    profiles: ["langfuse"]
+    command: ["redis-server", "--requirepass", "${LANGFUSE_REDIS_PASSWORD:?defina LANGFUSE_REDIS_PASSWORD}", "--maxmemory-policy", "noeviction"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PW\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    environment:
+      REDIS_PW: ${LANGFUSE_REDIS_PASSWORD}
+    restart: unless-stopped
+
+  # Armazenamento S3 do Langfuse (eventos e mídia). Imagem mínima (sem shell): o bucket `langfuse` é uma pasta de /data que o
+  # serviço de preparo abaixo cria uma vez (no MinIO, pasta na raiz do disco = bucket). Mesma imagem (digest) dos testes do modelo.
+  langfuse-minio-preparo:
+    image: busybox:1.37.0
+    profiles: ["langfuse"]
+    command: ["sh", "-c", "mkdir -p /data/langfuse && chown -R 65532:65532 /data"]
+    volumes:
+      - langfuse_minio_data:/data
+
+  langfuse-minio:
+    image: cgr.dev/chainguard/minio@sha256:ae73835075ee168f1745cc28d4cf5bbd6a5973e5609b2b2593280aaa495ea113
+    profiles: ["langfuse"]
+    depends_on:
+      langfuse-minio-preparo: { condition: service_completed_successfully }
+    command: ["server", "/data", "--address", ":9000", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: ${LANGFUSE_MINIO_PASSWORD:?defina LANGFUSE_MINIO_PASSWORD}
+    volumes:
+      - langfuse_minio_data:/data
+    restart: unless-stopped
+
+volumes:
+  langfuse_db:
+  langfuse_clickhouse_data:
+  langfuse_clickhouse_logs:
+  langfuse_minio_data:

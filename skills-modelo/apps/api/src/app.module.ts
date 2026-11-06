@@ -11,6 +11,7 @@ import { ConfigModule } from './config/config.module';
 import { EmailModule } from './email/email.module';
 import { FilaModule } from './fila/fila.module';
 import { FiltroErros } from './http/filtro-erros';
+import { IaModule } from './ia/ia.module';
 import { LgpdModule } from './lgpd/lgpd.module';
 import { LogModule } from './log/log.module';
 import { SaudeModule } from './saude/saude.module';
@@ -32,6 +33,7 @@ export class AppModule {
       // AuthModule depois do SegurancaModule: a sessão só é consultada no banco depois do limite e da origem.
       // ArmazenamentoModule (upload): depois do AuthModule, usa a sessão, a auditoria e o limite por usuário.
       // FilaModule (global): tarefas em segundo plano; depois do EmailModule (o alerta de falha envia e-mail) e do BancoModule.
+      // IaModule: cliente do modelo + rastreio Langfuse; depois do AuthModule (rota só GESTOR/ADMIN) e da auditoria.
       // LgpdModule (global): chaves da criptografia de campo e máscara de CPF/e-mail por papel em toda resposta.
       imports: [
         ConfigModule.registrar(config),
@@ -46,6 +48,7 @@ export class AppModule {
         AuthModule,
         ClientesModule,
         ArmazenamentoModule,
+        IaModule,
         SaudeModule,
       ],
       // Erros sempre em JSON padrão ({ status, erro, requestId }), inclusive o 404 de /api/* desconhecido.
