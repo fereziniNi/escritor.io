@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Teste de scripts/release.sh (skill versionamento-release). Roda num repositório git TEMPORÁRIO: nada aqui faz push, tag ou
-# build de verdade no seu projeto (o release.sh é chamado com --local, que não builda nem publica).
+# Teste de scripts/release.sh (skill versionamento-release). Roda em repositórios git TEMPORÁRIOS: nada aqui faz push, tag ou
+# build de verdade no seu projeto (o push dos casos 9 e 10 vai para um remote "origin" de mentira, uma pasta bare temporária, e
+# um "docker" falso no PATH registra se alguém tentou publicar imagem).
 # Uso: bash scripts/release.test.sh
 set -uo pipefail
 
@@ -130,6 +131,53 @@ verifica "--dry-run mostra a versão nova 1.4.1"            contem "$TMP_BASE/sa
 verifica "--dry-run não muda nada"                         igual "$(cd "$R" && git status --porcelain)$(cat "$R/VERSION")" "1.4.0"
 (cd "$R" && bash scripts/release.sh gigante --local >/dev/null 2>&1); CODIGO=$?
 verifica "tipo inválido: aborta"                           test "$CODIGO" -ne 0
+
+# Remote de mentira: repositório bare temporário como "origin", com a branch main já enviada (upstream configurado).
+com_origin() { # dir do repo
+  local bare="$1.git"
+  git init -q --bare -b main "$bare"
+  (cd "$1" && git remote add origin "$bare" && git push -q -u origin main)
+}
+# docker falso: só anota que foi chamado (o release.sh nunca pode publicar imagem).
+mkdir -p "$TMP_BASE/bin"
+printf '#!/usr/bin/env bash
+echo "$*" >> "%s/docker-chamado.txt"
+' "$TMP_BASE" > "$TMP_BASE/bin/docker"
+chmod +x "$TMP_BASE/bin/docker"
+
+# ---------- 9) modo padrão: envia branch e tag; quem publica a imagem é o workflow ----------
+R="$(novo_repo publica)"; com_origin "$R"
+(cd "$R" && PATH="$TMP_BASE/bin:$PATH" bash scripts/release.sh patch >"$TMP_BASE/saida-publica.txt" 2>&1); CODIGO=$?
+verifica "padrão: termina com sucesso"                     igual "$CODIGO" "0"
+verifica "padrão: tag v1.4.1 chegou ao origin"             igual "$(git --git-dir="$R.git" tag -l v1.4.1)" "v1.4.1"
+verifica "padrão: branch do origin tem o commit de release" igual "$(git --git-dir="$R.git" rev-parse main)" "$(cd "$R" && git rev-parse HEAD)"
+verifica "padrão: nenhum docker (nem build nem push)"      test ! -e "$TMP_BASE/docker-chamado.txt"
+verifica "padrão: avisa que o workflow publica a imagem"   contem "$TMP_BASE/saida-publica.txt" "workflow"
+
+# ---------- 10) --testar-imagem: só docker build local, nunca push ----------
+R="$(novo_repo prova)"; com_origin "$R"
+(cd "$R" && PATH="$TMP_BASE/bin:$PATH" bash scripts/release.sh patch --testar-imagem >/dev/null 2>&1); CODIGO=$?
+verifica "--testar-imagem: termina com sucesso"            igual "$CODIGO" "0"
+verifica "--testar-imagem: chamou docker build"            contem "$TMP_BASE/docker-chamado.txt" "build"
+verifica "--testar-imagem: nunca docker push"              nao_contem "$TMP_BASE/docker-chamado.txt" "push"
+
+# ---------- 11) branch atrás do remote: aborta sem mudar nada ----------
+R="$(novo_repo atras)"; com_origin "$R"
+OUTRO="$TMP_BASE/atras-outro"
+git clone -q "$R.git" "$OUTRO" 2>/dev/null
+(cd "$OUTRO" && git config user.email "outra@exemplo.com.br" && git config user.name "Outra" && echo y > y.txt && git add y.txt && git commit -q -m "colega" && git push -q origin main)
+ANTES="$(cd "$R" && git rev-parse HEAD)"
+(cd "$R" && bash scripts/release.sh patch --local >"$TMP_BASE/saida-atras.txt" 2>&1); CODIGO=$?
+verifica "atrás do remote: aborta"                         test "$CODIGO" -ne 0
+verifica "atrás do remote: mensagem explica"               contem "$TMP_BASE/saida-atras.txt" "atrás"
+verifica "atrás do remote: VERSION intacta"                igual "$(cat "$R/VERSION")" "1.4.0"
+verifica "atrás do remote: nenhum commit novo"             igual "$(cd "$R" && git rev-parse HEAD)" "$ANTES"
+
+# ---------- 12) modo padrão sem upstream: aborta (não tem para onde enviar nem o que conferir) ----------
+R="$(novo_repo sem-upstream)"
+(cd "$R" && bash scripts/release.sh patch >/dev/null 2>&1); CODIGO=$?
+verifica "sem upstream: aborta"                            test "$CODIGO" -ne 0
+verifica "sem upstream: VERSION intacta"                   igual "$(cat "$R/VERSION")" "1.4.0"
 
 echo
 echo "$((TESTES - FALHAS))/$TESTES verificações passaram"

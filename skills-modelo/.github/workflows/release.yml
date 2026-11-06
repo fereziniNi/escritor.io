@@ -1,8 +1,8 @@
 # Release padrão Multiplica (skill versionamento-release). Dispara quando a tag vX.Y.Z sobe (o scripts/release.sh a cria e envia):
 # confere que a tag é a versão do VERSION e que o commit está na branch principal, publica ghcr.io/<org>/<app>:X.Y.Z
 # (com APP_VERSAO e APP_COMMIT embutidos) e cria a Release do GitHub com as notas do CHANGELOG.md.
-# Não repete lint/testes: a tag só sai de um commit da branch principal, que já passou no ci.yml. Se você publica a imagem
-# pelo release.sh na sua máquina, este workflow é redundante: o docker push dele já fez o mesmo (a tag da imagem é idempotente).
+# Não repete lint/testes: a tag só sai de um commit da branch principal, que já passou no ci.yml. ESTE workflow é o ÚNICO que
+# publica a imagem: o release.sh só cria e envia a tag (nunca faz docker push), para cada tag de imagem ter um publicador só.
 # Actions fixadas pelo SHA do commit (o comentário diz a versão); o Dependabot (github-actions) atualiza.
 name: Release
 

@@ -1,29 +1,31 @@
 #!/usr/bin/env bash
-# Corta uma versão do sistema (skill versionamento-release). Uso, na raiz do projeto, no bash (Linux, macOS ou Git Bash no Windows):
-#   scripts/release.sh <major|minor|patch> [--dry-run | --local]
+# Corta uma versão do sistema (skill versionamento-release). Uso, na raiz do projeto, no bash (Linux, macOS com o bash 3.2 de
+# fábrica, ou Git Bash no Windows):
+#   scripts/release.sh <major|minor|patch> [--dry-run | --local | --testar-imagem]
 #
 # O que faz, nesta ordem (todas as conferências vêm ANTES de qualquer alteração):
-#   1. exige árvore limpa (nem arquivo novo sem commit), branch principal (main ou master) e novidades em "Não publicado";
+#   1. exige árvore limpa (nem arquivo novo sem commit), branch principal (main ou master), a branch em dia com o remote
+#      (git fetch; recusa se está atrás ou divergiu de @{u}) e novidades em "Não publicado";
 #   2. calcula a versão nova a partir de VERSION (SemVer) e recusa se a tag vX.Y.Z já existe;
 #   3. grava a versão em VERSION e em todos os package.json versionados (menos estagios/);
 #   4. move "Não publicado" do CHANGELOG.md para "## [X.Y.Z] - AAAA-MM-DD" (e deixa "Não publicado" vazio);
 #   5. commit "chore(release): vX.Y.Z" e tag anotada vX.Y.Z;
-#   6. docker build (APP_VERSAO e APP_COMMIT embutidos), docker push de <APP_IMAGEM>:X.Y.Z e git push da branch e da tag.
+#   6. git push da branch e da tag. QUEM PUBLICA A IMAGEM É O WORKFLOW .github/workflows/release.yml, disparado pela tag:
+#      este script nunca faz docker push (um publicador só para cada tag de imagem).
 #
-# Opções:  --dry-run  só mostra a versão nova e o que seria feito; não muda nada.
-#          --local    faz 1 a 5 e para: sem build, sem push (é como o scripts/release.test.sh roda).
-# Variáveis: APP_IMAGEM  imagem sem tag, ex. ghcr.io/minha-org/meu-app (padrão: derivada do remote "origin" do GitHub);
-#            RELEASE_BRANCHES  branches permitidas (padrão "main master").
-# Pré-requisitos do passo 6: docker aberto e `docker login ghcr.io` feito (token com write:packages); remote "origin" com permissão de push.
-# Errou depois do commit (build falhou)? O script diz como desfazer; nada foi publicado enquanto o push não aconteceu.
+# Opções:  --dry-run        só mostra a versão nova e o que seria feito; não muda nada.
+#          --local          faz 1 a 5 e para: sem push (é como o scripts/release.test.sh roda).
+#          --testar-imagem  antes do push, um docker build LOCAL como prova (não publica nada); se falhar, nada sai da máquina.
+# Variável: RELEASE_BRANCHES  branches permitidas (padrão "main master").
+# Pré-requisito do passo 6: remote "origin" (a branch com upstream) com permissão de push.
 set -euo pipefail
 
 erro() { echo "ERRO: $*" >&2; exit 1; }
 
 TIPO="${1:-}"
 MODO="${2:-}"
-case "$TIPO" in major | minor | patch) ;; *) erro "uso: scripts/release.sh <major|minor|patch> [--dry-run | --local]" ;; esac
-case "$MODO" in "" | --dry-run | --local) ;; *) erro "opção desconhecida: $MODO (use --dry-run ou --local)" ;; esac
+case "$TIPO" in major | minor | patch) ;; *) erro "uso: scripts/release.sh <major|minor|patch> [--dry-run | --local | --testar-imagem]" ;; esac
+case "$MODO" in "" | --dry-run | --local | --testar-imagem) ;; *) erro "opção desconhecida: $MODO (use --dry-run, --local ou --testar-imagem)" ;; esac
 
 cd "$(dirname "$0")/.."
 git rev-parse --git-dir >/dev/null 2>&1 || erro "esta pasta não é um repositório git"
@@ -34,6 +36,15 @@ command -v node >/dev/null 2>&1 || erro "node não encontrado (ele edita os pack
 RAMO="$(git rev-parse --abbrev-ref HEAD)"
 PERMITIDAS="${RELEASE_BRANCHES:-main master}"
 case " $PERMITIDAS " in *" $RAMO "*) ;; *) erro "versão só sai da branch principal ($PERMITIDAS); você está em '$RAMO'." ;; esac
+
+# Em dia com o remote: versão cortada de uma branch atrasada ou divergente não sobe (o push seria recusado) ou pula commits.
+if UPSTREAM="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)"; then
+  git fetch -q "${UPSTREAM%%/*}" || erro "git fetch falhou: sem conferir o remote não dá para saber se a branch está em dia."
+  ATRAS="$(git rev-list --count "HEAD..@{u}")"
+  [ "$ATRAS" = "0" ] || erro "a branch $RAMO está $ATRAS commit(s) atrás de $UPSTREAM (ou divergiu): rode git pull --ff-only e confira antes de cortar a versão."
+elif [ "$MODO" = "" ] || [ "$MODO" = "--testar-imagem" ]; then
+  erro "a branch $RAMO não tem upstream (git push -u origin $RAMO): sem ele não dá para conferir o remote nem enviar a tag."
+fi
 
 [ -f VERSION ] || erro "arquivo VERSION não encontrado na raiz"
 ATUAL="$(tr -d '[:space:]' < VERSION)"
@@ -52,28 +63,21 @@ NOVIDADES="$(awk '/^## \[Não publicado\]/{f=1;next} /^## \[/{f=0} f && NF' CHAN
 [ -n "$NOVIDADES" ] || erro 'a seção "Não publicado" do CHANGELOG.md está vazia: anote o que mudou antes de cortar a versão.'
 
 # package.json versionados (o git já ignora node_modules); estagios/ são cópias de referência, não entram.
-mapfile -t PACOTES < <(git ls-files -- '*package.json' | grep -v '^estagios/' || true)
+# Laço de leitura em vez de mapfile: funciona no bash 3.2 do macOS.
+PACOTES=()
+while IFS= read -r p; do
+  [ -n "$p" ] && PACOTES+=("$p")
+done < <(git ls-files -- '*package.json' | grep -v '^estagios/' || true)
 
 DATA="${RELEASE_DATA:-$(date +%Y-%m-%d)}"
-IMAGEM="${APP_IMAGEM:-}"
-if [ -z "$IMAGEM" ] && [ "$MODO" = "" ]; then
-  ORIGEM="$(git remote get-url origin 2>/dev/null || true)"
-  if [[ "$ORIGEM" =~ github\.com[:/]([^/]+)/([^/]+)$ ]]; then
-    REPO="${BASH_REMATCH[2]%.git}"
-    IMAGEM="$(echo "ghcr.io/${BASH_REMATCH[1]}/$REPO" | tr '[:upper:]' '[:lower:]')"
-  else
-    erro "defina APP_IMAGEM (ex. ghcr.io/minha-org/meu-app): não consegui derivar do remote origin"
-  fi
-fi
 
 echo "==> $ATUAL -> $NOVA ($TIPO) na branch $RAMO, em $DATA"
 echo "    package.json: ${PACOTES[*]:-nenhum}"
-[ "$MODO" != "--local" ] && [ "$MODO" != "--dry-run" ] && echo "    imagem: $IMAGEM:$NOVA"
 if [ "$MODO" = "--dry-run" ]; then echo "(--dry-run: nada foi alterado)"; exit 0; fi
 
 # 3) VERSION e package.json (troca só o 1º "version", o do próprio pacote, preservando a formatação)
 printf '%s\n' "$NOVA" > VERSION
-for arquivo in "${PACOTES[@]}"; do
+for arquivo in ${PACOTES[@]+"${PACOTES[@]}"}; do
   node -e '
     const fs = require("fs");
     const [arquivo, nova] = process.argv.slice(1);
@@ -93,20 +97,24 @@ awk -v versao="$NOVA" -v data="$DATA" '
 mv CHANGELOG.md.novo CHANGELOG.md
 
 # 5) commit e tag
-git add VERSION CHANGELOG.md "${PACOTES[@]}"
+git add VERSION CHANGELOG.md ${PACOTES[@]+"${PACOTES[@]}"}
 git commit -q -m "chore(release): v$NOVA"
 git tag -a "v$NOVA" -m "Versão $NOVA"
 COMMIT="$(git rev-parse --short HEAD)"
 echo "==> commit $COMMIT e tag v$NOVA criados"
 
 DESFAZER="para desfazer: git tag -d v$NOVA && git reset --hard HEAD~1"
-if [ "$MODO" = "--local" ]; then echo "(--local: sem build e sem push. $DESFAZER)"; exit 0; fi
+if [ "$MODO" = "--local" ]; then echo "(--local: sem push. $DESFAZER)"; exit 0; fi
 
-# 6) imagem e push. A ordem importa: se o build ou o push da imagem falhar, nada do git foi publicado e dá para desfazer.
-command -v docker >/dev/null 2>&1 || erro "docker não encontrado. Commit e tag ficaram locais; $DESFAZER"
-echo "==> docker build $IMAGEM:$NOVA"
-docker build -t "$IMAGEM:$NOVA" --build-arg "APP_VERSAO=$NOVA" --build-arg "APP_COMMIT=$COMMIT" . \
-  || erro "o build falhou. Nada foi publicado; $DESFAZER"
-docker push "$IMAGEM:$NOVA" || erro "o push da imagem falhou (docker login ghcr.io feito, com write:packages?). Commit e tag ficaram locais; repita o 'docker push $IMAGEM:$NOVA' ou $DESFAZER"
-git push origin "$RAMO" "v$NOVA" || erro "o push do git falhou. A imagem $IMAGEM:$NOVA já foi publicada; repita: git push origin $RAMO v$NOVA"
-echo "==> v$NOVA publicada: $IMAGEM:$NOVA. Na instalação do cliente, troque APP_VERSAO=$NOVA no deploy/.env e rode docker compose up -d."
+# Prova opcional: a imagem builda nesta máquina. Só build, nunca push (quem publica é o release.yml).
+if [ "$MODO" = "--testar-imagem" ]; then
+  command -v docker >/dev/null 2>&1 || erro "docker não encontrado. Commit e tag ficaram locais; $DESFAZER"
+  echo "==> docker build de prova (local, não publica)"
+  docker build -t "release-prova:$NOVA" --build-arg "APP_VERSAO=$NOVA" --build-arg "APP_COMMIT=$COMMIT" . \
+    || erro "o build de prova falhou. Nada foi enviado; $DESFAZER"
+fi
+
+# 6) push: a tag dispara o release.yml, que publica a imagem X.Y.Z e a Release do GitHub.
+git push "${UPSTREAM%%/*}" "$RAMO" "v$NOVA" || erro "o push do git falhou. Commit e tag ficaram locais; repita: git push ${UPSTREAM%%/*} $RAMO v$NOVA (ou $DESFAZER)"
+echo "==> v$NOVA enviada. O workflow Release (GitHub Actions) publica a imagem X.Y.Z=$NOVA; acompanhe na aba Actions."
+echo "    Na instalação do cliente, depois que o workflow terminar: APP_VERSAO=$NOVA no deploy/.env e docker compose up -d."

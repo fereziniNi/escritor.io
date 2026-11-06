@@ -25,7 +25,7 @@ quem usa o sistema e quem faz o suporte sabem qual versão está no ar.
 | Git | qualquer recente, repositório com remote `origin` no GitHub | `git remote -v` |
 | Node.js | 22.22 ou mais nova | `node --version` |
 | Bash | no Windows, o que vem com o Git (**Git Bash**); o script não roda no PowerShell puro | `bash --version` |
-| Docker | aberto, com `docker login ghcr.io` feito (token com permissão `write:packages`) | `docker version` |
+| Docker | só para `--testar-imagem` (build local de prova; quem publica a imagem é o workflow do GitHub) | `docker version` |
 
 ### Variáveis de ambiente
 
@@ -33,7 +33,6 @@ quem usa o sistema e quem faz o suporte sabem qual versão está no ar.
 |---|---|---|---|
 | `APP_VERSAO` | não (`dev`) | `1.4.1` | versão gravada no build da imagem; vai para `/api/health` e para o rodapé |
 | `APP_COMMIT` | não (`desconhecido`) | `a1b2c3d` | commit gravado no build da imagem |
-| `APP_IMAGEM` | só ao rodar `release.sh` | `ghcr.io/minha-org/meu-app` | onde publicar a imagem (padrão: derivada do remote `origin`) |
 | `RELEASE_BRANCHES` | não (`main master`) | `main` | branches de onde pode sair versão |
 
 `APP_VERSAO` e `APP_COMMIT` quem preenche é o build (`--build-arg`), nunca o `.env`.
@@ -55,10 +54,11 @@ pelo SHA do commit.
    ```bash
    bash scripts/release.sh patch --dry-run
    ```
-4. Com tudo commitado na branch principal e novidades em "Não publicado" no `CHANGELOG.md`, corte a versão de verdade:
+4. Com tudo commitado na branch principal (em dia com o GitHub) e novidades em "Não publicado" no `CHANGELOG.md`, corte a versão de verdade:
    ```bash
-   APP_IMAGEM=ghcr.io/minha-org/meu-app bash scripts/release.sh patch
+   bash scripts/release.sh patch
    ```
-   No PowerShell chame o Git Bash: `& "C:\Program Files\Git\bin\bash.exe" scripts/release.sh patch` (defina antes `$env:APP_IMAGEM = "ghcr.io/minha-org/meu-app"`).
+   No PowerShell chame o Git Bash: `& "C:\Program Files\Git\bin\bash.exe" scripts/release.sh patch`. O script envia só a tag: a imagem
+   `ghcr.io/minha-org/meu-app:X.Y.Z` é publicada pelo workflow **Release** do GitHub (aba Actions); espere ele ficar verde.
 5. Confira: `git tag -l` mostra `vX.Y.Z`, o `CHANGELOG.md` tem `## [X.Y.Z] - data` e, com o sistema rodando, `curl http://localhost:3000/api/health`
    (PowerShell: `curl.exe`) mostra `"versao":"X.Y.Z"`; o rodapé do menu lateral mostra `vX.Y.Z`.
