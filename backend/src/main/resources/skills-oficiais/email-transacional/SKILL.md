@@ -18,8 +18,10 @@ Comitê (`MailService`) e Conta Gráfica.
    (HTML e texto). O resto do sistema injeta `ServicoEmail` (nunca o `EnviadorEmail` direto nem o `nodemailer`).
 2. **Dois enviadores**: `EnviadorSmtp` (nodemailer) e `EnviadorLog` (só registra o envio). Escolha por `MAIL_MODE=smtp|log`
    em `email/email.module.ts`. Padrão do schema: `log`.
-3. **`log` é recusado em produção**: `carregarConfig` lança `ErroConfiguracao` citando `MAIL_MODE` quando
-   `NODE_ENV=production` e `MAIL_MODE=log` (inclusive quando a variável nem foi definida). O sistema não sobe sem e-mail de verdade.
+3. **`log` é recusado em produção, falha fechada**: `carregarConfig` lança `ErroConfiguracao` citando `MAIL_MODE` quando
+   `NODE_ENV=production` e `MAIL_MODE=log` (inclusive quando a variável nem foi definida); e `criarEnviador` (`email.module.ts`, no boot)
+   só aceita `log` com `NODE_ENV` **declarado** `development` ou `test` (`config.NODE_ENV_DECLARADO`; `NODE_ENV` ausente conta como
+   produção). O mesmo vale para a porta 25 sem TLS. O sistema não sobe sem e-mail de verdade.
 4. **Variáveis** (no schema E nos dois `.env.example`; o teste `env-documentadas` cobra):
    `MAIL_MODE` (`smtp`|`log`, padrão `log`), `SMTP_HOST` (obrigatória com `smtp`), `SMTP_PORT` (padrão **587**),
    `SMTP_SEGURO` (`true`|`false`, padrão `false`: `true` = TLS direto na 465; `false` = STARTTLS), `SMTP_USUARIO`,
@@ -79,7 +81,8 @@ Pré-requisito: esqueleto da skill `novo-projeto-multiplica`, mais `identidade-v
    mexeu nele, faça **só** a mudança descrita:
    - `apps/api/src/config/config.ts`: o bloco `MAIL_MODE`...`EMAIL_REMETENTE` no fim do `esquemaBase` e o
      `esquemaConfig = esquemaBase.superRefine(...)` com as regras entre variáveis. A referência é o arquivo completo
-     **depois da skill `seguranca`** (traz `CORS_ORIGENS`, `LIMITE_REQ_POR_IP`, `PROXIES_CONFIAVEIS`).
+     **depois da skill `seguranca`** (traz `CORS_ORIGENS`, `LIMITE_REQ_POR_IP`, `PROXIES_CONFIAVEIS`). Acrescente também o
+     `NODE_ENV_DECLARADO` (tipo `Config` e o `return` do `carregarConfig`: o `NODE_ENV` cru, `undefined` quando ausente; regra 3).
    - `apps/api/src/app.module.ts`: `import { EmailModule } ...` e `EmailModule` nos `imports`, depois do `BancoModule`.
      A referência importa `SegurancaModule` de `./seguranca/seguranca.module` (skill `seguranca`, `referencia/apps/api/src/seguranca/seguranca.module.ts`).
    - `docker-compose.yml`: o serviço `mailpit` (regra 11).

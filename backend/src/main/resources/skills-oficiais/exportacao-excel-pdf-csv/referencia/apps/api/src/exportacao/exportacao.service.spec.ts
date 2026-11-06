@@ -131,6 +131,14 @@ describe('enviarArquivo: desconexão do cliente', () => {
     expect(lidos).toBeLessThan(1000);
   });
 
+  it('resposta que já fechou antes de anexar o ouvinte (cliente caiu durante a consulta) destrói o fluxo na hora', async () => {
+    const { servico } = montar();
+    const arquivo = await servico.exportar(gestor, { recurso: 'cliente', formato: 'csv', titulo: 'T', colunas, fonte: fonte(2000) });
+    const res = Object.assign(respostaFalsa(), { destroyed: true });
+    enviarArquivo(res as unknown as Response, arquivo);
+    expect((arquivo.conteudo as Readable).destroyed).toBe(true);
+  });
+
   it('fechar depois de terminar de escrever não faz nada', async () => {
     const { servico } = montar();
     const arquivo = await servico.exportar(gestor, { recurso: 'cliente', formato: 'csv', titulo: 'T', colunas, fonte: fonte(1) });

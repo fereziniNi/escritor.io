@@ -30,6 +30,9 @@ cliente, registrada no `CLAUDE.md`.
 6. **Parâmetros para os modelos atuais.** Não envie `temperature`/`top_p`/`top_k`, `budget_tokens` nem pré-preenchimento da resposta
    (400 nos modelos 5.x); `max_tokens` padrão **1024** (o raciocínio adaptativo gasta parte); a resposta é a união dos blocos `text` (blocos
    `thinking` são ignorados). Raciocínio mais fundo ou menos custo: `effort` por tarefa, medido, não por palpite.
+   **Resposta cortada ou recusada não é sucesso:** `stop_reason` `max_tokens` ou `refusal` → `gerar` lança `ErroIaResposta` (com
+   `motivo`; a mensagem não traz o texto parcial), o rastreio marca erro só com o tipo (`ErroIaResposta`) e o uso real de tokens, e quem
+   chama **não audita nem cobra como resultado pronto** (a rota de resumo responde **502**). Nunca devolva texto parcial como se fosse a resposta.
 7. **Langfuse é opcional e invisível quando ausente.** O exportador só é registrado com `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`
    (`Segredo`) e `LANGFUSE_URL` **as três**; faltando qualquer uma, tudo é no-op (nada vai à rede). O rastreio usa um provider
    OpenTelemetry **próprio** (não registra global) e nunca derruba a chamada de IA.
@@ -50,12 +53,13 @@ cliente, registrada no `CLAUDE.md`.
     **`127.0.0.1:3100`**; todo segredo vem do ambiente **sem valor padrão** (compose recusa subir sem ele); sem telemetria.
 12. **Testes (todos no modelo, sem API real):** sem chaves → nenhum exportador; `CAPTURAR_CONTEUDO=false` → span sem input/output;
     `true` → CPF e e-mail mascarados; `modeloPara('resumo')` respeita `LLM_MODELO_RESUMO`; `IA_HABILITADA=false` → "IA desabilitada neste
-    ambiente"; com `LITELLM_URL` a chamada vai para a base falsa; modelo desconhecido → custo `null`; produção sem chave não sobe; rota:
-    401/403/origem/400/200 com auditoria sem texto/429.
+    ambiente"; com `LITELLM_URL` a chamada vai para a base falsa; modelo desconhecido → custo `null`; produção sem chave não sobe;
+    `max_tokens`/`refusal` → `ErroIaResposta` e span de erro sem o texto; rota: 401/403/origem/400/200 com auditoria sem texto/502 sem
+    auditoria/429.
 
 ## Como aplicar
 
-Pré-requisito: skills anteriores aplicadas, na ordem do catálogo, até `fila-de-tarefas`, e `pnpm test` passando. Esta skill usa
+Pré-requisito: skills anteriores aplicadas, na ordem do catálogo, até `fila-de-tarefas` (10; as opcionais 8 e 9 só se o sistema usa), e `pnpm test` passando. Esta skill usa
 `lgpd-dados-pessoais` (`lgpd/mascarar.ts`), `trilha-auditoria` (`AuditoriaService`), `seguranca` (`LimitadorJanelaFixa`, checagem de origem),
 `usuarios-e-papeis` (`@Papeis`, `UsuarioLogado`, `validarOu400`, `test/usuario-de-teste.ts`). Ao copiar um arquivo de `referencia/`, mantenha o
 mesmo caminho relativo e **apague a 1ª linha** (`origem: ...`).

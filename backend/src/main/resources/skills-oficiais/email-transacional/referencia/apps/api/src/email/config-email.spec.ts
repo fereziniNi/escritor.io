@@ -6,6 +6,8 @@ import { inspect } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { ErroConfiguracao, carregarConfig } from '../config/config';
 import { Segredo } from '../config/segredo';
+import { criarEnviador } from './email.module';
+import { EnviadorLog, EnviadorSmtp } from './enviador-email';
 
 const base = (extra: Record<string, string | undefined> = {}): NodeJS.ProcessEnv => ({
   DATABASE_URL: 'postgres://app:senha-de-teste@localhost:5432/app',
@@ -82,7 +84,7 @@ describe('configuração de e-mail', () => {
   });
 
   it('EMAIL_REMETENTE com quebra de linha (injeção de cabeçalho) lança', () => {
-    expect(() => carregarConfig(base({ ...smtp, EMAIL_REMETENTE: 'a@exemplo.com.br\nBcc: x@y.com' }))).toThrow(/EMAIL_REMETENTE/);
+    expect(() => carregarConfig(base({ ...smtp, EMAIL_REMETENTE: 'a@exemplo.com.br\nBcc: x@y.exemplo.com.br' }))).toThrow(/EMAIL_REMETENTE/);
   });
 
   it('porta 465 com SMTP_SEGURO=false lança (TLS direto é obrigatório nela)', () => {
@@ -97,5 +99,19 @@ describe('configuração de e-mail', () => {
 
   it('SMTP_SEGURO só aceita true ou false', () => {
     expect(() => carregarConfig(base({ ...smtp, SMTP_SEGURO: 'sim' }))).toThrow(/SMTP_SEGURO/);
+  });
+});
+
+describe('criarEnviador: falha fechada no boot (NODE_ENV ausente conta como produção)', () => {
+  it('MAIL_MODE=log sem NODE_ENV declarado: não sobe; com development/test declarados: EnviadorLog', () => {
+    expect(() => criarEnviador(carregarConfig(base()))).toThrow(/MAIL_MODE/);
+    expect(criarEnviador(carregarConfig(base({ NODE_ENV: 'development' })))).toBeInstanceOf(EnviadorLog);
+    expect(criarEnviador(carregarConfig(base({ NODE_ENV: 'test' })))).toBeInstanceOf(EnviadorLog);
+  });
+
+  it('porta 25 sem TLS sem NODE_ENV declarado: não sobe; em desenvolvimento declarado: sobe', () => {
+    expect(() => criarEnviador(carregarConfig(base({ ...smtp, SMTP_PORT: '25' })))).toThrow(/SMTP_PORT/);
+    expect(criarEnviador(carregarConfig(base({ NODE_ENV: 'development', ...smtp, SMTP_PORT: '25' })))).toBeInstanceOf(EnviadorSmtp);
+    expect(criarEnviador(carregarConfig(base({ ...smtp, SMTP_PORT: '587' })))).toBeInstanceOf(EnviadorSmtp);
   });
 });

@@ -20,6 +20,7 @@ let app: INestApplication;
 let db: Db;
 let llm: Server;
 let chamadasLlm = 0;
+let motivoParada = 'end_turn';
 type Linha = typeof usuario.$inferSelect;
 let admin: Linha;
 let gestor: Linha;
@@ -51,7 +52,7 @@ beforeAll(async () => {
           role: 'assistant',
           model: 'claude-sonnet-5-5',
           content: [{ type: 'text', text: 'Vendas subiram 12%.' }],
-          stop_reason: 'end_turn',
+          stop_reason: motivoParada,
           stop_sequence: null,
           usage: { input_tokens: 500, output_tokens: 50 },
         }),
@@ -122,6 +123,23 @@ describe('POST /api/ia/resumir', () => {
     expect(tudo).not.toContain('123.456.789-09');
     expect(tudo).not.toContain('Vendas subiram');
     expect(tudo).not.toContain('Relatório mensal');
+  });
+
+  it('resposta cortada (max_tokens) ou recusada: 502 e nada na trilha como resumo feito', async () => {
+    const outro = await criarUsuario('admin2@exemplo.com.br', 'ADMIN');
+    const contar = async () => Number((await dono.query("select count(*) from evento_auditoria where acao = 'ia.resumir'")).rows[0].count);
+    const antes = await contar();
+    try {
+      for (const motivo of ['max_tokens', 'refusal']) {
+        motivoParada = motivo;
+        const res = await resumir(outro);
+        expect(res.status).toBe(502);
+        expect(JSON.stringify(res.body)).not.toContain('Vendas subiram');
+      }
+    } finally {
+      motivoParada = 'end_turn';
+    }
+    expect(await contar()).toBe(antes);
   });
 
   it('limite por usuário: o 4º pedido do GESTOR no minuto dá 429 com Retry-After', async () => {

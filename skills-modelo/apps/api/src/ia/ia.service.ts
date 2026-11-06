@@ -1,7 +1,7 @@
-import { Inject, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { BadGatewayException, Inject, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { type UsuarioAtual } from '../usuarios/usuario-atual';
-import { ErroIaDesabilitada, type ClienteIa } from './cliente-ia';
+import { ErroIaDesabilitada, ErroIaResposta, type ClienteIa } from './cliente-ia';
 import { CLIENTE_IA } from './tokens';
 
 const SISTEMA_RESUMO =
@@ -30,6 +30,8 @@ export class IaService {
       r = await this.ia.gerar({ tarefa: 'resumo', system: SISTEMA_RESUMO, prompt: texto, userId: eu.id, maxTokens: 2048 });
     } catch (e) {
       if (e instanceof ErroIaDesabilitada) throw new ServiceUnavailableException(e.message);
+      // Resposta cortada ou recusada: 502, sem auditar como resumo feito.
+      if (e instanceof ErroIaResposta) throw new BadGatewayException(e.message);
       throw e;
     }
     await this.auditoria.registrar({

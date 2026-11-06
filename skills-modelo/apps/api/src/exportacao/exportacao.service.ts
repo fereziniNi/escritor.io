@@ -170,5 +170,7 @@ export function enviarArquivo(res: Response, arquivo: ArquivoExportado): Streama
   res.on('close', () => {
     if (!res.writableFinished) fluxo.destroy();
   });
+  // A conexão pode ter caído enquanto a consulta rodava: aí o `close` já passou e o ouvinte acima nunca dispara.
+  if (res.destroyed) fluxo.destroy();
   return new StreamableFile(fluxo);
 }

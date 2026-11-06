@@ -2,7 +2,7 @@ import { type IncomingMessage, type Server, type ServerResponse, createServer } 
 import { InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Segredo } from '../config/segredo';
-import { ErroIaDesabilitada, criarClienteIa, exigirConfigIa } from './cliente-ia';
+import { ErroIaDesabilitada, ErroIaResposta, criarClienteIa, exigirConfigIa } from './cliente-ia';
 import { criarRastreio } from './rastreio';
 
 interface Chamada {
@@ -15,10 +15,12 @@ let servidor: Server;
 let url: string;
 let chamadas: Chamada[];
 let status = 200;
+let motivoParada = 'end_turn';
 
 beforeEach(async () => {
   chamadas = [];
   status = 200;
+  motivoParada = 'end_turn';
   servidor = createServer((req: IncomingMessage, res: ServerResponse) => {
     const partes: Buffer[] = [];
     req.on('data', (p: Buffer) => partes.push(p));
@@ -44,7 +46,7 @@ beforeEach(async () => {
             { type: 'thinking', thinking: '', signature: 'x' },
             { type: 'text', text: 'Resumo pronto.' },
           ],
-          stop_reason: 'end_turn',
+          stop_reason: motivoParada,
           stop_sequence: null,
           usage: { input_tokens: 1000, output_tokens: 200 },
         }),
@@ -107,6 +109,20 @@ describe('criarClienteIa', () => {
     const a = exportador.getFinishedSpans()[0]!.attributes;
     expect(a['langfuse.observation.level']).toBe('ERROR');
     expect(JSON.stringify(a)).not.toContain('123.456.789-09');
+  });
+
+  it.each(['max_tokens', 'refusal'] as const)('stop_reason=%s: lança ErroIaResposta (não é sucesso) e o rastreio guarda só o tipo', async (motivo) => {
+    motivoParada = motivo;
+    const exportador = new InMemorySpanExporter();
+    const rastreio = criarRastreio({ LANGFUSE_CAPTURAR_CONTEUDO: false }, { processadoresExtras: [new SimpleSpanProcessor(exportador)] });
+    const ia = criarClienteIa({ ...base, LITELLM_URL: url }, { rastreio, env: {} });
+    const erro = await ia.gerar({ tarefa: 'resumo', prompt: 'x' }).catch((e: unknown) => e);
+    expect(erro).toBeInstanceOf(ErroIaResposta);
+    expect((erro as ErroIaResposta).motivo).toBe(motivo);
+    const a = exportador.getFinishedSpans()[0]!.attributes;
+    expect(a['langfuse.observation.level']).toBe('ERROR');
+    expect(a['langfuse.observation.status_message']).toBe('ErroIaResposta');
+    expect(JSON.stringify(a)).not.toContain('Resumo pronto.');
   });
 
   it('habilitada sem ANTHROPIC_API_KEY: erro claro, sem chamada', async () => {
