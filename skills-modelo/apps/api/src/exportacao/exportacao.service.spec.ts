@@ -1,9 +1,11 @@
+import { EventEmitter } from 'node:events';
 import { type Readable } from 'node:stream';
 import { describe, expect, it, vi } from 'vitest';
 import { type Config } from '../config/config';
 import { type AuditoriaService } from '../auditoria/auditoria.service';
 import { type UsuarioAtual } from '../usuarios/usuario-atual';
-import { colunasPessoaisSemMascara, ExportacaoService, type FonteLinhas } from './exportacao.service';
+import { type Response } from 'express';
+import { colunasPessoaisSemMascara, enviarArquivo, ExportacaoService, type FonteLinhas } from './exportacao.service';
 
 const config = { EXPORTACAO_MAX_LINHAS: 5, NOME_SISTEMA: 'Sistema Exemplo' } as unknown as Config;
 const usuario: UsuarioAtual = { id: 'u1', email: 'u@exemplo.com.br', nome: 'U', papel: 'USUARIO' };
@@ -102,5 +104,47 @@ describe('colunasPessoaisSemMascara', () => {
       { chave: 'nome', titulo: 'e', tipo: 'texto' },
     ]);
     expect(lista).toEqual(['titularCpf', 'contatoEmail']);
+  });
+});
+
+describe('enviarArquivo: desconexão do cliente', () => {
+  const respostaFalsa = () => Object.assign(new EventEmitter(), { setHeader: vi.fn(), writableFinished: false });
+
+  it('fechar a resposta antes do fim destrói o fluxo e encerra o gerador de lotes (nenhum lote novo é lido)', async () => {
+    const { servico } = montar();
+    const f = fonte(2000);
+    const arquivo = await servico.exportar({ ...usuario, papel: 'ADMIN' }, { recurso: 'cliente', formato: 'csv', titulo: 'T', colunas, fonte: f });
+    const res = respostaFalsa();
+    enviarArquivo(res as unknown as Response, arquivo);
+    const fluxo = arquivo.conteudo as Readable;
+    await new Promise<void>((ok) => {
+      fluxo.once('data', () => ok());
+      fluxo.resume();
+    });
+    res.emit('close');
+    expect(fluxo.destroyed).toBe(true);
+    await new Promise((ok) => setTimeout(ok, 50));
+    const lidos = f.lidos();
+    await new Promise((ok) => setTimeout(ok, 100));
+    expect(f.lidos()).toBe(lidos);
+    expect(lidos).toBeLessThan(1000);
+  });
+
+  it('fechar depois de terminar de escrever não faz nada', async () => {
+    const { servico } = montar();
+    const arquivo = await servico.exportar(gestor, { recurso: 'cliente', formato: 'csv', titulo: 'T', colunas, fonte: fonte(1) });
+    const res = respostaFalsa();
+    res.writableFinished = true;
+    enviarArquivo(res as unknown as Response, arquivo);
+    res.emit('close');
+    expect((arquivo.conteudo as Readable).destroyed).toBe(false);
+  });
+
+  it('PDF (Buffer) também sai como fluxo', async () => {
+    const { servico } = montar();
+    const arquivo = await servico.exportar(gestor, { recurso: 'cliente', formato: 'pdf', titulo: 'T', colunas, fonte: fonte(2) });
+    expect(Buffer.isBuffer(arquivo.conteudo)).toBe(true);
+    const arquivoEnviado = enviarArquivo(respostaFalsa() as unknown as Response, arquivo);
+    expect(arquivoEnviado.getStream().readable).toBe(true);
   });
 });

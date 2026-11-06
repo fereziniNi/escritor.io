@@ -4,7 +4,6 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 import { BANCO, type Db } from '../banco/banco';
 import { cliente } from '../banco/esquema';
 import { type ArquivoExportado, ExportacaoService, type FormatoExportacao } from '../exportacao/exportacao.service';
-
 import { CHAVES_LGPD, type ChavesLgpd } from '../lgpd/chaves';
 import { normalizarCpf } from '../lgpd/cpf';
 import { exigirPapel, type UsuarioAtual } from '../usuarios/usuario-atual';
@@ -152,7 +151,7 @@ export class ClientesService {
 
   /**
    * Os clientes do mais novo para o mais velho, em lotes, paginando por CHAVE (`criado_em`, `id`) e não por OFFSET: cada
-   * lote é uma consulta barata mesmo no fim de 100.000 linhas, e inserções durante a exportação não repetem nem pulam linha.
+   * lote lê só os próximos 500 pelo índice `cliente_criado_em_id_desc` (migração `0006`, sem ele cada lote ordenaria a tabela toda), e inserções durante a exportação não repetem nem pulam linha.
    * O `criado_em` volta como texto para a chave manter a precisão de microssegundos do Postgres (um Date de JS perde).
    */
   private async *lotesParaExportar(): AsyncGenerator<Record<string, unknown>[]> {

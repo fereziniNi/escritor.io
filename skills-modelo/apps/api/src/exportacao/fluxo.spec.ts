@@ -91,4 +91,29 @@ describe('exportação em fluxo: 100.000 linhas x 10 colunas', () => {
     await expect(consumir(excelEmFluxo(meta, quebra()))).rejects.toThrow(/Excel/);
     await expect(consumir(csvEmFluxo(meta, quebra()))).rejects.toThrow(/banco caiu/);
   });
+
+  it('destruir o fluxo no meio (cliente desconectou) para de buscar lotes: Excel e CSV', async () => {
+    for (const montar of [excelEmFluxo, csvEmFluxo]) {
+      let lidos = 0;
+      async function* lotes(): Lotes {
+        for (let i = 0; i < 400; i++) {
+          await new Promise((ok) => setTimeout(ok, 2));
+          lidos++;
+          yield Array.from({ length: LOTE }, (_, k) => ({ a: `linha ${i}-${k}`, e: k }));
+        }
+      }
+      const fluxo = montar(meta, lotes());
+      // Lê um pouco e abandona, como um download cancelado.
+      await new Promise<void>((ok) => {
+        fluxo.once('data', () => ok());
+        fluxo.resume();
+      });
+      fluxo.destroy();
+      await new Promise((ok) => setTimeout(ok, 100));
+      const noMomento = lidos;
+      await new Promise((ok) => setTimeout(ok, 300));
+      expect(lidos).toBe(noMomento);
+      expect(lidos).toBeLessThan(400);
+    }
+  }, 60_000);
 });

@@ -102,14 +102,30 @@ export function excelEmFluxo(meta: MetaRelatorio, lotes: Lotes, identidade: Iden
       };
 
       for await (const lote of lotes) {
+        // Cliente foi embora (o fluxo foi destruído): para de escrever e, ao sair do laço, encerra o gerador de lotes.
+        if (saida.destroyed) return;
         for (const dados of lote) escrever(dados, false, false);
         // Dá tempo à compressão do zip (roda em outra thread) e cede o laço de eventos: o exceljs não aplica pressão de volta
         // entre a escrita das linhas e o deflate, então sem esta pausa os lotes se acumulam na memória (medido: 100.000 x 10
         // chegava a ~300 MB de buffers externos; com a pausa ficam em ~6 MB e o crescimento deixa de depender das linhas).
         await new Promise<void>((ok) => setTimeout(ok, PAUSA_MS));
-        // Respeita também o consumidor: se o download está lento, espera esvaziar a saída.
-        if (saida.writableNeedDrain) await new Promise<void>((ok) => saida.once('drain', ok));
+        // Respeita também o consumidor: se o download está lento, espera esvaziar a saída. 'close' e 'error' também soltam a
+        // espera (destruído, nunca vem 'drain').
+        if (saida.writableNeedDrain && !saida.destroyed) {
+          await new Promise<void>((ok) => {
+            const solta = () => {
+              saida.off('drain', solta);
+              saida.off('close', solta);
+              saida.off('error', solta);
+              ok();
+            };
+            saida.once('drain', solta);
+            saida.once('close', solta);
+            saida.once('error', solta);
+          });
+        }
       }
+      if (saida.destroyed) return;
       if (meta.totais) {
         const primeira = cols[0];
         escrever(meta.totais, true, primeira?.tipo === 'texto' && meta.totais[primeira.chave] === undefined);

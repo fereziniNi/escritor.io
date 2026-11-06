@@ -1,5 +1,5 @@
 // origem: skills-modelo/apps/api/src/exportacao/exportacao.service.ts
-import { type Readable } from 'node:stream';
+import { Readable } from 'node:stream';
 import { Inject, Injectable, Logger, StreamableFile } from '@nestjs/common';
 import { type Response } from 'express';
 import { z } from 'zod';
@@ -164,5 +164,12 @@ export function enviarArquivo(res: Response, arquivo: ArquivoExportado): Streama
   res.setHeader('X-Exportacao-Truncada', String(arquivo.truncado));
   // Só vale para quem chama de outra origem (CORS_ORIGENS): deixa o navegador ler o nome e o aviso de corte.
   res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, X-Exportacao-Truncada');
-  return Buffer.isBuffer(arquivo.conteudo) ? new StreamableFile(arquivo.conteudo) : new StreamableFile(arquivo.conteudo);
+  const fluxo = Buffer.isBuffer(arquivo.conteudo) ? Readable.from([arquivo.conteudo], { objectMode: false }) : arquivo.conteudo;
+  // Cliente desconectou (fechou a aba, cancelou o download) antes do fim: destrói o fluxo. Sem isto o `pipe` só se solta da
+  // resposta e o gerador de lotes fica parado para sempre, com a consulta e a conexão do banco presas; destruído, ele é
+  // encerrado (`return`) e nenhum lote novo é lido.
+  res.on('close', () => {
+    if (!res.writableFinished) fluxo.destroy();
+  });
+  return new StreamableFile(fluxo);
 }

@@ -43,6 +43,13 @@
       "when": 1793923544968,
       "tag": "0005_cliente",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793956699175,
+      "tag": "0006_indice_cliente_exportacao",
+      "breakpoints": true
     }
   ]
 }

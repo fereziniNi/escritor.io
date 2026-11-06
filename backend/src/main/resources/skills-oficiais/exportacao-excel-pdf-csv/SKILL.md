@@ -107,6 +107,7 @@ passando. Ao copiar um arquivo de `referencia/`, mantenha o mesmo caminho relati
    - `apps/api/src/clientes/` (exemplo da skill `lgpd-dados-pessoais`): `clientes.module.ts` importa `ExportacaoModule`;
      `clientes.service.ts` ganha `exportar(ator, formato)` (monta o `RelatorioTabular` de clientes e chama o
      `ExportacaoService`); `clientes.controller.ts` ganha `GET /api/clientes/exportar` antes de `:id`.
+   Migração do índice `cliente (criado_em desc, id desc)` que sustenta os lotes: SQL à mão, como manda `referencia/migracao-indice-cliente.md` (sem ele cada lote ordena a tabela toda).
 5. Rode `pnpm --filter api test`: passa (precisa do Docker). O e2e prova a máscara por papel nos três formatos, a auditoria antes do corpo, o corte
    (`EXPORTACAO_MAX_LINHAS=4`), a fórmula e a leitura em lotes (1.200 linhas com o mesmo `criado_em`); `fluxo.spec.ts` mede a memória
    de 100.000 linhas x 10 colunas.
@@ -155,6 +156,7 @@ dos tokens. De `email-transacional`: `email/modelo-email.ts` (`COR`). De `usuari
 - `referencia/apps/api/src/clientes/clientes.service.ts`, `clientes.controller.ts`, `clientes.module.ts` — exemplo completo de um recurso exportável (regras 8, 9, 11); passos 4 e 9.
 - `referencia/apps/api/src/auditoria/auditoria.service.ts`, `auditoria.controller.ts`, `auditoria.module.ts`, `referencia/apps/api/test/auditoria.e2e.spec.ts` — a trilha usando o `ExportacaoService` (regras 9 e 10); passo 4.
 - `referencia/apps/web/src/lib/auditoria-api.ts`, `telas/TelaAuditoria.tsx`, `TelaAuditoria.test.tsx` — a tela da auditoria com o `BotaoExportar` (regra 12); passo 4.
+- `referencia/migracao-indice-cliente.md` — o índice `cliente_criado_em_id_desc` (migração `0006`) da leitura em lotes (regra 10); passo 4 e a cada recurso novo exportado.
 - `referencia/apps/api/src/config/config.ts`, `referencia/.env.example`, `referencia/deploy/.env.example` — as duas variáveis novas; passo 4.
 - `referencia/apps/web/src/componentes/BotaoExportar.tsx`, `BotaoExportar.test.tsx`, `referencia/apps/web/src/lib/exportar-api.ts` — o botão (regra 12); passo 6.
 
