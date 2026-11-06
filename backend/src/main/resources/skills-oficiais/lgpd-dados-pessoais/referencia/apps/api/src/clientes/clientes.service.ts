@@ -119,10 +119,21 @@ export class ClientesService {
     return this.publico(await this.linha(id));
   }
 
-  /** Busca exata pelo índice cego: o CPF nunca vai para o banco em claro, nem na consulta. */
+  /**
+   * Busca exata pelo índice cego: o CPF nunca vai para o banco em claro, nem na consulta. Só GESTOR e ADMIN (quem vê o
+   * CPF completo): com o CPF mascarado na mão, 1000 tentativas bastariam para descobri-lo. Toda busca, achando ou não,
+   * vira `cliente.buscar_cpf` na trilha, sem o CPF (só se achou e, se achou, o id).
+   */
   async buscarPorCpf(ator: UsuarioAtual, cpf: string): Promise<ClientePublico> {
-    exigirPapel(ator, 'ADMIN', 'GESTOR', 'USUARIO');
+    exigirPapel(ator, 'ADMIN', 'GESTOR');
     const [linha] = await this.db.select().from(cliente).where(eq(cliente.cpfIndice, this.indiceDe(cpf)));
+    await this.auditoria.registrar({
+      acao: 'cliente.buscar_cpf',
+      atorId: ator.id,
+      alvoTipo: 'cliente',
+      ...(linha ? { alvoId: linha.id } : {}),
+      depois: { encontrado: linha !== undefined },
+    });
     if (!linha) throw new NotFoundException();
     return this.publico(linha);
   }

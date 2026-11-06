@@ -6,7 +6,8 @@ import { mascararCpf, mascararCpfEmTexto } from './mascarar';
  * Nunca logar dado pessoal. Duas barreiras (a regra principal continua sendo NÃO passar o dado ao logger):
  * 1. `redact` do pino com os campos abaixo (no topo do objeto logado e um nível abaixo): o valor vira `[REDACTED]`.
  * 2. `destinoSemDadosPessoais`: cada linha pronta é varrida e todo CPF que sobrou (na mensagem, num campo qualquer, na
- *    mensagem ou na pilha de um erro) sai mascarado (`***.456.789-**`).
+ *    mensagem ou na pilha de um erro) sai mascarado (`***.456.789-**`). Só CPF: e-mail, nome ou telefone em texto livre
+ *    NÃO são achados pela varredura (só pelo `redact`, quando estão num campo com o nome certo).
  */
 const CAMPOS = ['cpf', 'email', 'telefone', 'celular', 'dataNascimento', 'rg'];
 export const CAMPOS_PESSOAIS_LOG: readonly string[] = CAMPOS.flatMap((c) => [c, `*.${c}`]);
@@ -32,7 +33,16 @@ export function redigirLinhaLog(linha: string): string {
   }
 }
 
-/** Embrulha o destino do pino (stdout em produção, memória nos testes) com a varredura de CPF. */
-export function destinoSemDadosPessoais(destino: DestinationStream): DestinationStream {
-  return { write: (linha: string) => destino.write(redigirLinhaLog(linha)) };
+/** O que o pino usa do destino além de `write` (sonic-boom): esvaziar o buffer no desligamento e fechar. */
+type DestinoCompleto = DestinationStream & { flushSync?: () => void; end?: () => void };
+
+/**
+ * Embrulha o destino do pino (stdout em produção, memória nos testes) com a varredura de CPF. Repassa `flushSync` e `end`
+ * quando o destino original os tem: sem isso, as últimas linhas antes de a API cair poderiam se perder.
+ */
+export function destinoSemDadosPessoais(destino: DestinoCompleto): DestinoCompleto {
+  const embrulho: DestinoCompleto = { write: (linha: string) => destino.write(redigirLinhaLog(linha)) };
+  if (typeof destino.flushSync === 'function') embrulho.flushSync = () => destino.flushSync!();
+  if (typeof destino.end === 'function') embrulho.end = () => destino.end!();
+  return embrulho;
 }

@@ -22,7 +22,8 @@ export function mascararCpf(cpf: string): string {
 export function mascararEmail(email: string): string {
   const i = email.lastIndexOf('@');
   if (i < 1 || i === email.length - 1) return '***';
-  return `${email[0]}***${email.slice(i)}`;
+  // Primeiro ponto de código (Array.from): letra fora do BMP ou acentuada composta não sai cortada ao meio.
+  return `${Array.from(email)[0]}***${email.slice(i)}`;
 }
 
 /**

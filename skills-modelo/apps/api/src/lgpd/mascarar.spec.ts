@@ -38,6 +38,10 @@ describe('mascararEmail', () => {
     expect(mascararEmail('ana.souza@exemplo.com.br')).toBe('a***@exemplo.com.br');
   });
 
+  it('primeira letra por ponto de código (não corta caractere fora do BMP)', () => {
+    expect(mascararEmail('𝒜na@exemplo.com.br')).toBe('𝒜***@exemplo.com.br');
+  });
+
   it('formato estranho vira "***"', () => {
     expect(mascararEmail('sem-arroba')).toBe('***');
     expect(mascararEmail('@exemplo.com.br')).toBe('***');

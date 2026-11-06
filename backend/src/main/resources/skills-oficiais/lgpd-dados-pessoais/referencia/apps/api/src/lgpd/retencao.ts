@@ -61,7 +61,10 @@ export async function executarRetencao(opcoes: { db: Db; config: Config; agora?:
  * com o DONO do banco (DATABASE_URL), nunca com o runtime (que não tem UPDATE na trilha e falha aqui com "must be owner").
  * Numa transação só: desliga o gatilho de imutabilidade, apaga o `ip` dos eventos mais velhos que `dias`, registra
  * `auditoria.expurgo` e religa o gatilho. Erro em qualquer passo desfaz tudo, inclusive o "desligar" (DDL do Postgres é
- * transacional); a tabela fica travada (ACCESS EXCLUSIVE) durante a janela, então ninguém grava com o gatilho desligado.
+ * transacional). O DISABLE TRIGGER trava a tabela em SHARE ROW EXCLUSIVE até o fim da transação: leituras seguem, mas
+ * todo INSERT na trilha (logins, ações da API) ESPERA — ninguém grava com o gatilho desligado, e a API fica lenta nas
+ * ações auditadas enquanto o UPDATE roda. Agende fora do horário de uso; numa trilha muito grande, faça a primeira
+ * execução (a que pega o acumulado) numa janela de manutenção — depois cada execução só pega os poucos dias novos.
  * Devolve quantos eventos perderam o IP.
  */
 export async function expurgarIpAuditoria(dono: Db, dias: number, agora: Date = new Date()): Promise<number> {

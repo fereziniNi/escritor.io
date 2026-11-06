@@ -37,10 +37,14 @@ export class ClientesController {
     return this.clientes.criar(eu, validarOu400(esquemaCliente, corpo));
   }
 
-  /** Busca exata por CPF (índice cego). POST para o CPF ir no corpo. */
+  /**
+   * Busca exata por CPF (índice cego). POST para o CPF ir no corpo. Só GESTOR e ADMIN: quem vê o CPF mascarado
+   * (`***.456.789-**`) acharia o CPF completo em no máximo 1000 buscas (só os 3 primeiros dígitos são desconhecidos; os
+   * verificadores saem deles). Cada busca fica na trilha (`cliente.buscar_cpf`).
+   */
   @Post('busca-cpf')
   @HttpCode(200)
-  @Papeis('ADMIN', 'GESTOR', 'USUARIO')
+  @Papeis('ADMIN', 'GESTOR')
   buscarPorCpf(@UsuarioLogado() eu: UsuarioAtual, @Body() corpo: unknown): Promise<ClientePublico> {
     return this.clientes.buscarPorCpf(eu, validarOu400(esquemaBusca, corpo).cpf);
   }

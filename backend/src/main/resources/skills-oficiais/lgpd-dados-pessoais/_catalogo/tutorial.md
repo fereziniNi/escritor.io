@@ -92,6 +92,8 @@ Nenhum pacote novo. Cria a tabela de exemplo `cliente` (uma migração) e dois c
 - **Erro 500 ao listar clientes e o log fala em "não foi possível decifrar"**: a chave que cifrou aqueles dados não está mais em
   `DADOS_CHAVES` (foi trocada sem o passo 2 da troca, ou o `.env` de desenvolvimento estava sem chaves e a API reiniciou). Volte a
   chave antiga para a lista; em desenvolvimento, apague os clientes de teste.
+- **O Usuário recebe "Acesso negado" ao procurar por CPF**: é de propósito. Quem vê o CPF pela metade conseguiria descobrir o
+  CPF inteiro testando no máximo 1000 combinações, por isso só Gestor e Administrador procuram por CPF (e cada busca fica na auditoria).
 - **O Usuário vê o CPF inteiro**: confira o papel dele em **Usuários** (Gestor e Administrador veem completo de propósito).
 
 Próximo passo: seguir a ordem de skills indicada pelo Claude Code.

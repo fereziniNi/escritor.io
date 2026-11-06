@@ -118,6 +118,23 @@ describe('cliente com CPF cifrado (AES-256-GCM) e índice cego (HMAC)', () => {
     await http().post('/api/clientes/busca-cpf').set('x-usuario-teste', cab(gestor)).set('Origin', PAINEL).send({ cpf: OUTRO_CPF }).expect(404);
   });
 
+  it('busca por CPF: USUARIO → 403 (com o CPF mascarado, 1000 tentativas achariam o completo) e nada vai para a trilha', async () => {
+    const antes = (await eventosDe('cliente.buscar_cpf')).length;
+    await http().post('/api/clientes/busca-cpf').set('x-usuario-teste', cab(comum)).set('Origin', PAINEL).send({ cpf: CPF }).expect(403);
+    expect((await eventosDe('cliente.buscar_cpf')).length).toBe(antes);
+  });
+
+  it('busca por CPF: toda busca de GESTOR fica na trilha (achou ou não), sem o CPF', async () => {
+    const achou = await http().post('/api/clientes/busca-cpf').set('x-usuario-teste', cab(gestor)).set('Origin', PAINEL).send({ cpf: CPF }).expect(200);
+    const [evento] = await eventosDe('cliente.buscar_cpf');
+    expect(evento).toMatchObject({ ator_id: gestor.id, alvo_tipo: 'cliente', alvo_id: achou.body.id, depois: { encontrado: true } });
+    await http().post('/api/clientes/busca-cpf').set('x-usuario-teste', cab(gestor)).set('Origin', PAINEL).send({ cpf: '11144477735' }).expect(404);
+    const [semAchar] = await eventosDe('cliente.buscar_cpf');
+    expect(semAchar).toMatchObject({ ator_id: gestor.id, alvo_id: null, depois: { encontrado: false } });
+    const trilha = JSON.stringify(await eventosDe('cliente.buscar_cpf'));
+    for (const proibido of [CPF, CPF_FORMATADO, '11144477735', '456.789', '444.777']) expect(trilha).not.toContain(proibido);
+  });
+
   it('sem sessão → 401', async () => {
     await http().get('/api/clientes').expect(401);
   });
@@ -300,12 +317,13 @@ describe('rotação de chave: recifrar (pnpm --filter api lgpd:recifrar)', () =>
   it('com a chave nova na frente, re-cifra o que usa a antiga; tudo continua legível', async () => {
     const novo = new Chaveiro(lerChavesDados(`k2:${chave()},k1:${CHAVE_ANTIGA}`));
     const antes = (await dono.query('select id, cpf_cifrado from cliente where cpf_cifrado is not null')).rows as { id: string; cpf_cifrado: string }[];
-    expect(antes.length).toBeGreaterThan(0);
+    // Lote de 2 com mais de 4 linhas: passa por vários lotes (paginação por id).
+    expect(antes.length).toBeGreaterThan(4);
     const claros = Object.fromEntries(antes.map((l) => [l.id, novo.decifrar(l.cpf_cifrado, COLUNA_CPF)]));
     const runtime = criarBanco(urlRuntime);
     try {
-      expect(await recifrarClientes(runtime, novo)).toBe(antes.length);
-      expect(await recifrarClientes(runtime, novo)).toBe(0);
+      expect(await recifrarClientes(runtime, novo, 2)).toBe(antes.length);
+      expect(await recifrarClientes(runtime, novo, 2)).toBe(0);
     } finally {
       await runtime.$client.end();
     }

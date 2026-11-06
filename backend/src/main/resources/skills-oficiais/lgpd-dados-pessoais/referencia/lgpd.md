@@ -39,8 +39,11 @@ isso é protegido. Responsável técnico: <nome>. Encarregado (DPO) do cliente: 
 - **Rotação**: chave nova na frente de `DADOS_CHAVES` → reiniciar → `lgpd:recifrar` → retirar a antiga. Última rotação: <data>.
   Periodicidade: <**a definir**, sugestão anual ou após incidente>.
 - **Máscara por papel**: interceptor global; só GESTOR e ADMIN veem CPF e e-mail completos.
+- **Busca por CPF**: só GESTOR e ADMIN, e cada busca fica na auditoria (`cliente.buscar_cpf`, sem o CPF). Motivo: no CPF
+  mascarado `***.456.789-**` só faltam os 3 primeiros dígitos (os verificadores saem deles), então quem vê a máscara e
+  pudesse buscar descobriria o CPF em no máximo 1000 tentativas. Vale para toda busca por dado que algum papel vê mascarado.
 - **Logs**: campos `cpf`, `email`, `telefone`, `celular`, `dataNascimento`, `rg` saem `[REDACTED]`; CPF em qualquer
-  texto sai `***.456.789-**`. CPF nunca na URL (busca por POST).
+  texto sai `***.456.789-**` (a varredura de texto livre cobre só CPF). CPF nunca na URL (busca por POST).
 
 ## Direitos do titular (art. 18)
 
@@ -67,6 +70,15 @@ Prazo de resposta ao titular: <**a definir** com o jurídico>. Canal do titular:
 |---|---|---|---|
 | <provedor de e-mail> | E-mail do usuário (código de login, convite) | Envio de e-mail transacional | <a definir> |
 | <outro> | | | |
+
+## Riscos aceitos
+
+- Nome e e-mail ficam em claro no banco (exibição e contato).
+- Quem tiver o banco **e** as chaves lê os CPFs; perder as chaves = perder os CPFs.
+- A cifra é amarrada à coluna, não à linha: quem pode escrever no banco consegue trocar o CPF cifrado entre dois registros.
+  Endurecimento opcional: incluir o id da linha na AAD (<adotado / não adotado>).
+- GESTOR e ADMIN podem buscar por CPF (auditado).
+- Backups antigos guardam o que a retenção já apagou.
 
 ## Pendências (decidir com jurídico/DPO)
 

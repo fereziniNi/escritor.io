@@ -28,7 +28,8 @@ em teste manual. Vem de BeyondCredit (`privacy/`), CONECTA (`modules/pii`) e Fin
    cru); ausente ou vazio conta como produção. Em dev/teste sem chaves: chaves aleatórias do processo, com aviso (o que
    for cifrado não abre depois de reiniciar — em dev, gere as chaves uma vez e ponha no `.env`).
 4. **Rotação**: (1) chave nova **na frente** de `DADOS_CHAVES` (`k2:...,k1:...`) e reinicie; (2) `pnpm --filter api
-   lgpd:recifrar` re-cifra o que ainda está numa chave antiga (idempotente); (3) só então retire a antiga. Dado cifrado
+   lgpd:recifrar` re-cifra o que ainda está numa chave antiga (idempotente, em lotes de **500** por paginação de id); (3) só
+   então retire a antiga. Dado cifrado
    com uma chave que continua na lista sempre decifra. `DADOS_CHAVE_INDICE` **não roda** junto (trocá-la = recalcular todos
    os índices).
 5. **Índice cego** (`lgpd/indice-cego.ts`): **HMAC-SHA256** com `DADOS_CHAVE_INDICE` de `coluna + "\0" + valor
@@ -38,36 +39,47 @@ em teste manual. Vem de BeyondCredit (`privacy/`), CONECTA (`modules/pii`) e Fin
    de 64 hex no índice e CHECK "os dois nulos ou os dois preenchidos" (ver `cliente.tabela.ts`; migração gerada pelo
    drizzle-kit, sem SQL à mão). CPF válido (dígitos verificadores, `cpfValido`) ou 400. **CPF nunca na URL**: busca por
    `POST .../busca-cpf` com o CPF no corpo.
-7. **Máscara por papel** (`MascararDadosPessoaisInterceptor`, global via `APP_INTERCEPTOR`): toda resposta para quem **não é
-   GESTOR nem ADMIN** (USUARIO, sem sessão, papel novo) sai com chave `cpf` → **`***.456.789-**`** (`mascararCpf("12345678909")`),
-   chave `email` → **`a***@exemplo.com.br`** (`mascararEmail("ana.souza@exemplo.com.br")`) e CPF dentro de qualquer texto
-   mascarado. Exceção: o objeto que é o próprio usuário logado (`id` igual) mantém o e-mail. Arquivo binário passa. Erro
-   não passa pelo interceptor: **nunca** ponha dado pessoal em mensagem de erro.
-8. **Logs sem dado pessoal** (`lgpd/redator-log.ts`, ligado no `log.module.ts`): `redact` do pino com `cpf`, `email`,
+7. **Busca por identificador mascarado**: toda busca exata por um dado que algum papel vê mascarado (CPF, e-mail,
+   telefone) é **restrita aos papéis que o veem completo** (rota **e** serviço) e **auditada a cada chamada**, achando ou
+   não, sem o valor buscado no evento (`cliente.buscar_cpf` com `depois: { encontrado }` e o id se achou). Motivo: em
+   `***.456.789-**` só faltam os 3 primeiros dígitos (os 2 verificadores saem deles), então **1000 buscas** revelariam o CPF.
+   No exemplo, `busca-cpf` é **só GESTOR e ADMIN**.
+8. **Máscara por papel** (`MascararDadosPessoaisInterceptor`, global via `APP_INTERCEPTOR`): toda resposta para quem **não é
+   GESTOR nem ADMIN** (USUARIO, sem sessão, papel novo) sai com chave que começa com `cpf` (`/^cpf/i`: `cpf`, `cpfConjuge`,
+   `cpfs`) → **`***.456.789-**`** (`mascararCpf("12345678909")`), chave que começa com `email` (`/^email/i`, texto ou lista)
+   → **`a***@exemplo.com.br`** (`mascararEmail("ana.souza@exemplo.com.br")`, primeira letra por ponto de código) e CPF dentro
+   de qualquer texto mascarado. Só objetos literais e listas são percorridos: **devolva DTO como objeto literal** (instância
+   de classe, Date e arquivo passam intactos). Exceção: o objeto que é o próprio usuário logado (`id` igual) mantém o
+   e-mail. Erro não passa pelo interceptor: **nunca** ponha dado pessoal em mensagem de erro.
+9. **Logs sem dado pessoal** (`lgpd/redator-log.ts`, ligado no `log.module.ts`): `redact` do pino com `cpf`, `email`,
    `telefone`, `celular`, `dataNascimento`, `rg` (no topo e um nível abaixo) → `[REDACTED]`; e o destino do pino
    (`destinoSemDadosPessoais`) varre cada linha: CPF formatado sempre, 11 dígitos soltos só se forem CPF válido, viram
-   `***.456.789-**` (na mensagem, em qualquer campo, na pilha do erro). A regra continua sendo **não passar** o dado ao logger;
+   `***.456.789-**` (na mensagem, em qualquer campo, na pilha do erro). A varredura de texto livre cobre **só CPF**: e-mail,
+   nome ou telefone no meio de uma mensagem não são achados. A regra continua sendo **não passar** o dado ao logger;
    na trilha de auditoria, só o id do titular (nunca nome nem CPF; e-mail só mascarado).
-9. **Retenção** (`lgpd/retencao.ts`, comando `pnpm --filter api lgpd:retencao`, função simples que a skill `fila-de-tarefas`
+10. **Retenção** (`lgpd/retencao.ts`, comando `pnpm --filter api lgpd:retencao`, função simples que a skill `fila-de-tarefas`
    pode agendar): com `RETENCAO_DIAS` = N (inteiro ≥ 1; **vazia = nada é expurgado**, prazo a definir com jurídico/DPO),
    anonimiza cliente com `encerrado_em` há mais de N dias, apaga `codigo_login` criados há mais de N dias e `sessao`
    criadas há mais de N dias e já vencidas; um evento `lgpd.retencao` resume. Roda com o **papel de runtime**.
-10. **IP da trilha** (`RETENCAO_AUDITORIA_IP_DIAS`, vazia = trilha intacta), regra 12 da `trilha-auditoria`: o mesmo
+11. **IP da trilha** (`RETENCAO_AUDITORIA_IP_DIAS`, vazia = trilha intacta), regra 12 da `trilha-auditoria`: o mesmo
     comando conecta como o **DONO** (`DATABASE_URL`) e, **numa transação só**, `DISABLE TRIGGER evento_auditoria_sem_alteracao`,
     `UPDATE ... SET ip = NULL` nos eventos mais velhos, `ENABLE TRIGGER` e grava `auditoria.expurgo`. Erro desfaz tudo (DDL é
-    transacional) e a tabela fica travada durante a janela. Com o runtime falha (não é dono). **Nunca** dentro da API: rode
-    onde o dono já existe (serviço de migração). Ligar é decisão registrada no `CLAUDE.md`.
-11. **Direitos do titular** (`TitularController`, **só ADMIN** na rota e no serviço): `GET /api/admin/lgpd/titulares/:id/exportar`
+    transacional). O `DISABLE TRIGGER` trava a trilha em **SHARE ROW EXCLUSIVE** até o fim: leituras seguem, mas todo INSERT
+    (login, ações auditadas) **espera** — rode **fora do horário de uso**, e a primeira execução numa trilha grande (o
+    acumulado) numa janela de manutenção; as seguintes pegam só os dias novos. Com o runtime falha (não é dono). **Nunca**
+    dentro da API: rode onde o dono já existe (serviço de migração). Ligar é decisão registrada no `CLAUDE.md`.
+12. **Direitos do titular** (`TitularController`, **só ADMIN** na rota e no serviço): `GET /api/admin/lgpd/titulares/:id/exportar`
     (JSON completo em anexo `titular-<id>.json`, `Cache-Control: no-store`, `@MesmaOrigem()`, evento `lgpd.exportar_titular`) e
     `POST /api/admin/lgpd/titulares/:id/anonimizar` (guarda de origem da `seguranca`; troca nome por `Titular anonimizado`, apaga
     e-mail, CPF cifrado e índice, marca `anonimizado_em`, **mantém o id**; evento `lgpd.anonimizar_titular` na mesma
     transação; de novo → 409). Retenção e rota usam a mesma `anonimizarCliente`.
-12. **Documento** `docs/lgpd.md` a partir de `referencia/lgpd.md`: inventário (dado, onde, finalidade, base legal, proteção,
+13. **Documento** `docs/lgpd.md` a partir de `referencia/lgpd.md`: inventário (dado, onde, finalidade, base legal, proteção,
     quem vê, retenção), chaves e rotação, direitos do titular, retenção, compartilhamento e pendências marcadas **a definir**.
-13. **Riscos que sobram (aceitos)**: nome e e-mail ficam em claro (exibição/busca); quem tem banco **e** chaves lê tudo
+14. **Riscos que sobram (aceitos)**: nome e e-mail ficam em claro (exibição/busca); quem tem banco **e** chaves lê tudo
     (chaves fora do servidor de banco, no cofre do cliente); perder as chaves = perder os CPFs; o envelope não amarra a
-    linha (trocar o CPF cifrado entre duas linhas da mesma coluna exige escrita no banco); backups antigos guardam o que
-    a retenção já apagou.
+    linha (trocar o CPF cifrado entre duas linhas da mesma coluna exige escrita no banco; **endurecimento opcional**: AAD =
+    `coluna + ":" + id da linha`, com o id gerado antes de cifrar — decisão no `CLAUDE.md`, e o `recifrar` passa a usar a
+    mesma AAD); backups antigos guardam o que a retenção já apagou; GESTOR e ADMIN podem buscar CPFs (auditado, regra 7).
 
 ## Como aplicar
 
@@ -77,8 +89,8 @@ dependência npm nova (só `node:crypto`). Ao copiar um arquivo de `referencia/`
 
 **Projeto no esqueleto:**
 
-1. TDD — copie **primeiro** os testes: `apps/api/src/lgpd/chaveiro.spec.ts`, `mascarar.spec.ts`, `redator-log.spec.ts`,
-   `config-lgpd.spec.ts` e `apps/api/test/lgpd.e2e.spec.ts`. Rode `pnpm --filter api test`: tem de falhar (módulos inexistentes).
+1. TDD — copie **primeiro** os testes: `apps/api/src/lgpd/chaveiro.spec.ts`, `mascarar.spec.ts`, `mascarar-dados.spec.ts`,
+   `redator-log.spec.ts`, `config-lgpd.spec.ts` e `apps/api/test/lgpd.e2e.spec.ts`. Rode `pnpm --filter api test`: tem de falhar (módulos inexistentes).
 2. Código: copie `apps/api/src/lgpd/` inteiro (`cpf.ts`, `mascarar.ts`, `chaveiro.ts`, `indice-cego.ts`, `chaves.ts`,
    `redator-log.ts`, `mascarar-dados.interceptor.ts`, `lgpd.module.ts`, `retencao.ts`, `recifrar.ts`, `executar-lgpd.ts`) e o
    exemplo `apps/api/src/clientes/` (`cliente.tabela.ts`, `clientes.service.ts`, `clientes.controller.ts`,
@@ -138,21 +150,21 @@ gatilho `evento_auditoria_sem_alteracao`.
 - `referencia/apps/api/src/lgpd/chaveiro.ts` — AES-256-GCM, leitura e validação das chaves, rotação (regras 1, 2, 4); passo 2 e para entender o desenho.
 - `referencia/apps/api/src/lgpd/indice-cego.ts`, `cpf.ts` — HMAC do índice, normalização e validação do CPF (regras 5, 6); passo 2.
 - `referencia/apps/api/src/lgpd/chaves.ts` — `carregarChavesLgpd`, a falha fechada, e o token `CHAVES_LGPD` (regra 3); passo 2.
-- `referencia/apps/api/src/lgpd/mascarar.ts`, `mascarar-dados.interceptor.ts`, `lgpd.module.ts` — máscaras e o interceptor global (regra 7); passo 2.
-- `referencia/apps/api/src/lgpd/redator-log.ts` e `referencia/apps/api/src/log/log.module.ts` — logs sem dado pessoal (regra 8); passos 2 e 3.
-- `referencia/apps/api/src/lgpd/retencao.ts`, `recifrar.ts`, `executar-lgpd.ts` — retenção, expurgo do IP com o dono, re-cifra (regras 4, 9, 10); passos 2 e 8.
-- `referencia/apps/api/src/clientes/` — o exemplo completo: tabela com CHECK, serviço, rotas e rotas do titular (regras 6, 11); passos 2 e 5.
+- `referencia/apps/api/src/lgpd/mascarar.ts`, `mascarar-dados.interceptor.ts`, `lgpd.module.ts` — máscaras e o interceptor global (regra 8); passo 2.
+- `referencia/apps/api/src/lgpd/redator-log.ts` e `referencia/apps/api/src/log/log.module.ts` — logs sem dado pessoal (regra 9); passos 2 e 3.
+- `referencia/apps/api/src/lgpd/retencao.ts`, `recifrar.ts`, `executar-lgpd.ts` — retenção, expurgo do IP com o dono, re-cifra (regras 4, 10, 11); passos 2 e 8.
+- `referencia/apps/api/src/clientes/` — o exemplo completo: tabela com CHECK, serviço, rotas e rotas do titular (regras 6, 7, 12); passos 2 e 5.
 - `referencia/apps/api/src/lgpd/*.spec.ts` e `referencia/apps/api/test/lgpd.e2e.spec.ts` — cada regra testada, inclusive contra Postgres com os dois papéis; passo 1.
 - `referencia/apps/api/src/config/config.ts`, `app.module.ts`, `banco/esquema.ts`, `test/auth.e2e.spec.ts`, `referencia/.env.example`,
   `referencia/deploy/.env.example` — os arquivos de skills anteriores alterados; passo 3.
-- `referencia/lgpd.md` — modelo do `docs/lgpd.md` do projeto (regra 12); passo 9.
+- `referencia/lgpd.md` — modelo do `docs/lgpd.md` do projeto (regra 13); passo 9.
 
 ## Checklist de pronto
 
 - [ ] `pnpm lint`, `pnpm typecheck`, `pnpm test` e `pnpm build` saem limpos.
 - [ ] Sem `DADOS_CHAVES`/`DADOS_CHAVE_INDICE` a API não sobe em produção (nem com `NODE_ENV` ausente); chave de tamanho errado, kid repetido ou índice igual a chave de dados é recusado no boot.
 - [ ] No banco, nenhuma coluna tem CPF em claro (`cpf_cifrado` começa com o kid; o CHECK recusa texto puro).
-- [ ] Busca por CPF funciona pelo índice cego, com o CPF no corpo (nunca na URL); CPF repetido → 409.
+- [ ] Busca por CPF funciona pelo índice cego, com o CPF no corpo (nunca na URL), só para GESTOR/ADMIN e com evento `cliente.buscar_cpf` a cada busca; CPF repetido → 409.
 - [ ] Rotação testada: chave nova na frente, `lgpd:recifrar`, tudo continua legível.
 - [ ] USUARIO vê `***.456.789-**` e `a***@dominio`; GESTOR e ADMIN veem completo.
 - [ ] Nenhuma linha de log da bateria de testes contém CPF ou e-mail de titular.

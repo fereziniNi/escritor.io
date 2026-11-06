@@ -36,6 +36,19 @@ describe('redigirLinhaLog', () => {
   });
 });
 
+describe('destinoSemDadosPessoais', () => {
+  it('repassa flushSync e end do destino original (últimas linhas não se perdem) e não inventa os que ele não tem', () => {
+    const chamados: string[] = [];
+    const embrulho = destinoSemDadosPessoais({ write: () => undefined, flushSync: () => void chamados.push('flush'), end: () => void chamados.push('end') });
+    embrulho.flushSync?.();
+    embrulho.end?.();
+    expect(chamados).toEqual(['flush', 'end']);
+    const simples = destinoSemDadosPessoais({ write: () => undefined });
+    expect(simples.flushSync).toBeUndefined();
+    expect(simples.end).toBeUndefined();
+  });
+});
+
 describe('log com CPF sai mascarado (pino com redact + varredura)', () => {
   it('campos pessoais (cpf, email, telefone...) saem [REDACTED], no topo e um nível abaixo', () => {
     const { logger, linhas } = loggerDeTeste();
