@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { conferirChavesDistintas, lerChaveIndice, lerChavesDados } from '../lgpd/chaveiro';
 import { Segredo, lerSegredo } from './segredo';
 
 /** Só caracteres de tag/sha (letras, números, . _ + -): um valor estranho no ambiente não vai para o /api/health. */
@@ -113,7 +114,34 @@ const esquemaBase = z.object({
     .optional(),
   AUTH_SESSAO_OCIOSA_MIN: z.coerce.number().int().min(1).max(1440).default(30),
   AUTH_SESSAO_ABSOLUTA_H: z.coerce.number().int().min(1).max(720).default(12),
+  /**
+   * Dados pessoais (src/lgpd/). DADOS_CHAVES: chaves AES-256-GCM da criptografia de campo, `kid:base64` separadas por
+   * vírgula (32 bytes cada; a primeira cifra, as outras só decifram). DADOS_CHAVE_INDICE: chave do HMAC do índice cego
+   * (32 bytes, diferente das de dados). As duas são Segredo e andam juntas; obrigatórias em produção (lgpd/chaves.ts).
+   * RETENCAO_DIAS: dias depois do encerramento até o expurgo (comando lgpd:retencao; vazia = nada é expurgado).
+   * RETENCAO_AUDITORIA_IP_DIAS: idade do evento de auditoria cujo IP o mesmo comando apaga, com o DONO do banco (vazia = a trilha fica intacta).
+   */
+  DADOS_CHAVES: z
+    .string()
+    .transform((v) => new Segredo(v))
+    .optional(),
+  DADOS_CHAVE_INDICE: z
+    .string()
+    .transform((v) => new Segredo(v))
+    .optional(),
+  RETENCAO_DIAS: z.coerce.number().int().min(1).max(36_500).optional(),
+  RETENCAO_AUDITORIA_IP_DIAS: z.coerce.number().int().min(1).max(36_500).optional(),
 });
+
+/** Mensagem de um erro de validação de chave (nunca contém o valor da chave). */
+const motivo = (f: () => unknown): string | null => {
+  try {
+    f();
+    return null;
+  } catch (e) {
+    return (e as Error).message;
+  }
+};
 
 /**
  * Regras entre variáveis: log nunca em produção; smtp exige servidor e remetente; usuário e senha andam juntos; sessão
@@ -139,6 +167,19 @@ export const esquemaConfig = esquemaBase.superRefine((c, ctx) => {
   }
   if (c.AUTH_SESSAO_OCIOSA_MIN > c.AUTH_SESSAO_ABSOLUTA_H * 60) {
     problema('AUTH_SESSAO_OCIOSA_MIN', 'não pode ser maior que AUTH_SESSAO_ABSOLUTA_H (em minutos)');
+  }
+  const chaves = c.DADOS_CHAVES?.revelar();
+  const indice = c.DADOS_CHAVE_INDICE?.revelar();
+  if ((chaves === undefined) !== (indice === undefined)) {
+    problema(chaves === undefined ? 'DADOS_CHAVES' : 'DADOS_CHAVE_INDICE', 'DADOS_CHAVES e DADOS_CHAVE_INDICE andam juntas: defina as duas');
+  }
+  const erroChaves = chaves === undefined ? null : motivo(() => lerChavesDados(chaves));
+  const erroIndice = indice === undefined ? null : motivo(() => lerChaveIndice(indice));
+  if (erroChaves) problema('DADOS_CHAVES', erroChaves);
+  if (erroIndice) problema('DADOS_CHAVE_INDICE', erroIndice);
+  if (chaves !== undefined && indice !== undefined && !erroChaves && !erroIndice) {
+    const erro = motivo(() => conferirChavesDistintas(lerChavesDados(chaves), lerChaveIndice(indice)));
+    if (erro) problema('DADOS_CHAVE_INDICE', erro);
   }
 });
 

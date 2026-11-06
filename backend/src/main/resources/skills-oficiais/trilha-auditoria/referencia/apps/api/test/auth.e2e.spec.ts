@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/test/auth.e2e.spec.ts
+// origem: skills-modelo/estagios/trilha-auditoria/apps/api/test/auth.e2e.spec.ts
 import { createHash } from 'node:crypto';
 import { type INestApplication } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';

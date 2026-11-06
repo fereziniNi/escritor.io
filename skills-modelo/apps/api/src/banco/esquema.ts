@@ -3,3 +3,4 @@
 export * from '../usuarios/usuario.tabela';
 export * from '../auth/auth.tabelas';
 export * from '../auditoria/evento-auditoria.tabela';
+export * from '../clientes/cliente.tabela';

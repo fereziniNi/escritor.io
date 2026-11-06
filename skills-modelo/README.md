@@ -40,6 +40,10 @@ Dois papéis de banco (skill `trilha-auditoria`): `DATABASE_URL` é o **dono** (
 `docker compose exec postgres psql -U app -d app -c "ALTER ROLE app_runtime LOGIN PASSWORD 'app_runtime'"` e descomente
 `DATABASE_URL_RUNTIME` no `.env`. Sem a variável a API só sobe com `NODE_ENV=development` ou `test` (usa o dono; o gatilho continua protegendo a trilha); em produção ela é obrigatória.
 
+Dados pessoais (skill `lgpd-dados-pessoais`): o CPF do exemplo `cliente` é cifrado com `DADOS_CHAVES` e buscado pelo índice
+cego de `DADOS_CHAVE_INDICE` (gere cada uma com `openssl rand -base64 32`; em produção são obrigatórias). Comandos:
+`pnpm --filter api lgpd:retencao` (expurgo por `RETENCAO_DIAS`) e `pnpm --filter api lgpd:recifrar` (depois de pôr uma chave nova na frente).
+
 ## Regra das referências
 
 Cada arquivo em `skills-oficiais/<slug>/referencia/` começa com um comentário na sintaxe dele contendo

@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { type INestApplication } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import request, { type Response } from 'supertest';
@@ -29,6 +29,9 @@ const PRODUCAO: Record<string, string> = {
   AUTH_SEGREDO_CODIGO: SEGREDO,
   AUTH_DOMINIOS_PERMITIDOS: 'exemplo.com.br',
   NOME_SISTEMA: 'Crédito <Multiplica>',
+  // Chaves de dados pessoais (skill lgpd-dados-pessoais): obrigatórias em produção.
+  DADOS_CHAVES: `k1:${randomBytes(32).toString('base64')}`,
+  DADOS_CHAVE_INDICE: randomBytes(32).toString('base64'),
 };
 
 let urlBanco: string;

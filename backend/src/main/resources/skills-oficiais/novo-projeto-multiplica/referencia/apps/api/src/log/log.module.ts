@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/src/log/log.module.ts
+// origem: skills-modelo/estagios/novo-projeto-multiplica/apps/api/src/log/log.module.ts
 import { randomUUID } from 'node:crypto';
 import { type IncomingMessage, type ServerResponse } from 'node:http';
 import { type DynamicModule, Module } from '@nestjs/common';

@@ -1,0 +1,3 @@
+nome: Dados pessoais (LGPD)
+descricao: Protege dado pessoal conforme a LGPD com CPF cifrado (AES-256-GCM, chave rotacionável) e busca por índice cego, máscara de CPF e e-mail por papel, logs sem dado pessoal, retenção com anonimização, exportar e anonimizar dados do titular e o modelo do docs/lgpd.md.
+categoria: SEGURANCA

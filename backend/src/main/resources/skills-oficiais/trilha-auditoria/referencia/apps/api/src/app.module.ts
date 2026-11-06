@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/src/app.module.ts
+// origem: skills-modelo/estagios/trilha-auditoria/apps/api/src/app.module.ts
 import { type DynamicModule, Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { type DestinationStream } from 'pino';

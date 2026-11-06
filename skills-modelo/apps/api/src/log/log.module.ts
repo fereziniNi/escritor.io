@@ -2,9 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { type IncomingMessage, type ServerResponse } from 'node:http';
 import { type DynamicModule, Module } from '@nestjs/common';
 import { LoggerModule } from 'nestjs-pino';
-import { type DestinationStream } from 'pino';
+import pino, { type DestinationStream } from 'pino';
 import { type Options } from 'pino-http';
 import { type Config } from '../config/config';
+import { CAMPOS_PESSOAIS_LOG, destinoSemDadosPessoais } from '../lgpd/redator-log';
 
 export const CABECALHO_REQUEST_ID = 'x-request-id';
 /** Request-id recebido só é aceito neste formato; qualquer outra coisa é trocada por um UUID novo. */
@@ -12,7 +13,8 @@ const FORMATO_REQUEST_ID = /^[A-Za-z0-9._-]{8,128}$/;
 
 /**
  * Defesa em profundidade: se algum log receber um objeto inesperado, estes campos saem censurados. A regra principal
- * continua sendo não passar corpo de requisição, credencial nem dado pessoal ao logger.
+ * continua sendo não passar corpo de requisição, credencial nem dado pessoal ao logger. Os campos de dado pessoal
+ * (cpf, email, telefone...) vêm da skill lgpd-dados-pessoais (lgpd/redator-log.ts).
  */
 const CAMPOS_CENSURADOS = [
   'req.headers',
@@ -25,8 +27,7 @@ const CAMPOS_CENSURADOS = [
   '*.password',
   '*.token',
   '*.segredo',
-  '*.cpf',
-  '*.email',
+  ...CAMPOS_PESSOAIS_LOG,
 ];
 
 /** Usa o X-Request-Id recebido (do Caddy ou do cliente) se for válido; senão gera um. Sempre devolve no header. */
@@ -55,12 +56,15 @@ function opcoesPinoHttp(config: Config): Options {
 
 @Module({})
 export class LogModule {
-  /** `destino` permite capturar os logs nos testes; por padrão, JSON em stdout (uma linha por evento). */
+  /**
+   * `destino` permite capturar os logs nos testes; por padrão, JSON em stdout (uma linha por evento). Todo destino passa
+   * pela varredura de CPF (lgpd/redator-log.ts): CPF que escapar do `redact` sai mascarado.
+   */
   static registrar(config: Config, destino?: DestinationStream): DynamicModule {
     const opcoes = opcoesPinoHttp(config);
     return {
       module: LogModule,
-      imports: [LoggerModule.forRoot({ pinoHttp: destino ? [opcoes, destino] : opcoes })],
+      imports: [LoggerModule.forRoot({ pinoHttp: [opcoes, destinoSemDadosPessoais(destino ?? pino.destination(1))] })],
     };
   }
 }

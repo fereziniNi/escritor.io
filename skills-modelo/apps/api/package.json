@@ -10,7 +10,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx src/banco/executar-migracoes.ts"
+    "db:migrate": "tsx src/banco/executar-migracoes.ts",
+    "lgpd:retencao": "tsx src/lgpd/executar-lgpd.ts retencao",
+    "lgpd:recifrar": "tsx src/lgpd/executar-lgpd.ts recifrar"
   },
   "dependencies": {
     "@nestjs/common": "11.2.8",
