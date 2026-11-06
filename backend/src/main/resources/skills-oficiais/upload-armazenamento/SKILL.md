@@ -100,7 +100,7 @@ antivírus) valem em qualquer stack. Registre no `CLAUDE.md` onde ficou cada coi
 
 Tudo que um arquivo de `referencia/` importa está em `referencia/` ou nas skills anteriores. De `novo-projeto-multiplica`: `config/config.module.ts` (`CONFIG`), `banco/banco.ts` (`BANCO`), `test/postgres.ts`. De `seguranca`:
 `seguranca/limitador.ts` (`LimitadorJanelaFixa`, `recusarPorLimite`) e `seguranca/origem.guard.ts` (`MesmaOrigem`). De `usuarios-e-papeis`: `usuarios/papeis.guard.ts`, `usuarios/usuario-atual.ts`, `usuarios/usuario.tabela.ts`,
-`test/usuario-de-teste.ts`. De `trilha-auditoria`: `usuarios/usuarios.service.ts` (`validarOu400`). De `exportacao-excel-pdf-csv`: `auditoria/auditoria.service.ts` (`registrar(evento, tx)`) e `exportacao/content-disposition.ts` (`contentDisposition`). De
+`usuarios/usuarios.service.ts` (`validarOu400`), `test/usuario-de-teste.ts`. De `exportacao-excel-pdf-csv`: `auditoria/auditoria.service.ts` (`registrar(evento, tx)`) e `exportacao/content-disposition.ts` (`contentDisposition`). De
 `identidade-visual`: o `Button` e as classes de `Campo.tsx`; de `exportacao-excel-pdf-csv`, `lib/exportar-api.ts`.
 
 - `referencia/apps/api/src/armazenamento/armazenamento.ts`, `chave.ts` — interface e chave do servidor. Leia antes de qualquer implementação.

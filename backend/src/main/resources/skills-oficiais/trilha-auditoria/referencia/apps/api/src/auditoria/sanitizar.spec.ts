@@ -55,6 +55,6 @@ describe('mascararEmail', () => {
   it('formato estranho vira ***', () => {
     expect(mascararEmail('sem-arroba')).toBe('***');
     expect(mascararEmail('')).toBe('***');
-    expect(mascararEmail('@x.com')).toBe('***');
+    expect(mascararEmail('@x.exemplo.com.br')).toBe('***');
   });
 });

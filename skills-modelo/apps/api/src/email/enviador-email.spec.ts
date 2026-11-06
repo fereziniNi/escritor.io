@@ -35,8 +35,8 @@ describe('EnviadorLog', () => {
 
 describe('EnviadorLog validação', () => {
   it.each([
-    ['para com quebra de linha', { para: 'a@exemplo.com.br\nBcc: x@y.com' }],
-    ['assunto com quebra de linha', { assunto: 'oi\r\nBcc: x@y.com' }],
+    ['para com quebra de linha', { para: 'a@exemplo.com.br\nBcc: x@y.exemplo.com.br' }],
+    ['assunto com quebra de linha', { assunto: 'oi\r\nBcc: x@y.exemplo.com.br' }],
     ['destinatário sem @', { para: 'sem-arroba' }],
   ])('recusa %s como o SMTP e não loga', async (_nome, parcial) => {
     const log = vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
@@ -62,8 +62,8 @@ describe('EnviadorSmtp', () => {
   });
 
   it.each([
-    ['para com quebra de linha', { para: 'a@exemplo.com.br\nBcc: x@y.com' }],
-    ['assunto com quebra de linha', { assunto: 'oi\r\nBcc: x@y.com' }],
+    ['para com quebra de linha', { para: 'a@exemplo.com.br\nBcc: x@y.exemplo.com.br' }],
+    ['assunto com quebra de linha', { assunto: 'oi\r\nBcc: x@y.exemplo.com.br' }],
     ['destinatário sem @', { para: 'sem-arroba' }],
   ])('recusa %s (injeção de cabeçalho)', async (_nome, parcial) => {
     const enviador = new EnviadorSmtp(opcoes, createTransport({ jsonTransport: true }));

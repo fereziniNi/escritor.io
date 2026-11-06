@@ -17,7 +17,7 @@ const evento = (n: number, extra: Record<string, unknown> = {}) => ({
   alvoId: BETO.id,
   antes: { papel: 'USUARIO', ativo: true },
   depois: { papel: 'USUARIO', ativo: false },
-  ip: '10.0.0.5',
+  ip: '192.0.2.5',
   requestId: 'req-abcdef12',
   ...extra,
 });
@@ -64,7 +64,7 @@ describe('TelaAuditoria', () => {
     expect(within(tabela).getByText('usuario.desativar')).toBeInTheDocument();
     expect(within(tabela).getByText('auth.login')).toBeInTheDocument();
     expect(within(tabela).getAllByText('ana@exemplo.com.br').length).toBeGreaterThan(0);
-    expect(within(tabela).getAllByText('10.0.0.5').length).toBeGreaterThan(0);
+    expect(within(tabela).getAllByText('192.0.2.5').length).toBeGreaterThan(0);
     // 15:30 UTC = 12:30 em Brasília
     expect(within(tabela).getAllByText(/05\/11\/2026.*12:30/).length).toBeGreaterThan(0);
   });

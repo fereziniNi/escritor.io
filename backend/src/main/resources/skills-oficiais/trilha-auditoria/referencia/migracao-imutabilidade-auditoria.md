@@ -9,8 +9,8 @@ Depois da migração que cria a tabela (`pnpm --filter api db:generate` com `--n
 Por que dois papéis: o **dono** de uma tabela ignora qualquer `REVOKE` contra si mesmo. Se a API usar o mesmo usuário que
 roda as migrações (o dono), o `REVOKE` não vale nada. Então o dono (`DATABASE_URL`) só roda migrações; a API conecta como
 `app_runtime` (`DATABASE_URL_RUNTIME`), que não é dono de nada. O gatilho é a segunda camada: protege também quando só
-existe um usuário (desenvolvimento) e contra um `UPDATE` acidental feito de um console SQL como dono. (Mesma ideia da
-ADR 0009 do escritor.io, que separa o papel de migração do papel de runtime.)
+existe um usuário (desenvolvimento) e contra um `UPDATE` acidental feito de um console SQL como dono. Regra: o papel que
+roda as migrações nunca é o papel com que a aplicação conecta.
 
 Crie a migração vazia e cole o SQL abaixo:
 

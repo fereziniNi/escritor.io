@@ -17,8 +17,8 @@ lições dos pentests (SEC-001 e VULN-02: o decorator sozinho não protege o dad
 1. **Tabela `usuario`** (`apps/api/src/usuarios/usuario.tabela.ts`, exportada por `banco/esquema.ts`):
    `id` uuid (padrão `gen_random_uuid()`), `email` text, `nome` text, `papel` enum `papel` (padrão `USUARIO`),
    `ativo` boolean (padrão `true`), `criado_em` timestamptz. **Único em `lower(email)`**
-   (`CREATE UNIQUE INDEX "usuario_email_unico" ON "usuario" USING btree (lower("email"))`): o banco recusa `Ana@x.com`
-   e `ana@x.com` juntos. E-mail sempre guardado **em minúsculas e sem espaços** (`normalizarEmail`).
+   (`CREATE UNIQUE INDEX "usuario_email_unico" ON "usuario" USING btree (lower("email"))`): o banco recusa `Ana@exemplo.com.br`
+   e `ana@exemplo.com.br` juntos. E-mail sempre guardado **em minúsculas e sem espaços** (`normalizarEmail`).
 2. **Papéis**: `PAPEIS = ['ADMIN', 'GESTOR', 'USUARIO']` (`usuarios/papel.ts`, igual a `packages/contratos/src/usuarios.ts`;
    `papel.spec.ts` falha se divergirem). Sempre MAIÚSCULO, comparado por **igualdade exata**: `"admin"`, `"Admin"` e
    `"ADMIN "` não valem (nem no token/sessão, nem no corpo da requisição: viram 403 e 400). Papel novo: acrescente nos

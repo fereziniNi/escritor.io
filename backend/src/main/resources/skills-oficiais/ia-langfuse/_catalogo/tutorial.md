@@ -20,7 +20,7 @@ por padrão ele **não** recebe o conteúdo dos textos.
 
 | Ferramenta | Versão | Como conferir |
 |---|---|---|
-| Esqueleto do projeto | skills `novo-projeto-multiplica` até `fila-de-tarefas` já aplicadas | `ls apps/api/src/fila` ou `dir apps\api\src\fila` |
+| Esqueleto do projeto | skills `novo-projeto-multiplica` até `fila-de-tarefas` já aplicadas (exportação e upload só se o sistema usa) | `ls apps/api/src/fila` ou `dir apps\api\src\fila` |
 | Node.js | 22.22 ou mais nova | `node --version` |
 | pnpm | 9.15.4 | `pnpm --version` |
 | Docker | qualquer versão recente (Postgres dos testes; Langfuse opcional) | `docker version` |

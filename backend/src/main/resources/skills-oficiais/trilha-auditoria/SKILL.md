@@ -9,7 +9,7 @@ Todo sistema Multiplica registra **quem fez o quê, em quê, quando e de onde** 
 administrador, nem um `UPDATE` descuidado no console conseguem alterar ou apagar um evento. O código em `referencia/` é cópia
 de um projeto-modelo que compila e passa nos testes (inclusive contra Postgres real, com os dois papéis de banco): copie e
 adapte, não reescreva de memória. Vem da união de Conta Gráfica (gatilho `auditoria_imutavel`), BeyondCredit (`audit_event`),
-CambIA (`operacoes_eventos`) e da ADR 0009 do escritor.io (papel de banco separado). É controle de segurança: **cada valor
+CambIA (`operacoes_eventos`), com a regra do papel de banco separado (quem migra não é quem a API usa). É controle de segurança: **cada valor
 abaixo é fixo**; mudar um deles é decisão registrada no `CLAUDE.md`.
 
 ## Padrão Multiplica
@@ -28,7 +28,7 @@ abaixo é fixo**; mudar um deles é decisão registrada no `CLAUDE.md`.
 4. **Dois papéis de banco**. O **dono** (`DATABASE_URL`, o usuário que cria as tabelas) roda **só** as migrações. O **runtime**
    (`app_runtime`, `DATABASE_URL_RUNTIME`) é o que a API usa: `SELECT, INSERT, UPDATE, DELETE` em tudo menos a trilha
    (`INSERT` e `SELECT` só). Motivo: o dono ignora `REVOKE` contra si mesmo, então o `REVOKE` só vale para um papel que
-   não é dono (ADR 0009). A migração cria `app_runtime` **sem login e sem senha** se ele não existir, dá os privilégios
+   não é dono; por isso migração e aplicação usam papéis diferentes. A migração cria `app_runtime` **sem login e sem senha** se ele não existir, dá os privilégios
    (`GRANT` nas tabelas e sequências existentes e `ALTER DEFAULT PRIVILEGES` para as futuras) e quem instala define a senha
    uma vez. `BancoModule` usa `DATABASE_URL_RUNTIME ?? DATABASE_URL`. **Falha fechada** (como o `AUTH_SEGREDO_CODIGO` do login): só com
    `NODE_ENV=development` ou `test` **declarados** a API pode rodar sem `DATABASE_URL_RUNTIME` (como o dono, com o gatilho protegendo);

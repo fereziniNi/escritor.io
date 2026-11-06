@@ -95,12 +95,30 @@ sistema. Pergunte ao usuário se quer migrar para o esqueleto. Se não quiser, a
 stack (3–9, 14, 15) nos caminhos equivalentes do projeto e registre no `CLAUDE.md` onde ficou cada coisa, para as
 próximas skills acharem.
 
-**Ordem de aplicação das outras skills** (depois desta):
+**Ordem de aplicação das outras skills** (depois desta) — é uma **cadeia**, sempre nesta ordem:
 
-1. `identidade-visual` → 2. `seguranca` → 3. `email-transacional` → 4. `usuarios-e-papeis` →
-5. `login-codigo-email` → 6. `trilha-auditoria` → 7. `lgpd-dados-pessoais` →
-8. conforme a necessidade do sistema: `exportacao-excel-pdf-csv`, `upload-armazenamento`, `fila-de-tarefas`,
-   `ia-langfuse` → 9. `versionamento-release` → 10. `instalacao-docker-compose`.
+1. `identidade-visual` → 2. `seguranca` → 3. `email-transacional` → 4. `usuarios-e-papeis` → 5. `login-codigo-email` →
+6. `trilha-auditoria` → 7. `lgpd-dados-pessoais` → 8. `exportacao-excel-pdf-csv` → 9. `upload-armazenamento` →
+10. `fila-de-tarefas` → 11. `ia-langfuse` → 12. `instalacao-docker-compose` → 13. `versionamento-release`.
+
+Cada arquivo "completo" de `referencia/` (`app.module.ts`, `config.ts`, `main.ts`, `banco/esquema.ts`, os dois `.env.example`) é o
+estado depois daquela skill **e de todas as anteriores**: copiado inteiro, ele traz módulos, variáveis e tabelas das skills de
+antes. Por isso só se substitui o arquivo inteiro quando o projeto está exatamente na etapa anterior; se não está (pulou uma skill
+ou mudou o arquivo), aplique **só a mudança descrita** no passo "arquivos de skills anteriores" de cada skill.
+
+- **Obrigatórias:** 1 a 7, `fila-de-tarefas` (10: o e-mail passa por ela e a instalação usa `ROLE`), `instalacao-docker-compose`
+  (12) e `versionamento-release` (13).
+- **Podem ser puladas:** `exportacao-excel-pdf-csv` (8), `upload-armazenamento` (9) e `ia-langfuse` (11). A 9 usa a 8
+  (`exportacao/content-disposition.ts`, `lib/exportar-api.ts`): pular a 8 obriga a pular a 9. Ao copiar arquivos completos de uma
+  skill posterior, **tire** o que é da pulada:
+  - sem 8: `exportacao/` e o `ExportacaoModule`/`ExportacaoService` importados em `clientes/` e `auditoria/` (fique com as versões da
+    `lgpd-dados-pessoais`/`trilha-auditoria`), a migração `0006_indice_cliente_exportacao` (e a entrada dela no `_journal.json`), o bloco "Exportação" do `config.ts` e dos
+    `.env.example`, `BotaoExportar` e `lib/exportar-api.ts` na web;
+  - sem 9: `ArmazenamentoModule` do `app.module.ts`, a linha `export * from '../armazenamento/...'` de `banco/esquema.ts` (e não
+    copie a migração `0007_arquivo` nem a entrada dela no `_journal.json`), o bloco "Upload e armazenamento" do `config.ts` (esquema e regras S3/Azure do `superRefine`) e dos
+    `.env.example`; no compose de instalação, o volume `arquivos` e o profile `antivirus` podem sair;
+  - sem 11: `IaModule` do `app.module.ts`, o bloco "IA" do `config.ts` e dos `.env.example`; no compose de instalação, os serviços
+    `langfuse-*` e os segredos `anthropic_api_key`/`langfuse_secret_key` podem sair (vazios, não atrapalham).
 
 Ao terminar cada uma, acrescente-a em "Skills Multiplica aplicadas" no `CLAUDE.md`.
 

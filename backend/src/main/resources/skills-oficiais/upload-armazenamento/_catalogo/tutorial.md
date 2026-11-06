@@ -33,7 +33,7 @@ estiver ligado, o arquivo só aparece depois de verificado.
 |---|---|---|---|
 | `ARMAZENAMENTO_TIPO` | não (padrão `local`) | `s3` | onde os arquivos ficam: `local` (pasta do servidor), `s3` (S3, MinIO) ou `azure` |
 | `ARMAZENAMENTO_PASTA` | não (padrão `dados/arquivos`) | `/dados/arquivos` | pasta do tipo `local`; em produção, um volume |
-| `ARMAZENAMENTO_SEGREDO_URL` | em produção com `local` | `(openssl rand -hex 32)` | chave dos links de download; sem ela a API não sobe em produção |
+| `ARMAZENAMENTO_SEGREDO_URL` | em produção com `local` | `ARMAZENAMENTO_SEGREDO_URL_ARQUIVO=/run/secrets/segredo_url` | chave dos links de download; sem ela a API não sobe em produção. Gere com um gerador criptográfico: `openssl rand -hex 32` (bash) ou, no PowerShell (5.1 ou 7), `$b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); ($b \| ForEach-Object { $_.ToString('x2') }) -join ''`. Nunca `Get-Random`. No servidor, o `gerar-segredos.sh` da skill `instalacao-docker-compose` já cria `segredos/segredo_url` |
 | `UPLOAD_MAX_MB` | não (padrão 10) | `10` | tamanho máximo de um arquivo, de 1 a 500 |
 | `UPLOAD_LIMITE_POR_MIN` | não (padrão 20) | `20` | envios por minuto por usuário |
 | `URL_ASSINADA_SEGUNDOS` | não (padrão 300) | `300` | validade do link de download (10 a 3600) |
@@ -73,7 +73,7 @@ Em produção, a skill de instalação precisa configurar o limite do Caddy, o v
 ### Se não funcionar
 
 - **Erro 413 em arquivo pequeno, em produção**: o Caddy (ou nginx) está com limite menor que `UPLOAD_MAX_MB`. Veja `request_body max_size` em `referencia/instalacao-upload.md`.
-- **A API não sobe e o erro cita `ARMAZENAMENTO_SEGREDO_URL`**: em produção com `local` o segredo é obrigatório. Gere com `openssl rand -hex 32`.
+- **A API não sobe e o erro cita `ARMAZENAMENTO_SEGREDO_URL`**: em produção com `local` o segredo é obrigatório. Gere com `openssl rand -hex 32` (bash) ou, no PowerShell (5.1 ou 7), `$b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); ($b | ForEach-Object { $_.ToString('x2') }) -join ''`. Nunca `Get-Random`. No servidor, o `gerar-segredos.sh` da skill `instalacao-docker-compose` já cria `segredos/segredo_url`.
 - **Erro 415 num PDF de verdade**: o arquivo não começa como PDF (alguns programas colocam lixo antes do `%PDF-`). Gere o PDF de novo.
 - **Erro 503 com o antivírus ligado**: o ClamAV está fora do ar ou ainda carregando. O sistema recusa de propósito (não guarda arquivo sem verificar).
 - **Todo arquivo grande falha com o antivírus ligado**: o `StreamMaxLength` do ClamAV é menor que `UPLOAD_MAX_MB`; no compose do modelo é `600M`.

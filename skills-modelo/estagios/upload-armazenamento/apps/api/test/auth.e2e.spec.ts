@@ -119,7 +119,7 @@ describe('pedir código', () => {
     api = await subirApi();
     await criarUsuario(api.db, 'ana@exemplo.com.br');
     await criarUsuario(api.db, 'desativada@exemplo.com.br', { ativo: false });
-    await criarUsuario(api.db, 'externa@outrodominio.com.br');
+    await criarUsuario(api.db, 'externa@outro.exemplo.com.br');
   });
 
   beforeEach(() => {
@@ -128,7 +128,7 @@ describe('pedir código', () => {
   });
 
   it('e-mail fora do domínio, inexistente e cadastrado: mesmo 202, mesmo corpo, todos ≥ 600 ms', async () => {
-    const fora = await cronometrar(() => pedirCodigo(api, 'externa@outrodominio.com.br'));
+    const fora = await cronometrar(() => pedirCodigo(api, 'externa@outro.exemplo.com.br'));
     const inexistente = await cronometrar(() => pedirCodigo(api, 'ninguem@exemplo.com.br'));
     const cadastrado = await cronometrar(() => pedirCodigo(api, 'ana@exemplo.com.br'));
     for (const r of [fora, inexistente, cadastrado]) {
@@ -140,7 +140,7 @@ describe('pedir código', () => {
   });
 
   it('fora do domínio, inexistente ou desativado: nenhum e-mail enviado e nada gravado', async () => {
-    for (const email of ['externa@outrodominio.com.br', 'ninguem@exemplo.com.br', 'desativada@exemplo.com.br']) {
+    for (const email of ['externa@outro.exemplo.com.br', 'ninguem@exemplo.com.br', 'desativada@exemplo.com.br']) {
       await pedirCodigo(api, email).expect(202);
       const linhas = await api.db.select().from(codigoLogin).where(eq(codigoLogin.email, email));
       expect(linhas).toHaveLength(0);
