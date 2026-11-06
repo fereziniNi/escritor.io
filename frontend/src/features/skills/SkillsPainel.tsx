@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { buscarSkill, buscarVersao } from './api'
+import { BotaoVoltar } from './BotaoVoltar'
 import { AprovacoesSkills } from './AprovacoesSkills'
 import { DetalheSkill } from './DetalheSkill'
 import { EditorSkill } from './EditorSkill'
@@ -32,21 +33,17 @@ function EditorDaSkill({ slug, aoSalvar, aoCancelar }: { slug?: string; aoSalvar
   if (detalheQuery.isPending) return <p className="mensagem-carregando">Carregando...</p>
   if (detalheQuery.isError) {
     return (
-      <div>
-        <button type="button" className="botao-secundario" onClick={aoCancelar}>
-          Voltar
-        </button>
+      <div className="skills-tela">
+        <BotaoVoltar aoVoltar={aoCancelar} />
         <p className="mensagem-erro">Não foi possível carregar a skill.</p>
       </div>
     )
   }
   if (propostaDeOutro(detalheQuery.data, meuId)) {
     return (
-      <div>
-        <button type="button" className="botao-secundario" onClick={aoCancelar}>
-          Voltar
-        </button>
-        <p className="mensagem-aviso" role="status">
+      <div className="skills-tela">
+        <BotaoVoltar aoVoltar={aoCancelar} />
+        <p className="skills-aviso" role="status">
           Há uma proposta de {pendente?.autorNome} aguardando aprovação. Aguarde a decisão de um gestor antes de editar.
         </p>
       </div>
@@ -55,18 +52,16 @@ function EditorDaSkill({ slug, aoSalvar, aoCancelar }: { slug?: string; aoSalvar
   if (editaMinhaProposta && propostaQuery.isPending) return <p className="mensagem-carregando">Carregando...</p>
   if (editaMinhaProposta && propostaQuery.isError) {
     return (
-      <div>
-        <button type="button" className="botao-secundario" onClick={aoCancelar}>
-          Voltar
-        </button>
+      <div className="skills-tela">
+        <BotaoVoltar aoVoltar={aoCancelar} />
         <p className="mensagem-erro">Não foi possível carregar sua proposta.</p>
       </div>
     )
   }
   return (
-    <>
+    <div className="skills-tela">
       {editaMinhaProposta && (
-        <p className="mensagem-aviso" role="status">
+        <p className="skills-aviso skills-aviso-info" role="status">
           Você está editando sua proposta pendente (v{pendente.numero})
         </p>
       )}
@@ -77,7 +72,7 @@ function EditorDaSkill({ slug, aoSalvar, aoCancelar }: { slug?: string; aoSalvar
         aoSalvar={() => aoSalvar(slug)}
         aoCancelar={aoCancelar}
       />
-    </>
+    </div>
   )
 }
 

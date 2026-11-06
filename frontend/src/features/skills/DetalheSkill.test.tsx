@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
@@ -89,6 +89,33 @@ describe('DetalheSkill', () => {
     expect(await screen.findByText('Copiado!')).toBeInTheDocument()
   })
 
+  it('o botão Copiar no canto do bloco do prompt copia e avisa', async () => {
+    usarServidor()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    renderDetalhe()
+    await screen.findByText('Use a skill login-seguro')
+    await userEvent.click(screen.getByRole('button', { name: 'Copiar' }))
+    expect(writeText).toHaveBeenCalledWith('Use a skill login-seguro')
+    expect(await screen.findByRole('status')).toHaveTextContent('Copiado!')
+  })
+
+  it('abas seguem o padrão tablist: setas trocam a aba e o painel é rotulado por ela', async () => {
+    usarServidor()
+    renderDetalhe()
+    const geral = await screen.findByRole('tab', { name: 'Visão geral' })
+    expect(geral).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tabpanel', { name: 'Visão geral' })).toBeInTheDocument()
+    geral.focus()
+    await userEvent.keyboard('{ArrowRight}')
+    const arquivos = screen.getByRole('tab', { name: 'Arquivos' })
+    expect(arquivos).toHaveAttribute('aria-selected', 'true')
+    expect(arquivos).toHaveFocus()
+    expect(screen.getByRole('tabpanel', { name: 'Arquivos' })).toBeInTheDocument()
+    await userEvent.keyboard('{ArrowLeft}{ArrowLeft}')
+    expect(screen.getByRole('tab', { name: 'Histórico' })).toHaveAttribute('aria-selected', 'true')
+  })
+
   it('sem clipboard, orienta a copiar manualmente', async () => {
     usarServidor()
     Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })
@@ -140,8 +167,12 @@ describe('DetalheSkill', () => {
     )
     renderDetalhe()
     await userEvent.click(await screen.findByRole('tab', { name: 'Histórico' }))
-    expect(await screen.findByText('v2 · Publicada')).toBeInTheDocument()
-    expect(screen.getByText('v1 · Rejeitada')).toBeInTheDocument()
+    const v2 = (await screen.findByRole('button', { name: 'Restaurar v2' })).closest('li')!
+    expect(within(v2).getByText('v2')).toBeInTheDocument()
+    expect(within(v2).getByText('Publicada')).toBeInTheDocument()
+    const v1 = screen.getByRole('button', { name: 'Restaurar v1' }).closest('li')!
+    expect(within(v1).getByText('v1')).toBeInTheDocument()
+    expect(within(v1).getByText('Rejeitada')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Restaurar v1' }))
     await waitFor(() => expect(chamou).toBe(true))
   })

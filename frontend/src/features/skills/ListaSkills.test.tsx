@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
@@ -107,7 +107,9 @@ describe('ListaSkills', () => {
   it('mostra o rótulo "Segurança" no cartão e no select', async () => {
     server.use(http.get('/skills', () => HttpResponse.json([skill({ categoria: 'SEGURANCA' })])))
     renderLista()
-    expect(await screen.findByText(/Segurança · v1/)).toBeInTheDocument()
+    const cartao = await screen.findByRole('button', { name: /Login seguro/ })
+    expect(within(cartao).getByText('Segurança')).toBeInTheDocument()
+    expect(within(cartao).getByText('v1')).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'Segurança' })).toBeInTheDocument()
     expect(screen.queryByText(/SEGURANCA/)).not.toBeInTheDocument()
   })

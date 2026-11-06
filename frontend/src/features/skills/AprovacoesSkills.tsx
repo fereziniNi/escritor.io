@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { aprovar, buscarSkill, buscarVersao, ErroSkill, listarPropostas, rejeitar } from './api'
+import { BotaoVoltar } from './BotaoVoltar'
 import { DiffProposta } from './DiffProposta'
 import './skills.css'
 import type { Proposta } from './types'
@@ -60,14 +61,14 @@ function RevisaoProposta({ proposta, aoVoltar, aoDecidir }: { proposta: Proposta
 
   return (
     <div className="skills-aprovacao">
-      <button type="button" className="botao-secundario" onClick={aoVoltar}>
-        Voltar
-      </button>
-      <h2>{proposta.nomeSkill}</h2>
-      <p className="cartao-item-meta">
-        Versão {proposta.numero} proposta por {proposta.autorNome}
-        {proposta.mensagem ? ` — ${proposta.mensagem}` : ''}
-      </p>
+      <BotaoVoltar aoVoltar={aoVoltar} rotulo="Voltar às aprovações" />
+      <header className="skills-cabecalho-simples">
+        <h2>{proposta.nomeSkill}</h2>
+        <p>
+          Versão {proposta.numero} proposta por {proposta.autorNome}
+          {proposta.mensagem ? ` — ${proposta.mensagem}` : ''}
+        </p>
+      </header>
 
       {(vigenteQuery.isPending || propostaQuery.isPending) && <p className="mensagem-carregando">Carregando...</p>}
       {(vigenteQuery.isError || propostaQuery.isError) && <p className="mensagem-erro">Não foi possível carregar as diferenças.</p>}
@@ -81,30 +82,35 @@ function RevisaoProposta({ proposta, aoVoltar, aoDecidir }: { proposta: Proposta
 
       {rejeitando ? (
         <div className="skills-rejeicao">
-          <label>
-            Motivo da rejeição
-            <textarea value={motivo} onChange={(e) => {
+          <label className="skills-campo">
+            <span className="skills-campo-rotulo">Motivo da rejeição</span>
+            <textarea
+              value={motivo}
+              onChange={(e) => {
                 setMotivo(e.target.value)
                 setErroMotivo(false)
-              }} rows={3} />
+              }}
+              rows={3}
+            />
           </label>
           {erroMotivo && <p className="mensagem-erro">Informe o motivo da rejeição.</p>}
-          <div className="linha-botoes">
-            <button type="button" onClick={confirmarRejeicao} disabled={ocupado}>
-              Confirmar rejeição
-            </button>
-            <button type="button" className="botao-secundario" onClick={() => alternarRejeicao(false)} disabled={ocupado}>
+          <div className="skills-rodape-acoes">
+            <button type="button" className="skills-btn skills-btn-fantasma" onClick={() => alternarRejeicao(false)} disabled={ocupado}>
               Cancelar
+            </button>
+            <button type="button" className="skills-btn skills-btn-perigo-cheio" onClick={confirmarRejeicao} disabled={ocupado}>
+              Confirmar rejeição
             </button>
           </div>
         </div>
       ) : (
-        <div className="linha-botoes">
-          <button type="button" onClick={() => aprovarMut.mutate()} disabled={ocupado || !propostaQuery.data}>
-            Aprovar
-          </button>
-          <button type="button" className="botao-secundario" onClick={() => alternarRejeicao(true)} disabled={ocupado}>
+        <div className="skills-rodape-acoes">
+          <button type="button" className="skills-btn skills-btn-perigo" onClick={() => alternarRejeicao(true)} disabled={ocupado}>
             Rejeitar
+          </button>
+          <button type="button" className="skills-btn skills-btn-primario" onClick={() => aprovarMut.mutate()} disabled={ocupado || !propostaQuery.data}>
+            <span aria-hidden="true">✓</span>
+            Aprovar
           </button>
         </div>
       )}
@@ -123,26 +129,44 @@ export function AprovacoesSkills({ aoVoltar }: { aoVoltar: () => void }) {
 
   return (
     <div className="skills-aprovacoes">
-      <button type="button" className="botao-secundario" onClick={aoVoltar}>
-        Voltar
-      </button>
-      <h2>Aprovações</h2>
+      <BotaoVoltar aoVoltar={aoVoltar} />
+      <header className="skills-cabecalho-simples">
+        <h2>Aprovações</h2>
+        <p>Propostas de alteração em skills oficiais aguardando a decisão de um gestor.</p>
+      </header>
       {query.isPending && <p className="mensagem-carregando">Carregando...</p>}
       {query.isError && <p className="mensagem-erro">Não foi possível carregar as propostas.</p>}
-      {query.data?.length === 0 && <p className="mensagem-vazia">Nenhuma proposta pendente.</p>}
-      <ul className="lista-cartoes">
-        {query.data?.map((p) => (
-          <li key={`${p.slug}-${p.numero}`} className="cartao-item">
-            <button type="button" className="skills-cartao" onClick={() => setAberta(p)}>
-              <span className="cartao-item-titulo">{p.nomeSkill}</span>
-              <span className="cartao-item-meta">
-                v{p.numero} · {p.autorNome}
-                {p.mensagem ? ` · ${p.mensagem}` : ''}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
+      {query.data?.length === 0 && (
+        <div className="skills-estado">
+          <p className="skills-estado-titulo">Nenhuma proposta pendente.</p>
+          <p>Tudo em dia por aqui.</p>
+        </div>
+      )}
+      {query.data && query.data.length > 0 && (
+        <ul className="skills-cartoes">
+          {query.data.map((p) => (
+            <li key={`${p.slug}-${p.numero}`}>
+              <button type="button" className="skills-cartao" onClick={() => setAberta(p)}>
+                <span className="skills-cartao-topo">
+                  <span className="skills-cartao-titulo">{p.nomeSkill}</span>
+                  <span className="skills-chip skills-chip-pendente">v{p.numero} · aguardando</span>
+                </span>
+                {p.mensagem && <span className="skills-cartao-descricao">{p.mensagem}</span>}
+                <span className="skills-cartao-rodape">
+                  <span>por {p.autorNome}</span>
+                  <span className="skills-separador" aria-hidden="true">
+                    ·
+                  </span>
+                  <span>{new Date(p.criadaEm).toLocaleString('pt-BR')}</span>
+                  <span className="skills-revisar" aria-hidden="true">
+                    Revisar →
+                  </span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

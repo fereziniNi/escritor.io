@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { criarSkill, ErroSkill, salvarVersao } from './api'
+import { BotaoVoltar } from './BotaoVoltar'
 import './skills.css'
 import { CATEGORIAS, ROTULO_CATEGORIA, type Categoria, type SkillVersao } from './types'
 
@@ -217,86 +218,99 @@ export function EditorSkill({
         if (!bloqueado) salvar.mutate()
       }}
     >
+      <BotaoVoltar aoVoltar={aoCancelar} rotulo={criacao ? 'Voltar às skills' : 'Voltar à skill'} />
       <h2>{criacao ? 'Nova skill' : `Editar ${slug}`}</h2>
       {oficial && (
-        <p className="mensagem-aviso" role="status">
+        <p className="skills-aviso" role="status">
           Esta skill é oficial: sua alteração vai para aprovação.
         </p>
       )}
 
-      {criacao && (
-        <label>
-          Slug
-          <input
-            value={slugDigitado}
-            onChange={(e) => {
-              setSlugDigitado(e.target.value)
-              atualizarModelo(e.target.value, nome, descricao)
-            }}
-          />
-        </label>
-      )}
-      <label>
-        Nome
-        <input
-          value={nome}
-          onChange={(e) => {
-            setNome(e.target.value)
-            atualizarModelo(slugDigitado, e.target.value, descricao)
-          }}
-        />
-      </label>
-      <label>
-        Descrição
-        <input
-          value={descricao}
-          onChange={(e) => {
-            setDescricao(e.target.value)
-            atualizarModelo(slugDigitado, nome, e.target.value)
-          }}
-        />
-      </label>
-      <label>
-        Categoria
-        <select value={categoria} onChange={(e) => setCategoria(e.target.value as Categoria)}>
-          {CATEGORIAS.map((c) => (
-            <option key={c} value={c}>
-              {ROTULO_CATEGORIA[c]}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Prompt de uso
-        <textarea rows={3} value={promptUso} onChange={(e) => setPromptUso(e.target.value)} />
-      </label>
-      <label>
-        Tutorial de instalação
-        <textarea rows={6} value={tutorial} onChange={(e) => setTutorial(e.target.value)} />
-      </label>
+      <fieldset className="skills-bloco">
+        <legend>Informações</legend>
+        <div className="skills-grade-campos">
+          {criacao && (
+            <label className="skills-campo">
+              <span className="skills-campo-rotulo">Slug</span>
+              <input
+                value={slugDigitado}
+                placeholder="ex.: login-seguro"
+                onChange={(e) => {
+                  setSlugDigitado(e.target.value)
+                  atualizarModelo(e.target.value, nome, descricao)
+                }}
+              />
+            </label>
+          )}
+          <label className="skills-campo">
+            <span className="skills-campo-rotulo">Nome</span>
+            <input
+              value={nome}
+              onChange={(e) => {
+                setNome(e.target.value)
+                atualizarModelo(slugDigitado, e.target.value, descricao)
+              }}
+            />
+          </label>
+          <label className="skills-campo skills-campo-largo">
+            <span className="skills-campo-rotulo">Descrição</span>
+            <input
+              value={descricao}
+              onChange={(e) => {
+                setDescricao(e.target.value)
+                atualizarModelo(slugDigitado, nome, e.target.value)
+              }}
+            />
+          </label>
+          <label className="skills-campo">
+            <span className="skills-campo-rotulo">Categoria</span>
+            <select value={categoria} onChange={(e) => setCategoria(e.target.value as Categoria)}>
+              {CATEGORIAS.map((c) => (
+                <option key={c} value={c}>
+                  {ROTULO_CATEGORIA[c]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </fieldset>
 
-      <fieldset>
+      <fieldset className="skills-bloco">
+        <legend>Como usar</legend>
+        <label className="skills-campo">
+          <span className="skills-campo-rotulo">Prompt de uso</span>
+          <textarea rows={4} value={promptUso} onChange={(e) => setPromptUso(e.target.value)} />
+        </label>
+        <label className="skills-campo">
+          <span className="skills-campo-rotulo">Tutorial de instalação</span>
+          <textarea rows={6} value={tutorial} onChange={(e) => setTutorial(e.target.value)} />
+        </label>
+      </fieldset>
+
+      <fieldset className="skills-bloco">
         <legend>Arquivos</legend>
         {arquivos.map((a) => {
           const principal = a.id === principalId
           return (
             <div key={a.id} className="skills-editor-arquivo">
-              <input
-                aria-label={`Caminho de ${a.caminho}`}
-                value={a.caminho}
-                readOnly={principal}
-                onChange={(e) => alterarArquivo(a.id, { caminho: e.target.value })}
-              />
-              {!principal && (
-                <button
-                  type="button"
-                  className="botao-secundario"
-                  aria-label={`Remover ${a.caminho}`}
-                  onClick={() => setArquivos((atual) => atual.filter((x) => x.id !== a.id))}
-                >
-                  Remover
-                </button>
-              )}
+              <div className="skills-editor-arquivo-topo">
+                <input
+                  aria-label={`Caminho de ${a.caminho}`}
+                  value={a.caminho}
+                  readOnly={principal}
+                  onChange={(e) => alterarArquivo(a.id, { caminho: e.target.value })}
+                />
+                {!principal && (
+                  <button
+                    type="button"
+                    className="skills-btn skills-btn-perigo skills-btn-pequeno"
+                    aria-label={`Remover ${a.caminho}`}
+                    onClick={() => setArquivos((atual) => atual.filter((x) => x.id !== a.id))}
+                  >
+                    Remover
+                  </button>
+                )}
+              </div>
               <textarea
                 rows={8}
                 aria-label={`Conteúdo de ${a.caminho}`}
@@ -309,33 +323,42 @@ export function EditorSkill({
             </div>
           )
         })}
-        <div className="linha-botoes">
+        <div className="skills-novo-arquivo">
           <input aria-label="Novo arquivo" placeholder="pasta/arquivo.md" value={novoCaminho} onChange={(e) => setNovoCaminho(e.target.value)} />
-          <button type="button" className="botao-secundario" onClick={adicionarArquivo} disabled={!novoCaminho.trim()}>
+          <button type="button" className="skills-btn skills-btn-secundario skills-btn-pequeno" onClick={adicionarArquivo} disabled={!novoCaminho.trim()}>
+            <span aria-hidden="true">+</span>
             Adicionar arquivo
           </button>
         </div>
       </fieldset>
 
-      <label>
-        Mensagem da alteração
-        <input value={mensagem} onChange={(e) => setMensagem(e.target.value)} />
+      <label className="skills-campo">
+        <span className="skills-campo-rotulo">Mensagem da alteração</span>
+        <input value={mensagem} placeholder="O que mudou nesta versão?" onChange={(e) => setMensagem(e.target.value)} />
       </label>
 
-      {erros.map((e, i) => (
-        <p key={`${i}-${e}`} className="mensagem-erro">
-          {e}
+      {(erros.length > 0 || erroServidor) && (
+        <div className="skills-erros">
+          {erros.map((e, i) => (
+            <p key={`${i}-${e}`} className="mensagem-erro">
+              {e}
+            </p>
+          ))}
+          {erroServidor && <p className="mensagem-erro">{erroServidor}</p>}
+        </div>
+      )}
+      {enviada && (
+        <p className="skills-aviso skills-aviso-info" role="status">
+          Proposta enviada para aprovação
         </p>
-      ))}
-      {erroServidor && <p className="mensagem-erro">{erroServidor}</p>}
-      {enviada && <p className="mensagem-aviso" role="status">Proposta enviada para aprovação</p>}
+      )}
 
-      <div className="linha-botoes">
-        <button type="submit" disabled={bloqueado || !slugEfetivo}>
-          Salvar
-        </button>
-        <button type="button" className="botao-secundario" onClick={aoCancelar}>
+      <div className="skills-rodape-acoes">
+        <button type="button" className="skills-btn skills-btn-fantasma" onClick={aoCancelar}>
           Cancelar
+        </button>
+        <button type="submit" className="skills-btn skills-btn-primario" disabled={bloqueado || !slugEfetivo}>
+          Salvar
         </button>
       </div>
     </form>
