@@ -27,10 +27,15 @@ x-ambiente: &ambiente
   DADOS_CHAVES_ARQUIVO: /run/secrets/dados_chaves
   DADOS_CHAVE_INDICE_ARQUIVO: /run/secrets/dados_chave_indice
   ARMAZENAMENTO_SEGREDO_URL_ARQUIVO: /run/secrets/segredo_url
-  # Arquivo vazio = sem senha (relay interno, Mailpit). Com SMTP_USUARIO no .env, ponha a senha neste arquivo.
+  # Segredos que a TI preenche (gerar-segredos.sh cria vazios). Arquivo vazio = variável ausente: SMTP sem senha (relay
+  # interno, Mailpit), IA sem chave, Langfuse sem rastreio, sem S3/Azure. NUNCA ponha estes valores no .env.
   SMTP_SENHA_ARQUIVO: /run/secrets/smtp_senha
+  ANTHROPIC_API_KEY_ARQUIVO: /run/secrets/anthropic_api_key
+  LANGFUSE_SECRET_KEY_ARQUIVO: /run/secrets/langfuse_secret_key
+  S3_SECRET_KEY_ARQUIVO: /run/secrets/s3_secret_key
+  AZURE_CONNECTION_STRING_ARQUIVO: /run/secrets/azure_connection_string
 
-x-segredos: &segredos [database_url_runtime, auth_segredo_codigo, dados_chaves, dados_chave_indice, segredo_url, smtp_senha]
+x-segredos: &segredos [database_url_runtime, auth_segredo_codigo, dados_chaves, dados_chave_indice, segredo_url, smtp_senha, anthropic_api_key, langfuse_secret_key, s3_secret_key, azure_connection_string]
 
 services:
   caddy:
@@ -63,7 +68,7 @@ services:
       <<: *ambiente
       ROLE: migrar
       DATABASE_URL_ARQUIVO: /run/secrets/database_url
-    secrets: [database_url, database_url_runtime, auth_segredo_codigo, dados_chaves, dados_chave_indice, segredo_url, smtp_senha]
+    secrets: [database_url, database_url_runtime, auth_segredo_codigo, dados_chaves, dados_chave_indice, segredo_url, smtp_senha, anthropic_api_key, langfuse_secret_key, s3_secret_key, azure_connection_string]
     depends_on:
       banco: { condition: service_healthy }
 
@@ -143,30 +148,25 @@ services:
       start_period: 60s
     networks: [interna]
 
-  # ---- Langfuse self-host (skill ia-langfuse), profile langfuse. Variáveis LANGFUSE_* no .env (ver .env.example). ----
-  # O Compose cobra "${VAR:?}" mesmo de serviço com profile desligado; por isso aqui os segredos usam ":-" e este serviço
-  # recusa a subida do profile quando falta algum.
+  # ---- Langfuse self-host (skill ia-langfuse), profile langfuse. ----
+  # Senhas e chaves da infraestrutura do Langfuse ficam em segredos/langfuse.env (gerar-segredos.sh), lido SÓ pelos serviços
+  # langfuse-*: migracao, app e worker não as recebem. No .env ficam só LANGFUSE_INIT_USER_EMAIL e LANGFUSE_URL_PUBLICA (não
+  # são segredo). O Compose cobra "${VAR:?}" mesmo de serviço com profile desligado; por isso essas duas usam ":-" e este
+  # serviço recusa a subida do profile quando falta alguma coisa.
   langfuse-conferir:
     image: busybox:1.37.0
     profiles: ["langfuse"]
+    env_file: &langfuse-segredos ./segredos/langfuse.env
     environment:
-      LANGFUSE_NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-}
-      LANGFUSE_SALT: ${LANGFUSE_SALT:-}
-      LANGFUSE_ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-}
-      LANGFUSE_DB_PASSWORD: ${LANGFUSE_DB_PASSWORD:-}
-      LANGFUSE_CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-}
-      LANGFUSE_REDIS_PASSWORD: ${LANGFUSE_REDIS_PASSWORD:-}
-      LANGFUSE_MINIO_PASSWORD: ${LANGFUSE_MINIO_PASSWORD:-}
       LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-}
-      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-}
-      LANGFUSE_URL_PUBLICA: ${LANGFUSE_URL_PUBLICA:-}
+      NEXTAUTH_URL: ${LANGFUSE_URL_PUBLICA:-}
     command:
       - sh
       - -c
       - |
         falta=0
-        for v in LANGFUSE_NEXTAUTH_SECRET LANGFUSE_SALT LANGFUSE_ENCRYPTION_KEY LANGFUSE_DB_PASSWORD LANGFUSE_CLICKHOUSE_PASSWORD LANGFUSE_REDIS_PASSWORD LANGFUSE_MINIO_PASSWORD LANGFUSE_INIT_USER_EMAIL LANGFUSE_INIT_USER_PASSWORD LANGFUSE_URL_PUBLICA; do
-          eval "x=\$$$$v"; [ -n "$$x" ] || { echo "defina $$v no .env"; falta=1; }
+        for v in DATABASE_URL SALT ENCRYPTION_KEY NEXTAUTH_SECRET CLICKHOUSE_PASSWORD REDIS_AUTH REDIS_PW MINIO_ROOT_PASSWORD POSTGRES_PASSWORD LANGFUSE_INIT_USER_PASSWORD LANGFUSE_INIT_USER_EMAIL NEXTAUTH_URL; do
+          eval "x=\$$$$v"; [ -n "$$x" ] || { echo "falta $$v (segredos/langfuse.env: sh gerar-segredos.sh; no .env: LANGFUSE_INIT_USER_EMAIL e LANGFUSE_URL_PUBLICA)"; falta=1; }
         done
         exit $$falta
 
@@ -182,36 +182,31 @@ services:
     # 127.0.0.1: só esta máquina alcança o painel. Para a equipe, um bloco do Caddy num subdomínio próprio (ver o tutorial).
     ports:
       - "127.0.0.1:3100:3000"
+    # DATABASE_URL, SALT, ENCRYPTION_KEY, NEXTAUTH_SECRET, CLICKHOUSE_PASSWORD, REDIS_AUTH, as chaves S3 do MinIO e
+    # LANGFUSE_INIT_USER_PASSWORD vêm de segredos/langfuse.env.
+    env_file: *langfuse-segredos
     environment:
       <<: &langfuse-env
-        DATABASE_URL: postgresql://langfuse:${LANGFUSE_DB_PASSWORD:-}@langfuse-db:5432/langfuse
-        SALT: ${LANGFUSE_SALT:-}
-        ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-}
         TELEMETRY_ENABLED: "false"
         CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
         CLICKHOUSE_URL: http://langfuse-clickhouse:8123
         CLICKHOUSE_USER: clickhouse
-        CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-}
         CLICKHOUSE_CLUSTER_ENABLED: "false"
         REDIS_HOST: langfuse-redis
         REDIS_PORT: "6379"
-        REDIS_AUTH: ${LANGFUSE_REDIS_PASSWORD:-}
         LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
         LANGFUSE_S3_EVENT_UPLOAD_REGION: us-east-1
         LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
-        LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-}
         LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
         LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
         LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
         LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
         LANGFUSE_S3_MEDIA_UPLOAD_REGION: us-east-1
         LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
-        LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-}
         LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://langfuse-minio:9000
         LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
         LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
       NEXTAUTH_URL: ${LANGFUSE_URL_PUBLICA:-}
-      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-}
       # Sem cadastro aberto: o primeiro usuário vem de LANGFUSE_INIT_*; os demais, convidados no painel.
       AUTH_DISABLE_SIGNUP: "true"
       LANGFUSE_INIT_ORG_ID: multiplica
@@ -220,7 +215,6 @@ services:
       LANGFUSE_INIT_PROJECT_NAME: Sistema
       LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-}
       LANGFUSE_INIT_USER_NAME: Administrador
-      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-}
     restart: unless-stopped
     networks: [interna]
 
@@ -228,6 +222,7 @@ services:
     image: langfuse/langfuse-worker:3.227.0
     profiles: ["langfuse"]
     depends_on: *langfuse-depende
+    env_file: *langfuse-segredos
     environment: *langfuse-env
     restart: unless-stopped
     networks: [interna]
@@ -238,10 +233,10 @@ services:
     profiles: ["langfuse"]
     depends_on:
       langfuse-conferir: { condition: service_completed_successfully }
+    env_file: *langfuse-segredos
     environment:
       POSTGRES_DB: langfuse
       POSTGRES_USER: langfuse
-      POSTGRES_PASSWORD: ${LANGFUSE_DB_PASSWORD:-}
     volumes:
       - langfuse_db:/var/lib/postgresql/data
     healthcheck:
@@ -258,10 +253,10 @@ services:
     depends_on:
       langfuse-conferir: { condition: service_completed_successfully }
     user: "101:101"
+    env_file: *langfuse-segredos
     environment:
       CLICKHOUSE_DB: default
       CLICKHOUSE_USER: clickhouse
-      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-}
     volumes:
       - langfuse_clickhouse_data:/var/lib/clickhouse
       - langfuse_clickhouse_logs:/var/log/clickhouse-server
@@ -284,8 +279,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    environment:
-      REDIS_PW: ${LANGFUSE_REDIS_PASSWORD:-}
+    env_file: *langfuse-segredos
     restart: unless-stopped
     networks: [interna]
 
@@ -303,9 +297,9 @@ services:
       langfuse-conferir: { condition: service_completed_successfully }
       langfuse-minio-preparo: { condition: service_completed_successfully }
     command: ["server", "/data", "--address", ":9000", "--console-address", ":9001"]
+    env_file: *langfuse-segredos
     environment:
       MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: ${LANGFUSE_MINIO_PASSWORD:-}
     volumes:
       - langfuse_minio_data:/data
     restart: unless-stopped
@@ -322,6 +316,10 @@ secrets:
   dados_chave_indice: { file: ./segredos/dados_chave_indice }
   segredo_url: { file: ./segredos/segredo_url }
   smtp_senha: { file: ./segredos/smtp_senha }
+  anthropic_api_key: { file: ./segredos/anthropic_api_key }
+  langfuse_secret_key: { file: ./segredos/langfuse_secret_key }
+  s3_secret_key: { file: ./segredos/s3_secret_key }
+  azure_connection_string: { file: ./segredos/azure_connection_string }
 
 networks:
   interna:

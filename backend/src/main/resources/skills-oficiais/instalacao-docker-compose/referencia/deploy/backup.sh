@@ -5,7 +5,7 @@
 #   arquivos-AAAAMMDD-HHMMSS.tar.gz   volume dos uploads (ARMAZENAMENTO_TIPO=local)
 # e apaga os com mais de BACKUP_DIAS dias (padrão 14). Pode rodar com o sistema no ar.
 # Agende no cron do servidor (todo dia às 2h), como root:
-#   0 2 * * * cd /opt/sistema/deploy && sh backup.sh >> backups/backup.log 2>&1
+#   0 2 * * * cd /opt/sistema/deploy && mkdir -p backups && sh backup.sh >> backups/backup.log 2>&1
 # Copie a pasta de backups para FORA do servidor (outro disco, nuvem do cliente): backup só no mesmo disco não é backup.
 # O backup NÃO leva as chaves (segredos/): sem segredos/dados_chaves os CPFs restaurados não abrem. Guarde-as no cofre.
 set -eu

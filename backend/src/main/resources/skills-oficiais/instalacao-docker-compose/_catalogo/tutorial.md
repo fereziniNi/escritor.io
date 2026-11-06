@@ -41,7 +41,9 @@ PowerShell (Windows). Ela é a última skill a aplicar: use depois que o sistema
 | `PORTA_HTTP`, `PORTA_HTTPS` | não (80, 443) | `8443` | só se 80/443 estiverem ocupadas |
 | `BACKUP_DIAS` | não (14) | `14` | por quantos dias os backups ficam |
 
-Senhas e chaves **não** vão no `.env`: o script `gerar-segredos.sh` cria a pasta `deploy/segredos/` com valores aleatórios.
+Senhas e chaves **não** vão no `.env`: o script `gerar-segredos.sh` cria a pasta `deploy/segredos/` com valores aleatórios (inclusive
+`segredos/langfuse.env`, só para os serviços do Langfuse) e arquivos vazios para o que vem de fora (`smtp_senha`, `anthropic_api_key`,
+`langfuse_secret_key`, `s3_secret_key`, `azure_connection_string`), que a TI preenche como o `deploy/INSTALACAO.md` ensina.
 
 ### Dependências
 

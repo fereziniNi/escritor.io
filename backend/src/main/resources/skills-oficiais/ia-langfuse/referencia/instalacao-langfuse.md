@@ -40,4 +40,6 @@ Documento de apoio da skill `ia-langfuse` (e entrega para a skill `instalacao-do
 
 Copie os serviços `langfuse-web`, `langfuse-worker`, `langfuse-db`, `langfuse-clickhouse`, `langfuse-redis`, `langfuse-minio-preparo`, `langfuse-minio` (todos com
 `profiles: ["langfuse"]`) e os quatro volumes para `deploy/docker-compose.yml`, mantendo versões e `AUTH_DISABLE_SIGNUP`. Os segredos passam a vir dos arquivos de segredo
-do compose de produção (nunca valor fixo no YAML) e o Caddy publica o painel num subdomínio próprio com HTTPS.
+do compose de produção (nunca valor fixo no YAML): as senhas da infraestrutura do Langfuse num arquivo próprio (`segredos/langfuse.env`, `env_file` só dos serviços
+`langfuse-*`; a aplicação, que recebe o `.env` inteiro, nunca as vê) e a `LANGFUSE_SECRET_KEY` da API em `segredos/langfuse_secret_key` (`LANGFUSE_SECRET_KEY_ARQUIVO`).
+O Caddy publica o painel num subdomínio próprio com HTTPS.

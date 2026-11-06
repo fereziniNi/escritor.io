@@ -11,6 +11,10 @@ chmod 700 segredos
 
 aleatorio_hex() { head -c "$1" /dev/urandom | od -An -tx1 | tr -d ' \n'; }
 aleatorio_b64() { head -c 32 /dev/urandom | base64 | tr -d '\n'; }
+# Valor de uma instalação antiga que guardava a senha do Langfuse no .env (a senha do banco do Langfuse não pode mudar
+# depois de criado o volume). Sem .env ou sem a linha: vazio.
+do_env() { [ -f .env ] && grep -E "^$1=" .env | tail -n 1 | cut -d= -f2- || true; }
+antigo_ou_novo() { v="$(do_env "$1")"; if [ -n "$v" ]; then printf '%s' "$v"; else aleatorio_hex "$2"; fi; }
 
 gravar() {
   if [ -s "segredos/$1" ]; then
@@ -29,8 +33,42 @@ gravar auth_segredo_codigo "$(aleatorio_hex 32)"
 gravar dados_chaves "k1:$(aleatorio_b64)"
 gravar dados_chave_indice "$(aleatorio_b64)"
 gravar segredo_url "$(aleatorio_hex 32)"
-# Senha do SMTP: a TI do cliente escreve neste arquivo (vazio = servidor sem autenticação).
-[ -e segredos/smtp_senha ] || { : > segredos/smtp_senha; echo "criado:  segredos/smtp_senha (vazio: preencha se o SMTP tiver usuário)"; }
+
+# Segredos que vêm de fora e a TI escreve (vazio = não usado): senha do SMTP, chave da IA, chave secreta do Langfuse (do
+# projeto, criada no painel), chave do S3 e connection string do Azure. Ficam só-leitura no fim; para preencher um:
+#   chmod 600 segredos/NOME && printf '%s' 'VALOR' > segredos/NOME && chmod 444 segredos/NOME && docker compose up -d
+for nome in smtp_senha anthropic_api_key langfuse_secret_key s3_secret_key azure_connection_string; do
+  [ -e "segredos/$nome" ] || { : > "segredos/$nome"; echo "criado:  segredos/$nome (vazio: preencha se for usar)"; }
+done
+
+# Infraestrutura do Langfuse (profile langfuse): lido SÓ pelos serviços langfuse-* (env_file), nunca por app, worker e migracao.
+# Já nos nomes que cada contêiner espera. Instalação antiga com LANGFUSE_*_PASSWORD no .env: os valores de lá são reaproveitados
+# (depois apague essas linhas do .env).
+if [ -s segredos/langfuse.env ]; then
+  echo "mantido: segredos/langfuse.env"
+else
+  db="$(antigo_ou_novo LANGFUSE_DB_PASSWORD 24)"
+  ch="$(antigo_ou_novo LANGFUSE_CLICKHOUSE_PASSWORD 24)"
+  rd="$(antigo_ou_novo LANGFUSE_REDIS_PASSWORD 24)"
+  mn="$(antigo_ou_novo LANGFUSE_MINIO_PASSWORD 24)"
+  cat > segredos/langfuse.env <<FIM
+# Gerado por gerar-segredos.sh. Só os serviços langfuse-* leem este arquivo.
+DATABASE_URL=postgresql://langfuse:$db@langfuse-db:5432/langfuse
+POSTGRES_PASSWORD=$db
+SALT=$(antigo_ou_novo LANGFUSE_SALT 32)
+ENCRYPTION_KEY=$(antigo_ou_novo LANGFUSE_ENCRYPTION_KEY 32)
+NEXTAUTH_SECRET=$(antigo_ou_novo LANGFUSE_NEXTAUTH_SECRET 32)
+CLICKHOUSE_PASSWORD=$ch
+REDIS_AUTH=$rd
+REDIS_PW=$rd
+MINIO_ROOT_PASSWORD=$mn
+LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY=$mn
+LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY=$mn
+# Senha do primeiro acesso ao painel (usuário LANGFUSE_INIT_USER_EMAIL do .env). Troque no painel depois de entrar.
+LANGFUSE_INIT_USER_PASSWORD=$(antigo_ou_novo LANGFUSE_INIT_USER_PASSWORD 16)
+FIM
+  echo "criado:  segredos/langfuse.env"
+fi
 
 # A pasta (700) protege os arquivos no servidor; os arquivos ficam legíveis para os processos sem privilégio dos
 # contêineres (usuário node da imagem, postgres), que os recebem montados em /run/secrets.

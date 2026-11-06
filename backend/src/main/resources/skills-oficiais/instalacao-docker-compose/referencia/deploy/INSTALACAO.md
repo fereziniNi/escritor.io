@@ -29,7 +29,18 @@ endereço do sistema apontando para o servidor; portas 80 e 443 liberadas (para 
    docker run --rm -v "${PWD}:/deploy" busybox:1.37.0 sh /deploy/gerar-segredos.sh
    ```
    **Copie a pasta `segredos/` para o cofre de senhas do cliente.** Sem `segredos/dados_chaves` os CPFs guardados não podem mais ser lidos.
-   Se o SMTP tiver usuário, escreva a senha dele (só ela, sem quebra de linha) em `segredos/smtp_senha`.
+   Segredos que vêm de fora ficam em arquivos que nascem vazios (vazio = não usado): `smtp_senha` (senha do SMTP, se tiver usuário),
+   `anthropic_api_key` (IA), `langfuse_secret_key` (chave secreta do projeto no Langfuse), `s3_secret_key` e `azure_connection_string`
+   (armazenamento fora do servidor). Os arquivos são só-leitura: para preencher um, libere, escreva só o valor e trave de novo:
+
+   ```bash
+   sudo chmod 600 segredos/smtp_senha && sudo sh -c "printf '%s' 'A_SENHA' > segredos/smtp_senha" && sudo chmod 444 segredos/smtp_senha
+   ```
+   ```powershell
+   Set-ItemProperty segredos\smtp_senha IsReadOnly $false; Set-Content -NoNewline -Encoding ascii segredos\smtp_senha 'A_SENHA'; Set-ItemProperty segredos\smtp_senha IsReadOnly $true
+   ```
+   As senhas da infraestrutura do Langfuse (profile `langfuse`) ficam em `segredos/langfuse.env`, lido só pelos serviços `langfuse-*`.
+   Nenhum segredo vai no `.env`: ele é entregue à aplicação.
 
 2. Configure: copie o modelo e preencha (cada linha tem um comentário dizendo o que é).
 
@@ -40,7 +51,7 @@ endereço do sistema apontando para o servidor; portas 80 e 443 liberadas (para 
    Copy-Item .env.example .env; notepad .env
    ```
    Obrigatórias: `DOMINIO`, `CADDY_TLS`, `APP_IMAGEM`, `APP_VERSAO`, `SMTP_HOST`, `EMAIL_REMETENTE`, `ADMIN_INICIAL_EMAIL`, `ALERTA_EMAIL`.
-   - `CADDY_TLS=ti@cliente.com.br` (o e-mail da TI): certificado público automático (Let's Encrypt), renovado sozinho.
+   - `CADDY_TLS=ti@exemplo.com.br` (o e-mail da TI): certificado público automático (Let's Encrypt), renovado sozinho.
    - `CADDY_TLS=internal`: rede interna sem acesso da internet. O Caddy emite o próprio certificado; instale a raiz dele nos computadores
      dos usuários (`docker compose cp caddy:/data/caddy/pki/authorities/local/root.crt ./raiz-caddy.crt` e distribua por GPO).
    - `NODE_ENV=production` sempre, **inclusive em homologação** (outro valor é recusado ou deixa o login inseguro).
@@ -72,7 +83,7 @@ endereço do sistema apontando para o servidor; portas 80 e 443 liberadas (para 
 
 1. **Backup antes** (seção 4).
 2. No `.env`, troque `APP_VERSAO` (ex.: `1.0.0` → `1.1.0`).
-3. `docker compose pull && docker compose up -d` (PowerShell igual). A `migracao` roda de novo (aplica as mudanças de banco da versão nova)
+3. `docker compose pull && docker compose up -d` (PowerShell: `docker compose pull; if ($?) { docker compose up -d }`). A `migracao` roda de novo (aplica as mudanças de banco da versão nova)
    e só depois `app` e `worker` são trocados. Fora do ar: alguns segundos.
 4. Confira `/api/health`: o campo `versao` mostra a versão nova.
 
@@ -92,7 +103,7 @@ O que entra: o banco inteiro (`pg_dump -Fc`) e os arquivos enviados pelos usuár
 ```bash
 sh backup.sh
 # cron do root, todo dia às 2h:  sudo crontab -e  e acrescente
-0 2 * * * cd /opt/sistema/deploy && sh backup.sh >> backups/backup.log 2>&1
+0 2 * * * cd /opt/sistema/deploy && mkdir -p backups && sh backup.sh >> backups/backup.log 2>&1
 ```
 ```powershell
 $c = Get-Date -Format yyyyMMdd-HHmmss; New-Item -ItemType Directory -Force backups | Out-Null
@@ -109,18 +120,28 @@ docker compose run --rm --no-deps --user root -v "${PWD}/backups:/backups" app s
 
 ## 5. Restaurar
 
-Apaga o banco atual e põe o do backup no lugar (os usuários ficam alguns minutos sem o sistema):
+Troca o banco do sistema pelo do backup **sem apagar o atual antes da hora**: o backup é restaurado num banco ao lado (`app_restaurando`)
+com o sistema no ar e conferido; só então o sistema para alguns segundos, o banco atual vira `app_antes_<data>` e o restaurado vira `app`.
+Se o backup falhar, nada muda. Os uploads atuais vão para `backups/arquivos-antes-<data>.tar.gz` antes da troca.
 
 ```bash
 sh restore.sh --confirmar backups/banco-20260301-020000.dump backups/arquivos-20260301-020000.tar.gz
+# conferido o sistema, apague o banco anterior (o nome aparece no fim da restauração):
+docker compose exec banco dropdb -U app app_antes_20260301_093000
 ```
 ```powershell
-docker compose stop app worker caddy
-docker compose cp backups/banco-20260301-020000.dump banco:/tmp/restaurar.dump
-docker compose exec banco psql -U app -d postgres -c "DROP DATABASE IF EXISTS app WITH (FORCE)" -c "CREATE DATABASE app OWNER app"
+$d = "backups/banco-20260301-020000.dump"; $t = "backups/arquivos-20260301-020000.tar.gz"; $c = Get-Date -Format yyyyMMdd_HHmmss
 docker compose exec banco psql -U app -d postgres -c "DO `$`$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='app_runtime') THEN CREATE ROLE app_runtime NOLOGIN; END IF; END `$`$"
-docker compose exec banco pg_restore -U app -d app --exit-on-error /tmp/restaurar.dump
-docker compose run --rm --no-deps --user root -v "${PWD}/backups:/backups" app sh -c "find /dados/arquivos -mindepth 1 -delete && tar xzf /backups/arquivos-20260301-020000.tar.gz -C /dados/arquivos && chown -R node:node /dados/arquivos"
+docker compose exec banco psql -U app -d postgres -c "DROP DATABASE IF EXISTS app_restaurando WITH (FORCE)" -c "CREATE DATABASE app_restaurando OWNER app"
+docker compose cp $d banco:/tmp/restaurar.dump
+docker compose exec banco pg_restore -U app -d app_restaurando --exit-on-error /tmp/restaurar.dump
+if (-not $?) { throw "o backup não restaurou: o sistema não foi tocado (apague app_restaurando)" }
+docker compose exec banco psql -U app -d app_restaurando -At -c "SELECT count(*) FROM drizzle.__drizzle_migrations"   # tem de ser maior que 0
+docker compose run --rm --no-deps --user root -v "${PWD}/backups:/backups" app sh -c "rm -rf /dados/arquivos/.restaurando && mkdir /dados/arquivos/.restaurando && tar xzf /backups/$(Split-Path $t -Leaf) -C /dados/arquivos/.restaurando"
+if (-not $?) { throw "os uploads não extraíram: nada foi trocado" }
+docker compose stop app worker caddy
+docker compose exec banco psql -v ON_ERROR_STOP=1 -U app -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='app' AND pid <> pg_backend_pid()" -c "ALTER DATABASE app RENAME TO app_antes_$c" -c "ALTER DATABASE app_restaurando RENAME TO app"
+docker compose run --rm --no-deps --user root -v "${PWD}/backups:/backups" app sh -c "cd /dados/arquivos && tar czf /backups/arquivos-antes-$c.tar.gz --exclude=./.restaurando . && find . -mindepth 1 -maxdepth 1 ! -name .restaurando -exec rm -rf {} + && find .restaurando -mindepth 1 -maxdepth 1 -exec mv {} . \; && rmdir .restaurando && chown -R node:node /dados/arquivos"
 docker compose up -d
 ```
 
@@ -135,6 +156,7 @@ Primeiro: `docker compose ps` e `docker compose logs --tail 100 <serviço>` (`ap
 |---|---|---|
 | `required variable DOMINIO is missing a value` (ou `APP_IMAGEM`, `APP_VERSAO`, `CADDY_TLS`) | linha faltando no `.env` | preencha a variável que a mensagem cita |
 | `secret ... file ... not found` | `segredos/` não foi gerada | `sh gerar-segredos.sh` |
+| `env file .../segredos/langfuse.env not found` | instalação anterior a este arquivo | `sh gerar-segredos.sh` (reaproveita as senhas `LANGFUSE_*` do `.env`; depois apague essas linhas do `.env`) |
 | `migracao` `Exited (1)` e `app` não sobe | migração falhou | `docker compose logs migracao`; corrija e `docker compose up -d` |
 | log `Configuração inválida` com a lista `problemas` | variável errada ou faltando no `.env` | cada item diz a variável e o motivo |
 | log `ROLE é obrigatória` / `ALERTA_EMAIL é obrigatória` | `.env` antigo ou serviço criado à mão | use o `docker-compose.yml` da versão; preencha `ALERTA_EMAIL` |

@@ -39,10 +39,13 @@ Conta Gráfica (imagem única, deploy). **Cada valor abaixo é fixo**; mudar um 
    migrações, **`definirSenhaRuntime`** (`ALTER ROLE app_runtime LOGIN PASSWORD` com a senha de `DATABASE_URL_RUNTIME`; trocar o
    segredo e subir = rotação; nunca cria papel; recusa o mesmo usuário do dono) e `prepararFila` (schema `fila`, filas e GRANTs).
 8. **Segredos em arquivo, nunca no `.env`**: `deploy/segredos/` (`banco_senha`, `database_url`, `database_url_runtime`,
-   `auth_segredo_codigo`, `dados_chaves`, `dados_chave_indice`, `segredo_url`, `smtp_senha`) gerada por `gerar-segredos.sh`
+   `auth_segredo_codigo`, `dados_chaves`, `dados_chave_indice`, `segredo_url`) gerada por `gerar-segredos.sh`
    (hex de 24/32 bytes; `k1:` + base64 de 32 bytes para `dados_chaves`; nunca sobrescreve), montada como `secrets:` do compose em
-   `/run/secrets/<nome>` e lida por `NOME_ARQUIVO`. Pasta `700`, arquivos `444` (os contêineres sem privilégio precisam ler; quem
-   protege é a pasta). Postgres por `POSTGRES_PASSWORD_FILE`. O guia manda copiar `segredos/` para o cofre do cliente.
+   `/run/secrets/<nome>` e lida por `NOME_ARQUIVO`. Segredos que vêm de fora nascem **vazios** (vazio = não usado) e a TI preenche:
+   `smtp_senha`, `anthropic_api_key`, `langfuse_secret_key`, `s3_secret_key`, `azure_connection_string` (`*_ARQUIVO` em `migracao`,
+   `app` e `worker`). Pasta `700`, arquivos `444` (os contêineres sem privilégio precisam ler; quem protege é a pasta): para preencher,
+   `chmod 600`, escrever só o valor, `chmod 444` (o guia mostra). Postgres por `POSTGRES_PASSWORD_FILE`. O guia manda copiar
+   `segredos/` para o cofre do cliente.
 9. **`.env` único** na pasta `deploy/`: o compose lê para interpolar e passa à aplicação (`env_file: .env`); o `environment:` do compose
    fixa `NODE_ENV=production`, `PROXIES_CONFIAVEIS=1`, `ROLE` e os `*_ARQUIVO`. `chmod 600 .env`. `deploy/.gitignore`: `segredos/`, `backups/`, `.env`.
 10. **Caddy** (`deploy/Caddyfile`): `import seguranca.caddy` no topo e `import seguranca` dentro do site (skill `seguranca`);
@@ -52,16 +55,22 @@ Conta Gráfica (imagem única, deploy). **Cada valor abaixo é fixo**; mudar um 
     padrão (reescreve `X-Forwarded-For`) com `read_timeout 120s`; log JSON. HTTP redireciona para HTTPS (308).
 11. **Profiles opcionais** (`COMPOSE_PROFILES` no `.env`): `mailpit` (`axllent/mailpit:v1.31.6`, painel só em `127.0.0.1:8025`;
     homologação com `SMTP_HOST=mailpit`, `SMTP_PORT=1025`); `antivirus` (`clamav/clamav:1.4.6`, `StreamMaxLength 600M`, sem porta);
-    `langfuse` (serviços da skill `ia-langfuse`, mesmas versões, painel em `127.0.0.1:3100`). O Compose cobra `${VAR:?}` **até de
-    profile desligado**: no compose de instalação os segredos do Langfuse usam `${VAR:-}` e o serviço `langfuse-conferir` (busybox)
-    recusa a subida do profile dizendo qual `LANGFUSE_*` falta.
+    `langfuse` (serviços da skill `ia-langfuse`, mesmas versões, painel em `127.0.0.1:3100`). **As senhas da infraestrutura do
+    Langfuse** (banco, ClickHouse, Redis, MinIO, `SALT`, `ENCRYPTION_KEY`, `NEXTAUTH_SECRET`, `LANGFUSE_INIT_USER_PASSWORD`) ficam em
+    `segredos/langfuse.env`, gerado por `gerar-segredos.sh` já com os nomes de cada contêiner e lido por `env_file` **só** nos serviços
+    `langfuse-*`: `migracao`, `app` e `worker` (que recebem o `.env` inteiro) não as veem. No `.env` só `LANGFUSE_INIT_USER_EMAIL` e
+    `LANGFUSE_URL_PUBLICA`, com `${VAR:-}` (o Compose cobra `${VAR:?}` **até de profile desligado**); o serviço `langfuse-conferir`
+    (busybox) recusa a subida do profile dizendo o que falta. Instalação antiga com `LANGFUSE_*_PASSWORD` no `.env`: o script reaproveita.
 12. **Backup** (`deploy/backup.sh`): `pg_dump -Fc` do banco inteiro (confere com `pg_restore -l` antes de aceitar) + `tar.gz` do volume
     `arquivos`; nomes `banco-AAAAMMDD-HHMMSS.dump` e `arquivos-...tar.gz`; `umask 077`, pasta `700`, arquivos `chmod 600`; retenção
-    `BACKUP_DIAS=14` apagando só esses dois padrões; nada pela metade (`.parcial` + `trap`). Exemplo de cron: `0 2 * * * cd /opt/sistema/deploy && sh backup.sh >> backups/backup.log 2>&1`.
-13. **Restauração** (`deploy/restore.sh`): sem `--confirmar` não apaga nada; com ele para `app`, `worker` e `caddy`, garante o papel
-    `app_runtime` (é do servidor, não vai no dump), `DROP DATABASE ... WITH (FORCE)` + `CREATE DATABASE app OWNER app`,
-    `pg_restore --exit-on-error`, repõe os uploads e `docker compose up -d` (a `migracao` reaplica migrações e a senha do runtime).
-    `BANCO_DESTINO=<nome>` restaura num banco novo ao lado, sem tocar no sistema.
+    `BACKUP_DIAS=14` apagando só esses dois padrões; nada pela metade (`.parcial` + `trap`). Exemplo de cron: `0 2 * * * cd /opt/sistema/deploy && mkdir -p backups && sh backup.sh >> backups/backup.log 2>&1`.
+13. **Restauração** (`deploy/restore.sh`): **nunca apaga o banco do sistema antes de a restauração dar certo.** Sem `--confirmar`
+    não faz nada; com ele garante o papel `app_runtime` (é do servidor, não vai no dump), restaura em **`app_restaurando`** com o
+    sistema no ar (`pg_restore --exit-on-error`), confere (`drizzle.__drizzle_migrations` com linhas) e extrai os uploads numa pasta ao
+    lado; qualquer falha até aqui apaga só o `app_restaurando`. Só então para `app`, `worker` e `caddy` e troca os nomes
+    (`app` → `app_antes_<AAAAMMDD_HHMMSS>`, `app_restaurando` → `app`), guarda os uploads atuais em `backups/arquivos-antes-<carimbo>.tar.gz`,
+    troca os uploads e `docker compose up -d` (a `migracao` reaplica migrações e a senha do runtime). O banco anterior fica até a TI
+    apagá-lo (`dropdb`). `BANCO_DESTINO=<nome>` restaura num banco novo ao lado, sem tocar no sistema. O guia traz o mesmo fluxo em PowerShell.
 14. **`deploy/testar-backup.sh`**: backup → restauração num banco vazio (`teste_restauracao`) → contagem de linhas de cada tabela de
     `public` e `drizzle` igual à do sistema, schema `fila` presente → apaga o teste. Termina com `OK: backup ... restaurado`. Mensal.
 15. **Guia da TI** (`deploy/INSTALACAO.md`): instalar, atualizar, voltar versão (com e sem mudança de banco), backup, restaurar e
@@ -141,7 +150,8 @@ Usados sem cópia: `deploy/caddy/seguranca.caddy` (skill `seguranca`); `apps/api
 - [ ] Só o `caddy` publica porta; `app` e `banco` sem `ports:`; `PROXIES_CONFIAVEIS=1`; `app`/`worker` sem a senha do dono.
 - [ ] Subiu com `tls internal`: `curl -k https://localhost/api/health` → `"status":"ok"`; cabeçalhos da `seguranca` na resposta do SPA.
 - [ ] Login real pelo Caddy: código pelo Mailpit enviado pelo worker; cookie `__Host-sessao` com `Secure`.
-- [ ] `testar-backup.sh` → `OK`; `restore.sh --confirmar` volta o sistema com os dados e os uploads.
+- [ ] `testar-backup.sh` → `OK`; `restore.sh --confirmar` volta o sistema com os dados e os uploads e deixa `app_antes_<carimbo>`.
+- [ ] Nenhum segredo no `.env`: chaves de IA/Langfuse/S3/Azure em `segredos/`; senhas do Langfuse em `segredos/langfuse.env`.
 - [ ] Trocar `APP_VERSAO` e `up -d` atualiza (o `/api/health` mostra a versão); voltar o valor volta.
 - [ ] `INSTALACAO.md` com nomes do projeto, comandos bash e PowerShell; `segredos/` no cofre do cliente.
 - [ ] `instalacao-docker-compose` listada em "Skills Multiplica aplicadas" no `CLAUDE.md`.
