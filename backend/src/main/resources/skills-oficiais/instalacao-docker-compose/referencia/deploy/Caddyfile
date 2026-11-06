@@ -1,0 +1,31 @@
+# origem: skills-modelo/deploy/Caddyfile
+# Caddy da instalação (skill instalacao-docker-compose): HTTPS na frente da API. Valores vêm do .env pelo compose:
+#   DOMINIO      endereço do sistema (sistema.exemplo.com.br). O DNS tem de apontar para o servidor.
+#   CADDY_TLS    e-mail da TI (ti@exemplo.com.br): HTTPS automático com certificado público (Let's Encrypt), renovado sozinho;
+#                as portas 80 e 443 precisam estar abertas para a internet.
+#                internal: rede interna sem acesso da internet; o Caddy usa a própria autoridade certificadora e o navegador
+#                só confia depois de instalar a raiz (docker compose cp caddy:/data/caddy/pki/authorities/local/root.crt .).
+#   CORPO_MAX_MB calculado pelo compose: UPLOAD_MAX_MB + 2, em MiB como a API (margem do multipart). Nunca sem limite.
+# Mudou este arquivo? docker compose restart caddy
+
+import seguranca.caddy
+
+{$DOMINIO} {
+	tls {$CADDY_TLS}
+	# Cabeçalhos de segurança e CSP do SPA (skill seguranca, deploy/caddy/seguranca.caddy).
+	import seguranca
+	request_body {
+		max_size {$CORPO_MAX_MB}MiB
+	}
+	encode zstd gzip
+	# Padrão do reverse_proxy: reescreve X-Forwarded-For com o IP real (a API confia em 1 proxy: PROXIES_CONFIAVEIS=1).
+	reverse_proxy app:3000 {
+		transport http {
+			read_timeout 120s
+		}
+	}
+	log {
+		output stdout
+		format json
+	}
+}

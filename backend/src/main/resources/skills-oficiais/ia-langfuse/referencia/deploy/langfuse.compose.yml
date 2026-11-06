@@ -1,4 +1,4 @@
-# origem: skills-modelo/deploy/langfuse.compose.yml
+# origem: skills-modelo/estagios/ia-langfuse/deploy/langfuse.compose.yml
 # Langfuse self-host (skill ia-langfuse): painel de custo, latência e traços das chamadas de IA. Só sobe com o profile `langfuse`.
 #
 #   docker compose -f docker-compose.yml -f deploy/langfuse.compose.yml --env-file langfuse.env --profile langfuse up -d

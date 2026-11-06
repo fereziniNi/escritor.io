@@ -1,0 +1,3 @@
+nome: Instalação com Docker Compose
+descricao: Imagem única por versão, docker compose de produção com Caddy e HTTPS automático, banco sem porta publicada, segredos em arquivo, migração e worker pela mesma imagem, backup e restauração testados e o guia de instalação para a TI do cliente em bash e PowerShell.
+categoria: INFRA
