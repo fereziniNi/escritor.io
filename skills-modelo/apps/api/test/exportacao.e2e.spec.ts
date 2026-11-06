@@ -3,8 +3,10 @@ import { type INestApplication } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 import { Pool } from 'pg';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { AuditoriaService } from '../src/auditoria/auditoria.service';
 import { BANCO, type Db } from '../src/banco/banco';
+import { ClientesService } from '../src/clientes/clientes.service';
 import { usuario } from '../src/banco/esquema';
 import { type Config, carregarConfig } from '../src/config/config';
 import { criarApp } from '../src/criar-app';
@@ -162,12 +164,21 @@ describe('a exportação respeita a máscara de dados pessoais do papel (LGPD)',
 });
 
 describe('nome de cliente que parece fórmula', () => {
-  it('CSV e Excel mostram texto (apóstrofo na frente), nunca fórmula', async () => {
+  it('CSV leva apóstrofo; no Excel o texto fica literal (sem apóstrofo) e a célula não é fórmula', async () => {
     const csv = ((await exportar('csv', admin).expect(200)).body as Buffer).toString('utf8');
     expect(csv).toContain(`"'=HYPERLINK(""http://mal.exemplo.com"")"`);
-    const celulas = (await lerXlsx((await exportar('xlsx', admin).expect(200)).body as Buffer)).flat();
-    expect(celulas).toContain(`'=HYPERLINK("http://mal.exemplo.com")`);
-    expect(celulas).not.toContain('=HYPERLINK("http://mal.exemplo.com")');
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await exportar('xlsx', admin).expect(200)).body);
+    const textos: string[] = [];
+    let formulas = 0;
+    wb.worksheets[0]!.eachRow((l) =>
+      l.eachCell((c) => {
+        if (typeof c.value === 'string') textos.push(c.value);
+        if (c.formula) formulas++;
+      }),
+    );
+    expect(textos).toContain('=HYPERLINK("http://mal.exemplo.com")');
+    expect(formulas).toBe(0);
   });
 });
 
@@ -198,5 +209,39 @@ describe('limite de linhas (EXPORTACAO_MAX_LINHAS)', () => {
     const [evento] = await eventosDe('cliente.exportar');
     expect(evento).toMatchObject({ depois: { formato: 'csv', linhas: MAX, truncado: true } });
     expect(((await lerXlsx((await exportar('xlsx', admin).expect(200)).body as Buffer))).length).toBeGreaterThanOrEqual(MAX);
+  });
+});
+
+describe('trilha antes do corpo', () => {
+  it('se a auditoria falhar, nada é enviado (500 sem arquivo) e o evento não existe', async () => {
+    const espiao = vi.spyOn(app.get(AuditoriaService), 'registrar').mockRejectedValueOnce(new Error('trilha fora'));
+    const antes = (await eventosDe('cliente.exportar')).length;
+    const res = await exportar('csv', admin);
+    espiao.mockRestore();
+    expect(res.status).toBe(500);
+    expect(res.headers['content-disposition']).toBeUndefined();
+    expect((res.body as Buffer).toString('utf8')).not.toContain('Nome;');
+    expect((await eventosDe('cliente.exportar')).length).toBe(antes);
+  });
+});
+
+describe('leitura em lotes por chave (criado_em, id)', () => {
+  it('1.200 clientes com o MESMO criado_em: nenhum repetido, nenhum perdido, ordem estável do mais novo ao mais velho', async () => {
+    await dono.query("insert into cliente (nome, criado_em) select 'Lote ' || g, '2030-01-01 00:00:00.123456+00' from generate_series(1, 1200) g");
+    try {
+      const fonte = app.get<unknown>(ClientesService) as { lotesParaExportar(): AsyncIterable<{ nome: string }[]> };
+      const nomes: string[] = [];
+      let lotes = 0;
+      for await (const lote of fonte.lotesParaExportar()) {
+        lotes++;
+        nomes.push(...lote.map((l) => l.nome));
+      }
+      expect(lotes).toBe(Math.ceil((1200 + 5) / 500));
+      expect(nomes).toHaveLength(1200 + 5);
+      expect(new Set(nomes).size).toBe(nomes.length);
+      expect(nomes.slice(0, 1200).every((n) => n.startsWith('Lote '))).toBe(true);
+    } finally {
+      await dono.query("delete from cliente where nome like 'Lote %'");
+    }
   });
 });

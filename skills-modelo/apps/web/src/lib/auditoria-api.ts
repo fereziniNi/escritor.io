@@ -1,5 +1,5 @@
 import { type PaginaAuditoria, esquemaPaginaAuditoria } from 'contratos';
-import { ErroApi, pedir } from '@/lib/api';
+import { pedir } from '@/lib/api';
 
 /** Filtros da tela. `de` e `ate` são dias (AAAA-MM-DD) como o campo de data entrega. */
 export interface FiltrosAuditoria {
@@ -28,25 +28,5 @@ export function listarEventos(filtros: FiltrosAuditoria, cursor?: string): Promi
   return pedir(`/api/admin/auditoria?${p.toString()}`, esquemaPaginaAuditoria);
 }
 
-export interface ArquivoCsv {
-  blob: Blob;
-  nomeArquivo: string;
-  /** A API cortou a exportação no máximo de linhas (10.000). */
-  truncado: boolean;
-}
-
-/** Baixa o CSV com os mesmos filtros (a API também registra a exportação na trilha). */
-export async function baixarCsv(filtros: FiltrosAuditoria): Promise<ArquivoCsv> {
-  let res: Response;
-  try {
-    res = await fetch(`/api/admin/auditoria/csv?${parametros(filtros).toString()}`, { credentials: 'same-origin' });
-  } catch {
-    throw new ErroApi(0, 'API indisponível');
-  }
-  if (!res.ok) {
-    const corpo = (await res.json().catch(() => null)) as { erro?: string } | null;
-    throw new ErroApi(res.status, corpo?.erro ?? `Erro ${res.status}`);
-  }
-  const nome = /filename="([A-Za-z0-9._-]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1];
-  return { blob: await res.blob(), nomeArquivo: nome ?? 'auditoria.csv', truncado: res.headers.get('x-exportacao-truncada') === 'true' };
-}
+/** Os filtros aplicados como parâmetros do `BotaoExportar` (a API exporta com os mesmos filtros da listagem). */
+export const parametrosExportacao = (filtros: FiltrosAuditoria): Record<string, string> => Object.fromEntries(parametros(filtros));

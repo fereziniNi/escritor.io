@@ -1,6 +1,7 @@
 // origem: skills-modelo/apps/api/src/exportacao/csv.ts
+import { Readable } from 'node:stream';
 import { neutralizarFormula, textoCsv } from './formato';
-import { type RelatorioTabular } from './relatorio-tabular';
+import { type Lotes, type MetaRelatorio, type RelatorioTabular } from './relatorio-tabular';
 
 /** BOM UTF-8: sem ele o Excel em português abre o arquivo com os acentos quebrados. */
 export const BOM = '﻿';
@@ -32,18 +33,42 @@ export function montarCsv(cabecalho: readonly string[], linhas: readonly (readon
   return BOM + todas.map((l) => l.map(celulaCsv).join(SEPARADOR) + FIM_DE_LINHA).join('');
 }
 
-/** O relatório em CSV (UTF-8 com BOM, `;`, CRLF): decimais com vírgula, datas dd/mm/aaaa, fórmulas neutralizadas. */
-export function paraCsv(r: RelatorioTabular): Buffer {
-  const celula = (tipo: RelatorioTabular['colunas'][number]['tipo'], valor: unknown): Celula => {
-    const { texto, numerico } = textoCsv(tipo, valor);
-    return numerico ? new CsvLiteral(texto) : texto;
-  };
-  const linhas: Celula[][] = r.linhas.map((l) => r.colunas.map((c) => celula(c.tipo, l[c.chave])));
-  if (r.totais) {
-    const totais = r.totais;
-    const primeira = r.colunas[0];
-    const rotuloNaPrimeira = primeira?.tipo === 'texto' && totais[primeira.chave] === undefined;
-    linhas.push(r.colunas.map((c) => (rotuloNaPrimeira && c === primeira ? 'Total' : celula(c.tipo, totais[c.chave]))));
+type Coluna = RelatorioTabular['colunas'][number];
+
+const celulaTipada = (tipo: Coluna['tipo'], valor: unknown): Celula => {
+  const { texto, numerico } = textoCsv(tipo, valor);
+  return numerico ? new CsvLiteral(texto) : texto;
+};
+
+const linhaCsv = (celulas: readonly Celula[]) => celulas.map(celulaCsv).join(SEPARADOR) + FIM_DE_LINHA;
+
+/** Linhas de dados (texto CSV sem cabeçalho) de um lote. */
+const linhasDoLote = (colunas: Coluna[], lote: Record<string, unknown>[]) => lote.map((l) => linhaCsv(colunas.map((c) => celulaTipada(c.tipo, l[c.chave])))).join('');
+
+function linhaTotais(meta: MetaRelatorio): string {
+  if (!meta.totais) return '';
+  const totais = meta.totais;
+  const primeira = meta.colunas[0];
+  const rotuloNaPrimeira = primeira?.tipo === 'texto' && totais[primeira.chave] === undefined;
+  return linhaCsv(meta.colunas.map((c) => (rotuloNaPrimeira && c === primeira ? 'Total' : celulaTipada(c.tipo, totais[c.chave]))));
+}
+
+const cabecalhoCsv = (meta: MetaRelatorio) => BOM + linhaCsv(meta.colunas.map((c) => c.titulo));
+
+/**
+ * CSV em FLUXO (UTF-8 com BOM, `;`, CRLF): um lote por vez, com a pressão de volta do download (o `Readable.from` só pede o
+ * próximo lote quando o anterior foi consumido). Decimais com vírgula, datas dd/mm/aaaa, fórmulas neutralizadas.
+ */
+export function csvEmFluxo(meta: MetaRelatorio, lotes: Lotes): Readable {
+  async function* gerar() {
+    yield Buffer.from(cabecalhoCsv(meta), 'utf8');
+    for await (const lote of lotes) yield Buffer.from(linhasDoLote(meta.colunas, lote), 'utf8');
+    yield Buffer.from(linhaTotais(meta), 'utf8');
   }
-  return Buffer.from(montarCsv(r.colunas.map((c) => c.titulo), linhas), 'utf8');
+  return Readable.from(gerar(), { objectMode: false });
+}
+
+/** O relatório inteiro (já na memória) em CSV. Para volume grande use `csvEmFluxo`. */
+export function paraCsv(r: RelatorioTabular): Buffer {
+  return Buffer.from(cabecalhoCsv(r) + linhasDoLote(r.colunas, r.linhas) + linhaTotais(r), 'utf8');
 }

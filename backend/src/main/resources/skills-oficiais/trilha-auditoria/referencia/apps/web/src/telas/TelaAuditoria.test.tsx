@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/web/src/telas/TelaAuditoria.test.tsx
+// origem: skills-modelo/estagios/trilha-auditoria/apps/web/src/telas/TelaAuditoria.test.tsx
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';

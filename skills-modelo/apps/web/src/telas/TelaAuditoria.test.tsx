@@ -111,21 +111,25 @@ describe('TelaAuditoria', () => {
     expect(screen.queryByRole('button', { name: 'Carregar mais' })).not.toBeInTheDocument();
   });
 
-  it('exporta CSV com os mesmos filtros e baixa o arquivo', async () => {
+  it('exporta com os mesmos filtros pelo botão Exportar e baixa o arquivo', async () => {
     const criar = vi.fn(() => 'blob:csv');
     vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: criar, revokeObjectURL: vi.fn() }));
     const clicar = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
     const urls = fetchFalso({
-      '/api/admin/auditoria/csv': () => new Response('﻿Id;Ação\r\n1;x\r\n', { status: 200, headers: { 'content-type': 'text/csv; charset=utf-8', 'x-exportacao-truncada': 'false' } }),
+      '/api/admin/auditoria/exportar': () =>
+        new Response('Id;Ação\r\n1;x\r\n', { status: 200, headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="auditoria-20261105.csv"; filename*=UTF-8''auditoria-20261105.csv`, 'x-exportacao-truncada': 'false' } }),
     });
     renderizar();
     await screen.findByRole('table');
     await userEvent.type(screen.getByLabelText('Ação'), 'auth.login');
     await userEvent.click(screen.getByRole('button', { name: 'Filtrar' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Exportar CSV' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Exportar' }));
+    expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Excel (.xlsx)', 'PDF', 'CSV']);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'CSV' }));
     await waitFor(() => expect(clicar).toHaveBeenCalled());
-    const csv = urls.find((u) => u.pathname === '/api/admin/auditoria/csv')!;
-    expect(csv.searchParams.get('acao')).toBe('auth.login');
+    const exportacao = urls.find((u) => u.pathname === '/api/admin/auditoria/exportar')!;
+    expect(exportacao.searchParams.get('acao')).toBe('auth.login');
+    expect(exportacao.searchParams.get('formato')).toBe('csv');
     expect(criar).toHaveBeenCalled();
   });
 
@@ -133,12 +137,13 @@ describe('TelaAuditoria', () => {
     vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:csv'), revokeObjectURL: vi.fn() }));
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
     fetchFalso({
-      '/api/admin/auditoria/csv': () => new Response('﻿Id\r\n', { status: 200, headers: { 'content-type': 'text/csv', 'x-exportacao-truncada': 'true' } }),
+      '/api/admin/auditoria/exportar': () => new Response('Id\r\n', { status: 200, headers: { 'content-type': 'text/csv', 'x-exportacao-truncada': 'true' } }),
     });
     renderizar();
     await screen.findByRole('table');
-    await userEvent.click(screen.getByRole('button', { name: 'Exportar CSV' }));
-    expect(await screen.findByRole('status')).toHaveTextContent('10.000');
+    await userEvent.click(screen.getByRole('button', { name: 'Exportar' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'CSV' }));
+    expect(await screen.findByRole('status')).toHaveTextContent(/cortado/i);
   });
 
   it('mostra a mensagem da API quando a listagem é recusada (403)', async () => {

@@ -375,12 +375,18 @@ describe('GET /api/admin/auditoria', () => {
   });
 });
 
-describe('GET /api/admin/auditoria/csv', () => {
+const binario = (res: NodeJS.EventEmitter, cb: (e: Error | null, corpo: Buffer) => void) => {
+  const partes: Buffer[] = [];
+  res.on('data', (p: Buffer) => partes.push(p));
+  res.on('end', () => cb(null, Buffer.concat(partes)));
+};
+
+describe('GET /api/admin/auditoria/exportar', () => {
   const csv = (consulta: Record<string, string>, como: Linha = admin) =>
-    request(app.getHttpServer()).get('/api/admin/auditoria/csv').query(consulta).set('x-usuario-teste', cab(como));
+    request(app.getHttpServer()).get('/api/admin/auditoria/exportar').query({ formato: 'csv', ...consulta }).set('x-usuario-teste', cab(como));
 
   it('só ADMIN', async () => {
-    await request(app.getHttpServer()).get('/api/admin/auditoria/csv').expect(401);
+    await request(app.getHttpServer()).get('/api/admin/auditoria/exportar?formato=csv').expect(401);
     await csv({}, comum).expect(403);
     await csv({}, gestor).expect(403);
   });
@@ -412,6 +418,15 @@ describe('GET /api/admin/auditoria/csv', () => {
 
   it('filtro inválido → 400', async () => {
     await csv({ atorId: 'x' }).expect(400);
+  });
+
+  it('formato ausente ou desconhecido → 400; xlsx e pdf também saem', async () => {
+    await request(app.getHttpServer()).get('/api/admin/auditoria/exportar').set('x-usuario-teste', cab(admin)).expect(400);
+    await csv({ formato: 'docx' }).expect(400);
+    const xlsx = await csv({ formato: 'xlsx', acao: 'filtro.criar' }).buffer(true).parse((res, cb) => binario(res, cb)).expect(200);
+    expect((xlsx.body as Buffer).subarray(0, 2).toString('latin1')).toBe('PK');
+    const pdf = await csv({ formato: 'pdf', acao: 'filtro.criar' }).buffer(true).parse((res, cb) => binario(res, cb)).expect(200);
+    expect((pdf.body as Buffer).subarray(0, 4).toString('latin1')).toBe('%PDF');
   });
 });
 

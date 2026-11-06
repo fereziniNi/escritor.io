@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/src/auditoria/auditoria.module.ts
+// origem: skills-modelo/estagios/trilha-auditoria/apps/api/src/auditoria/auditoria.module.ts
 import { type MiddlewareConsumer, Global, Module, type NestModule, RequestMethod } from '@nestjs/common';
 import { AuditoriaController } from './auditoria.controller';
 import { AuditoriaService } from './auditoria.service';

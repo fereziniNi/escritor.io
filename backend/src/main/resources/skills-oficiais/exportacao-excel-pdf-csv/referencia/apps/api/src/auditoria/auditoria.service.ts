@@ -1,21 +1,17 @@
 // origem: skills-modelo/apps/api/src/auditoria/auditoria.service.ts
 import { Inject, Injectable } from '@nestjs/common';
 import { type ConsultaAuditoria, type EventoAuditoria, FORMATO_ACAO, type PaginaAuditoria, esquemaPaginaAuditoria } from 'contratos';
-import { and, desc, eq, gte, lt, lte } from 'drizzle-orm';
+import { and, desc, eq, gte, lt, lte, sql } from 'drizzle-orm';
 import { BANCO, type Db } from '../banco/banco';
 import { eventoAuditoria, usuario } from '../banco/esquema';
 import { type Config } from '../config/config';
 import { CONFIG } from '../config/config.module';
-import { paraCsv } from '../exportacao/csv';
-import { contentDisposition } from '../exportacao/content-disposition';
+import { type FonteLinhas } from '../exportacao/exportacao.service';
 import { type RelatorioTabular } from '../exportacao/relatorio-tabular';
 import { exigirPapel, type UsuarioAtual } from '../usuarios/usuario-atual';
 import { contextoDaRequisicao } from './contexto-requisicao';
 import { exigirPapelRuntime } from './papel-runtime';
 import { sanitizarDetalhes } from './sanitizar';
-
-/** Máximo de linhas de uma exportação CSV. Acima disso o arquivo sai cortado e a resposta avisa (cabeçalho). */
-export const LIMITE_EXPORTACAO = 10_000;
 
 export interface NovoEvento {
   /** `grupo.acao` em minúsculas (ex.: `usuario.desativar`). Outro formato é erro de programação e lança. */
@@ -35,8 +31,8 @@ export interface NovoEvento {
 /** Banco ou transação: passe a transação para o evento nascer (e desfazer) junto com a mudança. */
 type Executor = Pick<Db, 'insert'>;
 
-/** Colunas do CSV da trilha: tudo texto (data já formatada em Brasília, antes e depois em JSON). */
-const COLUNAS_CSV: RelatorioTabular['colunas'] = [
+/** Colunas da exportação da trilha (Excel, PDF e CSV): tudo texto (data já formatada em Brasília, antes e depois em JSON). */
+export const COLUNAS_EXPORTACAO: RelatorioTabular['colunas'] = [
   { chave: 'id', titulo: 'Id', tipo: 'texto' },
   { chave: 'dataHora', titulo: 'Data e hora (Brasília)', tipo: 'texto' },
   { chave: 'ator', titulo: 'Ator', tipo: 'texto' },
@@ -49,6 +45,9 @@ const COLUNAS_CSV: RelatorioTabular['colunas'] = [
   { chave: 'ip', titulo: 'IP', tipo: 'texto' },
   { chave: 'requestId', titulo: 'Request-id', tipo: 'texto' },
 ];
+
+/** Eventos por consulta na exportação em lotes. */
+const TAMANHO_LOTE = 500;
 
 const partes = new Intl.DateTimeFormat('pt-BR', {
   timeZone: 'America/Sao_Paulo',
@@ -111,21 +110,34 @@ export class AuditoriaService {
   }
 
   /**
-   * CSV (BOM UTF-8, separador `;`) com os mesmos filtros, até LIMITE_EXPORTACAO linhas. A exportação em si vira um evento
-   * `auditoria.exportar` com os filtros e a quantidade de linhas.
+   * Fonte de linhas para a exportação da trilha (skill exportacao-excel-pdf-csv): os mesmos filtros da listagem (cursor e
+   * limite não valem: exporta tudo que bate, até EXPORTACAO_MAX_LINHAS), em lotes por chave (`id` decrescente, o cursor da
+   * própria listagem). Só ADMIN. Quem grava o evento `auditoria.exportar` é o `ExportacaoService`, antes de enviar.
    */
-  async exportarCsv(ator: UsuarioAtual | undefined, consulta: ConsultaAuditoria): Promise<{ csv: Buffer; truncado: boolean; contentDisposition: string }> {
+  fonteExportacao(ator: UsuarioAtual | undefined, consulta: ConsultaAuditoria): { filtros: Record<string, string>; fonte: FonteLinhas } {
     exigirPapel(ator, 'ADMIN');
-    // Cursor e limite da consulta não valem aqui: a exportação pega tudo que bate com os filtros, até LIMITE_EXPORTACAO.
     const filtros = { de: consulta.de, ate: consulta.ate, atorId: consulta.atorId, acao: consulta.acao };
-    const linhas = await this.buscar(filtros, LIMITE_EXPORTACAO + 1);
-    const truncado = linhas.length > LIMITE_EXPORTACAO;
-    const itens = truncado ? linhas.slice(0, LIMITE_EXPORTACAO) : linhas;
-    // O mesmo `paraCsv` das demais exportações (skill exportacao-excel-pdf-csv): BOM, `;`, CRLF e fórmula neutralizada.
-    const csv = paraCsv({
-      titulo: 'Auditoria',
-      colunas: COLUNAS_CSV,
-      linhas: itens.map((e) => {
+    const aplicados = Object.fromEntries(Object.entries(filtros).filter((par): par is [string, string] => par[1] !== undefined));
+    return {
+      filtros: aplicados,
+      fonte: {
+        contar: async (max) => {
+          const r = await this.db.execute<{ n: number }>(
+            sql`select count(*)::int as n from (select 1 from ${eventoAuditoria} where ${this.condicoes(filtros)} limit ${max}) t`,
+          );
+          return r.rows[0]?.n ?? 0;
+        },
+        lotes: () => this.lotesParaExportar(filtros),
+      },
+    };
+  }
+
+  private async *lotesParaExportar(filtros: Pick<ConsultaAuditoria, 'de' | 'ate' | 'atorId' | 'acao'>): AsyncGenerator<Record<string, unknown>[]> {
+    let cursor: string | undefined;
+    for (;;) {
+      const eventos = await this.buscar(filtros, TAMANHO_LOTE, cursor);
+      if (eventos.length === 0) return;
+      yield eventos.map((e) => {
         const d = emBrasilia(new Date(e.ocorridoEm));
         return {
           id: e.id,
@@ -140,15 +152,20 @@ export class AuditoriaService {
           ip: e.ip,
           requestId: e.requestId,
         };
-      }),
-    });
-    await this.registrar({
-      acao: 'auditoria.exportar',
-      atorId: ator.id,
-      depois: { filtros: Object.fromEntries(Object.entries(filtros).filter(([, v]) => v !== undefined)), linhas: itens.length, truncado },
-    });
-    const h = emBrasilia(new Date());
-    return { csv, truncado, contentDisposition: contentDisposition(`auditoria-${h['year']}${h['month']}${h['day']}.csv`) };
+      });
+      if (eventos.length < TAMANHO_LOTE) return;
+      cursor = eventos[eventos.length - 1]!.id;
+    }
+  }
+
+  private condicoes(filtros: Pick<ConsultaAuditoria, 'de' | 'ate' | 'atorId' | 'acao'>, cursor?: string) {
+    return and(
+      filtros.de ? gte(eventoAuditoria.ocorridoEm, new Date(filtros.de)) : undefined,
+      filtros.ate ? lte(eventoAuditoria.ocorridoEm, new Date(filtros.ate)) : undefined,
+      filtros.atorId ? eq(eventoAuditoria.atorId, filtros.atorId) : undefined,
+      filtros.acao ? eq(eventoAuditoria.acao, filtros.acao) : undefined,
+      cursor ? lt(eventoAuditoria.id, Number(cursor)) : undefined,
+    );
   }
 
   private async buscar(filtros: Pick<ConsultaAuditoria, 'de' | 'ate' | 'atorId' | 'acao'>, quantidade: number, cursor?: string): Promise<EventoAuditoria[]> {
@@ -168,15 +185,7 @@ export class AuditoriaService {
       })
       .from(eventoAuditoria)
       .leftJoin(usuario, eq(usuario.id, eventoAuditoria.atorId))
-      .where(
-        and(
-          filtros.de ? gte(eventoAuditoria.ocorridoEm, new Date(filtros.de)) : undefined,
-          filtros.ate ? lte(eventoAuditoria.ocorridoEm, new Date(filtros.ate)) : undefined,
-          filtros.atorId ? eq(eventoAuditoria.atorId, filtros.atorId) : undefined,
-          filtros.acao ? eq(eventoAuditoria.acao, filtros.acao) : undefined,
-          cursor ? lt(eventoAuditoria.id, Number(cursor)) : undefined,
-        ),
-      )
+      .where(this.condicoes(filtros, cursor))
       .orderBy(desc(eventoAuditoria.id))
       .limit(quantidade);
     return linhas.map((l) => ({ ...l, id: String(l.id), ocorridoEm: l.ocorridoEm.toISOString() }));

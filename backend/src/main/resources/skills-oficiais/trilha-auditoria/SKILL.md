@@ -65,7 +65,10 @@ abaixo é fixo**; mudar um deles é decisão registrada no `CLAUDE.md`.
     separador **`;`**, linhas terminadas em CRLF, cabeçalho em português, data em horário de Brasília. Texto que começa com
     `= + - @` tab ou CR ganha apóstrofo (planilha não executa fórmula). No máximo **10.000** linhas; acima disso o cabeçalho
     `X-Exportacao-Truncada: true` avisa e a tela mostra o aviso. Quem exporta fica registrado (`auditoria.exportar`, com os
-    filtros e a quantidade de linhas).
+    filtros e a quantidade de linhas). Quando a skill `exportacao-excel-pdf-csv` for aplicada (depois desta), ela SUBSTITUI esta
+    exportação: a rota vira `GET /api/admin/auditoria/exportar?formato=xlsx|pdf|csv` (mesmos filtros, limite `EXPORTACAO_MAX_LINHAS`, fluxo
+    em lotes, evento `auditoria.exportar` gravado antes do corpo), o `csv.ts` daqui passa a viver em `exportacao/` e a tela usa o
+    `BotaoExportar`. Nada disto muda enquanto ela não for aplicada.
 11. **Tela** `TelaAuditoria` (`/admin/auditoria`, menu Admin "Auditoria"): filtros De, Até, Ator (lista de usuários), Ação (com
     sugestões) e botões Filtrar/Limpar; tabela com data e hora de Brasília, ator, ação, alvo, IP e "Detalhes" (antes, depois,
     request-id); "Carregar mais"; botão **Exportar CSV** (usa os filtros aplicados). Somente leitura: sem botão de editar ou apagar.

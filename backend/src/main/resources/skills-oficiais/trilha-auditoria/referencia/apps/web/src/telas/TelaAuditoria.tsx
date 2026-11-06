@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/web/src/telas/TelaAuditoria.tsx
+// origem: skills-modelo/estagios/trilha-auditoria/apps/web/src/telas/TelaAuditoria.tsx
 import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 import { ACOES_CONHECIDAS, type EventoAuditoria } from 'contratos';
 import { type FormEvent, useState } from 'react';

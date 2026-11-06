@@ -1,12 +1,13 @@
-import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { ACOES_CONHECIDAS, type EventoAuditoria } from 'contratos';
 import { type FormEvent, useState } from 'react';
+import { BotaoExportar } from '@/componentes/BotaoExportar';
 import { CabecalhoPagina } from '@/componentes/CabecalhoPagina';
 import { Campo, classeCampo } from '@/componentes/Campo';
 import { Cartao } from '@/componentes/Cartao';
 import { Carregando, ErroCarregar, EstadoVazio } from '@/componentes/estados';
 import { Button } from '@/componentes/ui/button';
-import { baixarCsv, type FiltrosAuditoria, listarEventos } from '@/lib/auditoria-api';
+import { type FiltrosAuditoria, listarEventos, parametrosExportacao } from '@/lib/auditoria-api';
 import { listarUsuarios } from '@/lib/usuarios-api';
 
 const dataHoraBrasilia = new Intl.DateTimeFormat('pt-BR', {
@@ -62,7 +63,7 @@ function Detalhes({ e }: { e: EventoAuditoria }) {
 
 /**
  * Trilha de auditoria (só ADMIN; a API recusa os outros com 403). Somente leitura: filtra por período, ator e ação,
- * pagina e exporta CSV. Não existe editar nem apagar evento.
+ * pagina e exporta (Excel, PDF ou CSV, pelo BotaoExportar). Não existe editar nem apagar evento.
  */
 export function TelaAuditoria() {
   const [de, setDe] = useState('');
@@ -70,7 +71,6 @@ export function TelaAuditoria() {
   const [atorId, setAtorId] = useState('');
   const [acao, setAcao] = useState('');
   const [aplicados, setAplicados] = useState<FiltrosAuditoria>({});
-  const [aviso, setAviso] = useState<string | null>(null);
 
   const usuarios = useQuery({ queryKey: ['usuarios'], queryFn: listarUsuarios });
   const lista = useInfiniteQuery({
@@ -79,22 +79,8 @@ export function TelaAuditoria() {
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (ultima) => ultima.proximoCursor ?? undefined,
   });
-  const exportar = useMutation({
-    mutationFn: () => baixarCsv(aplicados),
-    onSuccess: ({ blob, nomeArquivo, truncado }) => {
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = nomeArquivo;
-      link.click();
-      URL.revokeObjectURL(url);
-      setAviso(truncado ? 'A exportação foi cortada em 10.000 linhas. Restrinja o período ou os filtros para ver o resto.' : `Arquivo ${nomeArquivo} gerado.`);
-    },
-  });
-
   function filtrar(e: FormEvent) {
     e.preventDefault();
-    setAviso(null);
     setAplicados({ de, ate, atorId, acao });
   }
 
@@ -103,12 +89,10 @@ export function TelaAuditoria() {
     setAte('');
     setAtorId('');
     setAcao('');
-    setAviso(null);
     setAplicados({});
   }
 
   const eventos = lista.data?.pages.flatMap((p) => p.itens) ?? [];
-  const erro = exportar.error;
 
   return (
     <div>
@@ -116,9 +100,7 @@ export function TelaAuditoria() {
         titulo="Auditoria"
         descricao="Quem fez o quê e quando. Os registros não podem ser alterados nem apagados."
         acoes={
-          <Button type="button" variant="outline" disabled={exportar.isPending} onClick={() => exportar.mutate()}>
-            Exportar CSV
-          </Button>
+          <BotaoExportar url="/api/admin/auditoria/exportar" parametros={parametrosExportacao(aplicados)} />
         }
       />
 
@@ -157,17 +139,6 @@ export function TelaAuditoria() {
           </Button>
         </form>
       </Cartao>
-
-      {aviso && (
-        <p role="status" className="mb-3 rounded-md bg-sucesso-suave px-3 py-2 text-13 text-sucesso">
-          {aviso}
-        </p>
-      )}
-      {erro && (
-        <p role="alert" className="mb-3 rounded-md bg-perigo-suave px-3 py-2 text-13 text-perigo">
-          {erro.message}
-        </p>
-      )}
 
       <Cartao className="overflow-hidden p-0">
         {lista.isPending ? (

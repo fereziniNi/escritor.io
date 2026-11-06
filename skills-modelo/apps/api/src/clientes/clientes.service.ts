@@ -1,10 +1,10 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { BANCO, type Db } from '../banco/banco';
 import { cliente } from '../banco/esquema';
 import { type ArquivoExportado, ExportacaoService, type FormatoExportacao } from '../exportacao/exportacao.service';
-import { type RelatorioTabular } from '../exportacao/relatorio-tabular';
+
 import { CHAVES_LGPD, type ChavesLgpd } from '../lgpd/chaves';
 import { normalizarCpf } from '../lgpd/cpf';
 import { exigirPapel, type UsuarioAtual } from '../usuarios/usuario-atual';
@@ -30,6 +30,9 @@ export interface DadosCliente {
 type Linha = typeof cliente.$inferSelect;
 /** Banco ou transação. */
 type Executor = Pick<Db, 'update' | 'insert'>;
+
+/** Linhas por consulta na exportação em lotes. */
+const TAMANHO_LOTE = 500;
 
 /** Nome que fica no lugar do nome do titular anonimizado. */
 export const NOME_ANONIMIZADO = 'Titular anonimizado';
@@ -119,14 +122,16 @@ export class ClientesService {
   /**
    * Lista de clientes em Excel, PDF ou CSV (skill exportacao-excel-pdf-csv). Os campos `cpf` e `email` seguem a mesma
    * máscara da API: USUARIO recebe `***.456.789-**` e `a***@dominio`, GESTOR e ADMIN o completo (o `ExportacaoService`
-   * aplica `mascararResposta` antes de gerar o arquivo). Registra `cliente.exportar` na trilha; no máximo
-   * EXPORTACAO_MAX_LINHAS clientes (os mais novos), com `X-Exportacao-Truncada` quando passou.
+   * aplica `mascararResposta` lote a lote antes de gerar o arquivo). Registra `cliente.exportar` na trilha ANTES de enviar;
+   * no máximo EXPORTACAO_MAX_LINHAS clientes (os mais novos), com `X-Exportacao-Truncada` quando passou. Excel e CSV saem em
+   * fluxo, lidos do banco em lotes (`lotesParaExportar`), sem carregar a tabela inteira.
    */
   async exportar(ator: UsuarioAtual, formato: FormatoExportacao): Promise<ArquivoExportado> {
     exigirPapel(ator, 'ADMIN', 'GESTOR', 'USUARIO');
-    // Uma linha além do máximo: o ExportacaoService vê que passou e avisa o corte.
-    const linhas = await this.db.select().from(cliente).orderBy(desc(cliente.criadoEm)).limit(this.exportacao.maxLinhas + 1);
-    const relatorio: RelatorioTabular = {
+    return this.exportacao.exportar(ator, {
+      recurso: 'cliente',
+      formato,
+      nomeBase: 'clientes',
       titulo: 'Clientes',
       colunas: [
         { chave: 'nome', titulo: 'Nome', tipo: 'texto' },
@@ -135,13 +140,40 @@ export class ClientesService {
         { chave: 'criadoEm', titulo: 'Cliente desde', tipo: 'data' },
         { chave: 'situacao', titulo: 'Situação', tipo: 'texto' },
       ],
-      linhas: linhas.map((l) => {
-        const c = this.publico(l);
+      fonte: {
+        contar: async (max) => {
+          const r = await this.db.execute<{ n: number }>(sql`select count(*)::int as n from (select 1 from ${cliente} limit ${max}) t`);
+          return r.rows[0]?.n ?? 0;
+        },
+        lotes: () => this.lotesParaExportar(),
+      },
+    });
+  }
+
+  /**
+   * Os clientes do mais novo para o mais velho, em lotes, paginando por CHAVE (`criado_em`, `id`) e não por OFFSET: cada
+   * lote é uma consulta barata mesmo no fim de 100.000 linhas, e inserções durante a exportação não repetem nem pulam linha.
+   * O `criado_em` volta como texto para a chave manter a precisão de microssegundos do Postgres (um Date de JS perde).
+   */
+  private async *lotesParaExportar(): AsyncGenerator<Record<string, unknown>[]> {
+    let chave: { quando: string; id: string } | undefined;
+    for (;;) {
+      const linhas = await this.db
+        .select({ linha: cliente, quando: sql<string>`${cliente.criadoEm}::text` })
+        .from(cliente)
+        .where(chave ? sql`(${cliente.criadoEm}, ${cliente.id}) < (${chave.quando}::timestamptz, ${chave.id}::uuid)` : undefined)
+        .orderBy(desc(cliente.criadoEm), desc(cliente.id))
+        .limit(TAMANHO_LOTE);
+      if (linhas.length === 0) return;
+      yield linhas.map(({ linha }) => {
+        const c = this.publico(linha);
         const situacao = c.anonimizadoEm ? 'Anonimizado' : c.encerradoEm ? 'Encerrado' : 'Ativo';
         return { nome: c.nome, email: c.email, cpf: c.cpf, criadoEm: c.criadoEm, situacao };
-      }),
-    };
-    return this.exportacao.exportar(ator, { recurso: 'cliente', formato, relatorio, nomeBase: 'clientes' });
+      });
+      const ultima = linhas[linhas.length - 1]!;
+      chave = { quando: ultima.quando, id: ultima.linha.id };
+      if (linhas.length < TAMANHO_LOTE) return;
+    }
   }
 
   async obter(ator: UsuarioAtual, id: string): Promise<ClientePublico> {

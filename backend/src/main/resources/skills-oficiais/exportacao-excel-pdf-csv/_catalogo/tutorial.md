@@ -33,7 +33,7 @@ PDF) e o sistema avisa na tela.
 
 | Nome | Obrigatória | Exemplo | Para que serve |
 |---|---|---|---|
-| `EXPORTACAO_MAX_LINHAS` | não (padrão 10000) | `10000` | máximo de linhas de um arquivo Excel ou CSV (o PDF corta em 2000). Vai de 1 a 100000: o arquivo é montado na memória do servidor |
+| `EXPORTACAO_MAX_LINHAS` | não (padrão 10000) | `10000` | máximo de linhas de um arquivo Excel ou CSV (o PDF corta em 2000). Vai de 1 a 100000. Excel e CSV são gravados aos poucos (não pesam na memória do servidor); o PDF é montado na memória, por isso corta em 2000 |
 | `EXPORTACAO_LOGO` | não | `/app/logo.png` | caminho de um logo **PNG ou JPEG** (até 512 KB) que aparece no topo do PDF. Se o arquivo não existir ou não for PNG/JPEG, a API não sobe |
 | `NOME_SISTEMA` | não (padrão `Sistema`; já existe) | `Sistema Exemplo` | nome que aparece no topo do Excel e do PDF |
 
@@ -67,8 +67,10 @@ Pacotes novos na API: `exceljs`, `pdfkit` e `@fontsource/inter` (a fonte do PDF,
   salvo por outro programa sem o BOM. Baixe de novo pelo botão e abra com duplo clique.
 - **O CSV abre tudo numa coluna só**: o Excel do computador usa vírgula como separador de lista. Troque em Configurações do
   Windows → Região → formato de lista, ou importe pelo menu Dados escolhendo `;`.
-- **Uma célula do Excel começa com um apóstrofo (`'=...`)**: é de propósito. O texto começava com `=`, `+`, `-` ou `@` e foi
-  protegido para não virar fórmula.
+- **Uma célula do CSV começa com um apóstrofo (`'=...`)**: é de propósito. O texto começava com `=`, `+`, `-` ou `@` e foi
+  protegido para o Excel não executá-lo como fórmula. No arquivo **Excel (.xlsx)** o texto aparece como está, sem apóstrofo.
+- **O download do Excel ou CSV de uma lista enorme parou no meio**: o servidor perdeu a conexão com o banco durante a gravação. O arquivo
+  incompleto não é entregue como bom (o navegador mostra falha); tente de novo.
 - **A API não sobe e o erro cita `EXPORTACAO_LOGO`**: o arquivo não existe naquele caminho (no servidor ele precisa estar dentro da
   imagem ou montado como volume) ou não é PNG/JPEG. SVG não é aceito.
 - **`formato` inválido (erro 400)**: use `xlsx`, `pdf` ou `csv`, em minúsculas.

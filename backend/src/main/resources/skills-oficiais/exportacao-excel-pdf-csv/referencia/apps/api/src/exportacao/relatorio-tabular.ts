@@ -25,6 +25,12 @@ export interface RelatorioTabular {
   totais?: Record<string, unknown>;
 }
 
+/** Título, colunas e totais: tudo do relatório menos as linhas (no modo em fluxo elas chegam em lotes). */
+export type MetaRelatorio = Pick<RelatorioTabular, 'titulo' | 'colunas' | 'totais'>;
+
+/** Linhas em lotes (ex.: de uma consulta paginada por chave). Excel e CSV consomem um lote por vez, sem juntar tudo na memória. */
+export type Lotes = AsyncIterable<Record<string, unknown>[]>;
+
 /** Identidade que aparece nos arquivos. `logo`: PNG ou JPEG (só o PDF desenha). */
 export interface IdentidadeExportacao {
   nomeSistema: string;

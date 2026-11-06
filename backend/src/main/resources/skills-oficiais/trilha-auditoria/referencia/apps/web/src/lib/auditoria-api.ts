@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/web/src/lib/auditoria-api.ts
+// origem: skills-modelo/estagios/trilha-auditoria/apps/web/src/lib/auditoria-api.ts
 import { type PaginaAuditoria, esquemaPaginaAuditoria } from 'contratos';
 import { ErroApi, pedir } from '@/lib/api';
 

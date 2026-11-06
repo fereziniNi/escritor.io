@@ -1,4 +1,5 @@
 import { type MiddlewareConsumer, Global, Module, type NestModule, RequestMethod } from '@nestjs/common';
+import { ExportacaoModule } from '../exportacao/exportacao.module';
 import { AuditoriaController } from './auditoria.controller';
 import { AuditoriaService } from './auditoria.service';
 import { ContextoRequisicaoMiddleware } from './contexto-requisicao';
@@ -11,6 +12,7 @@ import { RegistroEventosAuditoria } from './registro-eventos-auditoria';
  */
 @Global()
 @Module({
+  imports: [ExportacaoModule],
   controllers: [AuditoriaController],
   providers: [AuditoriaService, RegistroEventosAuditoria],
   exports: [AuditoriaService, RegistroEventosAuditoria],

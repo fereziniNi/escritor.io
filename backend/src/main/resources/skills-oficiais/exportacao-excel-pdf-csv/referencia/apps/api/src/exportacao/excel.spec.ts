@@ -71,11 +71,12 @@ describe('paraExcel', () => {
     expect(c.font?.color?.argb).toBe('FFFFFFFF');
   });
 
-  it('texto que parece fórmula fica como texto (apóstrofo na frente) e não vira fórmula', async () => {
+  it('texto que parece fórmula fica como texto literal, sem apóstrofo, e não é fórmula', async () => {
     const { aba, cabecalho } = await ler();
     const c = aba.getRow(cabecalho + 2).getCell(1);
-    expect(c.value).toBe("'=1+1");
+    expect(c.value).toBe('=1+1');
     expect(c.type).toBe(ExcelJS.ValueType.String);
+    expect(c.formula).toBeUndefined();
   });
 
   it('linha de totais depois dos dados e nome do sistema no topo', async () => {
