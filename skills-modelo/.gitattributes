@@ -1,0 +1,3 @@
+# Scripts de shell precisam de fim de linha LF mesmo no Windows (com CRLF o bash falha: "carriage return" no fim de cada comando).
+*.sh text eol=lf
+VERSION text eol=lf

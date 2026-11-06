@@ -1,0 +1,72 @@
+# Release padrão Multiplica (skill versionamento-release). Dispara quando a tag vX.Y.Z sobe (o scripts/release.sh a cria e envia):
+# confere que a tag é a versão do VERSION e que o commit está na branch principal, publica ghcr.io/<org>/<app>:X.Y.Z
+# (com APP_VERSAO e APP_COMMIT embutidos) e cria a Release do GitHub com as notas do CHANGELOG.md.
+# Não repete lint/testes: a tag só sai de um commit da branch principal, que já passou no ci.yml. Se você publica a imagem
+# pelo release.sh na sua máquina, este workflow é redundante: o docker push dele já fez o mesmo (a tag da imagem é idempotente).
+# Actions fixadas pelo SHA do commit (o comentário diz a versão); o Dependabot (github-actions) atualiza.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write # criar a Release
+  packages: write # publicar a imagem no ghcr.io
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  imagem:
+    name: imagem · release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Tag, VERSION e branch principal batem
+        run: |
+          versao="${GITHUB_REF_NAME#v}"
+          if [ "$versao" != "$(tr -d '[:space:]' < VERSION)" ]; then
+            echo "A tag $GITHUB_REF_NAME não é a versão do arquivo VERSION ($(cat VERSION)). Use scripts/release.sh." >&2
+            exit 1
+          fi
+          git fetch origin main master 2>/dev/null || true
+          if ! { git merge-base --is-ancestor "$GITHUB_SHA" origin/main 2>/dev/null || git merge-base --is-ancestor "$GITHUB_SHA" origin/master 2>/dev/null; }; then
+            echo "O commit da tag não está na branch principal." >&2
+            exit 1
+          fi
+          grep -q "^## \[$versao\] - " CHANGELOG.md || { echo "CHANGELOG.md sem a seção da versão $versao." >&2; exit 1; }
+          echo "VERSAO=$versao" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ghcr.io exige o nome em minúsculas.
+      - name: Nome da imagem
+        run: echo "IMAGEM=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      # Só a tag da versão (nunca latest): é ela que permite voltar para a versão anterior.
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGEM }}:${{ env.VERSAO }}
+          build-args: |
+            APP_VERSAO=${{ env.VERSAO }}
+            APP_COMMIT=${{ github.sha }}
+
+      - name: Release do GitHub com as notas do CHANGELOG
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          awk -v v="$VERSAO" '$0 ~ "^## \\[" v "\\]" {f=1; next} /^## \[/ {f=0} f' CHANGELOG.md > notas.md
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notas.md --verify-tag

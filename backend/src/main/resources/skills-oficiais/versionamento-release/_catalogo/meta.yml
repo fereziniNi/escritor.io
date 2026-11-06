@@ -1,0 +1,3 @@
+nome: Versionamento e release
+descricao: Versão única em VERSION, CHANGELOG em português, script que corta a versão (tag, commit, imagem) e workflow de release, com a versão visível no /api/health e no rodapé da sidebar.
+categoria: INFRA
