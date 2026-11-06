@@ -1,0 +1,338 @@
+# Instalação no servidor do cliente (skill instalacao-docker-compose). Na pasta deploy/ do servidor:
+#   sh gerar-segredos.sh              # uma vez: cria segredos/ com senhas e chaves aleatórias
+#   cp .env.example .env              # e preencha (DOMINIO, APP_IMAGEM, APP_VERSAO, SMTP...)
+#   docker compose up -d              # lê o .env desta pasta
+# Serviços: caddy (único com porta publicada: 80/443, HTTPS) -> app (API + SPA) ; worker (fila) ; migracao (roda e termina a
+# cada subida) ; banco (Postgres, sem porta publicada). Profiles opcionais: mailpit (homologação), antivirus, langfuse.
+# A MESMA imagem roda migracao, app e worker (muda só ROLE). Imagem sempre por versão: ${APP_IMAGEM}:${APP_VERSAO}, nunca latest.
+
+name: ${PROJETO:-sistema}
+
+# Comum a migracao, app e worker. As variáveis da API vêm do .env; segredos vêm de arquivos (segredos/, montados em
+# /run/secrets) e NUNCA do .env. NODE_ENV=production sempre (a imagem também define), inclusive em homologação.
+x-aplicacao: &aplicacao
+  image: "${APP_IMAGEM:?defina APP_IMAGEM no .env, ex. registro.exemplo.com.br/sistema}:${APP_VERSAO:?defina APP_VERSAO no .env, ex. 1.4.0 (nunca latest)}"
+  env_file: .env
+  restart: unless-stopped
+  networks: [interna]
+
+x-ambiente: &ambiente
+  NODE_ENV: production
+  # Só o Caddy alcança a API (nenhuma porta publicada): 1 proxy confiável, e o reverse_proxy do Caddy reescreve o X-Forwarded-For.
+  PROXIES_CONFIAVEIS: "1"
+  # Papel de runtime (app_runtime): é por ele que app e worker conectam. Sem UPDATE/DELETE na trilha de auditoria.
+  DATABASE_URL_RUNTIME_ARQUIVO: /run/secrets/database_url_runtime
+  AUTH_SEGREDO_CODIGO_ARQUIVO: /run/secrets/auth_segredo_codigo
+  DADOS_CHAVES_ARQUIVO: /run/secrets/dados_chaves
+  DADOS_CHAVE_INDICE_ARQUIVO: /run/secrets/dados_chave_indice
+  ARMAZENAMENTO_SEGREDO_URL_ARQUIVO: /run/secrets/segredo_url
+  # Arquivo vazio = sem senha (relay interno, Mailpit). Com SMTP_USUARIO no .env, ponha a senha neste arquivo.
+  SMTP_SENHA_ARQUIVO: /run/secrets/smtp_senha
+
+x-segredos: &segredos [database_url_runtime, auth_segredo_codigo, dados_chaves, dados_chave_indice, segredo_url, smtp_senha]
+
+services:
+  caddy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    ports:
+      - "${PORTA_HTTP:-80}:80"
+      - "${PORTA_HTTPS:-443}:443"
+      - "${PORTA_HTTPS:-443}:443/udp"
+    environment:
+      DOMINIO: "${DOMINIO:?defina DOMINIO no .env, ex. sistema.exemplo.com.br (o DNS tem de apontar para este servidor)}"
+      CADDY_TLS: "${CADDY_TLS:?defina CADDY_TLS no .env, e-mail da TI (certificado publico automatico) ou internal (rede interna)}"
+      UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-10}
+    # O corpo aceito pelo Caddy é UPLOAD_MAX_MB + 2 MB (margem do multipart): a API decide o 413 do arquivo grande.
+    command: ["sh", "-c", "export CORPO_MAX_MB=$$((UPLOAD_MAX_MB + 2)) && exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/seguranca.caddy:/etc/caddy/seguranca.caddy:ro
+      - caddy_dados:/data
+      - caddy_config:/config
+    depends_on:
+      app: { condition: service_healthy }
+    networks: [interna]
+
+  # Uma vez por subida, antes da app: migrações do banco, senha do app_runtime e schema da fila. Com o DONO do banco.
+  migracao:
+    <<: *aplicacao
+    restart: "no"
+    environment:
+      <<: *ambiente
+      ROLE: migrar
+      DATABASE_URL_ARQUIVO: /run/secrets/database_url
+    secrets: [database_url, database_url_runtime, auth_segredo_codigo, dados_chaves, dados_chave_indice, segredo_url, smtp_senha]
+    depends_on:
+      banco: { condition: service_healthy }
+
+  app:
+    <<: *aplicacao
+    # Sem "ports:": só o Caddy alcança a API (PROXIES_CONFIAVEIS=1 depende disso).
+    environment:
+      <<: *ambiente
+      ROLE: api
+      # O schema exige DATABASE_URL; app e worker NÃO recebem a senha do dono (só a migracao). Conectam por DATABASE_URL_RUNTIME.
+      DATABASE_URL: postgres://app@banco:5432/app
+    secrets: *segredos
+    volumes:
+      - arquivos:/dados/arquivos
+    stop_grace_period: 45s
+    depends_on:
+      migracao: { condition: service_completed_successfully }
+      banco: { condition: service_healthy }
+
+  worker:
+    <<: *aplicacao
+    environment:
+      <<: *ambiente
+      ROLE: worker
+      DATABASE_URL: postgres://app@banco:5432/app
+    secrets: *segredos
+    volumes:
+      - arquivos:/dados/arquivos
+    # Maior que FILA_ENCERRAR_TIMEOUT_S (30): o SIGTERM espera as tarefas em andamento terminarem.
+    stop_grace_period: 45s
+    depends_on:
+      migracao: { condition: service_completed_successfully }
+      banco: { condition: service_healthy }
+
+  banco:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD_FILE: /run/secrets/banco_senha
+    secrets: [banco_senha]
+    # Sem "ports:": o banco só é alcançado pela rede interna do compose. Acesso da TI: docker compose exec banco psql -U app -d app
+    volumes:
+      - banco_dados:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [interna]
+
+  # Homologação: caixa de entrada falsa. No .env: SMTP_HOST=mailpit, SMTP_PORT=1025. Painel só nesta máquina: http://127.0.0.1:8025
+  # (de fora: túnel SSH). Nunca em produção.
+  mailpit:
+    image: axllent/mailpit:v1.31.6
+    profiles: ["mailpit"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PORTA_MAILPIT:-8025}:8025"
+    networks: [interna]
+
+  # Antivírus (skill upload-armazenamento). No .env: ANTIVIRUS_HABILITADO=true, CLAMAV_HOST=clamav. 1 a 3 minutos para ficar pronto.
+  clamav:
+    image: clamav/clamav:1.4.6
+    profiles: ["antivirus"]
+    restart: unless-stopped
+    environment:
+      CLAMD_CONF_StreamMaxLength: 600M
+    volumes:
+      - clamav:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "clamdcheck.sh"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 60s
+    networks: [interna]
+
+  # ---- Langfuse self-host (skill ia-langfuse), profile langfuse. Variáveis LANGFUSE_* no .env (ver .env.example). ----
+  # O Compose cobra "${VAR:?}" mesmo de serviço com profile desligado; por isso aqui os segredos usam ":-" e este serviço
+  # recusa a subida do profile quando falta algum.
+  langfuse-conferir:
+    image: busybox:1.37.0
+    profiles: ["langfuse"]
+    environment:
+      LANGFUSE_NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-}
+      LANGFUSE_SALT: ${LANGFUSE_SALT:-}
+      LANGFUSE_ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-}
+      LANGFUSE_DB_PASSWORD: ${LANGFUSE_DB_PASSWORD:-}
+      LANGFUSE_CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-}
+      LANGFUSE_REDIS_PASSWORD: ${LANGFUSE_REDIS_PASSWORD:-}
+      LANGFUSE_MINIO_PASSWORD: ${LANGFUSE_MINIO_PASSWORD:-}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-}
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-}
+      LANGFUSE_URL_PUBLICA: ${LANGFUSE_URL_PUBLICA:-}
+    command:
+      - sh
+      - -c
+      - |
+        falta=0
+        for v in LANGFUSE_NEXTAUTH_SECRET LANGFUSE_SALT LANGFUSE_ENCRYPTION_KEY LANGFUSE_DB_PASSWORD LANGFUSE_CLICKHOUSE_PASSWORD LANGFUSE_REDIS_PASSWORD LANGFUSE_MINIO_PASSWORD LANGFUSE_INIT_USER_EMAIL LANGFUSE_INIT_USER_PASSWORD LANGFUSE_URL_PUBLICA; do
+          eval "x=\$$$$v"; [ -n "$$x" ] || { echo "defina $$v no .env"; falta=1; }
+        done
+        exit $$falta
+
+  langfuse-web:
+    image: langfuse/langfuse:3.227.0
+    profiles: ["langfuse"]
+    depends_on: &langfuse-depende
+      langfuse-conferir: { condition: service_completed_successfully }
+      langfuse-db: { condition: service_healthy }
+      langfuse-clickhouse: { condition: service_healthy }
+      langfuse-redis: { condition: service_healthy }
+      langfuse-minio: { condition: service_started }
+    # 127.0.0.1: só esta máquina alcança o painel. Para a equipe, um bloco do Caddy num subdomínio próprio (ver o tutorial).
+    ports:
+      - "127.0.0.1:3100:3000"
+    environment:
+      <<: &langfuse-env
+        DATABASE_URL: postgresql://langfuse:${LANGFUSE_DB_PASSWORD:-}@langfuse-db:5432/langfuse
+        SALT: ${LANGFUSE_SALT:-}
+        ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-}
+        TELEMETRY_ENABLED: "false"
+        CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+        CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+        CLICKHOUSE_USER: clickhouse
+        CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-}
+        CLICKHOUSE_CLUSTER_ENABLED: "false"
+        REDIS_HOST: langfuse-redis
+        REDIS_PORT: "6379"
+        REDIS_AUTH: ${LANGFUSE_REDIS_PASSWORD:-}
+        LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+        LANGFUSE_S3_EVENT_UPLOAD_REGION: us-east-1
+        LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+        LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-}
+        LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+        LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+        LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+        LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+        LANGFUSE_S3_MEDIA_UPLOAD_REGION: us-east-1
+        LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
+        LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-}
+        LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+        LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+        LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+      NEXTAUTH_URL: ${LANGFUSE_URL_PUBLICA:-}
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-}
+      # Sem cadastro aberto: o primeiro usuário vem de LANGFUSE_INIT_*; os demais, convidados no painel.
+      AUTH_DISABLE_SIGNUP: "true"
+      LANGFUSE_INIT_ORG_ID: multiplica
+      LANGFUSE_INIT_ORG_NAME: Multiplica
+      LANGFUSE_INIT_PROJECT_ID: sistema
+      LANGFUSE_INIT_PROJECT_NAME: Sistema
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-}
+      LANGFUSE_INIT_USER_NAME: Administrador
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-}
+    restart: unless-stopped
+    networks: [interna]
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3.227.0
+    profiles: ["langfuse"]
+    depends_on: *langfuse-depende
+    environment: *langfuse-env
+    restart: unless-stopped
+    networks: [interna]
+
+  # Banco próprio do Langfuse (nunca o do sistema).
+  langfuse-db:
+    image: postgres:16-alpine
+    profiles: ["langfuse"]
+    depends_on:
+      langfuse-conferir: { condition: service_completed_successfully }
+    environment:
+      POSTGRES_DB: langfuse
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: ${LANGFUSE_DB_PASSWORD:-}
+    volumes:
+      - langfuse_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse -d langfuse"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks: [interna]
+
+  langfuse-clickhouse:
+    image: clickhouse/clickhouse-server:25.8-alpine
+    profiles: ["langfuse"]
+    depends_on:
+      langfuse-conferir: { condition: service_completed_successfully }
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-}
+    volumes:
+      - langfuse_clickhouse_data:/var/lib/clickhouse
+      - langfuse_clickhouse_logs:/var/log/clickhouse-server
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:8123/ping || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks: [interna]
+
+  langfuse-redis:
+    image: redis:7.4.2-alpine
+    profiles: ["langfuse"]
+    depends_on:
+      langfuse-conferir: { condition: service_completed_successfully }
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PW\" --maxmemory-policy noeviction"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PW\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    environment:
+      REDIS_PW: ${LANGFUSE_REDIS_PASSWORD:-}
+    restart: unless-stopped
+    networks: [interna]
+
+  langfuse-minio-preparo:
+    image: busybox:1.37.0
+    profiles: ["langfuse"]
+    command: ["sh", "-c", "mkdir -p /data/langfuse && chown -R 65532:65532 /data"]
+    volumes:
+      - langfuse_minio_data:/data
+
+  langfuse-minio:
+    image: cgr.dev/chainguard/minio@sha256:ae73835075ee168f1745cc28d4cf5bbd6a5973e5609b2b2593280aaa495ea113
+    profiles: ["langfuse"]
+    depends_on:
+      langfuse-conferir: { condition: service_completed_successfully }
+      langfuse-minio-preparo: { condition: service_completed_successfully }
+    command: ["server", "/data", "--address", ":9000", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: ${LANGFUSE_MINIO_PASSWORD:-}
+    volumes:
+      - langfuse_minio_data:/data
+    restart: unless-stopped
+    networks: [interna]
+
+# Gerados por gerar-segredos.sh. A pasta segredos/ é 700 (só o root do servidor entra); os arquivos são legíveis para que
+# os processos sem privilégio dos contêineres os leiam em /run/secrets.
+secrets:
+  banco_senha: { file: ./segredos/banco_senha }
+  database_url: { file: ./segredos/database_url }
+  database_url_runtime: { file: ./segredos/database_url_runtime }
+  auth_segredo_codigo: { file: ./segredos/auth_segredo_codigo }
+  dados_chaves: { file: ./segredos/dados_chaves }
+  dados_chave_indice: { file: ./segredos/dados_chave_indice }
+  segredo_url: { file: ./segredos/segredo_url }
+  smtp_senha: { file: ./segredos/smtp_senha }
+
+networks:
+  interna:
+
+# Entram no backup: banco_dados (backup.sh, pg_dump) e arquivos (backup.sh, tar). caddy_dados guarda os certificados.
+volumes:
+  banco_dados:
+  arquivos:
+  caddy_dados:
+  caddy_config:
+  clamav:
+  langfuse_db:
+  langfuse_clickhouse_data:
+  langfuse_clickhouse_logs:
+  langfuse_minio_data:

@@ -3,6 +3,7 @@ import { carregarArquivoEnv } from './config/arquivo-env';
 import { type Config, ErroConfiguracao, carregarConfig } from './config/config';
 import { criarApp } from './criar-app';
 import { migrarBanco } from './banco/migrar';
+import { definirSenhaRuntime } from './banco/senha-runtime';
 import { type PapelProcesso, resolverPapel, servePortaHttp } from './fila/papel';
 import { prepararFila } from './fila/preparar-fila';
 
@@ -34,8 +35,10 @@ async function iniciar(): Promise<void> {
   const config = lerConfig();
   const papel = lerPapel(config);
   if (papel === 'migrar') {
-    // Serviço "migracao" do compose: migrações do banco e schema da fila, os dois com o DONO (DATABASE_URL); termina ao acabar.
+    // Serviço "migracao" do compose: migrações do banco, senha do papel de runtime e schema da fila, tudo com o DONO
+    // (DATABASE_URL); termina ao acabar. A senha vem de DATABASE_URL_RUNTIME (instalacao-docker-compose).
     await migrarBanco(config.DATABASE_URL.revelar());
+    if (config.DATABASE_URL_RUNTIME) await definirSenhaRuntime(config.DATABASE_URL.revelar(), config.DATABASE_URL_RUNTIME.revelar());
     await prepararFila(config.DATABASE_URL.revelar(), { conceder: true });
     process.stdout.write(`${JSON.stringify({ level: 'info', time: Date.now(), msg: 'migrações e fila preparadas' })}\n`);
     return;

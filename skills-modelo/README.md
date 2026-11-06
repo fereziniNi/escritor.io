@@ -9,7 +9,7 @@ testes e funciona junto. Não faz parte do build do escritor.io (que usa Maven e
 | `apps/api` | NestJS 11 + Drizzle + PostgreSQL 16, config validada com zod, logs pino com request-id, `/api/health` |
 | `apps/web` | React 19 + Vite + Tailwind 4 + shadcn/ui + TanStack Query + react-router |
 | `packages/contratos` | esquemas zod e tipos usados pela API e pela web |
-| `deploy/` | arquivos de instalação no cliente (Docker Compose; `deploy/caddy/seguranca.caddy` com cabeçalhos e CSP) |
+| `Dockerfile`, `deploy/` | instalação no cliente (skill `instalacao-docker-compose`): imagem única, `deploy/docker-compose.yml` com Caddy, backup/restore e o guia da TI `deploy/INSTALACAO.md` |
 | `.github/` | CI e Dependabot de referência para os repositórios dos sistemas novos (não é a CI do escritor.io) |
 | `estagios/` | versões anteriores de arquivos que uma skill posterior alterou, para a `referencia/` da skill anterior |
 | `scripts/verificar-referencias.mjs` | confere que cada `referencia/` das skills é cópia fiel deste projeto |

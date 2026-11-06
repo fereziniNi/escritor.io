@@ -2,9 +2,9 @@
 #
 #   docker compose -f docker-compose.yml -f deploy/langfuse.compose.yml --env-file langfuse.env --profile langfuse up -d
 #
-# Este arquivo é um complemento (nenhum serviço do sistema depende dele). Quando existir o compose de instalação
-# (deploy/docker-compose.yml, skill instalacao-docker-compose), os serviços e volumes abaixo são copiados para lá, com
-# `profiles: ["langfuse"]`, e este arquivo deixa de ser usado.
+# Este arquivo é o complemento de DESENVOLVIMENTO (nenhum serviço do sistema depende dele). No servidor do cliente os mesmos
+# serviços e volumes estão no compose de instalação (deploy/docker-compose.yml, skill instalacao-docker-compose, profile
+# langfuse, variáveis no deploy/.env): lá este arquivo não é usado.
 #
 # Variáveis (arquivo langfuse.env; SEM valor padrão para segredo: gere cada um com `openssl rand -hex 32`):
 #   LANGFUSE_NEXTAUTH_SECRET, LANGFUSE_SALT, LANGFUSE_ENCRYPTION_KEY (64 hex), LANGFUSE_DB_PASSWORD, LANGFUSE_CLICKHOUSE_PASSWORD,
