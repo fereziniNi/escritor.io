@@ -5,10 +5,12 @@ import { BANCO, type Db } from '../banco/banco';
 import { eventoAuditoria, usuario } from '../banco/esquema';
 import { type Config } from '../config/config';
 import { CONFIG } from '../config/config.module';
+import { paraCsv } from '../exportacao/csv';
+import { contentDisposition } from '../exportacao/content-disposition';
+import { type RelatorioTabular } from '../exportacao/relatorio-tabular';
 import { exigirPapel, type UsuarioAtual } from '../usuarios/usuario-atual';
 import { contextoDaRequisicao } from './contexto-requisicao';
 import { exigirPapelRuntime } from './papel-runtime';
-import { montarCsv } from './csv';
 import { sanitizarDetalhes } from './sanitizar';
 
 /** Máximo de linhas de uma exportação CSV. Acima disso o arquivo sai cortado e a resposta avisa (cabeçalho). */
@@ -32,7 +34,20 @@ export interface NovoEvento {
 /** Banco ou transação: passe a transação para o evento nascer (e desfazer) junto com a mudança. */
 type Executor = Pick<Db, 'insert'>;
 
-const CABECALHO_CSV = ['Id', 'Data e hora (Brasília)', 'Ator', 'Ator (id)', 'Ação', 'Alvo (tipo)', 'Alvo (id)', 'Antes', 'Depois', 'IP', 'Request-id'];
+/** Colunas do CSV da trilha: tudo texto (data já formatada em Brasília, antes e depois em JSON). */
+const COLUNAS_CSV: RelatorioTabular['colunas'] = [
+  { chave: 'id', titulo: 'Id', tipo: 'texto' },
+  { chave: 'dataHora', titulo: 'Data e hora (Brasília)', tipo: 'texto' },
+  { chave: 'ator', titulo: 'Ator', tipo: 'texto' },
+  { chave: 'atorId', titulo: 'Ator (id)', tipo: 'texto' },
+  { chave: 'acao', titulo: 'Ação', tipo: 'texto' },
+  { chave: 'alvoTipo', titulo: 'Alvo (tipo)', tipo: 'texto' },
+  { chave: 'alvoId', titulo: 'Alvo (id)', tipo: 'texto' },
+  { chave: 'antes', titulo: 'Antes', tipo: 'texto' },
+  { chave: 'depois', titulo: 'Depois', tipo: 'texto' },
+  { chave: 'ip', titulo: 'IP', tipo: 'texto' },
+  { chave: 'requestId', titulo: 'Request-id', tipo: 'texto' },
+];
 
 const partes = new Intl.DateTimeFormat('pt-BR', {
   timeZone: 'America/Sao_Paulo',
@@ -98,39 +113,41 @@ export class AuditoriaService {
    * CSV (BOM UTF-8, separador `;`) com os mesmos filtros, até LIMITE_EXPORTACAO linhas. A exportação em si vira um evento
    * `auditoria.exportar` com os filtros e a quantidade de linhas.
    */
-  async exportarCsv(ator: UsuarioAtual | undefined, consulta: ConsultaAuditoria): Promise<{ csv: string; truncado: boolean; nomeArquivo: string }> {
+  async exportarCsv(ator: UsuarioAtual | undefined, consulta: ConsultaAuditoria): Promise<{ csv: Buffer; truncado: boolean; contentDisposition: string }> {
     exigirPapel(ator, 'ADMIN');
     // Cursor e limite da consulta não valem aqui: a exportação pega tudo que bate com os filtros, até LIMITE_EXPORTACAO.
     const filtros = { de: consulta.de, ate: consulta.ate, atorId: consulta.atorId, acao: consulta.acao };
     const linhas = await this.buscar(filtros, LIMITE_EXPORTACAO + 1);
     const truncado = linhas.length > LIMITE_EXPORTACAO;
     const itens = truncado ? linhas.slice(0, LIMITE_EXPORTACAO) : linhas;
-    const csv = montarCsv(
-      CABECALHO_CSV,
-      itens.map((e) => {
+    // O mesmo `paraCsv` das demais exportações (skill exportacao-excel-pdf-csv): BOM, `;`, CRLF e fórmula neutralizada.
+    const csv = paraCsv({
+      titulo: 'Auditoria',
+      colunas: COLUNAS_CSV,
+      linhas: itens.map((e) => {
         const d = emBrasilia(new Date(e.ocorridoEm));
-        return [
-          e.id,
-          `${d['day']}/${d['month']}/${d['year']} ${d['hour']}:${d['minute']}:${d['second']}`,
-          e.atorEmail,
-          e.atorId,
-          e.acao,
-          e.alvoTipo,
-          e.alvoId,
-          e.antes === null || e.antes === undefined ? null : JSON.stringify(e.antes),
-          e.depois === null || e.depois === undefined ? null : JSON.stringify(e.depois),
-          e.ip,
-          e.requestId,
-        ];
+        return {
+          id: e.id,
+          dataHora: `${d['day']}/${d['month']}/${d['year']} ${d['hour']}:${d['minute']}:${d['second']}`,
+          ator: e.atorEmail,
+          atorId: e.atorId,
+          acao: e.acao,
+          alvoTipo: e.alvoTipo,
+          alvoId: e.alvoId,
+          antes: e.antes === null || e.antes === undefined ? null : JSON.stringify(e.antes),
+          depois: e.depois === null || e.depois === undefined ? null : JSON.stringify(e.depois),
+          ip: e.ip,
+          requestId: e.requestId,
+        };
       }),
-    );
+    });
     await this.registrar({
       acao: 'auditoria.exportar',
       atorId: ator.id,
       depois: { filtros: Object.fromEntries(Object.entries(filtros).filter(([, v]) => v !== undefined)), linhas: itens.length, truncado },
     });
     const h = emBrasilia(new Date());
-    return { csv, truncado, nomeArquivo: `auditoria-${h['year']}${h['month']}${h['day']}.csv` };
+    return { csv, truncado, contentDisposition: contentDisposition(`auditoria-${h['year']}${h['month']}${h['day']}.csv`) };
   }
 
   private async buscar(filtros: Pick<ConsultaAuditoria, 'de' | 'ate' | 'atorId' | 'acao'>, quantidade: number, cursor?: string): Promise<EventoAuditoria[]> {

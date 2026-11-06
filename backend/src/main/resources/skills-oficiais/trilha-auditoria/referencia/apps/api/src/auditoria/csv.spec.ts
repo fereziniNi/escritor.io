@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/src/auditoria/csv.spec.ts
+// origem: skills-modelo/estagios/trilha-auditoria/apps/api/src/auditoria/csv.spec.ts
 import { describe, expect, it } from 'vitest';
 import { BOM, celulaCsv, montarCsv } from './csv';
 

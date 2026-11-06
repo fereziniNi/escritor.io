@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/src/auditoria/csv.ts
+// origem: skills-modelo/estagios/trilha-auditoria/apps/api/src/auditoria/csv.ts
 /** BOM UTF-8: sem ele o Excel em português abre o arquivo com os acentos quebrados. */
 export const BOM = '﻿';
 const SEPARADOR = ';';

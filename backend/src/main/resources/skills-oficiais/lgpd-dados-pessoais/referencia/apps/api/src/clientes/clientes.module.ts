@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/src/clientes/clientes.module.ts
+// origem: skills-modelo/estagios/lgpd-dados-pessoais/apps/api/src/clientes/clientes.module.ts
 import { Module } from '@nestjs/common';
 import { ClientesController } from './clientes.controller';
 import { ClientesService } from './clientes.service';

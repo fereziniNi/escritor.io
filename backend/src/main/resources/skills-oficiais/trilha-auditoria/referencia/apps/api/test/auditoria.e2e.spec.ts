@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/test/auditoria.e2e.spec.ts
+// origem: skills-modelo/estagios/trilha-auditoria/apps/api/test/auditoria.e2e.spec.ts
 import { randomUUID } from 'node:crypto';
 import { type INestApplication } from '@nestjs/common';
 import { desc, sql } from 'drizzle-orm';

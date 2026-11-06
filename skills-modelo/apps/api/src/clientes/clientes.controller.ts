@@ -1,5 +1,7 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { Body, Controller, Get, Header, HttpCode, Param, ParseUUIDPipe, Post, Query, Res, type StreamableFile } from '@nestjs/common';
+import { type Response } from 'express';
 import { z } from 'zod';
+import { enviarArquivo, esquemaExportar } from '../exportacao/exportacao.service';
 import { cpfValido } from '../lgpd/cpf';
 import { Papeis } from '../usuarios/papeis.guard';
 import { type UsuarioAtual, UsuarioLogado } from '../usuarios/usuario-atual';
@@ -46,6 +48,17 @@ export class ClientesController {
   @Papeis('ADMIN', 'GESTOR')
   buscarPorCpf(@UsuarioLogado() eu: UsuarioAtual, @Body() corpo: unknown): Promise<ClientePublico> {
     return this.clientes.buscarPorCpf(eu, validarOu400(esquemaBusca, corpo).cpf);
+  }
+
+  /**
+   * Exporta a lista (`?formato=xlsx|pdf|csv`). Declarada ANTES de `:id` (senão `exportar` seria lido como id). A máscara
+   * segue o papel de quem pede, igual à lista JSON; fica na trilha como `cliente.exportar`.
+   */
+  @Get('exportar')
+  @Papeis('ADMIN', 'GESTOR', 'USUARIO')
+  @Header('Cache-Control', 'no-store')
+  async exportar(@UsuarioLogado() eu: UsuarioAtual, @Query() consulta: unknown, @Res({ passthrough: true }) res: Response): Promise<StreamableFile> {
+    return enviarArquivo(res, await this.clientes.exportar(eu, validarOu400(esquemaExportar, consulta).formato));
   }
 
   @Get(':id')

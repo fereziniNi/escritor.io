@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/src/auditoria/auditoria.controller.ts
+// origem: skills-modelo/estagios/trilha-auditoria/apps/api/src/auditoria/auditoria.controller.ts
 import { Controller, Get, Header, Query, Res } from '@nestjs/common';
 import { type PaginaAuditoria, esquemaConsultaAuditoria } from 'contratos';
 import { type Response } from 'express';

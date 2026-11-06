@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/src/clientes/clientes.service.ts
+// origem: skills-modelo/estagios/lgpd-dados-pessoais/apps/api/src/clientes/clientes.service.ts
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { desc, eq } from 'drizzle-orm';
 import { AuditoriaService } from '../auditoria/auditoria.service';

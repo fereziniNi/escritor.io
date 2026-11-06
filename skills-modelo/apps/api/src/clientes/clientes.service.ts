@@ -3,6 +3,8 @@ import { desc, eq } from 'drizzle-orm';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { BANCO, type Db } from '../banco/banco';
 import { cliente } from '../banco/esquema';
+import { type ArquivoExportado, ExportacaoService, type FormatoExportacao } from '../exportacao/exportacao.service';
+import { type RelatorioTabular } from '../exportacao/relatorio-tabular';
 import { CHAVES_LGPD, type ChavesLgpd } from '../lgpd/chaves';
 import { normalizarCpf } from '../lgpd/cpf';
 import { exigirPapel, type UsuarioAtual } from '../usuarios/usuario-atual';
@@ -69,6 +71,7 @@ export class ClientesService {
     @Inject(BANCO) private readonly db: Db,
     @Inject(CHAVES_LGPD) private readonly chaves: ChavesLgpd,
     private readonly auditoria: AuditoriaService,
+    private readonly exportacao: ExportacaoService,
   ) {}
 
   private publico(l: Linha): ClientePublico {
@@ -111,6 +114,34 @@ export class ClientesService {
     exigirPapel(ator, 'ADMIN', 'GESTOR', 'USUARIO');
     const linhas = await this.db.select().from(cliente).orderBy(desc(cliente.criadoEm)).limit(200);
     return linhas.map((l) => this.publico(l));
+  }
+
+  /**
+   * Lista de clientes em Excel, PDF ou CSV (skill exportacao-excel-pdf-csv). Os campos `cpf` e `email` seguem a mesma
+   * máscara da API: USUARIO recebe `***.456.789-**` e `a***@dominio`, GESTOR e ADMIN o completo (o `ExportacaoService`
+   * aplica `mascararResposta` antes de gerar o arquivo). Registra `cliente.exportar` na trilha; no máximo
+   * EXPORTACAO_MAX_LINHAS clientes (os mais novos), com `X-Exportacao-Truncada` quando passou.
+   */
+  async exportar(ator: UsuarioAtual, formato: FormatoExportacao): Promise<ArquivoExportado> {
+    exigirPapel(ator, 'ADMIN', 'GESTOR', 'USUARIO');
+    // Uma linha além do máximo: o ExportacaoService vê que passou e avisa o corte.
+    const linhas = await this.db.select().from(cliente).orderBy(desc(cliente.criadoEm)).limit(this.exportacao.maxLinhas + 1);
+    const relatorio: RelatorioTabular = {
+      titulo: 'Clientes',
+      colunas: [
+        { chave: 'nome', titulo: 'Nome', tipo: 'texto' },
+        { chave: 'email', titulo: 'E-mail', tipo: 'texto' },
+        { chave: 'cpf', titulo: 'CPF', tipo: 'texto' },
+        { chave: 'criadoEm', titulo: 'Cliente desde', tipo: 'data' },
+        { chave: 'situacao', titulo: 'Situação', tipo: 'texto' },
+      ],
+      linhas: linhas.map((l) => {
+        const c = this.publico(l);
+        const situacao = c.anonimizadoEm ? 'Anonimizado' : c.encerradoEm ? 'Encerrado' : 'Ativo';
+        return { nome: c.nome, email: c.email, cpf: c.cpf, criadoEm: c.criadoEm, situacao };
+      }),
+    };
+    return this.exportacao.exportar(ator, { recurso: 'cliente', formato, relatorio, nomeBase: 'clientes' });
   }
 
   async obter(ator: UsuarioAtual, id: string): Promise<ClientePublico> {

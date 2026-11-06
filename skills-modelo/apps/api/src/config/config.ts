@@ -131,6 +131,14 @@ const esquemaBase = z.object({
     .optional(),
   RETENCAO_DIAS: z.coerce.number().int().min(1).max(36_500).optional(),
   RETENCAO_AUDITORIA_IP_DIAS: z.coerce.number().int().min(1).max(36_500).optional(),
+  /**
+   * Exportação (src/exportacao/). EXPORTACAO_MAX_LINHAS: máximo de linhas de um arquivo Excel/CSV (o PDF corta em 2.000);
+   * acima disso o arquivo sai cortado e o cabeçalho X-Exportacao-Truncada: true avisa. Os arquivos são montados em memória,
+   * por isso o teto (100.000). EXPORTACAO_LOGO: caminho de um PNG ou JPEG (até 512 KB) que o PDF desenha no topo; arquivo
+   * ilegível = a API não sobe. Vazia: só o nome do sistema (NOME_SISTEMA).
+   */
+  EXPORTACAO_MAX_LINHAS: z.coerce.number().int().min(1).max(100_000).default(10_000),
+  EXPORTACAO_LOGO: z.string().min(1).optional(),
 });
 
 /** Mensagem de um erro de validação de chave (nunca contém o valor da chave). */

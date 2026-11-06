@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/src/auditoria/auditoria.service.ts
+// origem: skills-modelo/estagios/trilha-auditoria/apps/api/src/auditoria/auditoria.service.ts
 import { Inject, Injectable } from '@nestjs/common';
 import { type ConsultaAuditoria, type EventoAuditoria, FORMATO_ACAO, type PaginaAuditoria, esquemaPaginaAuditoria } from 'contratos';
 import { and, desc, eq, gte, lt, lte } from 'drizzle-orm';

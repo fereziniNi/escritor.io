@@ -388,7 +388,7 @@ describe('GET /api/admin/auditoria/csv', () => {
   it('CSV com BOM UTF-8, separador ponto e vírgula, cabeçalho em português e as linhas do filtro', async () => {
     const res = await csv({ acao: 'filtro.criar' }).expect(200);
     expect(res.headers['content-type']).toMatch(/^text\/csv; charset=utf-8/);
-    expect(res.headers['content-disposition']).toMatch(/^attachment; filename="auditoria-\d{8}\.csv"$/);
+    expect(res.headers['content-disposition']).toMatch(/^attachment; filename="auditoria-\d{8}\.csv"; filename\*=UTF-8''auditoria-\d{8}\.csv$/);
     expect(res.text.charCodeAt(0)).toBe(0xfeff);
     const linhas = res.text.slice(1).split('\r\n').filter(Boolean);
     expect(linhas[0]).toBe('Id;Data e hora (Brasília);Ator;Ator (id);Ação;Alvo (tipo);Alvo (id);Antes;Depois;IP;Request-id');

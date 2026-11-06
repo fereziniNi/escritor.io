@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/src/clientes/clientes.controller.ts
+// origem: skills-modelo/estagios/lgpd-dados-pessoais/apps/api/src/clientes/clientes.controller.ts
 import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { z } from 'zod';
 import { cpfValido } from '../lgpd/cpf';
