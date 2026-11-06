@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/src/email/enviar-com-retry.ts
+// origem: skills-modelo/estagios/email-transacional/apps/api/src/email/enviar-com-retry.ts
 import { type EnviadorEmail, ErroEmailPermanente, type MensagemEmail } from './enviador-email';
 
 export interface OpcoesRetry {

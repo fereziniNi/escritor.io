@@ -11,6 +11,7 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/banco/executar-migracoes.ts",
+    "fila:migrar": "tsx src/fila/executar-migracao-fila.ts",
     "lgpd:retencao": "tsx src/lgpd/executar-lgpd.ts retencao",
     "lgpd:recifrar": "tsx src/lgpd/executar-lgpd.ts recifrar"
   },
@@ -32,6 +33,7 @@
     "nodemailer": "10.3.1",
     "pdfkit": "0.20.2",
     "pg": "8.23.1",
+    "pg-boss": "11.1.2",
     "pino": "10.4.0",
     "pino-http": "11.0.0",
     "reflect-metadata": "0.2.2",

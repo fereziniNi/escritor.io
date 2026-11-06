@@ -184,6 +184,17 @@ const esquemaBase = z.object({
     .transform((v) => v === 'true'),
   CLAMAV_HOST: z.string().min(1).default('clamav'),
   CLAMAV_PORTA: z.coerce.number().int().min(1).max(65535).default(3310),
+  /**
+   * Fila de tarefas (src/fila/). ROLE: o que este processo faz (a MESMA imagem roda os quatro): api = escuta a porta e só
+   * enfileira; worker = só consome a fila e roda as rotinas agendadas; tudo = os dois (desenvolvimento); migrar = cria/atualiza
+   * o schema `fila` com o DONO do banco e termina. Vazio só vale como `tudo` com NODE_ENV=development/test declarado; em
+   * produção a API não sobe sem ROLE (fila/papel.ts). ALERTA_EMAIL: um endereço que recebe o aviso de falha definitiva de
+   * tarefa (nome, id e tentativas; nunca os dados da tarefa). FILA_ENCERRAR_TIMEOUT_S: quanto o SIGTERM espera as tarefas em
+   * andamento terminarem antes de sair (o `stop_grace_period` do compose precisa ser maior).
+   */
+  ROLE: z.enum(['api', 'worker', 'tudo', 'migrar'], { error: 'deve ser api, worker, tudo ou migrar' }).optional(),
+  ALERTA_EMAIL: z.string().trim().toLowerCase().pipe(z.email().max(254)).optional(),
+  FILA_ENCERRAR_TIMEOUT_S: z.coerce.number().int().min(1).max(600).default(30),
 });
 
 /** Mensagem de um erro de validação de chave (nunca contém o valor da chave). */

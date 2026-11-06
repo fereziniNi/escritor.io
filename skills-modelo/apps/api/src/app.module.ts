@@ -9,6 +9,7 @@ import { ClientesModule } from './clientes/clientes.module';
 import { type Config } from './config/config';
 import { ConfigModule } from './config/config.module';
 import { EmailModule } from './email/email.module';
+import { FilaModule } from './fila/fila.module';
 import { FiltroErros } from './http/filtro-erros';
 import { LgpdModule } from './lgpd/lgpd.module';
 import { LogModule } from './log/log.module';
@@ -30,6 +31,7 @@ export class AppModule {
       // SegurancaModule logo depois do LogModule: limite e checagem de origem já com request-id e log.
       // AuthModule depois do SegurancaModule: a sessão só é consultada no banco depois do limite e da origem.
       // ArmazenamentoModule (upload): depois do AuthModule, usa a sessão, a auditoria e o limite por usuário.
+      // FilaModule (global): tarefas em segundo plano; depois do EmailModule (o alerta de falha envia e-mail) e do BancoModule.
       // LgpdModule (global): chaves da criptografia de campo e máscara de CPF/e-mail por papel em toda resposta.
       imports: [
         ConfigModule.registrar(config),
@@ -39,6 +41,7 @@ export class AppModule {
         AuditoriaModule,
         LgpdModule,
         EmailModule,
+        FilaModule,
         UsuariosModule,
         AuthModule,
         ClientesModule,

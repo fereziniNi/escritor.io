@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/src/main.ts
+// origem: skills-modelo/estagios/novo-projeto-multiplica/apps/api/src/main.ts
 import 'reflect-metadata';
 import { carregarArquivoEnv } from './config/arquivo-env';
 import { type Config, ErroConfiguracao, carregarConfig } from './config/config';

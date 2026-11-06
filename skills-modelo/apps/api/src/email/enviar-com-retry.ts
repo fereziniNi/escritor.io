@@ -18,8 +18,8 @@ const dormirDeVerdade = (ms: number) =>
 /**
  * Envia com até 3 tentativas e espera crescente. O tempo total é limitado (prazos do SMTP somados às esperas), mas ainda
  * assim é lento para uma requisição HTTP: no meio de uma requisição use `ServicoEmail.disparar`. ErroEmailPermanente
- * (endereço inválido, SMTP recusou com 5xx) não repete. Quando a skill `fila-de-tarefas` é aplicada, este retry sai e
- * quem repete é a fila.
+ * (endereço inválido, SMTP recusou com 5xx) não repete. Com a skill `fila-de-tarefas`, o `disparar` usa a fila (5 tentativas) e
+ * este retry curto fica só para `ServicoEmail.enviar` (rotinas e o alerta de falha).
  */
 export async function enviarComRetry(enviador: EnviadorEmail, m: MensagemEmail, opcoes: OpcoesRetry = {}): Promise<void> {
   const { tentativas = 3, esperaInicialMs = 500, dormir = dormirDeVerdade } = opcoes;

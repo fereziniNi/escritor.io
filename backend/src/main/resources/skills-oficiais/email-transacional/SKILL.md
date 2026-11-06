@@ -44,11 +44,9 @@ Comitê (`MailService`) e Conta Gráfica.
 9. **Nunca segure uma requisição HTTP no SMTP**: dentro de rota/handler use `ServicoEmail.disparar(m)` (devolve na hora,
    envia em segundo plano com o retry, só loga a falha mascarada, **nunca lança**). `ServicoEmail.enviar(m)` espera o
    resultado e lança se esgotar: use em rotinas e scripts. Resposta ao usuário nunca depende do SMTP (e não revela se o
-   e-mail existe: skill `seguranca`, regra 10). **Limite**: enquanto a skill `fila-de-tarefas` não for aplicada, o e-mail
-   de um `disparar` ainda em andamento se perde se o processo for encerrado (deploy, reinício); para e-mail que não pode
-   se perder, use `enviar` numa rotina que registre o resultado.
-10. **Quando a skill `fila-de-tarefas` for aplicada**, o envio passa pela fila (a fila repete com backoff e alerta em
-    falha definitiva) e o retry de `enviar-com-retry.ts` deixa de ser usado; a tarefa de fila atualiza esta skill. Até lá, vale o que está aqui.
+   e-mail existe: skill `seguranca`, regra 10). **Limite** (só sem a skill `fila-de-tarefas`): o e-mail de um `disparar` ainda em andamento se perde se o processo for encerrado (deploy, reinício); para e-mail que não pode
+   se perder, use `enviar` numa rotina que registre o resultado, ou aplique a skill `fila-de-tarefas` (regra 10), que resolve isso.
+10. **Quando a skill `fila-de-tarefas` for aplicada**, o `disparar` grava o e-mail na fila (tarefa `email-enviar`: 5 tentativas, espera de 5 s que dobra, alerta em falha definitiva, `chave` opcional contra envio duplicado) e o limite da regra 9 deixa de existir: a mensagem sobrevive a reinício e deploy. `ErroEmailPermanente` não repete. `ServicoEmail.enviar` continua direto (retry de `enviar-com-retry.ts`, 3 tentativas), para rotinas e para o alerta. A skill de fila substitui `servico-email.ts`; até lá, vale o que está aqui.
 11. **Mailpit no compose de dev** (`docker-compose.yml`, serviço `mailpit`): imagem `axllent/mailpit:v1.31.6` (versão
     fixa, nunca `latest`), portas só em `127.0.0.1`: SMTP `1025`, interface web `8025`. O `.env.example` de dev já aponta
     para ele (`MAIL_MODE=smtp`, `SMTP_HOST=localhost`, `SMTP_PORT=1025`). Nunca exponha o Mailpit em servidor.

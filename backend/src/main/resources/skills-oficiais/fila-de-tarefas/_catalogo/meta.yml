@@ -1,0 +1,3 @@
+nome: Fila de tarefas em segundo plano
+descricao: Fila no mesmo Postgres (pg-boss) com tentativas e espera crescente, rotinas agendadas, chave de idempotência, processo worker pelo ROLE, alerta por e-mail quando uma tarefa falha de vez e desligamento sem perder tarefa em andamento.
+categoria: INFRA

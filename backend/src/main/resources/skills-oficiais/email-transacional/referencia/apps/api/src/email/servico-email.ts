@@ -1,4 +1,4 @@
-// origem: skills-modelo/apps/api/src/email/servico-email.ts
+// origem: skills-modelo/estagios/email-transacional/apps/api/src/email/servico-email.ts
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ENVIADOR_EMAIL, type EnviadorEmail, type MensagemEmail } from './enviador-email';
 import { enviarComRetry } from './enviar-com-retry';

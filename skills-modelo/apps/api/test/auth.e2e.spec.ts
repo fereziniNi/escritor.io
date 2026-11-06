@@ -13,6 +13,7 @@ import { carregarConfig } from '../src/config/config';
 import { criarApp } from '../src/criar-app';
 import { EmailModule } from '../src/email/email.module';
 import { ServicoEmail } from '../src/email/servico-email';
+import { prepararFila } from '../src/fila/preparar-fila';
 import { subirPostgres } from './postgres';
 
 const PAINEL = 'https://painel.exemplo.com.br';
@@ -22,6 +23,8 @@ const TEMPO_MINIMO_MS = 600;
 /** Configuração de produção (cookie __Host-sessao + Secure). SMTP aponta para lugar nenhum: os testes espiam o envio. */
 const PRODUCAO: Record<string, string> = {
   NODE_ENV: 'production',
+  // Produção exige ROLE (skill fila-de-tarefas). api só enfileira: não consome nem precisa de ALERTA_EMAIL.
+  ROLE: 'api',
   MAIL_MODE: 'smtp',
   SMTP_HOST: '127.0.0.1',
   SMTP_PORT: '1',
@@ -105,6 +108,8 @@ const eu = (api: Api, cookie: string) => request(api.app.getHttpServer()).get('/
 
 beforeAll(async () => {
   ({ url: urlBanco, urlRuntime, parar } = await subirPostgres());
+  // Em produção o schema da fila vem do passo de migração (o runtime não faz DDL): aqui, o mesmo passo, com o dono.
+  await prepararFila(urlBanco, { conceder: true });
 });
 
 afterAll(async () => {
