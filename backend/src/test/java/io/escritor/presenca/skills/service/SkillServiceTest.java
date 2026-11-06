@@ -103,6 +103,17 @@ class SkillServiceTest {
         return skill;
     }
 
+    private Skill skillComVigenteDoSistema() {
+        Skill skill = new Skill(SLUG, null, AGORA);
+        skill.marcarOficial(true);
+        SkillVersao v1 = new SkillVersao(skill, 1, EstadoVersao.PUBLICADA, "Segurança", "d", CategoriaSkill.SEGURANCA,
+                "p", "t", "Importação inicial do repositório", null, AGORA,
+                List.of(new ArquivoSkill("SKILL.md", SKILL_MD)));
+        skill.definirVigente(v1);
+        lenient().when(skillRepository.findComLockBySlug(SLUG)).thenReturn(Optional.of(skill));
+        return skill;
+    }
+
     private SkillVersao proposta(Skill skill, Usuario autor, int numero) {
         SkillVersao p = new SkillVersao(skill, numero, EstadoVersao.PROPOSTA, "Segurança 2", "d2",
                 CategoriaSkill.SEGURANCA, "p", "t", "Mudança", autor, AGORA,
@@ -486,6 +497,76 @@ class SkillServiceTest {
     @Test
     void importarComPendenteDeHumanoNaoFazNada() {
         Skill skill = skillComVigente(true);
+        skill.registrarHashImportado("h1");
+        SkillVersao pendente = proposta(skill, ana, 2);
+
+        service.importar(SLUG, dados(), "h2");
+
+        assertThat(pendente.getEstado()).isEqualTo(EstadoVersao.PROPOSTA);
+        assertThat(skill.getHashImportado()).isEqualTo("h1");
+        verify(versaoRepository, never()).save(any());
+    }
+
+    @Test
+    void importarComVigenteDoSistemaPublicaDireto() {
+        Skill skill = skillComVigenteDoSistema();
+        skill.registrarHashImportado("h1");
+        when(versaoRepository.findFirstBySkillAndEstado(skill, EstadoVersao.PROPOSTA)).thenReturn(Optional.empty());
+        when(versaoRepository.proximoNumero(skill)).thenReturn(2);
+
+        SkillVersao v = service.importar(SLUG, dados(), "h2");
+
+        assertThat(v.getEstado()).isEqualTo(EstadoVersao.PUBLICADA);
+        assertThat(v.getAutor()).isNull();
+        assertThat(skill.getVersaoVigente()).isSameAs(v);
+        assertThat(skill.getHashImportado()).isEqualTo("h2");
+        verify(notificacaoService, never()).registrar(any(), any(), any(), any());
+    }
+
+    @Test
+    void importarComVigenteDoSistemaSubstituiPendenteDoSistemaEPublica() {
+        Skill skill = skillComVigenteDoSistema();
+        skill.registrarHashImportado("h1");
+        SkillVersao pendente = proposta(skill, null, 2);
+        when(versaoRepository.proximoNumero(skill)).thenReturn(3);
+
+        SkillVersao v = service.importar(SLUG, dados(), "h2");
+
+        assertThat(pendente.getEstado()).isEqualTo(EstadoVersao.REJEITADA);
+        verify(versaoRepository).saveAndFlush(pendente);
+        assertThat(v.getEstado()).isEqualTo(EstadoVersao.PUBLICADA);
+        assertThat(skill.getVersaoVigente()).isSameAs(v);
+    }
+
+    @Test
+    void importarComHashIgualAprovaPendenteDoSistemaQuandoVigenteEhDoSistema() {
+        Skill skill = skillComVigenteDoSistema();
+        skill.registrarHashImportado("h1");
+        SkillVersao pendente = proposta(skill, null, 2);
+
+        SkillVersao v = service.importar(SLUG, dados(), "h1");
+
+        assertThat(v).isSameAs(pendente);
+        assertThat(pendente.getEstado()).isEqualTo(EstadoVersao.PUBLICADA);
+        assertThat(skill.getVersaoVigente()).isSameAs(pendente);
+        verify(versaoRepository, never()).save(any());
+    }
+
+    @Test
+    void importarComHashIgualNaoAprovaPendenteQuandoVigenteEhDePessoa() {
+        Skill skill = skillComVigente(true);
+        skill.registrarHashImportado("h1");
+        SkillVersao pendente = proposta(skill, null, 2);
+
+        service.importar(SLUG, dados(), "h1");
+
+        assertThat(pendente.getEstado()).isEqualTo(EstadoVersao.PROPOSTA);
+        assertThat(skill.getVersaoVigente()).isNotSameAs(pendente);
+    }
+
+    @Test
+    void importarComVigenteDoSistemaRespeitaPendenteDeHumano() {
+        Skill skill = skillComVigenteDoSistema();
         skill.registrarHashImportado("h1");
         SkillVersao pendente = proposta(skill, ana, 2);
 

@@ -166,6 +166,12 @@ public class SkillService {
      * substituindo apenas uma pendente também do Sistema (pendente de pessoa é respeitada e nada
      * muda, o hash não é registrado e a próxima importação tenta de novo). Quando nada é feito,
      * devolve a versão vigente. Skill que não é (mais) oficial também não é tocada.
+     *
+     * <p>Pedido do usuário ("aprove todas... faça isso por mim"): se a versão vigente também veio do
+     * Sistema (ninguém editou a skill à mão), a atualização do repositório é publicada direto, sem
+     * passar pela fila de aprovação, e uma proposta do Sistema que ficou pendente de uma subida
+     * anterior é aprovada automaticamente. Skill com versão vigente de uma pessoa continua indo
+     * para a fila, para a atualização não atropelar a edição dela sem um gestor olhar.
      */
     public SkillVersao importar(String slug, DadosVersao dados, String hash) {
         if (dados == null) {
@@ -185,15 +191,33 @@ public class SkillService {
             log.warn("Skill oficial '{}' não importada: já existe uma skill não oficial com esse slug", slug);
             return existente.getVersaoVigente();
         }
+        boolean vigenteDoSistema = existente.getVersaoVigente() == null
+                || existente.getVersaoVigente().getAutor() == null;
+        SkillVersao pendente = versaoRepository.findFirstBySkillAndEstado(existente, EstadoVersao.PROPOSTA)
+                .orElse(null);
         if (Objects.equals(hash, existente.getHashImportado())) {
+            if (vigenteDoSistema && pendente != null && pendente.getAutor() == null) {
+                pendente.aprovar(null, agora());
+                existente.definirVigente(pendente);
+                log.info("Skill oficial '{}': proposta do Sistema v{} aprovada automaticamente", slug,
+                        pendente.getNumero());
+                return pendente;
+            }
             return existente.getVersaoVigente();
         }
         DadosVersao atualizacao = comMensagem(dados, MENSAGEM_IMPORTACAO_ATUALIZACAO);
         validar(slug, atualizacao);
-        SkillVersao pendente = versaoRepository.findFirstBySkillAndEstado(existente, EstadoVersao.PROPOSTA)
-                .orElse(null);
         if (pendente != null && pendente.getAutor() != null) {
             return existente.getVersaoVigente();
+        }
+        if (vigenteDoSistema) {
+            if (pendente != null) {
+                pendente.rejeitar(null, agora(), MOTIVO_SUBSTITUIDA);
+                versaoRepository.saveAndFlush(pendente);
+            }
+            SkillVersao publicada = publicar(existente, atualizacao, null);
+            existente.registrarHashImportado(hash);
+            return publicada;
         }
         SkillVersao nova = proporMudanca(existente, atualizacao, null);
         existente.registrarHashImportado(hash);
