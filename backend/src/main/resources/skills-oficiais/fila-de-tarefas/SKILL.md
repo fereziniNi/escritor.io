@@ -27,10 +27,18 @@ mudar um é decisão do cliente, registrada no `CLAUDE.md`.
    falha (5, 10, 20, 40 s; teto de 10 min). `backoff: false` = sempre 5 s. Registre **antes** de `iniciar()` (no `onModuleInit`).
 5. **Entrega "pelo menos uma vez".** Por isso o handler tem de aguentar rodar duas vezes. Para garantir **um efeito só**, envie com
    chave: `fila.enviar(nome, dados, { chave })`. A chave é reservada em `fila.efeito_unico` antes de rodar; falha libera a chave
-   (a nova tentativa roda); chave concluída nunca roda de novo; reserva de execução que morreu vence em **15 min**; chaves concluídas são
-   apagadas depois de **30 dias** (tarefa `fila-limpar-chaves`, 04:00).
-6. **Payload mínimo.** Ponha ids, não dados pessoais, e nunca segredo. O payload fica no banco até `deleteAfterSeconds` depois de
-   terminar: use o **menor prazo** que ainda deixa investigar (e-mail: 1 dia, porque o payload é a mensagem inteira; demais: 1 a 7 dias).
+   (a nova tentativa roda); chave concluída nunca roda de novo; reserva de execução que morreu vence no **`expireInSeconds` da fila**
+   (lido ao iniciar; padrão do pg-boss 15 min), não num prazo fixo; chaves concluídas são apagadas depois de **30 dias** (tarefa
+   `fila-limpar-chaves`, 04:00). **Limites conhecidos:** (a) se a **última** tentativa expira (processo morto no meio), o pg-boss marca
+   o job como falho sem passar pelo handler: **não há alerta** (o log do worker não mostra conclusão; confira `fila.job` com
+   `state = 'failed'`); (b) dois jobs com a **mesma chave rodando ao mesmo tempo**: o segundo vê a reserva viva, conclui sem efeito, e se
+   o primeiro falhar de vez o efeito não acontece; não reenvie a mesma chave enquanto a anterior roda.
+6. **Payload mínimo e retenção curta.** Ponha ids, não dados pessoais. O payload fica no banco até `deleteAfterSeconds` depois de
+   terminar e até `retentionSeconds` esperando (padrão do pg-boss: 14 dias): use o **menor prazo** que ainda deixa investigar (demais
+   filas: 1 a 7 dias). **Regra: segredo ou código (OTP) nunca fica no banco além da validade dele.** `email-enviar` leva o corpo
+   renderizado (com o código de login, 10 min): `retentionSeconds: 600`, `deleteAfterSeconds: 300`; o pg-boss apaga a cada **60 s**
+   (`maintenanceIntervalSeconds`, em `fila.ts`; o padrão dele é 1 vez por dia). Worker parado mais de 10 min = e-mail descartado (o
+   código já teria vencido). Teste: `fila/catalogo.spec.ts` e `prepararFila grava a retenção curta` (e2e).
 7. **Falha definitiva → e-mail para `ALERTA_EMAIL`.** Vale quando as tentativas se esgotam ou o handler lança `ErroSemRetry` (não
    repete). O e-mail vai por `ServicoEmail.enviar` (direto, **nunca pela fila**) e leva só: tarefa, id do job, tentativas e tipo do
    erro. **Nunca o payload nem a mensagem do erro** (está no log do worker, achado pelo id). Em produção, `worker` e `tudo` sem
@@ -50,13 +58,14 @@ mudar um é decisão do cliente, registrada no `CLAUDE.md`.
 12. **Banco inalcançável no boot não derruba**: a fila tenta de novo a cada 5 s (o `/api/health` mostra o banco fora). **Schema ausente
     ou sem permissão derruba** (configuração errada).
 13. **Testes (todos no modelo):** falha 2x e passa na 3ª conclui; mesma chave 2x = 1 efeito; chave liberada se falha; falha definitiva
-    alerta uma vez sem o payload; `ErroSemRetry` não repete; `ROLE=api` não consome; encerramento termina a tarefa em andamento e respeita
+    alerta uma vez sem o payload; `ErroSemRetry` não repete; reserva vence no `expireInSeconds` da fila; retenção de `email-enviar`
+    ≤ validade do código; `ROLE=api` não consome; encerramento termina a tarefa em andamento e respeita
     o prazo; `agendar` grava cron e fuso; runtime sem DDL; e-mail entregue pelo Mailpit via fila (com chave dupla = 1 mensagem);
     sem `ROLE` ou sem `ALERTA_EMAIL` em produção não sobe.
 
 ## Como aplicar
 
-Pré-requisito: skills anteriores aplicadas, na ordem do catálogo, até `upload-armazenamento`, e `pnpm test` passando. Esta skill usa
+Pré-requisito: skills anteriores aplicadas, na ordem do catálogo (1 a 9; `exportacao-excel-pdf-csv` e `upload-armazenamento` só se o sistema usa), e `pnpm test` passando. Esta skill usa
 `email-transacional` (`ServicoEmail`, `montarEmail`), `trilha-auditoria` (papel `app_runtime`, `test/postgres.ts`) e `lgpd-dados-pessoais`
 (`lgpd/retencao.ts`). Ao copiar um arquivo de `referencia/`, mantenha o mesmo caminho relativo e **apague a 1ª linha** (`origem: ...`).
 
@@ -64,7 +73,7 @@ Pré-requisito: skills anteriores aplicadas, na ordem do catálogo, até `upload
 
 1. Dependência (versão exata): `pnpm --filter api add -E pg-boss@11.1.2`. Acrescente em `apps/api/package.json`, em `scripts`:
    `"fila:migrar": "tsx src/fila/executar-migracao-fila.ts"`.
-2. TDD — copie **primeiro** os testes: `apps/api/src/fila/papel.spec.ts`, `apps/api/test/fila.e2e.spec.ts` e `apps/api/test/fila-app.e2e.spec.ts`.
+2. TDD — copie **primeiro** os testes: `apps/api/src/fila/papel.spec.ts`, `catalogo.spec.ts`, `apps/api/test/fila.e2e.spec.ts` e `apps/api/test/fila-app.e2e.spec.ts`.
    `pnpm --filter api test`: tem de falhar (módulos inexistentes).
 3. Código novo: `apps/api/src/fila/` inteiro (`papel.ts`, `catalogo.ts`, `fila.ts`, `preparar-fila.ts`, `executar-migracao-fila.ts`,
    `fila.module.ts`, `alerta-falha.ts`).
@@ -87,7 +96,7 @@ Pré-requisito: skills anteriores aplicadas, na ordem do catálogo, até `upload
    (e) falha que nunca vai passar: `throw new ErroSemRetry('...')`. Rode `pnpm --filter api fila:migrar` onde houver `DATABASE_URL_RUNTIME` (ou suba com `ROLE=migrar`).
 9. Produção: entregue `referencia/instalacao-fila.md` à skill `instalacao-docker-compose` (serviços `migracao`, `api`, `worker`, `stop_grace_period`).
 
-**Projeto existente fora do esqueleto:** mantenha os **números** (5 tentativas, 5 s dobrando até 10 min, alerta sem payload, reserva de chave de 15 min, 30 s de
+**Projeto existente fora do esqueleto:** mantenha os **números** (5 tentativas, 5 s dobrando até 10 min, alerta sem payload, reserva de chave com o prazo do job, retenção do e-mail ≤ validade do código, 30 s de
 encerramento, `ROLE`, dono cria/runtime só DML). Em Node use o pg-boss 11; em Java, JobRunr ou Quartz sobre o mesmo Postgres; em Python, Procrastinate ou Celery com o
 Postgres como broker. `papel.ts`, `catalogo.ts`, `preparar-fila.ts` e a lógica de `fila.ts` (envelope `{chave, dados}`, `umaVez`, decisão de falha definitiva) são a
 especificação: reproduza o comportamento e os testes. Registre no `CLAUDE.md` onde ficou cada coisa.
@@ -107,7 +116,7 @@ Tudo que um arquivo de `referencia/` importa está em `referencia/` ou nas skill
 - `.../fila/papel.ts` — `ROLE` e as regras de falha fechada (regras 7 e 8).
 - `.../fila/fila.module.ts`, `alerta-falha.ts` — ligação ao Nest, ciclo de vida, tarefas do sistema e o e-mail de alerta (regras 7, 9, 10, 12).
 - `.../email/servico-email.ts`, `enviar-com-retry.ts` — o e-mail pela fila (regra 11).
-- `.../fila/papel.spec.ts`, `apps/api/test/fila.e2e.spec.ts`, `fila-app.e2e.spec.ts` — testes (regra 13); passo 2.
+- `.../fila/papel.spec.ts`, `catalogo.spec.ts`, `apps/api/test/fila.e2e.spec.ts`, `fila-app.e2e.spec.ts` — testes (regra 13); passo 2.
 - `referencia/apps/api/src/main.ts`, `app.module.ts`, `config/config.ts`, `test/auth.e2e.spec.ts`, `.env.example`, `deploy/.env.example` — versões completas dos arquivos alterados.
 - `referencia/instalacao-fila.md` — serviços do compose de produção para a skill de instalação.
 
@@ -121,5 +130,5 @@ Tudo que um arquivo de `referencia/` importa está em `referencia/` ou nas skill
 - [ ] SIGTERM com tarefa em andamento: ela termina (até `FILA_ENCERRAR_TIMEOUT_S`) e `stop_grace_period` do compose é maior que isso.
 - [ ] `lgpd-retencao` e `fila-limpar-chaves` aparecem em `fila.schedule` com `America/Sao_Paulo`.
 - [ ] O convite/código de e-mail chega pela fila (Mailpit) e uma queda do SMTP não perde a mensagem.
-- [ ] Nenhuma tarefa nova leva dado pessoal no payload sem necessidade; `catalogo.ts` tem a retenção dela.
+- [ ] Nenhuma tarefa nova leva dado pessoal no payload sem necessidade; `catalogo.ts` tem a retenção dela; payload com segredo/código tem `retentionSeconds` e `deleteAfterSeconds` ≤ validade dele (`email-enviar`: 600/300).
 - [ ] `fila-de-tarefas` listada em "Skills Multiplica aplicadas" no `CLAUDE.md`.

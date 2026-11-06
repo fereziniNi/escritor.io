@@ -21,7 +21,7 @@ de cliente). Todo dia às 03:00 (horário de Brasília) o sistema aplica a regra
 
 | Ferramenta | Versão | Como conferir |
 |---|---|---|
-| Esqueleto do projeto | skills `novo-projeto-multiplica` até `upload-armazenamento` já aplicadas (usa e-mail, auditoria e LGPD) | `ls apps/api/src/lgpd` ou `dir apps\api\src\lgpd` |
+| Esqueleto do projeto | skills `novo-projeto-multiplica` até `lgpd-dados-pessoais` já aplicadas, mais `exportacao-excel-pdf-csv` e `upload-armazenamento` se o sistema usa (usa e-mail, auditoria e LGPD) | `ls apps/api/src/lgpd` ou `dir apps\api\src\lgpd` |
 | Node.js | 22.22 ou mais nova | `node --version` |
 | pnpm | 9.15.4 | `pnpm --version` |
 | Docker | qualquer versão recente (Postgres e Mailpit dos testes) | `docker version` |

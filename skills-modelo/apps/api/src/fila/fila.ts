@@ -57,6 +57,8 @@ interface Definicao {
   handler: Handler<never>;
   tentativas: number;
   backoff: boolean;
+  /** `expireInSeconds` da fila, lido ao iniciar: a reserva da chave de idempotência vence junto com o job. */
+  expiraS: number;
 }
 
 interface Agenda {
@@ -72,8 +74,14 @@ interface Envelope {
   dados: unknown;
 }
 
-/** Prazo padrão de um job ativo do pg-boss: depois dele o job é dado como perdido e repetido. A reserva de chave vale o mesmo. */
-const EXPIRA_RESERVA_S = 900;
+/** Prazo padrão de um job ativo do pg-boss (fila sem `expireInSeconds`): depois dele o job é dado como perdido e repetido. */
+const EXPIRA_PADRAO_S = 900;
+
+/**
+ * A cada quantos segundos o pg-boss apaga as tarefas vencidas (`deleteAfterSeconds`/`retentionSeconds`). O padrão dele é 1 vez
+ * por DIA, o que deixaria um payload com código de login no banco por até 24 h mesmo com prazo de minutos na fila.
+ */
+export const INTERVALO_LIMPEZA_S = 60;
 
 /**
  * Fila de tarefas sobre o MESMO Postgres (pg-boss, schema `fila`): sobrevive a reinício, repete com backoff e entrega
@@ -101,7 +109,7 @@ export class Fila {
     if (this.definicoes.has(nome)) throw new Error(`tarefa já registrada: '${nome}'`);
     const { tentativas = 5, backoff = true } = opcoes;
     if (!Number.isInteger(tentativas) || tentativas < 1 || tentativas > 50) throw new Error('tentativas deve ser um inteiro de 1 a 50');
-    this.definicoes.set(nome, { nome, handler: handler, tentativas, backoff });
+    this.definicoes.set(nome, { nome, handler: handler, tentativas, backoff, expiraS: EXPIRA_PADRAO_S });
   }
 
   /** Rotina por cron (5 campos), no fuso informado (padrão America/Sao_Paulo). Gravada por quem consome a fila; repetir é seguro. */
@@ -129,6 +137,7 @@ export class Fila {
       // Manutenção (expirar, apagar antigas) e cron só onde há consumo; a API apenas enfileira.
       supervise: consome,
       schedule: consome,
+      maintenanceIntervalSeconds: INTERVALO_LIMPEZA_S,
     });
     boss.on('error', (e: Error) => this.log.error(`[fila] erro do pg-boss: ${e.message}`));
     try {
@@ -144,6 +153,7 @@ export class Fila {
     this.boss = boss;
     if (!consome) return;
     for (const d of this.definicoes.values()) {
+      d.expiraS = (await boss.getQueue(d.nome))?.expireInSeconds ?? EXPIRA_PADRAO_S;
       await boss.work<Envelope>(d.nome, { includeMetadata: true, batchSize: 1, pollingIntervalSeconds: this.opcoes.intervaloSegundos ?? 2 }, async (jobs) => {
         for (const job of jobs) await this.executar(d, job);
       });
@@ -217,7 +227,7 @@ export class Fila {
     const { chave, dados } = job.data;
     try {
       if (chave === undefined || chave === null) await d.handler(dados as never, contexto);
-      else await this.umaVez(`${d.nome}:${chave}`, () => d.handler(dados as never, contexto));
+      else await this.umaVez(`${d.nome}:${chave}`, d.expiraS, () => d.handler(dados as never, contexto));
     } catch (e) {
       const erro = e instanceof Error ? e : new Error(String(e));
       const semRetry = erro instanceof ErroSemRetry;
@@ -240,10 +250,10 @@ export class Fila {
 
   /**
    * Reserva a chave, roda e marca como concluída. Falha libera a chave (a próxima tentativa roda). Chave já concluída (ou
-   * reservada por uma execução ainda viva) = não roda de novo. Se o processo morrer no meio, a reserva vence em 15 min
-   * (o mesmo prazo do job) e a repetição roda: "pelo menos uma vez".
+   * reservada por uma execução ainda viva) = não roda de novo. Se o processo morrer no meio, a reserva vence no mesmo prazo
+   * do job (`expireInSeconds` da fila, padrão 15 min) e a repetição roda: "pelo menos uma vez".
    */
-  private async umaVez(chave: string, executar: () => Promise<void>): Promise<void> {
+  private async umaVez(chave: string, expiraS: number, executar: () => Promise<void>): Promise<void> {
     const db = this.boss!.getDb();
     const t = `${SCHEMA_FILA}.efeito_unico`;
     const r = await db.executeSql(
@@ -251,7 +261,7 @@ export class Fila {
        ON CONFLICT (chave) DO UPDATE SET iniciado_em = now()
        WHERE ${t}.concluido_em IS NULL AND ${t}.iniciado_em < now() - make_interval(secs => $2)
        RETURNING chave`,
-      [chave, EXPIRA_RESERVA_S],
+      [chave, expiraS],
     );
     if (r.rows.length === 0) {
       this.log.info(`[fila] chave '${chave}' já executada: nada a fazer`);

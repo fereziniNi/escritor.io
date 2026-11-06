@@ -38,6 +38,9 @@ fixo**; mudar um deles é decisão de segurança registrada no `CLAUDE.md`, não
    domínio cadastrado. O primeiro administrador vem de `ADMIN_INICIAL_EMAIL` (skill `usuarios-e-papeis`).
 7. **E-mail do código** (skill `email-transacional`): assunto fixo **"Seu código de acesso"** (nunca o código no
    assunto), corpo com `montarEmail`, nome do sistema por `escaparHtml`, validade e "se não foi você, ignore".
+   **Segredo e código nunca ficam guardados além da validade**: o código só existe no banco como hash; o e-mail renderizado
+   (com o código em claro) que passa pela fila `email-enviar` (skill `fila-de-tarefas`) é apagado em no máximo 10 min
+   (`retentionSeconds: 600`, `deleteAfterSeconds: 300`, limpeza a cada 60 s). Não registre o corpo do e-mail em log nem auditoria.
 8. **Sessão**: token `randomBytes(32)` em base64url só no cookie; no banco `sessao(id, hash_token, usuario_id,
    criada_em, ultimo_uso_em, revogada)` guarda o **SHA-256** (`hash_token`, índice único). Expira parada
    **`AUTH_SESSAO_OCIOSA_MIN` = 30 min** ou **`AUTH_SESSAO_ABSOLUTA_H` = 12 h** depois do login, o que vier primeiro;
@@ -100,8 +103,8 @@ npm. Ao copiar um arquivo de `referencia/`, mantenha o mesmo caminho relativo e 
    neles, faça **só** a mudança descrita:
    - `apps/api/src/banco/esquema.ts`: a linha `export * from '../auth/auth.tabelas';`.
    - `apps/api/src/config/config.ts`: a constante `DOMINIO`, as quatro variáveis `AUTH_*` no fim do `esquemaBase`, a
-     regra "ociosa não maior que a absoluta" no `superRefine` e o `NODE_ENV_DECLARADO` (tipo `Config` e o `return` do
-     `carregarConfig`; o padrão `development` de `NODE_ENV` não muda).
+     regra "ociosa não maior que a absoluta" no `superRefine` (o `NODE_ENV_DECLARADO` já vem da skill `email-transacional`;
+     se o projeto ainda não tem, acrescente no tipo `Config` e no `return` do `carregarConfig`).
    - `apps/api/src/app.module.ts`: `AuthModule` nos `imports`, depois do `UsuariosModule` (e depois do `SegurancaModule`).
    - `.env.example` e `deploy/.env.example`: o bloco "Login por código no e-mail" do fim.
 5. Migração: `pnpm --filter api db:generate`. O SQL novo tem de criar `codigo_login` e `sessao`, a FK

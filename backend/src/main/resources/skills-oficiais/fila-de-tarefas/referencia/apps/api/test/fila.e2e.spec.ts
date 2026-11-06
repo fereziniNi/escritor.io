@@ -1,7 +1,9 @@
 // origem: skills-modelo/apps/api/test/fila.e2e.spec.ts
 /* eslint-disable @typescript-eslint/require-await -- os handlers de tarefa são async por contrato, mesmo quando o teste não espera nada */
 import { Pool } from 'pg';
+import PgBoss from 'pg-boss';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { FILAS_DO_SISTEMA, NOME_EMAIL_ENVIAR } from '../src/fila/catalogo';
 import { ErroSemRetry, Fila, type OpcoesFila } from '../src/fila/fila';
 import { prepararFila } from '../src/fila/preparar-fila';
 import { subirPostgres } from './postgres';
@@ -31,7 +33,7 @@ function criar(papel: 'api' | 'worker' | 'tudo', extra: Partial<OpcoesFila> = {}
 beforeAll(async () => {
   ({ url: urlDono, urlRuntime, parar } = await subirPostgres());
   await prepararFila(urlDono, {
-    tarefas: ['t-retry', 't-idem', 't-idem-falha', 't-falha', 't-api', 't-shutdown', 't-sem-retry', 't-agenda'],
+    tarefas: ['t-retry', 't-idem', 't-idem-falha', 't-falha', 't-api', 't-shutdown', 't-sem-retry', 't-agenda', 't-reserva'],
     conceder: true,
   });
 });
@@ -91,6 +93,45 @@ describe('fila de tarefas (pg-boss, schema fila, papel de runtime)', () => {
     await esperar(() => n >= 2, 30_000);
     expect(n).toBe(2);
   }, 40_000);
+
+  it('a reserva da chave vence no expireInSeconds da fila (não num prazo fixo): execução morta com fila de 2 s libera a chave', async () => {
+    const boss = new PgBoss({ connectionString: urlDono, schema: 'fila', migrate: false, supervise: false, schedule: false });
+    await boss.start();
+    try {
+      await boss.updateQueue('t-reserva', { expireInSeconds: 2 });
+    } finally {
+      await boss.stop({ graceful: false, wait: true });
+    }
+    // Reserva de uma execução que "morreu" há 5 s (nunca concluída): com o prazo fixo de 15 min a chave ficaria presa.
+    const pool = new Pool({ connectionString: urlDono, max: 1 });
+    try {
+      await pool.query("INSERT INTO fila.efeito_unico (chave, iniciado_em) VALUES ('t-reserva:k-morta', now() - interval '5 seconds')");
+    } finally {
+      await pool.end();
+    }
+    const f = criar('tudo');
+    let rodou = 0;
+    f.registrarTarefa('t-reserva', async () => {
+      rodou++;
+    });
+    await f.iniciar();
+    await f.enviar('t-reserva', {}, { chave: 'k-morta' });
+    await esperar(() => rodou === 1);
+  });
+
+  it('prepararFila grava a retenção curta de email-enviar (payload com código de login)', async () => {
+    const boss = new PgBoss({ connectionString: urlDono, schema: 'fila', migrate: false, supervise: false, schedule: false });
+    await boss.start();
+    try {
+      const q = await boss.getQueue(NOME_EMAIL_ENVIAR);
+      const esperado = FILAS_DO_SISTEMA[NOME_EMAIL_ENVIAR]!;
+      expect(q?.retentionSeconds).toBe(esperado.retentionSeconds);
+      expect(q?.deleteAfterSeconds).toBe(esperado.deleteAfterSeconds);
+      expect(q!.deleteAfterSeconds).toBeLessThanOrEqual(900);
+    } finally {
+      await boss.stop({ graceful: false, wait: true });
+    }
+  });
 
   it('falha definitiva chama o alerta uma vez, sem dados do payload', async () => {
     const alertas: Record<string, unknown>[] = [];
