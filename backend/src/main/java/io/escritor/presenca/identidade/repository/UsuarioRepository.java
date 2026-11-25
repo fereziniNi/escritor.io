@@ -12,6 +12,10 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     List<Usuario> findByAtivoTrueOrderByNomeAsc();
 
+    /** Usado a cada request pelo {@code JwtAuthenticationFilter}: um JWT ainda dentro da validade
+     * não vale mais se o usuário foi desligado ({@code ativo = false}). */
+    boolean existsByIdAndAtivoFalse(Long id);
+
     /** Pedido do usuário: avisar o admin por WhatsApp quando uma tarefa muda de status ou é
      * criada - `CardService`, não `EnvioWhatsApp#enviarParaChefe` (número fixo de configuração,
      * usado só pelo ponto) porque aqui o destinatário é quem tem o papel ADMIN de verdade no

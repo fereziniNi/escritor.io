@@ -1,5 +1,6 @@
 package io.escritor.presenca.seguranca;
 
+import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,8 +18,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
 
-    public JwtAuthenticationFilter(JwtService jwtService) {
+    private final UsuarioRepository usuarioRepository;
+
+    public JwtAuthenticationFilter(JwtService jwtService, UsuarioRepository usuarioRepository) {
         this.jwtService = jwtService;
+        this.usuarioRepository = usuarioRepository;
     }
 
     @Override
@@ -32,6 +36,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             jwtService.validar(token).ifPresent(jws -> {
                 String usuarioId = jws.getPayload().getSubject();
+                // usuário desligado (ativo = false) perde o acesso na hora, sem esperar o JWT
+                // expirar - segue anônimo e cai no 401 do entry point.
+                if (usuarioRepository.existsByIdAndAtivoFalse(Long.valueOf(usuarioId))) {
+                    return;
+                }
                 String papel = jws.getPayload().get("papel", String.class);
                 var authority = new SimpleGrantedAuthority("ROLE_" + papel);
                 var authentication =

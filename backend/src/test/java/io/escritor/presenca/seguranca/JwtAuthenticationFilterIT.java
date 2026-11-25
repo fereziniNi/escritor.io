@@ -27,6 +27,9 @@ class JwtAuthenticationFilterIT {
     @Autowired
     private JwtService jwtService;
 
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
     private RestTestClient restTestClient;
 
     private RestTestClient client() {
@@ -82,6 +85,37 @@ class JwtAuthenticationFilterIT {
                 .header("Authorization", "Bearer " + adulterado)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(corpoNovoUsuario("token-adulterado@escritor.io"))
+                .exchange()
+                .expectStatus().isUnauthorized();
+    }
+
+    @Test
+    void tokenAindaValidoDeUsuarioDesativadoERecusadoComUnauthorized() {
+        String tokenAdmin = jwtService.gerarAccessToken(1L, Papel.ADMIN);
+        String email = "desligado@escritor.io";
+
+        client().post()
+                .uri("/usuarios")
+                .header("Authorization", "Bearer " + tokenAdmin)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(corpoNovoUsuario(email))
+                .exchange()
+                .expectStatus().isCreated();
+
+        Long id = jdbcTemplate.queryForObject("SELECT id FROM usuario WHERE email = ?", Long.class, email);
+        String tokenDoDesligado = jwtService.gerarAccessToken(id, Papel.COLABORADOR);
+
+        client().get()
+                .uri("/usuarios/me")
+                .header("Authorization", "Bearer " + tokenDoDesligado)
+                .exchange()
+                .expectStatus().isOk();
+
+        jdbcTemplate.update("UPDATE usuario SET ativo = false WHERE id = ?", id);
+
+        client().get()
+                .uri("/usuarios/me")
+                .header("Authorization", "Bearer " + tokenDoDesligado)
                 .exchange()
                 .expectStatus().isUnauthorized();
     }

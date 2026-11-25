@@ -77,6 +77,6 @@ public class PresencaHandshakeInterceptor implements HandshakeInterceptor {
         }
 
         Long usuarioId = Long.valueOf(jws.get().getPayload().getSubject());
-        return usuarioRepository.findById(usuarioId);
+        return usuarioRepository.findById(usuarioId).filter(Usuario::isAtivo);
     }
 }
