@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -18,9 +19,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
 
-    private final UsuarioRepository usuarioRepository;
+    private final ObjectProvider<UsuarioRepository> usuarioRepository;
 
-    public JwtAuthenticationFilter(JwtService jwtService, UsuarioRepository usuarioRepository) {
+    public JwtAuthenticationFilter(JwtService jwtService, ObjectProvider<UsuarioRepository> usuarioRepository) {
         this.jwtService = jwtService;
         this.usuarioRepository = usuarioRepository;
     }
@@ -38,7 +39,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String usuarioId = jws.getPayload().getSubject();
                 // usuário desligado (ativo = false) perde o acesso na hora, sem esperar o JWT
                 // expirar - segue anônimo e cai no 401 do entry point.
-                if (usuarioRepository.existsByIdAndAtivoFalse(Long.valueOf(usuarioId))) {
+                if (usuarioRepository.getObject().existsByIdAndAtivoFalse(Long.valueOf(usuarioId))) {
                     return;
                 }
                 String papel = jws.getPayload().get("papel", String.class);
