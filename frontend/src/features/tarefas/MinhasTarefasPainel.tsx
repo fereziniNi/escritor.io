@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { listarProjetos } from '../organizacao/api'
 import { criarTarefa, listarMinhasTarefas, mudarEstadoTarefa } from './api'
+import { finalizarCronometro } from '../kanban/api'
 import { corDoProjeto } from './corDoProjeto'
 import type { EstadoTarefa, Tarefa } from './types'
 import './MinhasTarefas.css'
@@ -35,6 +36,10 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
   const [projetoNovo, setProjetoNovo] = useState('')
   const [prazoNovo, setPrazoNovo] = useState('')
 
+  // Tarefa cujo mini-formulário de conclusão está aberto (uma por vez) e o texto digitado
+  const [concluindoId, setConcluindoId] = useState<number | null>(null)
+  const [descricaoConclusao, setDescricaoConclusao] = useState('')
+
   const tarefasQuery = useQuery({ queryKey: ['tarefas'], queryFn: listarMinhasTarefas })
   const projetosQuery = useQuery({ queryKey: ['projetos'], queryFn: listarProjetos })
 
@@ -42,6 +47,27 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
     mutationFn: ({ cardId, estado }: { cardId: number; estado: EstadoTarefa }) => mudarEstadoTarefa(cardId, estado),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['tarefas'] }),
   })
+
+  const concluirMutation = useMutation({
+    mutationFn: ({ cardId, descricao }: { cardId: number; descricao: string }) => finalizarCronometro(cardId, descricao),
+    onSuccess: async () => {
+      setConcluindoId(null)
+      setDescricaoConclusao('')
+      await queryClient.invalidateQueries({ queryKey: ['tarefas'] })
+    },
+  })
+
+  function abrirConclusao(cardId: number) {
+    concluirMutation.reset()
+    setDescricaoConclusao('')
+    setConcluindoId(cardId)
+  }
+
+  function cancelarConclusao() {
+    concluirMutation.reset()
+    setConcluindoId(null)
+    setDescricaoConclusao('')
+  }
 
   const criarMutation = useMutation({
     mutationFn: criarTarefa,
@@ -75,6 +101,14 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
     const cor = corDoProjeto(t.projetoId)
     const opcoes = ESTADOS.filter((e) => e.valor === t.estado || (t.estadosDisponiveis ?? []).includes(e.valor))
     const urgente = t.estado !== 'FEITO' && t.prazo !== null && t.prazo <= hoje
+    const finalizada = t.concluidoEm !== null
+    const etapaUnica = opcoes.length === 1
+    const rotuloEtapa = opcoes[0]?.rotulo
+    const dicaId = `tarefa-dica-${t.cardId}`
+    let dicaSeletor: string | undefined
+    if (finalizada) dicaSeletor = 'Tarefa já finalizada'
+    else if (etapaUnica) dicaSeletor = `Este projeto só tem a etapa "${rotuloEtapa}". Use "Concluir" para finalizar a tarefa.`
+    const concluindo = concluindoId === t.cardId
     return (
       <li key={t.cardId} className="tarefa-item">
         <div className="tarefa-item-linha">
@@ -84,7 +118,9 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
           <select
             aria-label={`Estado de ${t.titulo}`}
             value={t.estado}
-            disabled={opcoes.length === 1}
+            disabled={etapaUnica || finalizada}
+            title={dicaSeletor}
+            aria-describedby={dicaSeletor ? dicaId : undefined}
             onChange={(e) => estadoMutation.mutate({ cardId: t.cardId, estado: e.target.value as EstadoTarefa })}
           >
             {opcoes.map((e) => (
@@ -93,6 +129,11 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
               </option>
             ))}
           </select>
+          {dicaSeletor && (
+            <span id={dicaId} className="sr-only">
+              {dicaSeletor}
+            </span>
+          )}
         </div>
         <div className="tarefa-item-meta">
           {!t.pessoal && t.projetoNome && (
@@ -105,7 +146,44 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
               Prazo: {formatarPrazo(t.prazo)}
             </span>
           )}
+          {t.estado !== 'FEITO' && !concluindo && (
+            <button type="button" className="tarefa-concluir" onClick={() => abrirConclusao(t.cardId)}>
+              Concluir
+            </button>
+          )}
         </div>
+        {concluindo && (
+          <form
+            className="tarefa-concluir-form"
+            onSubmit={(e) => {
+              e.preventDefault()
+              const descricao = descricaoConclusao.trim()
+              if (!descricao || concluirMutation.isPending) return
+              concluirMutation.mutate({ cardId: t.cardId, descricao })
+            }}
+          >
+            <label htmlFor={`concluir-${t.cardId}`}>O que foi feito?</label>
+            <input
+              id={`concluir-${t.cardId}`}
+              aria-label={`Descrição da conclusão de ${t.titulo}`}
+              value={descricaoConclusao}
+              onChange={(e) => setDescricaoConclusao(e.target.value)}
+              autoFocus
+            />
+            <div className="tarefa-concluir-acoes">
+              <button
+                type="submit"
+                className="tarefa-concluir tarefa-concluir--confirmar"
+                disabled={!descricaoConclusao.trim() || concluirMutation.isPending}
+              >
+                Confirmar conclusão
+              </button>
+              <button type="button" className="tarefa-concluir" onClick={cancelarConclusao}>
+                Cancelar
+              </button>
+            </div>
+          </form>
+        )}
       </li>
     )
   }
@@ -153,6 +231,7 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
       </div>
 
       {estadoMutation.isError && <p className="mensagem-erro" role="alert">{estadoMutation.error.message}</p>}
+      {concluirMutation.isError && <p className="mensagem-erro" role="alert">{concluirMutation.error.message}</p>}
       {tarefasQuery.isError && <p className="mensagem-erro" role="alert">{tarefasQuery.error.message}</p>}
 
       {tarefasQuery.isSuccess && visiveis.length === 0 && <p className="cartao-item-meta">Você não tem tarefas.</p>}

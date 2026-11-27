@@ -318,6 +318,121 @@ describe('MinhasTarefasPainel', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/limite de tarefas em andamento/)
   })
 
+  it('seletorDeEtapaUnicaExplicaComoFinalizar', async () => {
+    mockar([tarefa({ cardId: 1, titulo: 'Chamado', estado: 'EM_ANDAMENTO', estadosDisponiveis: ['EM_ANDAMENTO'] })])
+    renderPainel()
+
+    const seletor = await screen.findByLabelText('Estado de Chamado')
+    expect(seletor).toBeDisabled()
+    expect(seletor).toHaveAttribute('title', expect.stringContaining('Use "Concluir"'))
+    expect(seletor).toHaveAttribute('title', expect.stringContaining('"Em andamento"'))
+  })
+
+  it('concluirAbreCampoEConfirmarSoHabilitaComTexto', async () => {
+    mockar([tarefa({ cardId: 1, titulo: 'Chamado' })])
+    const user = userEvent.setup()
+    renderPainel()
+
+    await screen.findByText('Chamado')
+    expect(screen.queryByLabelText('Descrição da conclusão de Chamado')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Concluir' }))
+    const campo = screen.getByLabelText('Descrição da conclusão de Chamado')
+    const confirmar = screen.getByRole('button', { name: 'Confirmar conclusão' })
+    expect(confirmar).toBeDisabled()
+    await user.type(campo, '   ')
+    expect(confirmar).toBeDisabled()
+    await user.type(campo, 'feito')
+    expect(confirmar).toBeEnabled()
+  })
+
+  it('confirmarConclusaoEnviaDescricaoSemEspacosERecarregaALista', async () => {
+    let corpo: unknown = null
+    let feito = false
+    server.use(
+      http.get('/tarefas/minhas', () =>
+        HttpResponse.json([
+          tarefa({
+            cardId: 1,
+            titulo: 'Chamado',
+            estado: feito ? 'FEITO' : 'EM_ANDAMENTO',
+            concluidoEm: feito ? '2026-11-27T10:00:00Z' : null,
+          }),
+        ]),
+      ),
+      http.get('/projetos', () => HttpResponse.json(PROJETOS)),
+      http.post('/cards/1/cronometro/finalizar', async ({ request }) => {
+        corpo = await request.json()
+        feito = true
+        return HttpResponse.json({})
+      }),
+    )
+    const user = userEvent.setup()
+    renderPainel()
+
+    await screen.findByText('Chamado')
+    await user.click(screen.getByRole('button', { name: 'Concluir' }))
+    await user.type(screen.getByLabelText('Descrição da conclusão de Chamado'), '  Resolvido  ')
+    await user.click(screen.getByRole('button', { name: 'Confirmar conclusão' }))
+
+    await vi.waitFor(() => expect(corpo).toEqual({ descricao: 'Resolvido' }))
+    const secao = await screen.findByRole('region', { name: 'Feito' })
+    await vi.waitFor(() => expect(within(secao).getByText(/^Feito \(1\)/)).toBeInTheDocument())
+    expect(screen.queryByLabelText('Descrição da conclusão de Chamado')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Concluir' })).not.toBeInTheDocument()
+  })
+
+  it('erroAoConcluirMostraMensagemEMantemOTexto', async () => {
+    server.use(
+      http.get('/tarefas/minhas', () => HttpResponse.json([tarefa({ cardId: 1, titulo: 'Chamado' })])),
+      http.get('/projetos', () => HttpResponse.json(PROJETOS)),
+      http.post('/cards/1/cronometro/finalizar', () => new HttpResponse(null, { status: 500 })),
+    )
+    const user = userEvent.setup()
+    renderPainel()
+
+    await screen.findByText('Chamado')
+    await user.click(screen.getByRole('button', { name: 'Concluir' }))
+    await user.type(screen.getByLabelText('Descrição da conclusão de Chamado'), 'Texto importante')
+    await user.click(screen.getByRole('button', { name: 'Confirmar conclusão' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível finalizar a tarefa')
+    expect(screen.getByLabelText('Descrição da conclusão de Chamado')).toHaveValue('Texto importante')
+  })
+
+  it('tarefaFeitaNaoTemConcluirESeletorFicaDesabilitado', async () => {
+    mockar([tarefa({ cardId: 1, titulo: 'Entregue', estado: 'FEITO', concluidoEm: '2026-11-27T10:00:00Z' })])
+    renderPainel()
+
+    const seletor = await screen.findByLabelText('Estado de Entregue')
+    expect(screen.queryByRole('button', { name: 'Concluir' })).not.toBeInTheDocument()
+    expect(seletor).toBeDisabled()
+    expect(seletor).toHaveAttribute('title', 'Tarefa já finalizada')
+  })
+
+  it('cancelarFechaOFormularioSemRequisicao', async () => {
+    let chamou = false
+    server.use(
+      http.get('/tarefas/minhas', () => HttpResponse.json([tarefa({ cardId: 1, titulo: 'Chamado' })])),
+      http.get('/projetos', () => HttpResponse.json(PROJETOS)),
+      http.post('/cards/1/cronometro/finalizar', () => {
+        chamou = true
+        return HttpResponse.json({})
+      }),
+    )
+    const user = userEvent.setup()
+    renderPainel()
+
+    await screen.findByText('Chamado')
+    await user.click(screen.getByRole('button', { name: 'Concluir' }))
+    await user.type(screen.getByLabelText('Descrição da conclusão de Chamado'), 'abc')
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.queryByLabelText('Descrição da conclusão de Chamado')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Concluir' })).toBeInTheDocument()
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    expect(chamou).toBe(false)
+  })
+
   it('clicarNoTituloChamaAoAbrirTarefa', async () => {
     mockar([tarefa({ cardId: 7, titulo: 'Abrir', projetoId: 10 })])
     const aoAbrir = vi.fn()
