@@ -197,4 +197,56 @@ class TarefaEstadoEndToEndIT {
 
         chamar(intruso, "GET", "/cards/" + c.getId() + "/cronometro", null).expectStatus().isNotFound();
     }
+
+    // ---- Atribuir responsável faz a pessoa virar membro do projeto ----
+
+    @Test
+    void criarCardComResponsavelNaoMembroTornaOResponsavelMembro() {
+        Usuario membro = novoUsuario("e2e-atr-criar-membro@escritor.io");
+        Usuario novo = novoUsuario("e2e-atr-criar-novo@escritor.io");
+        Projeto p = projetoComMembro("Projeto Atribuir Criar", membro);
+        Coluna aFazer = coluna(p, "A fazer", 0);
+
+        chamar(membro, "POST", "/colunas/" + aFazer.getId() + "/cards",
+                "{\"titulo\":\"Nova\",\"responsavelId\":" + novo.getId() + "}")
+                .expectStatus().is2xxSuccessful();
+
+        org.assertj.core.api.Assertions.assertThat(membroProjetoRepository.existsByProjetoAndUsuario(p, novo)).isTrue();
+        chamar(novo, "GET", "/projetos/" + p.getId(), null).expectStatus().isOk();
+    }
+
+    @Test
+    void atualizarResponsavelParaNaoMembroTornaOResponsavelMembro() {
+        Usuario membro = novoUsuario("e2e-atr-patch-membro@escritor.io");
+        Usuario novo = novoUsuario("e2e-atr-patch-novo@escritor.io");
+        Projeto p = projetoComMembro("Projeto Atribuir Patch", membro);
+        Coluna aFazer = coluna(p, "A fazer", 0);
+        Card c = card(aFazer, membro, "Reatribuir");
+
+        chamar(membro, "PATCH", "/cards/" + c.getId(),
+                "{\"titulo\":\"Reatribuir\",\"responsavelId\":" + novo.getId() + "}")
+                .expectStatus().isOk();
+
+        org.assertj.core.api.Assertions.assertThat(membroProjetoRepository.existsByProjetoAndUsuario(p, novo)).isTrue();
+        chamar(novo, "GET", "/projetos/" + p.getId(), null).expectStatus().isOk();
+    }
+
+    @Test
+    void projetoPessoalNuncaGanhaMembroMasOResponsavelAindaAgeNoCard() {
+        Usuario dono = novoUsuario("e2e-atr-pessoal-dono@escritor.io");
+        Usuario outro = novoUsuario("e2e-atr-pessoal-outro@escritor.io");
+        Projeto p = projetoRepository.save(Projeto.pessoalDe(dono, LocalDate.now()));
+        membroProjetoRepository.save(new MembroProjeto(p, dono));
+        Coluna aFazer = coluna(p, "A fazer", 0);
+        coluna(p, "Feito", 1);
+        Card c = card(aFazer, dono, "Tarefa pessoal");
+
+        chamar(dono, "PATCH", "/cards/" + c.getId(),
+                "{\"titulo\":\"Tarefa pessoal\",\"responsavelId\":" + outro.getId() + "}")
+                .expectStatus().isOk();
+
+        org.assertj.core.api.Assertions.assertThat(membroProjetoRepository.existsByProjetoAndUsuario(p, outro)).isFalse();
+        chamar(outro, "GET", "/projetos/" + p.getId(), null).expectStatus().isNotFound();
+        patchEstado(outro, c.getId(), "FEITO", 200);
+    }
 }

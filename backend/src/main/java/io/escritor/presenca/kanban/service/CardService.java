@@ -3,9 +3,11 @@ package io.escritor.presenca.kanban.service;
 import io.escritor.presenca.escritorio.ws.PresencaWebSocketHandler;
 import io.escritor.presenca.escritorio.ws.PresencaWebSocketHandler.NovaTarefaWs;
 import io.escritor.presenca.escritorio.ws.PresencaWebSocketHandler.TarefaConcluidaWs;
+import io.escritor.presenca.identidade.domain.MembroProjeto;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Projeto;
 import io.escritor.presenca.identidade.domain.Usuario;
+import io.escritor.presenca.identidade.repository.MembroProjetoRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.identidade.service.ProjetoService;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
@@ -30,6 +32,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -45,6 +48,7 @@ public class CardService {
     private final ProjetoService projetoService;
     private final EnvioWhatsApp envioWhatsApp;
     private final AcessoAoCard acessoAoCard;
+    private final MembroProjetoRepository membroProjetoRepository;
 
     public CardService(
             CardRepository cardRepository,
@@ -56,7 +60,8 @@ public class CardService {
             NotificacaoService notificacaoService,
             ProjetoService projetoService,
             EnvioWhatsApp envioWhatsApp,
-            AcessoAoCard acessoAoCard) {
+            AcessoAoCard acessoAoCard,
+            MembroProjetoRepository membroProjetoRepository) {
         this.cardRepository = cardRepository;
         this.colunaRepository = colunaRepository;
         this.usuarioRepository = usuarioRepository;
@@ -67,6 +72,7 @@ public class CardService {
         this.projetoService = projetoService;
         this.envioWhatsApp = envioWhatsApp;
         this.acessoAoCard = acessoAoCard;
+        this.membroProjetoRepository = membroProjetoRepository;
     }
 
     public CardResponse criar(
@@ -91,6 +97,7 @@ public class CardService {
 
         Card novo = new Card(coluna, titulo, descricao, posicao, responsavel, prazo, estimativaMinutos, criadoPor);
         Card salvo = cardRepository.save(novo);
+        garantirMembro(coluna.getProjeto(), responsavel);
 
         // S3.17: o evento nasce aqui, dentro do mesmo serviço que cria o card - nunca é escrito
         // manualmente por outra camada (controller, evento assíncrono, etc.).
@@ -218,6 +225,7 @@ public class CardService {
 
         card.editar(titulo, descricao, novoResponsavel, prazo, estimativaMinutos);
         Card salvo = cardRepository.save(card);
+        garantirMembro(salvo.getColuna().getProjeto(), novoResponsavel);
 
         if (!Objects.equals(idDe(responsavelAnterior), idDe(novoResponsavel))) {
             cardEventoRepository.save(new CardEvento(
@@ -324,6 +332,25 @@ public class CardService {
             // quem nunca vai receber nada.
             if (destinatario.getWhatsapp() != null && !destinatario.getWhatsapp().isBlank()) {
                 envioWhatsApp.enviar(destinatario.getWhatsapp(), textoConcluida);
+            }
+        }
+    }
+
+    /** Quem vira responsável de um card passa a ser membro do projeto (pra enxergá-lo e
+     * trabalhar nele). Idempotente; sem responsável, nada; projeto pessoal nunca ganha membro (o
+     * dono é o único) - ali o responsável age só pelo {@link AcessoAoCard}. Sem aviso nem
+     * evento de histórico. */
+    private void garantirMembro(Projeto projeto, Usuario responsavel) {
+        // Usuário inativo (ex.: ex-funcionário) não ganha vínculo - a atribuição em si continua valendo.
+        if (responsavel == null || !responsavel.isAtivo() || projeto.isPessoal()) {
+            return;
+        }
+        if (!membroProjetoRepository.existsByProjetoAndUsuario(projeto, responsavel)) {
+            try {
+                membroProjetoRepository.save(new MembroProjeto(projeto, responsavel));
+            } catch (DataIntegrityViolationException jaEraMembro) {
+                // Corrida: outra requisição já adicionou o membro (uk_membro_projeto_projeto_usuario).
+                // O card já foi salvo - isso nunca pode virar erro.
             }
         }
     }
