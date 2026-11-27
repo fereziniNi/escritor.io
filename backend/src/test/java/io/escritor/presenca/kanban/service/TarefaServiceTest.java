@@ -98,7 +98,7 @@ class TarefaServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TarefaService(cardRepository, colunaRepository, projetoRepository, projetoPessoalService, cardService, projetoService);
+        service = new TarefaService(cardRepository, colunaRepository, projetoRepository, projetoPessoalService, cardService, projetoService, new AcessoAoCard(projetoService));
         lenient().when(projetoService.usuarioPodeVer(any(), any())).thenReturn(true);
     }
 
@@ -303,7 +303,8 @@ class TarefaServiceTest {
 
     @Test
     void mudarEstadoSemAcessoAoProjetoLanca404MesmoComTarefaFinalizada() {
-        Card c = card(7L, feito, null, Instant.now(), Instant.now());
+        Card c = cardDeOutroResponsavel(7L, feito, usuarioComId(5L));
+        ReflectionTestUtils.setField(c, "concluidoEm", Instant.now());
         when(cardRepository.findById(7L)).thenReturn(Optional.of(c));
         when(projetoService.usuarioPodeVer(10L, usuario)).thenReturn(false);
 
@@ -430,5 +431,50 @@ class TarefaServiceTest {
         service.criar(usuario, "X", null, null, null);
 
         verify(cardService).criar(eq(200L), eq("X"), isNull(), eq(1L), isNull(), isNull(), eq(usuario));
+    }
+
+    private Card cardDeOutroResponsavel(Long id, Coluna coluna, Usuario responsavel) {
+        Card c = card(id, coluna, null, Instant.now(), null);
+        ReflectionTestUtils.setField(c, "responsavel", responsavel);
+        return c;
+    }
+
+    @Test
+    void responsavelForaDoProjetoMudaOEstado() {
+        Usuario responsavel = usuarioComId(5L);
+        Card c = cardDeOutroResponsavel(7L, aFazer, responsavel);
+        when(cardRepository.findById(7L)).thenReturn(Optional.of(c));
+        lenient().when(projetoService.usuarioPodeVer(10L, responsavel)).thenReturn(false);
+        colunasDoProjeto();
+        when(cardRepository.findByColunaOrderByPosicaoAsc(feito)).thenReturn(List.of());
+
+        service.mudarEstado(7L, EstadoTarefa.FEITO, responsavel);
+
+        verify(cardService).mover(7L, 102L, 0, responsavel);
+    }
+
+    @Test
+    void naoResponsavelForaDoProjetoLevaNotFoundENadaMove() {
+        Usuario forasteiro = usuarioComId(6L);
+        Card c = cardDeOutroResponsavel(7L, aFazer, usuarioComId(5L));
+        when(cardRepository.findById(7L)).thenReturn(Optional.of(c));
+        when(projetoService.usuarioPodeVer(10L, forasteiro)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.mudarEstado(7L, EstadoTarefa.FEITO, forasteiro))
+                .isInstanceOf(RecursoNaoEncontradoException.class);
+        verifyNoInteractions(colunaRepository, cardService);
+    }
+
+    @Test
+    void membroQueNaoEResponsavelAindaMudaOEstado() {
+        Usuario membro = usuarioComId(8L);
+        Card c = cardDeOutroResponsavel(7L, aFazer, usuarioComId(5L));
+        when(cardRepository.findById(7L)).thenReturn(Optional.of(c));
+        colunasDoProjeto();
+        when(cardRepository.findByColunaOrderByPosicaoAsc(feito)).thenReturn(List.of());
+
+        service.mudarEstado(7L, EstadoTarefa.FEITO, membro);
+
+        verify(cardService).mover(7L, 102L, 0, membro);
     }
 }

@@ -1,7 +1,6 @@
 package io.escritor.presenca.kanban.service;
 
 import io.escritor.presenca.identidade.domain.Usuario;
-import io.escritor.presenca.identidade.service.ProjetoService;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.CardEvento;
@@ -30,8 +29,9 @@ import org.springframework.transaction.annotation.Transactional;
  * tarefa" pedido (o `HistoricoSecao` do front já lista `CardEvento` cronologicamente, com dia/hora
  * - não precisa de nada novo lá além dos rótulos dos 3 tipos novos).
  *
- * <p>Aberto a qualquer usuário autenticado que enxergue o projeto do card (membro, ou ADMIN) -
- * quem não vê recebe 404, como se o card não existisse (tarefas pessoais nunca vazam).
+ * <p>Aberto a qualquer usuário autenticado que enxergue o projeto do card (membro, ou ADMIN) ou
+ * seja o responsável por ele - quem não pode agir recebe 404, como se o card não existisse
+ * (tarefas pessoais nunca vazam).
  */
 @Service
 public class SessaoTrabalhoService {
@@ -39,19 +39,19 @@ public class SessaoTrabalhoService {
     private final CardRepository cardRepository;
     private final SessaoTrabalhoRepository sessaoTrabalhoRepository;
     private final CardEventoRepository cardEventoRepository;
-    private final ProjetoService projetoService;
+    private final AcessoAoCard acessoAoCard;
     private final Clock clock;
 
     public SessaoTrabalhoService(
             CardRepository cardRepository,
             SessaoTrabalhoRepository sessaoTrabalhoRepository,
             CardEventoRepository cardEventoRepository,
-            ProjetoService projetoService,
+            AcessoAoCard acessoAoCard,
             Clock clock) {
         this.cardRepository = cardRepository;
         this.sessaoTrabalhoRepository = sessaoTrabalhoRepository;
         this.cardEventoRepository = cardEventoRepository;
-        this.projetoService = projetoService;
+        this.acessoAoCard = acessoAoCard;
         this.clock = clock;
     }
 
@@ -146,11 +146,12 @@ public class SessaoTrabalhoService {
                 .sum();
     }
 
-    /** 404 (não 403) quando o card existe mas o projeto dele não é visível pro usuário - em
-     * especial tarefas pessoais de outras pessoas nunca são reveladas nem alteradas. */
+    /** 404 (não 403) quando o card existe mas o usuário não pode agir sobre ele (não vê o projeto
+     * e não é o responsável) - em especial tarefas pessoais de outras pessoas nunca são reveladas
+     * nem alteradas. */
     private Card buscarCard(Long id, Usuario usuario) {
         Card card = cardRepository.findById(id).orElseThrow(() -> new RecursoNaoEncontradoException("Card não encontrado: " + id));
-        if (!projetoService.usuarioPodeVer(card.getColuna().getProjeto().getId(), usuario)) {
+        if (!acessoAoCard.podeAgir(card, usuario)) {
             throw new RecursoNaoEncontradoException("Card não encontrado: " + id);
         }
         return card;
