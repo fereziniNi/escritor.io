@@ -41,9 +41,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -257,6 +259,89 @@ class CardServiceTest {
 
         verify(notificacaoService).registrar(eq(outro), eq(TipoNotificacao.NOVA_TAREFA), any(), isNull());
         verify(notificacaoService, never()).registrar(eq(criadoPor), any(), any(), any());
+    }
+
+    // ---------- Minhas tarefas: tarefa de projeto pessoal não notifica ninguém ----------
+    /** Coluna de um projeto pessoal (oculto, dono único) - privacidade: nada do que acontece aqui
+     * pode vazar por websocket global, central de notificações ou WhatsApp. */
+    private static Coluna colunaPessoal(Long id, Usuario dono) {
+        Projeto projeto = Projeto.pessoalDe(dono, LocalDate.now());
+        ReflectionTestUtils.setField(projeto, "id", 200L);
+        Coluna coluna = new Coluna(projeto, "A fazer", 0, null);
+        ReflectionTestUtils.setField(coluna, "id", id);
+        return coluna;
+    }
+
+    @Test
+    void criarEmProjetoPessoalNaoNotificaNinguem() {
+        Coluna pessoal = colunaPessoal(1L, criadoPor);
+        when(colunaRepository.findById(1L)).thenReturn(Optional.of(pessoal));
+        when(cardRepository.findFirstByColunaOrderByPosicaoDesc(pessoal)).thenReturn(Optional.empty());
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        service.criar(1L, "Tarefa privada", null, null, null, null, criadoPor);
+
+        verifyNoInteractions(presencaWebSocketHandler, notificacaoService, envioWhatsApp);
+        var captor = ArgumentCaptor.forClass(CardEvento.class);
+        verify(cardEventoRepository).save(captor.capture());
+        assertThat(captor.getValue().getTipo()).isEqualTo(TipoEventoCard.CRIACAO);
+    }
+
+    @Test
+    void moverEmProjetoPessoalNaoNotificaNinguem() {
+        Coluna origem = colunaPessoal(1L, criadoPor);
+        Coluna destino = outraColunaMesmoProjeto(origem, 2L, "Concluído");
+        Usuario admin = adminComId(20L, "Admin Geral");
+        admin.alterarWhatsapp("5511977776666");
+        Usuario quemMoveu = usuarioComId(2L);
+        Card card = cardComId(10L, origem, 1024.0);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(colunaRepository.findById(2L)).thenReturn(Optional.of(destino));
+        when(cardRepository.findByColunaOrderByPosicaoAsc(destino)).thenReturn(List.of());
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+        // cenário que notificaria num projeto normal (última coluna + admin com WhatsApp); lenient
+        // porque no projeto pessoal esses caminhos nem devem ser consultados.
+        lenient().when(colunaRepository.findByProjetoOrderByOrdemAsc(destino.getProjeto())).thenReturn(List.of(origem, destino));
+        lenient().when(usuarioRepository.findByPapelAndAtivoTrueOrderByNomeAsc(Papel.ADMIN)).thenReturn(List.of(admin));
+
+        service.mover(10L, 2L, 0, quemMoveu);
+
+        verifyNoInteractions(presencaWebSocketHandler, notificacaoService, envioWhatsApp);
+        var captor = ArgumentCaptor.forClass(CardEvento.class);
+        verify(cardEventoRepository).save(captor.capture());
+        assertThat(captor.getValue().getTipo()).isEqualTo(TipoEventoCard.MUDANCA_COLUNA);
+        verify(projetoWebSocketHandler).broadcastCardMovido(eq(200L), any());
+    }
+
+    @Test
+    void moverParaUltimaColunaEmProjetoNormalAindaNotificaOResponsavelECriador() {
+        Coluna destino = colunaComId(2L);
+        Coluna ultima = outraColunaMesmoProjeto(destino, 3L, "Concluído");
+        Usuario quemMoveu = usuarioComId(2L);
+        Card card = cardComId(10L, coluna, 1024.0);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(colunaRepository.findById(3L)).thenReturn(Optional.of(ultima));
+        when(cardRepository.findByColunaOrderByPosicaoAsc(ultima)).thenReturn(List.of());
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+        when(colunaRepository.findByProjetoOrderByOrdemAsc(ultima.getProjeto())).thenReturn(List.of(destino, ultima));
+
+        service.mover(10L, 3L, 0, quemMoveu);
+
+        verify(notificacaoService, atLeastOnce()).registrar(any(), eq(TipoNotificacao.TAREFA_CONCLUIDA), any(), any());
+    }
+
+    @Test
+    void criarEmProjetoNormalAindaNotificaOsOutrosUsuarios() {
+        Usuario outro = usuarioComId(2L);
+        when(colunaRepository.findById(1L)).thenReturn(Optional.of(coluna));
+        when(cardRepository.findFirstByColunaOrderByPosicaoDesc(coluna)).thenReturn(Optional.empty());
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+        when(usuarioRepository.findByAtivoTrueOrderByNomeAsc()).thenReturn(List.of(criadoPor, outro));
+
+        service.criar(1L, "Tarefa", null, null, null, null, criadoPor);
+
+        verify(notificacaoService, atLeastOnce()).registrar(any(), any(), any(), any());
+        verify(presencaWebSocketHandler).avisarNovaTarefa(eq(criadoPor.getId()), any());
     }
 
     // ---------- pedido do usuário: avisar o admin por WhatsApp ao criar/mover uma tarefa ----------

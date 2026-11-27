@@ -92,24 +92,28 @@ public class CardService {
         // manualmente por outra camada (controller, evento assíncrono, etc.).
         cardEventoRepository.save(new CardEvento(salvo, criadoPor, TipoEventoCard.CRIACAO, null, coluna.getNome()));
 
-        // Pedido do usuário: "quando qualquer pessoa adicionar uma tarefa nova... deve informar
-        // todos os usuários do sistema... em qual projeto foi" - broadcast global (todo mundo
-        // conectado agora, exceto quem criou), não uma lista de destinatários específicos como
-        // `avisarSeFinalizouATarefa`.
-        presencaWebSocketHandler.avisarNovaTarefa(
-                criadoPor.getId(), new NovaTarefaWs(salvo.getId(), salvo.getTitulo(), coluna.getProjeto().getNome(), criadoPor.getNome()));
-        // Mesmo escopo do broadcast acima ("todos os usuários do sistema") - diferente dele, não
-        // depende de estar conectado agora: quem estiver offline ainda vê isto na central de
-        // notificações depois (pedido do usuário: "ver as últimas que chegaram no sistema").
-        String textoNovaTarefa = criadoPor.getNome() + " criou a tarefa \"" + salvo.getTitulo() + "\" em " + coluna.getProjeto().getNome();
-        for (Usuario usuario : usuarioRepository.findByAtivoTrueOrderByNomeAsc()) {
-            if (!usuario.getId().equals(criadoPor.getId())) {
-                notificacaoService.registrar(usuario, TipoNotificacao.NOVA_TAREFA, textoNovaTarefa, null);
+        // Privacidade: tarefa de projeto pessoal ("Minhas tarefas") é só do dono - nenhum aviso
+        // (websocket global, central de notificações, WhatsApp) pode vazar pra outras pessoas.
+        if (!coluna.getProjeto().isPessoal()) {
+            // Pedido do usuário: "quando qualquer pessoa adicionar uma tarefa nova... deve informar
+            // todos os usuários do sistema... em qual projeto foi" - broadcast global (todo mundo
+            // conectado agora, exceto quem criou), não uma lista de destinatários específicos como
+            // `avisarSeFinalizouATarefa`.
+            presencaWebSocketHandler.avisarNovaTarefa(
+                    criadoPor.getId(), new NovaTarefaWs(salvo.getId(), salvo.getTitulo(), coluna.getProjeto().getNome(), criadoPor.getNome()));
+            // Mesmo escopo do broadcast acima ("todos os usuários do sistema") - diferente dele, não
+            // depende de estar conectado agora: quem estiver offline ainda vê isto na central de
+            // notificações depois (pedido do usuário: "ver as últimas que chegaram no sistema").
+            String textoNovaTarefa = criadoPor.getNome() + " criou a tarefa \"" + salvo.getTitulo() + "\" em " + coluna.getProjeto().getNome();
+            for (Usuario usuario : usuarioRepository.findByAtivoTrueOrderByNomeAsc()) {
+                if (!usuario.getId().equals(criadoPor.getId())) {
+                    notificacaoService.registrar(usuario, TipoNotificacao.NOVA_TAREFA, textoNovaTarefa, null);
+                }
             }
+            // Pedido do usuário: "criou alguma atividade... deve informar ao admin pelo WhatsApp" -
+            // além do aviso na tela acima (pra todo mundo), o admin também recebe por WhatsApp.
+            avisarAdminsPorWhatsapp(textoNovaTarefa, criadoPor);
         }
-        // Pedido do usuário: "criou alguma atividade... deve informar ao admin pelo WhatsApp" -
-        // além do aviso na tela acima (pra todo mundo), o admin também recebe por WhatsApp.
-        avisarAdminsPorWhatsapp(textoNovaTarefa, criadoPor);
 
         return CardResponse.de(salvo);
     }
@@ -170,15 +174,18 @@ public class CardService {
         if (!colunaAnterior.getId().equals(novaColuna.getId())) {
             cardEventoRepository.save(
                     new CardEvento(salvo, autor, TipoEventoCard.MUDANCA_COLUNA, colunaAnterior.getNome(), novaColuna.getNome()));
-            avisarSeFinalizouATarefa(salvo, novaColuna, autor);
-            // Pedido do usuário: "quando uma atividade muda de status, de feito para fazendo ou
-            // [...] deve informar ao admin pelo WhatsApp" - qualquer mudança de coluna, em
-            // qualquer direção (não só ao entrar na última coluna, diferente de
-            // `avisarSeFinalizouATarefa` acima) - o admin acompanha o fluxo inteiro, não só a
-            // conclusão.
-            String textoMudancaDeStatus = autor.getNome() + " moveu \"" + salvo.getTitulo() + "\" de \"" + colunaAnterior.getNome()
-                    + "\" para \"" + novaColuna.getNome() + "\" em " + novaColuna.getProjeto().getNome();
-            avisarAdminsPorWhatsapp(textoMudancaDeStatus, autor);
+            // Privacidade: projeto pessoal nunca avisa ninguém (o histórico acima continua).
+            if (!novaColuna.getProjeto().isPessoal()) {
+                avisarSeFinalizouATarefa(salvo, novaColuna, autor);
+                // Pedido do usuário: "quando uma atividade muda de status, de feito para fazendo ou
+                // [...] deve informar ao admin pelo WhatsApp" - qualquer mudança de coluna, em
+                // qualquer direção (não só ao entrar na última coluna, diferente de
+                // `avisarSeFinalizouATarefa` acima) - o admin acompanha o fluxo inteiro, não só a
+                // conclusão.
+                String textoMudancaDeStatus = autor.getNome() + " moveu \"" + salvo.getTitulo() + "\" de \"" + colunaAnterior.getNome()
+                        + "\" para \"" + novaColuna.getNome() + "\" em " + novaColuna.getProjeto().getNome();
+                avisarAdminsPorWhatsapp(textoMudancaDeStatus, autor);
+            }
         }
 
         projetoWebSocketHandler.broadcastCardMovido(novaColuna.getProjeto().getId(), response);
