@@ -73,6 +73,7 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
 
   function itemDaTarefa(t: Tarefa) {
     const cor = corDoProjeto(t.projetoId)
+    const opcoes = ESTADOS.filter((e) => e.valor === t.estado || (t.estadosDisponiveis ?? []).includes(e.valor))
     const urgente = t.estado !== 'FEITO' && t.prazo !== null && t.prazo <= hoje
     return (
       <li key={t.cardId} className="tarefa-item">
@@ -83,9 +84,10 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
           <select
             aria-label={`Estado de ${t.titulo}`}
             value={t.estado}
+            disabled={opcoes.length === 1}
             onChange={(e) => estadoMutation.mutate({ cardId: t.cardId, estado: e.target.value as EstadoTarefa })}
           >
-            {ESTADOS.map((e) => (
+            {opcoes.map((e) => (
               <option key={e.valor} value={e.valor}>
                 {e.rotulo}
               </option>

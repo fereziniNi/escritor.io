@@ -655,6 +655,7 @@ class CardServiceTest {
     @Test
     void moverParaAUltimaColunaDoProjetoNotificaResponsavelECriadorExcetoQuemMoveu() {
         Coluna destino = colunaComId(2L);
+        ReflectionTestUtils.setField(destino, "nome", "Concluído");
         Coluna primeiraColuna = outraColunaMesmoProjeto(destino, 1L, "A fazer");
         Usuario responsavel = usuarioComId(3L);
         Usuario quemMoveu = usuarioComId(4L);
@@ -686,6 +687,7 @@ class CardServiceTest {
     @Test
     void moverParaAUltimaColunaAvisaPorWhatsappQuemTemNumeroCadastrado() {
         Coluna destino = colunaComId(2L);
+        ReflectionTestUtils.setField(destino, "nome", "Concluído");
         Coluna primeiraColuna = outraColunaMesmoProjeto(destino, 1L, "A fazer");
         Usuario responsavel = usuarioComId(3L);
         responsavel.alterarWhatsapp("5511988887777");
@@ -724,6 +726,7 @@ class CardServiceTest {
     @Test
     void moverParaAUltimaColunaSemResponsavelNotificaSoOCriador() {
         Coluna destino = colunaComId(2L);
+        ReflectionTestUtils.setField(destino, "nome", "Concluído");
         Coluna primeiraColuna = outraColunaMesmoProjeto(destino, 1L, "A fazer");
         Usuario quemMoveu = usuarioComId(4L);
         Card card = cardComId(10L, primeiraColuna, 1024.0); // sem responsável, criadoPor = campo da classe (id 1)
@@ -741,6 +744,7 @@ class CardServiceTest {
     @Test
     void moverParaAUltimaColunaComResponsavelIgualAoCriadorNotificaUmaVezSo() {
         Coluna destino = colunaComId(2L);
+        ReflectionTestUtils.setField(destino, "nome", "Concluído");
         Coluna primeiraColuna = outraColunaMesmoProjeto(destino, 1L, "A fazer");
         Usuario quemMoveu = usuarioComId(4L);
         Card card = new Card(primeiraColuna, "Corrigir bug", null, 1024.0, criadoPor, null, null, criadoPor);
@@ -772,6 +776,51 @@ class CardServiceTest {
         service.mover(10L, 2L, 0, criadoPor);
 
         verify(presencaWebSocketHandler, never()).avisarTarefaConcluida(any(), any());
+    }
+
+    private void moverParaEVerificar(Coluna origem, Coluna destino, List<Coluna> colunasDoProjeto, boolean deveNotificar) {
+        Usuario responsavel = usuarioComId(3L);
+        Usuario quemMoveu = usuarioComId(4L);
+        Card card = new Card(origem, "Corrigir bug", null, 1024.0, responsavel, null, null, criadoPor);
+        ReflectionTestUtils.setField(card, "id", 10L);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(colunaRepository.findById(destino.getId())).thenReturn(Optional.of(destino));
+        when(cardRepository.findByColunaOrderByPosicaoAsc(destino)).thenReturn(List.of());
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+        when(colunaRepository.findByProjetoOrderByOrdemAsc(destino.getProjeto())).thenReturn(colunasDoProjeto);
+
+        service.mover(10L, destino.getId(), 0, quemMoveu);
+
+        if (deveNotificar) {
+            verify(presencaWebSocketHandler).avisarTarefaConcluida(eq(responsavel.getId()), any());
+        } else {
+            verify(presencaWebSocketHandler, never()).avisarTarefaConcluida(any(), any());
+            verify(notificacaoService, never()).registrar(any(), eq(TipoNotificacao.TAREFA_CONCLUIDA), any(), any());
+        }
+    }
+
+    @Test
+    void moverParaFeitoQueNaoEAUltimaColunaNotifica() {
+        Coluna fazendo = outraColunaMesmoProjeto(colunaComId(9L), 1L, "Fazendo");
+        Coluna feito = outraColunaMesmoProjeto(fazendo, 2L, "Feito");
+        Coluna backlog = outraColunaMesmoProjeto(fazendo, 3L, "Backlog");
+        moverParaEVerificar(fazendo, feito, List.of(fazendo, feito, backlog), true);
+    }
+
+    @Test
+    void moverParaBacklogUltimaColunaNaoNotifica() {
+        Coluna fazendo = outraColunaMesmoProjeto(colunaComId(9L), 1L, "Fazendo");
+        Coluna feito = outraColunaMesmoProjeto(fazendo, 2L, "Feito");
+        Coluna backlog = outraColunaMesmoProjeto(fazendo, 3L, "Backlog");
+        moverParaEVerificar(fazendo, backlog, List.of(fazendo, feito, backlog), false);
+    }
+
+    @Test
+    void ultimaColunaComNomeNaoReconhecidoAindaNotificaPorPosicao() {
+        Coluna primeira = outraColunaMesmoProjeto(colunaComId(9L), 1L, "Fila");
+        Coluna meio = outraColunaMesmoProjeto(primeira, 2L, "Revisão");
+        Coluna ultima = outraColunaMesmoProjeto(primeira, 3L, "Publicado");
+        moverParaEVerificar(primeira, ultima, List.of(primeira, meio, ultima), true);
     }
 
     @Test

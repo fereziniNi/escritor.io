@@ -14,6 +14,7 @@ import io.escritor.presenca.kanban.domain.CalculadoraPosicao;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.CardEvento;
 import io.escritor.presenca.kanban.domain.Coluna;
+import io.escritor.presenca.kanban.domain.EstadoTarefa;
 import io.escritor.presenca.kanban.domain.LimiteWipExcedidoException;
 import io.escritor.presenca.kanban.domain.TipoEventoCard;
 import io.escritor.presenca.kanban.repository.CardEventoRepository;
@@ -264,8 +265,9 @@ public class CardService {
     /**
      * Pedido do usuário: "sempre que alguém finalizar uma tarefa... notificado ao usuário" - o
      * board não tem uma coluna com significado fixo de "concluído" (nomes livres, só
-     * `Coluna.ordem` pra ordenar), então a heurística é a convenção usual de Kanban: entrar na
-     * ÚLTIMA coluna do projeto (maior `ordem`) conta como "terminou". Avisa o responsável e/ou
+     * `Coluna.ordem` pra ordenar), então a heurística é a mesma de "Minhas tarefas"
+     * ({@link EstadoTarefa#estadoDaColuna}): entrar numa coluna cujo NOME indica Feito (ou, se o
+     * nome não for reconhecido, na ÚLTIMA coluna do projeto) conta como "terminou". Avisa o responsável e/ou
      * criador do card - nunca quem fez o próprio movimento (mover o próprio card não é novidade
      * pra quem moveu). Um board de coluna única não dispara nada (não existe "última coluna
      * diferente da atual" pra chegar).
@@ -278,8 +280,17 @@ public class CardService {
         if (colunasDoProjeto.isEmpty()) {
             return;
         }
-        Coluna ultimaColuna = colunasDoProjeto.get(colunasDoProjeto.size() - 1);
-        if (!ultimaColuna.getId().equals(colunaDestino.getId())) {
+        int posicaoDoDestino = -1;
+        for (int i = 0; i < colunasDoProjeto.size(); i++) {
+            if (colunasDoProjeto.get(i).getId().equals(colunaDestino.getId())) {
+                posicaoDoDestino = i;
+                break;
+            }
+        }
+        if (posicaoDoDestino < 0
+                || EstadoTarefa.estadoDaColuna(
+                                colunaDestino.getNome(), posicaoDoDestino, colunasDoProjeto.size(), false)
+                        != EstadoTarefa.FEITO) {
             return;
         }
 

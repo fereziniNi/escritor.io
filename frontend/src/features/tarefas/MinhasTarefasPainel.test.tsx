@@ -32,6 +32,7 @@ function tarefa(parcial: Partial<Tarefa>): Tarefa {
     prazo: null,
     estimativaMinutos: null,
     concluidoEm: null,
+    estadosDisponiveis: ['A_FAZER', 'EM_ANDAMENTO', 'FEITO'],
     ...parcial,
   }
 }
@@ -243,6 +244,63 @@ describe('MinhasTarefasPainel', () => {
     await vi.waitFor(() => expect(corpo).toEqual({ estado: 'EM_ANDAMENTO' }))
     const secao = await screen.findByRole('region', { name: 'Em andamento' })
     expect(await within(secao).findByText('Mover')).toBeInTheDocument()
+  })
+
+  it('seletorDeEstadoMostraSoOsEstadosDisponiveis', async () => {
+    mockar([tarefa({ cardId: 1, titulo: 'Duas etapas', estadosDisponiveis: ['A_FAZER', 'FEITO'] })])
+    renderPainel()
+
+    const seletor = await screen.findByLabelText('Estado de Duas etapas')
+    const opcoes = within(seletor).getAllByRole('option').map((o) => o.textContent)
+    expect(opcoes).toEqual(['A fazer', 'Feito'])
+    expect(seletor).not.toBeDisabled()
+  })
+
+  it('seletorSempreIncluiOEstadoAtualMesmoAusenteDosDisponiveis', async () => {
+    mockar([tarefa({ cardId: 1, titulo: 'Ausente', estado: 'EM_ANDAMENTO', estadosDisponiveis: ['A_FAZER', 'FEITO'] })])
+    renderPainel()
+
+    const seletor = await screen.findByLabelText('Estado de Ausente')
+    const opcoes = within(seletor).getAllByRole('option').map((o) => o.textContent)
+    expect(opcoes).toEqual(['A fazer', 'Em andamento', 'Feito'])
+    expect(seletor).toHaveValue('EM_ANDAMENTO')
+  })
+
+  it('seletorComUmaUnicaOpcaoFicaDesabilitado', async () => {
+    mockar([tarefa({ cardId: 1, titulo: 'Chamado', estado: 'EM_ANDAMENTO', estadosDisponiveis: ['EM_ANDAMENTO'] })])
+    renderPainel()
+
+    const seletor = await screen.findByLabelText('Estado de Chamado')
+    expect(within(seletor).getAllByRole('option')).toHaveLength(1)
+    expect(seletor).toBeDisabled()
+  })
+
+  it('projetoFazendoFeitoBacklogMostraOsTresEstados', async () => {
+    mockar([
+      tarefa({
+        cardId: 1,
+        titulo: 'No backlog',
+        estado: 'A_FAZER',
+        estadosDisponiveis: ['A_FAZER', 'EM_ANDAMENTO', 'FEITO'],
+      }),
+    ])
+    renderPainel()
+
+    const seletor = await screen.findByLabelText('Estado de No backlog')
+    const opcoes = within(seletor).getAllByRole('option').map((o) => o.textContent)
+    expect(opcoes).toEqual(['A fazer', 'Em andamento', 'Feito'])
+    expect(seletor).toHaveValue('A_FAZER')
+  })
+
+  it('tarefaSemEstadosDisponiveisDeBackendAntigoMostraSoOEstadoAtual', async () => {
+    const semCampo = { ...tarefa({ cardId: 1, titulo: 'Legada', estado: 'EM_ANDAMENTO' }) } as Partial<Tarefa>
+    delete semCampo.estadosDisponiveis
+    mockar([semCampo as Tarefa])
+    renderPainel()
+
+    const seletor = await screen.findByLabelText('Estado de Legada')
+    expect(within(seletor).getAllByRole('option').map((o) => o.textContent)).toEqual(['Em andamento'])
+    expect(seletor).toBeDisabled()
   })
 
   it('erroAoTrocarEstadoMostraMensagem', async () => {

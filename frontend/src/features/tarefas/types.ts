@@ -10,4 +10,5 @@ export interface Tarefa {
   prazo: string | null
   estimativaMinutos: number | null
   concluidoEm: string | null
+  estadosDisponiveis: EstadoTarefa[]
 }

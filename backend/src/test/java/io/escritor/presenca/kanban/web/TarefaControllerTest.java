@@ -42,7 +42,8 @@ class TarefaControllerTest {
     private ContextoUsuarioAutenticado contextoUsuarioAutenticado;
 
     private static TarefaResponse resposta(EstadoTarefa estado) {
-        return new TarefaResponse(7L, "Escrever", null, null, true, estado, LocalDate.of(2026, 12, 1), 30, null);
+        return new TarefaResponse(7L, "Escrever", null, null, true, estado, LocalDate.of(2026, 12, 1), 30, null,
+                List.of(EstadoTarefa.A_FAZER, EstadoTarefa.FEITO));
     }
 
     @Test
