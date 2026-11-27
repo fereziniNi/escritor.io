@@ -101,7 +101,7 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    location ~ ^/(health|auth|admin|usuarios|equipes|projetos|escala|chat|integracoes|ponto|ajustes|quadros|colunas|cards|apontamentos|cronometro|happy-hour|mapas|relatorios|notificacoes) {
+    location ~ ^/(health|auth|admin|usuarios|equipes|projetos|escala|chat|integracoes|ponto|ajustes|quadros|colunas|cards|apontamentos|cronometro|happy-hour|mapas|relatorios|notificacoes|tarefas) {
         set $backend_upstream http://${BACKEND_HOST}:${BACKEND_PORT};
         proxy_pass $backend_upstream;
         proxy_set_header Host $host;
