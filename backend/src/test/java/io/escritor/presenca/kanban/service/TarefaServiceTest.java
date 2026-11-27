@@ -312,15 +312,69 @@ class TarefaServiceTest {
         verifyNoInteractions(colunaRepository, cardService);
     }
 
+
     @Test
-    void mudarEstadoEmProjetoDeUmaColunaDevolveOEstadoRealEmVezDoPedido() {
+    void mudarEstadoEmProjetoDeUmaColunaFazendoParaEstadoAusenteLancaIndisponivel() {
+        Coluna fazendo = colunaComId(projeto, 103L, "Fazendo", 0);
+        Card c = card(7L, fazendo, null, Instant.now(), null);
+        when(cardRepository.findById(7L)).thenReturn(Optional.of(c));
+        when(colunaRepository.findByProjetoOrderByOrdemAsc(projeto)).thenReturn(List.of(fazendo));
+
+        assertThatThrownBy(() -> service.mudarEstado(7L, EstadoTarefa.FEITO, usuario))
+                .isInstanceOf(EstadoTarefaIndisponivelException.class);
+        verify(cardService, never()).mover(any(), any(), anyInt(), any());
+    }
+
+    @Test
+    void cardEmColunaBacklogListaComoAFazerEExpoeEstadosDisponiveis() {
+        Coluna fazendo = colunaComId(projeto, 103L, "Fazendo", 1);
+        Coluna feitoCol = colunaComId(projeto, 104L, "Feito", 2);
+        Coluna backlog = colunaComId(projeto, 105L, "Backlog", 3);
+        Card c = card(7L, backlog, null, Instant.now(), null);
+        when(cardRepository.findByResponsavelAndArquivadoFalse(usuario)).thenReturn(List.of(c));
+        when(colunaRepository.findByProjetoOrderByOrdemAsc(projeto)).thenReturn(List.of(fazendo, feitoCol, backlog));
+
+        TarefaResponse t = service.listarMinhas(usuario).get(0);
+
+        assertThat(t.estado()).isEqualTo(EstadoTarefa.A_FAZER);
+        assertThat(t.estadosDisponiveis())
+                .containsExactly(EstadoTarefa.A_FAZER, EstadoTarefa.EM_ANDAMENTO, EstadoTarefa.FEITO);
+    }
+
+    @Test
+    void cardEmColunaFeitoNaoUltimaListaComoFeito() {
+        Coluna feitoCol = colunaComId(projeto, 104L, "Feito", 1);
+        Coluna backlog = colunaComId(projeto, 105L, "Backlog", 2);
+        Card c = card(7L, feitoCol, null, Instant.now(), null);
+        when(cardRepository.findByResponsavelAndArquivadoFalse(usuario)).thenReturn(List.of(c));
+        when(colunaRepository.findByProjetoOrderByOrdemAsc(projeto)).thenReturn(List.of(aFazer, feitoCol, backlog));
+
+        assertThat(service.listarMinhas(usuario).get(0).estado()).isEqualTo(EstadoTarefa.FEITO);
+    }
+
+    @Test
+    void mudarEstadoParaEtapaExistenteMovePelaColunaDeNome() {
+        Coluna fazendo = colunaComId(projeto, 103L, "Fazendo", 0);
+        Coluna feitoCol = colunaComId(projeto, 104L, "Feito", 1);
+        Coluna backlog = colunaComId(projeto, 105L, "Backlog", 2);
+        Card c = card(7L, fazendo, null, Instant.now(), null);
+        when(cardRepository.findById(7L)).thenReturn(Optional.of(c));
+        when(colunaRepository.findByProjetoOrderByOrdemAsc(projeto)).thenReturn(List.of(fazendo, feitoCol, backlog));
+        when(cardRepository.findByColunaOrderByPosicaoAsc(backlog)).thenReturn(List.of());
+
+        TarefaResponse resposta = service.mudarEstado(7L, EstadoTarefa.A_FAZER, usuario);
+
+        verify(cardService).mover(7L, 105L, 0, usuario);
+        assertThat(resposta.estado()).isEqualTo(EstadoTarefa.A_FAZER);
+    }
+
+    @Test
+    void mudarEstadoEmProjetoSemColunasLancaProjetoSemColunas() {
         Card c = card(7L, aFazer, null, Instant.now(), null);
         when(cardRepository.findById(7L)).thenReturn(Optional.of(c));
-        when(colunaRepository.findByProjetoOrderByOrdemAsc(projeto)).thenReturn(List.of(aFazer));
-        when(cardRepository.findByColunaOrderByPosicaoAsc(aFazer)).thenReturn(List.of(c));
+        when(colunaRepository.findByProjetoOrderByOrdemAsc(projeto)).thenReturn(List.of());
 
-        TarefaResponse resposta = service.mudarEstado(7L, EstadoTarefa.FEITO, usuario);
-
-        assertThat(resposta.estado()).isEqualTo(EstadoTarefa.A_FAZER);
+        assertThatThrownBy(() -> service.mudarEstado(7L, EstadoTarefa.A_FAZER, usuario))
+                .isInstanceOf(ProjetoSemColunasException.class);
     }
 }
