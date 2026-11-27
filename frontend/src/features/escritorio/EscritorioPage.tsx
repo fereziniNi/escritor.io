@@ -11,6 +11,7 @@ import { HappyHourPainel } from '../happyhour/HappyHourPainel'
 import { buscarNotificacoes, marcarNotificacoesComoLidas } from '../notificacoes/api'
 import { NotificacoesPainel } from '../notificacoes/NotificacoesPainel'
 import { SkillsPainel } from '../skills/SkillsPainel'
+import { MinhasTarefasPainel } from '../tarefas/MinhasTarefasPainel'
 import { buscarMapaAtivo } from './api'
 import { APARENCIA_PADRAO } from './avatar/aparenciaAvatar'
 import { ConfiguracoesPessoaisPage } from './ConfiguracoesPessoaisPage'
@@ -56,6 +57,7 @@ const TITULO_PAINEL: Record<PainelId, string> = {
   happyHour: '🎉 Happy Hour',
   notificacoes: '🔔 Notificações',
   skills: '🧩 Skills',
+  tarefas: '✅ Minhas tarefas',
 }
 
 /**
@@ -447,7 +449,7 @@ export function EscritorioPage() {
         <PainelFlutuante
           titulo={TITULO_PAINEL[painelAberto]}
           aoFechar={() => setPainelAberto(null)}
-          largo={painelAberto === 'projetos' || painelAberto === 'reunioes'}
+          largo={painelAberto === 'projetos' || painelAberto === 'reunioes' || painelAberto === 'tarefas'}
         >
           {painelAberto === 'ponto' && <PainelPonto />}
           {painelAberto === 'configuracoes' && (
@@ -465,6 +467,15 @@ export function EscritorioPage() {
           {painelAberto === 'whatsapp' && <IntegracaoWhatsAppPage />}
           {painelAberto === 'happyHour' && <HappyHourPainel />}
           {painelAberto === 'skills' && <SkillsPainel papel={papel} />}
+          {painelAberto === 'tarefas' && (
+            <MinhasTarefasPainel
+              aoAbrirTarefa={(projetoId, cardId) => {
+                // mesmo fluxo do widget do cronômetro ativo (updates em lote no mesmo handler)
+                setSelecaoProjeto({ projetoId, cardId })
+                setPainelAberto('projetos')
+              }}
+            />
+          )}
           {painelAberto === 'notificacoes' && <NotificacoesPainel itens={notificacoesQuery.data?.itens ?? []} />}
         </PainelFlutuante>
       )}

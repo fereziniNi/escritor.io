@@ -22,6 +22,8 @@ export type PainelId =
   | 'notificacoes'
   // Catálogo de Skills (🧩) - visível a todos os papéis.
   | 'skills'
+  // Painel "Minhas tarefas" (✅) - lista as tarefas do usuário (de projetos e pessoais).
+  | 'tarefas'
 
 /**
  * Toolbar inferior - substitui o `.escritorio-dock` antigo (botões com texto+emoji lado a lado)
@@ -127,6 +129,15 @@ export function BarraFerramentas({
             📱
           </button>
         )}
+        <button
+          type="button"
+          className={`escritorio-toolbar-botao${painelAberto === 'tarefas' ? ' escritorio-toolbar-botao--ativo' : ''}`}
+          aria-label="Minhas tarefas"
+          title="Minhas tarefas"
+          onClick={() => aoAbrirPainel('tarefas')}
+        >
+          ✅
+        </button>
         <button
           type="button"
           className={`escritorio-toolbar-botao${painelAberto === 'skills' ? ' escritorio-toolbar-botao--ativo' : ''}`}
