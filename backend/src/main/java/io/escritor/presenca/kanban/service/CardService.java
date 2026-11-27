@@ -32,6 +32,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -94,10 +95,9 @@ public class CardService {
                 .orElse(null);
         double posicao = CalculadoraPosicao.entre(ultimaPosicao, null);
 
-        garantirMembro(coluna.getProjeto(), responsavel);
-
         Card novo = new Card(coluna, titulo, descricao, posicao, responsavel, prazo, estimativaMinutos, criadoPor);
         Card salvo = cardRepository.save(novo);
+        garantirMembro(coluna.getProjeto(), responsavel);
 
         // S3.17: o evento nasce aqui, dentro do mesmo serviço que cria o card - nunca é escrito
         // manualmente por outra camada (controller, evento assíncrono, etc.).
@@ -223,10 +223,9 @@ public class CardService {
         Usuario responsavelAnterior = card.getResponsavel();
         Usuario novoResponsavel = responsavelId == null ? null : buscarUsuario(responsavelId);
 
-        garantirMembro(card.getColuna().getProjeto(), novoResponsavel);
-
         card.editar(titulo, descricao, novoResponsavel, prazo, estimativaMinutos);
         Card salvo = cardRepository.save(card);
+        garantirMembro(salvo.getColuna().getProjeto(), novoResponsavel);
 
         if (!Objects.equals(idDe(responsavelAnterior), idDe(novoResponsavel))) {
             cardEventoRepository.save(new CardEvento(
@@ -342,11 +341,17 @@ public class CardService {
      * dono é o único) - ali o responsável age só pelo {@link AcessoAoCard}. Sem aviso nem
      * evento de histórico. */
     private void garantirMembro(Projeto projeto, Usuario responsavel) {
-        if (responsavel == null || projeto.isPessoal()) {
+        // Usuário inativo (ex.: ex-funcionário) não ganha vínculo - a atribuição em si continua valendo.
+        if (responsavel == null || !responsavel.isAtivo() || projeto.isPessoal()) {
             return;
         }
         if (!membroProjetoRepository.existsByProjetoAndUsuario(projeto, responsavel)) {
-            membroProjetoRepository.save(new MembroProjeto(projeto, responsavel));
+            try {
+                membroProjetoRepository.save(new MembroProjeto(projeto, responsavel));
+            } catch (DataIntegrityViolationException jaEraMembro) {
+                // Corrida: outra requisição já adicionou o membro (uk_membro_projeto_projeto_usuario).
+                // O card já foi salvo - isso nunca pode virar erro.
+            }
         }
     }
 

@@ -15,6 +15,7 @@ import io.escritor.presenca.kanban.domain.CalculadoraPosicao;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.CardEvento;
 import io.escritor.presenca.kanban.domain.Coluna;
+import io.escritor.presenca.kanban.domain.EstimativaInvalidaException;
 import io.escritor.presenca.kanban.domain.LimiteWipExcedidoException;
 import io.escritor.presenca.kanban.domain.TipoEventoCard;
 import io.escritor.presenca.kanban.domain.TituloCardObrigatorioException;
@@ -35,6 +36,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -1153,5 +1155,87 @@ class CardServiceTest {
         service.atualizar(10L, "Título", null, 2L, null, null, criadoPor);
 
         verify(membroProjetoRepository, never()).save(any());
+    }
+
+    @Test
+    void criarComResponsavelInativoNaoAdicionaMembro() {
+        Usuario inativo = usuarioComId(2L);
+        ReflectionTestUtils.setField(inativo, "ativo", false);
+        when(colunaRepository.findById(1L)).thenReturn(Optional.of(coluna));
+        when(cardRepository.findFirstByColunaOrderByPosicaoDesc(coluna)).thenReturn(Optional.empty());
+        when(usuarioRepository.findById(2L)).thenReturn(Optional.of(inativo));
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        service.criar(1L, "Tarefa", null, 2L, null, null, criadoPor);
+
+        verify(membroProjetoRepository, never()).save(any());
+    }
+
+    @Test
+    void atualizarComResponsavelInativoNaoAdicionaMembro() {
+        Card card = cardComId(10L, coluna, 1024.0);
+        Usuario inativo = usuarioComId(2L);
+        ReflectionTestUtils.setField(inativo, "ativo", false);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(usuarioRepository.findById(2L)).thenReturn(Optional.of(inativo));
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        service.atualizar(10L, "Título", null, 2L, null, null, criadoPor);
+
+        verify(membroProjetoRepository, never()).save(any());
+    }
+
+    @Test
+    void criarComEstimativaInvalidaNaoAdicionaMembro() {
+        Usuario responsavel = usuarioComId(2L);
+        when(colunaRepository.findById(1L)).thenReturn(Optional.of(coluna));
+        when(cardRepository.findFirstByColunaOrderByPosicaoDesc(coluna)).thenReturn(Optional.empty());
+        when(usuarioRepository.findById(2L)).thenReturn(Optional.of(responsavel));
+
+        assertThatThrownBy(() -> service.criar(1L, "Tarefa", null, 2L, null, 0, criadoPor))
+                .isInstanceOf(EstimativaInvalidaException.class);
+
+        verify(membroProjetoRepository, never()).save(any());
+    }
+
+    @Test
+    void atualizarComEstimativaInvalidaNaoAdicionaMembro() {
+        Card card = cardComId(10L, coluna, 1024.0);
+        Usuario responsavel = usuarioComId(2L);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(usuarioRepository.findById(2L)).thenReturn(Optional.of(responsavel));
+
+        assertThatThrownBy(() -> service.atualizar(10L, "Título", null, 2L, null, 0, criadoPor))
+                .isInstanceOf(EstimativaInvalidaException.class);
+
+        verify(membroProjetoRepository, never()).save(any());
+    }
+
+    @Test
+    void criarToleraCorridaNaGravacaoDoMembro() {
+        Usuario responsavel = usuarioComId(2L);
+        when(colunaRepository.findById(1L)).thenReturn(Optional.of(coluna));
+        when(cardRepository.findFirstByColunaOrderByPosicaoDesc(coluna)).thenReturn(Optional.empty());
+        when(usuarioRepository.findById(2L)).thenReturn(Optional.of(responsavel));
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+        when(membroProjetoRepository.save(any())).thenThrow(new DataIntegrityViolationException("duplicado"));
+
+        var resposta = service.criar(1L, "Tarefa", null, 2L, null, null, criadoPor);
+
+        assertThat(resposta.responsavelId()).isEqualTo(2L);
+    }
+
+    @Test
+    void atualizarToleraCorridaNaGravacaoDoMembro() {
+        Card card = cardComId(10L, coluna, 1024.0);
+        Usuario responsavel = usuarioComId(2L);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(usuarioRepository.findById(2L)).thenReturn(Optional.of(responsavel));
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+        when(membroProjetoRepository.save(any())).thenThrow(new DataIntegrityViolationException("duplicado"));
+
+        var resposta = service.atualizar(10L, "Título", null, 2L, null, null, criadoPor);
+
+        assertThat(resposta.responsavelId()).isEqualTo(2L);
     }
 }
