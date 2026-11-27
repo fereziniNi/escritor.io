@@ -64,7 +64,9 @@ public class ProjetoService {
     public List<ProjetoResponse> listarVisiveis(Usuario usuario) {
         Set<Long> projetoIds = projetoIdsDoUsuario(usuario);
 
+        // Projeto pessoal (lista "Minhas tarefas") não aparece nas listas; o dono ainda o abre via buscarDetalhe.
         return projetoRepository.findAll().stream()
+                .filter(projeto -> !projeto.isPessoal())
                 .filter(projeto -> RegraVisibilidadeProjeto.visivel(projeto.getId(), projetoIds))
                 .map(ProjetoResponse::de)
                 .toList();
@@ -125,6 +127,11 @@ public class ProjetoService {
      */
     public void adicionarMembro(Long projetoId, AdicionarMembroProjetoRequest request, Usuario solicitante) {
         Projeto projeto = buscarProjeto(projetoId);
+        // Projeto pessoal: o dono é o único membro - nem o ADMIN (que ignora a checagem de
+        // membro abaixo) nem o próprio dono podem adicionar ninguém.
+        if (projeto.isPessoal()) {
+            throw new AcessoNegadoException("Projeto pessoal não aceita outros membros");
+        }
         if (solicitante.getPapel() != Papel.ADMIN && !membroProjetoRepository.existsByProjetoAndUsuario(projeto, solicitante)) {
             throw new AcessoNegadoException("Só um membro deste projeto (ou ADMIN) pode adicionar novos membros a ele");
         }

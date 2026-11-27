@@ -230,4 +230,45 @@ class ProjetoServiceTest {
 
         assertThatThrownBy(() -> service.buscarDetalhe(99L, usuario)).isInstanceOf(RecursoNaoEncontradoException.class);
     }
+
+    @Test
+    void listarVisiveisEscondeProjetoPessoal() {
+        Projeto normal = projetoComId(1L, "Backlog");
+        Projeto pessoal = Projeto.pessoalDe(usuario, LocalDate.now());
+        ReflectionTestUtils.setField(pessoal, "id", 2L);
+        when(membroProjetoRepository.findByUsuario(usuario))
+                .thenReturn(List.of(membroProjeto(normal, usuario), membroProjeto(pessoal, usuario)));
+        when(projetoRepository.findAll()).thenReturn(List.of(normal, pessoal));
+
+        var visiveis = service.listarVisiveis(usuario);
+
+        assertThat(visiveis).hasSize(1);
+        assertThat(visiveis.get(0).nome()).isEqualTo("Backlog");
+    }
+
+    @Test
+    void dono_buscaDetalheDoProprioProjetoPessoal() {
+        Projeto pessoal = Projeto.pessoalDe(usuario, LocalDate.now());
+        ReflectionTestUtils.setField(pessoal, "id", 2L);
+        when(projetoRepository.findById(2L)).thenReturn(Optional.of(pessoal));
+        when(membroProjetoRepository.findByUsuario(usuario)).thenReturn(List.of(membroProjeto(pessoal, usuario)));
+        when(membroProjetoRepository.findByProjeto(pessoal)).thenReturn(List.of(membroProjeto(pessoal, usuario)));
+        when(colunaRepository.findByProjetoOrderByOrdemAsc(pessoal)).thenReturn(List.of());
+
+        var detalhe = service.buscarDetalhe(2L, usuario);
+
+        assertThat(detalhe.nome()).isEqualTo("Pessoal");
+    }
+
+    @Test
+    void adicionarMembroEmProjetoPessoalLancaAcessoNegadoMesmoParaAdmin() {
+        Projeto pessoal = Projeto.pessoalDe(usuario, LocalDate.now());
+        ReflectionTestUtils.setField(pessoal, "id", 2L);
+        when(projetoRepository.findById(2L)).thenReturn(Optional.of(pessoal));
+
+        assertThatThrownBy(() -> service.adicionarMembro(2L, new AdicionarMembroProjetoRequest(admin.getId()), admin))
+                .isInstanceOf(AcessoNegadoException.class);
+
+        verify(membroProjetoRepository, never()).save(any());
+    }
 }

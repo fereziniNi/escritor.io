@@ -525,6 +525,95 @@ describe('EscritorioPage', () => {
     expect(await screen.findByText('Nenhuma skill encontrada.')).toBeInTheDocument()
   })
 
+  it('botaoMinhasTarefasAbreOPainel: o botão ✅ Minhas tarefas do dock abre o painel', async () => {
+    server.use(
+      http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)),
+      handlerPontoAberto(),
+      handlerHealthOk(),
+      http.get('/tarefas/minhas', () => HttpResponse.json([])),
+      http.get('/projetos', () => HttpResponse.json([])),
+    )
+    renderPagina()
+    await screen.findByTestId('mundo-canvas-host')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Minhas tarefas' }))
+
+    expect(await screen.findByRole('dialog', { name: /minhas tarefas/i })).toBeInTheDocument()
+    expect(await screen.findByText('Você não tem tarefas.')).toBeInTheDocument()
+  })
+
+  it('clicarEmUmaTarefaAbreOProjetoComOCard: clicar numa tarefa abre Projetos no projeto dela com o card expandido', async () => {
+    const projetoDetalhe = {
+      id: 1,
+      nome: 'Backlog',
+      cliente: 'Cliente Teste',
+      status: 'ATIVO',
+      inicio: '2026-01-01',
+      fimPrevisto: null,
+      membros: [{ usuarioId: 1, usuarioNome: 'Ana Souza' }],
+      colunas: [
+        {
+          id: 5,
+          nome: 'A fazer',
+          ordem: 0,
+          limiteWip: null,
+          cards: [
+            {
+              id: 7,
+              colunaId: 5,
+              titulo: 'Corrigir bug',
+              descricao: null,
+              posicao: 1024,
+              responsavelId: null,
+              prazo: null,
+              estimativaMinutos: null,
+              criadoPorId: 1,
+              criadoEm: '2026-01-15T09:00:00Z',
+              arquivado: false,
+            },
+          ],
+        },
+      ],
+    }
+    server.use(
+      http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)),
+      handlerPontoAberto(),
+      handlerHealthOk(),
+      http.get('/tarefas/minhas', () =>
+        HttpResponse.json([
+          {
+            cardId: 7,
+            titulo: 'Corrigir bug',
+            projetoId: 1,
+            projetoNome: 'Backlog',
+            pessoal: false,
+            estado: 'A_FAZER',
+            prazo: null,
+            estimativaMinutos: null,
+            concluidoEm: null,
+          },
+        ]),
+      ),
+      http.get('/projetos', () => HttpResponse.json([])),
+      http.get('/projetos/1', () => HttpResponse.json(projetoDetalhe)),
+      http.get('/usuarios/basico', () => HttpResponse.json([{ id: 1, nome: 'Ana Souza' }])),
+      http.get('/cards/7/cronometro', () =>
+        HttpResponse.json({ cardId: 7, iniciadoEm: null, totalMinutosFechados: 0, descricaoConclusao: null, concluidoEm: null }),
+      ),
+      http.get('/cards/7/comentarios', () => HttpResponse.json([])),
+      http.get('/cards/7/eventos', () => HttpResponse.json([])),
+    )
+    renderPagina()
+    await screen.findByTestId('mundo-canvas-host')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Minhas tarefas' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Corrigir bug' }))
+
+    expect(await screen.findByRole('dialog', { name: /projetos/i })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /ocultar detalhes/i })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: /minhas tarefas/i })).not.toBeInTheDocument()
+  })
+
   it('mostra o mini chat sempre montado no canto superior esquerdo, com a conversa Geral na lista', async () => {
     // pedido do usuário: "eu quero que voce deixe um mini chat aberto na lateral esquerda no
     // topo, igual ao tempo mas do lado esquerdo... igual ao whats, mas em miniatura igual um

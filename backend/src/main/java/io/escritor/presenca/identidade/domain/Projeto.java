@@ -6,7 +6,10 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
 
@@ -34,6 +37,10 @@ public class Projeto {
     @Column(name = "fim_previsto")
     private LocalDate fimPrevisto;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pessoal_de_usuario_id")
+    private Usuario pessoalDe;
+
     protected Projeto() {
         // JPA
     }
@@ -44,6 +51,16 @@ public class Projeto {
         this.status = status;
         this.inicio = inicio;
         this.fimPrevisto = fimPrevisto;
+    }
+
+    public static Projeto pessoalDe(Usuario dono, LocalDate hoje) {
+        Projeto projeto = new Projeto("Pessoal", "Pessoal", StatusProjeto.ATIVO, hoje, null);
+        projeto.pessoalDe = dono;
+        return projeto;
+    }
+
+    public boolean isPessoal() {
+        return pessoalDe != null;
     }
 
     public Long getId() {

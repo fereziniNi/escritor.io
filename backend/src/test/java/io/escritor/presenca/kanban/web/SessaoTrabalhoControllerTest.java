@@ -48,7 +48,7 @@ class SessaoTrabalhoControllerTest {
     @Test
     @WithMockUser
     void consultaOEstadoAtual() throws Exception {
-        when(sessaoTrabalhoService.consultar(1L)).thenReturn(new CronometroResponse(1L, Instant.parse("2026-01-13T09:00:00Z"), 30, null, null));
+        when(sessaoTrabalhoService.consultar(eq(1L), any())).thenReturn(new CronometroResponse(1L, Instant.parse("2026-01-13T09:00:00Z"), 30, null, null));
 
         mockMvc.perform(get("/cards/1/cronometro"))
                 .andExpect(status().isOk())

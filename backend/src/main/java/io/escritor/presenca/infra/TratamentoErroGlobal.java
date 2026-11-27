@@ -14,12 +14,15 @@ import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.AcessoNegadoException;
 import io.escritor.presenca.kanban.domain.CronometroJaEmAndamentoException;
 import io.escritor.presenca.kanban.domain.CronometroNaoIniciadoException;
+import io.escritor.presenca.kanban.domain.EstadoTarefaIndisponivelException;
 import io.escritor.presenca.kanban.domain.EstimativaInvalidaException;
 import io.escritor.presenca.kanban.domain.FiltroRelatorioInvalidoException;
 import io.escritor.presenca.kanban.domain.LimiteWipExcedidoException;
 import io.escritor.presenca.kanban.domain.LimiteWipInvalidoException;
 import io.escritor.presenca.kanban.domain.NomeColunaObrigatorioException;
 import io.escritor.presenca.kanban.domain.OrdemColunaDuplicadaException;
+import io.escritor.presenca.kanban.domain.ProjetoSemColunasException;
+import io.escritor.presenca.kanban.domain.TarefaJaFinalizadaException;
 import io.escritor.presenca.kanban.domain.TextoComentarioObrigatorioException;
 import io.escritor.presenca.kanban.domain.TituloCardObrigatorioException;
 import io.escritor.presenca.ponto.domain.JornadaDeOutroUsuarioException;
@@ -67,6 +70,21 @@ public class TratamentoErroGlobal {
     @ExceptionHandler(LimiteWipExcedidoException.class)
     ResponseEntity<Void> tratarLimiteWipExcedido() {
         return ResponseEntity.status(HttpStatus.CONFLICT).build();
+    }
+
+    @ExceptionHandler(TarefaJaFinalizadaException.class)
+    ResponseEntity<Void> tratarTarefaJaFinalizada() {
+        return ResponseEntity.status(HttpStatus.CONFLICT).build();
+    }
+
+    @ExceptionHandler(ProjetoSemColunasException.class)
+    ResponseEntity<Void> tratarProjetoSemColunas() {
+        return ResponseEntity.badRequest().build();
+    }
+
+    @ExceptionHandler(EstadoTarefaIndisponivelException.class)
+    ResponseEntity<Void> tratarEstadoTarefaIndisponivel() {
+        return ResponseEntity.badRequest().build();
     }
 
     @ExceptionHandler(OrdemColunaDuplicadaException.class)
