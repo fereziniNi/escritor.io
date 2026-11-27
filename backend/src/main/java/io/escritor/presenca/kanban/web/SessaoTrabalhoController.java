@@ -27,7 +27,7 @@ public class SessaoTrabalhoController {
 
     @GetMapping
     public CronometroResponse consultar(@PathVariable Long id) {
-        return sessaoTrabalhoService.consultar(id);
+        return sessaoTrabalhoService.consultar(id, contextoUsuarioAutenticado.usuarioAtual());
     }
 
     @PostMapping("/iniciar")

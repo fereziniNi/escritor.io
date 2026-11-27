@@ -4,6 +4,7 @@ import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Projeto;
 import io.escritor.presenca.identidade.domain.StatusProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
+import io.escritor.presenca.identidade.service.ProjetoService;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.CardEvento;
@@ -53,6 +54,9 @@ class SessaoTrabalhoServiceTest {
     @Mock
     private CardEventoRepository cardEventoRepository;
 
+    @Mock
+    private ProjetoService projetoService;
+
     private final Usuario autor = usuarioComId(1L);
     private Card card;
 
@@ -66,13 +70,14 @@ class SessaoTrabalhoServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SessaoTrabalhoService(cardRepository, sessaoTrabalhoRepository, cardEventoRepository, RELOGIO_FIXO);
+        service = new SessaoTrabalhoService(cardRepository, sessaoTrabalhoRepository, cardEventoRepository, projetoService, RELOGIO_FIXO);
         Projeto projeto = new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null);
         ReflectionTestUtils.setField(projeto, "id", 5L);
         Coluna coluna = new Coluna(projeto, "A fazer", 0, null);
         card = new Card(coluna, "Corrigir bug", null, 1024.0, null, null, null, autor);
         ReflectionTestUtils.setField(card, "id", 10L);
         lenient().when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        lenient().when(projetoService.usuarioPodeVer(5L, autor)).thenReturn(true);
     }
 
     @Test
@@ -197,7 +202,7 @@ class SessaoTrabalhoServiceTest {
     void consultarCardInexistenteLancaRecursoNaoEncontrado() {
         when(cardRepository.findById(999L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.consultar(999L)).isInstanceOf(RecursoNaoEncontradoException.class);
+        assertThatThrownBy(() -> service.consultar(999L, autor)).isInstanceOf(RecursoNaoEncontradoException.class);
     }
 
     @Test
@@ -221,5 +226,29 @@ class SessaoTrabalhoServiceTest {
         when(sessaoTrabalhoRepository.findByUsuarioAndFimIsNull(autor)).thenReturn(Optional.empty());
 
         assertThat(service.consultarAtivo(autor)).isEmpty();
+    }
+
+    @Test
+    void semAcessoAoProjetoDoCardTodasAsAcoesLancam404SemMudarNada() {
+        Usuario forasteiro = usuarioComId(2L);
+        when(projetoService.usuarioPodeVer(5L, forasteiro)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.consultar(10L, forasteiro)).isInstanceOf(RecursoNaoEncontradoException.class);
+        assertThatThrownBy(() -> service.iniciar(10L, forasteiro)).isInstanceOf(RecursoNaoEncontradoException.class);
+        assertThatThrownBy(() -> service.pausar(10L, forasteiro)).isInstanceOf(RecursoNaoEncontradoException.class);
+        assertThatThrownBy(() -> service.finalizar(10L, "Descrição", forasteiro)).isInstanceOf(RecursoNaoEncontradoException.class);
+
+        assertThat(card.getConcluidoEm()).isNull();
+        verify(sessaoTrabalhoRepository, never()).save(any());
+        verify(cardRepository, never()).save(any());
+        verify(cardEventoRepository, never()).save(any());
+    }
+
+    @Test
+    void membroDoProjetoConsultaNormalmente() {
+        when(sessaoTrabalhoRepository.findByCardAndFimIsNull(card)).thenReturn(Optional.empty());
+        when(sessaoTrabalhoRepository.findByCardOrderByInicioAsc(card)).thenReturn(List.of());
+
+        assertThat(service.consultar(10L, autor).cardId()).isEqualTo(10L);
     }
 }

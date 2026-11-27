@@ -102,6 +102,15 @@ describe('MinhasTarefasPainel', () => {
     expect(prazoDe('Futura')).not.toHaveClass('tarefa-prazo--urgente')
   })
 
+  it('tarefaFeitaComPrazoVencidoNaoFicaEmVermelho', async () => {
+    mockar([tarefa({ cardId: 1, titulo: 'Entregue', prazo: dataLocal(-1), estado: 'FEITO' })])
+    renderPainel()
+
+    await screen.findByText('Entregue')
+    const prazo = screen.getByText('Entregue').closest('li')!.querySelector('.tarefa-prazo')!
+    expect(prazo).not.toHaveClass('tarefa-prazo--urgente')
+  })
+
   it('feitoVemRecolhidoEAbreAoClicar', async () => {
     mockar([tarefa({ cardId: 4, titulo: 'Entregar rascunho', estado: 'FEITO' })])
     const user = userEvent.setup()

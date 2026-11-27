@@ -73,7 +73,7 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
 
   function itemDaTarefa(t: Tarefa) {
     const cor = corDoProjeto(t.projetoId)
-    const urgente = t.prazo !== null && t.prazo <= hoje
+    const urgente = t.estado !== 'FEITO' && t.prazo !== null && t.prazo <= hoje
     return (
       <li key={t.cardId} className="tarefa-item">
         <div className="tarefa-item-linha">

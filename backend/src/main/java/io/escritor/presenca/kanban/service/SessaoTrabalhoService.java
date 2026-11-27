@@ -1,6 +1,7 @@
 package io.escritor.presenca.kanban.service;
 
 import io.escritor.presenca.identidade.domain.Usuario;
+import io.escritor.presenca.identidade.service.ProjetoService;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.CardEvento;
@@ -29,8 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
  * tarefa" pedido (o `HistoricoSecao` do front já lista `CardEvento` cronologicamente, com dia/hora
  * - não precisa de nada novo lá além dos rótulos dos 3 tipos novos).
  *
- * <p>Aberto a qualquer usuário autenticado, em qualquer card - mesma simplificação já usada por
- * {@code CardService#criar}/{@code #mover} (sem checar responsável/projeto).
+ * <p>Aberto a qualquer usuário autenticado que enxergue o projeto do card (membro, ou ADMIN) -
+ * quem não vê recebe 404, como se o card não existisse (tarefas pessoais nunca vazam).
  */
 @Service
 public class SessaoTrabalhoService {
@@ -38,22 +39,25 @@ public class SessaoTrabalhoService {
     private final CardRepository cardRepository;
     private final SessaoTrabalhoRepository sessaoTrabalhoRepository;
     private final CardEventoRepository cardEventoRepository;
+    private final ProjetoService projetoService;
     private final Clock clock;
 
     public SessaoTrabalhoService(
             CardRepository cardRepository,
             SessaoTrabalhoRepository sessaoTrabalhoRepository,
             CardEventoRepository cardEventoRepository,
+            ProjetoService projetoService,
             Clock clock) {
         this.cardRepository = cardRepository;
         this.sessaoTrabalhoRepository = sessaoTrabalhoRepository;
         this.cardEventoRepository = cardEventoRepository;
+        this.projetoService = projetoService;
         this.clock = clock;
     }
 
     @Transactional
     public CronometroResponse iniciar(Long cardId, Usuario autor) {
-        Card card = buscarCard(cardId);
+        Card card = buscarCard(cardId, autor);
         if (card.getConcluidoEm() != null) {
             throw new CronometroJaEmAndamentoException("Essa tarefa já foi finalizada");
         }
@@ -76,7 +80,7 @@ public class SessaoTrabalhoService {
 
     @Transactional
     public CronometroResponse pausar(Long cardId, Usuario autor) {
-        Card card = buscarCard(cardId);
+        Card card = buscarCard(cardId, autor);
         SessaoTrabalho aberta = sessaoTrabalhoRepository
                 .findByCardAndFimIsNull(card)
                 .orElseThrow(() -> new CronometroNaoIniciadoException("O cronômetro dessa tarefa não está em andamento"));
@@ -93,7 +97,7 @@ public class SessaoTrabalhoService {
      * qualquer sessão aberta primeiro, se houver. */
     @Transactional
     public CronometroResponse finalizar(Long cardId, String descricao, Usuario autor) {
-        Card card = buscarCard(cardId);
+        Card card = buscarCard(cardId, autor);
         if (card.getConcluidoEm() != null) {
             throw new CronometroJaEmAndamentoException("Essa tarefa já foi finalizada");
         }
@@ -113,8 +117,8 @@ public class SessaoTrabalhoService {
     }
 
     @Transactional(readOnly = true)
-    public CronometroResponse consultar(Long cardId) {
-        return status(buscarCard(cardId));
+    public CronometroResponse consultar(Long cardId, Usuario usuario) {
+        return status(buscarCard(cardId, usuario));
     }
 
     /** Pedido do usuário: widget global (canto superior direito) da tarefa que essa pessoa está
@@ -142,7 +146,13 @@ public class SessaoTrabalhoService {
                 .sum();
     }
 
-    private Card buscarCard(Long id) {
-        return cardRepository.findById(id).orElseThrow(() -> new RecursoNaoEncontradoException("Card não encontrado: " + id));
+    /** 404 (não 403) quando o card existe mas o projeto dele não é visível pro usuário - em
+     * especial tarefas pessoais de outras pessoas nunca são reveladas nem alteradas. */
+    private Card buscarCard(Long id, Usuario usuario) {
+        Card card = cardRepository.findById(id).orElseThrow(() -> new RecursoNaoEncontradoException("Card não encontrado: " + id));
+        if (!projetoService.usuarioPodeVer(card.getColuna().getProjeto().getId(), usuario)) {
+            throw new RecursoNaoEncontradoException("Card não encontrado: " + id);
+        }
+        return card;
     }
 }
