@@ -73,11 +73,12 @@ Para tarefas sem projeto:
 2. Entram só cards com **responsável = eu** e não arquivados. Card sem responsável não aparece.
 3. Ordem dentro do grupo: prazo mais próximo primeiro, sem prazo por último, depois mais antigo.
    Prazo de hoje ou vencido aparece em vermelho.
-4. **Feito** vem recolhido e mostra só o concluído nos últimos 14 dias.
+4. **Feito** vem recolhido e mostra as **20 mais recentes** (por data de conclusão; sem data, pelo id). *Ajustado ao planejar: "últimos 14 dias" exigia uma data que cards movidos à mão para a última coluna não têm.*
 5. Trocar o estado na lista usa o `mover` existente para a coluna correspondente (a primeira
    coluna do meio, se houver várias). Erro de limite de tarefas é mostrado ao usuário. Mover
-   para Feito **não** pede a descrição de conclusão; a finalização formal (descrição, cronômetro)
-   continua dentro do card.
+   para Feito **não** pede a descrição de conclusão nem grava `concluidoEm`; a finalização formal
+   (descrição, cronômetro) continua dentro do card. Tarefa já finalizada formalmente (com
+   `concluidoEm`) conta como Feito e **não muda de estado pela lista** (resposta 409).
 6. **Nova tarefa:** título obrigatório, projeto (padrão: "Sem projeto"), prazo e estimativa
    opcionais. Nasce na primeira coluna, com responsável = quem criou.
 7. **Projeto pessoal:** nova coluna `projeto.pessoal_de_usuario_id` (nulo nos projetos normais,
@@ -85,7 +86,7 @@ Para tarefas sem projeto:
    painel de projetos do escritório e dos filtros de relatório. O dono é o único membro.
 8. **Tarefa pessoal não notifica ninguém:** sem aviso na tela, sem central de notificações, sem
    WhatsApp, em criar, mover e finalizar. Tarefas de projeto normal mantêm os avisos de hoje.
-9. Rota `/tarefas`, item de menu "Minhas tarefas". Os endpoints novos (`GET /tarefas/minhas`,
+9. **Painel do dock** "✅ Minhas tarefas" (a tela do app é o Escritório com painéis, não há rotas; *corrigido ao planejar*). Os endpoints novos (`GET /tarefas/minhas`,
    `POST /tarefas`, `PATCH /tarefas/{cardId}/estado`) reaproveitam `CardService`.
 10. Horas de tarefas pessoais somam no projeto pessoal; ele não aparece nos filtros por projeto.
     Elas continuam no total de horas da pessoa.
