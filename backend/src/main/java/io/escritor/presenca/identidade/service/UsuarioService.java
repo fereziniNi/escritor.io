@@ -13,7 +13,9 @@ import io.escritor.presenca.identidade.web.AtualizarWhatsappRequest;
 import io.escritor.presenca.identidade.web.CriarUsuarioRequest;
 import io.escritor.presenca.identidade.web.UsuarioBasicoResponse;
 import io.escritor.presenca.identidade.web.UsuarioResponse;
+import io.escritor.presenca.infra.ClockConfig;
 import io.escritor.presenca.seguranca.email.EnvioEmail;
+import java.time.LocalDate;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,7 +76,9 @@ public class UsuarioService {
                 .findById(usuarioId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
 
-        usuario.alterarCargaDiaria(request.cargaDiariaMinutos());
+        LocalDate hoje = LocalDate.now(ClockConfig.FUSO_EMPRESA);
+        LocalDate vigenteDesde = request.vigenteDesde() != null ? request.vigenteDesde() : hoje;
+        usuario.definirCargaDiaria(request.cargaDiariaMinutos(), vigenteDesde, hoje);
         Usuario salvo = usuarioRepository.save(usuario);
 
         return UsuarioResponse.de(salvo);

@@ -107,11 +107,15 @@ export async function criarColaborador(dados: {
 
 /** Pedido do usuário: "o admin deve definir [a carga diária] pros outros funcionários, não deve
  * ser padrão" - nome/email/papel não têm tela de edição ainda. */
-export async function atualizarCargaDiaria(colaboradorId: number, cargaDiariaMinutos: number): Promise<Colaborador> {
+export async function atualizarCargaDiaria(
+  colaboradorId: number,
+  cargaDiariaMinutos: number,
+  vigenteDesde?: string,
+): Promise<Colaborador> {
   const response = await apiFetch(`/usuarios/${colaboradorId}/carga-diaria`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ cargaDiariaMinutos }),
+    body: JSON.stringify({ cargaDiariaMinutos, vigenteDesde }),
   })
   if (!response.ok) {
     throw new Error('Não foi possível atualizar a carga diária')

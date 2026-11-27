@@ -96,7 +96,7 @@ class UsuarioServiceTest {
         when(usuarioRepository.findById(1L)).thenReturn(Optional.of(ana));
         when(usuarioRepository.save(any(Usuario.class))).thenAnswer(chamada -> chamada.getArgument(0));
 
-        var resposta = usuarioService.atualizarCargaDiaria(1L, new AtualizarCargaDiariaRequest(360));
+        var resposta = usuarioService.atualizarCargaDiaria(1L, new AtualizarCargaDiariaRequest(360, null));
 
         assertThat(resposta.cargaDiariaMinutos()).isEqualTo(360);
     }
@@ -105,7 +105,7 @@ class UsuarioServiceTest {
     void atualizarCargaDiariaDeUsuarioInexistenteLanca404() {
         when(usuarioRepository.findById(999L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> usuarioService.atualizarCargaDiaria(999L, new AtualizarCargaDiariaRequest(360)))
+        assertThatThrownBy(() -> usuarioService.atualizarCargaDiaria(999L, new AtualizarCargaDiariaRequest(360, null)))
                 .isInstanceOf(RecursoNaoEncontradoException.class);
     }
 
