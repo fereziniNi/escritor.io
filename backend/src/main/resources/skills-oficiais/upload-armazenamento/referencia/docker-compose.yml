@@ -1,0 +1,51 @@
+# origem: skills-modelo/docker-compose.yml
+# Desenvolvimento local: só a infraestrutura (a API e a web rodam com `pnpm dev`).
+# Instalação no cliente é outra coisa: deploy/docker-compose.yml (skill instalacao-docker-compose).
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+    # 127.0.0.1: só esta máquina alcança o banco de dev (sem isso o Docker publica em todas as interfaces).
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Caixa de entrada falsa: recebe qualquer e-mail enviado pela API em dev (nada sai para a internet).
+  # SMTP em 127.0.0.1:1025 e interface web em http://localhost:8025. Sem volume: as mensagens somem ao recriar.
+  mailpit:
+    image: axllent/mailpit:v1.31.6
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+
+  # Antivírus ClamAV (skill upload-armazenamento): só sobe com `docker compose --profile antivirus up -d clamav`. O clamd leva 1 a 3
+  # minutos para carregar as assinaturas na primeira vez (o healthcheck avisa). Com ANTIVIRUS_HABILITADO=true a API varre cada arquivo
+  # em 127.0.0.1:3310 antes de liberá-lo. StreamMaxLength tem de ser MAIOR que UPLOAD_MAX_MB, senão todo arquivo grande é recusado.
+  clamav:
+    image: clamav/clamav:1.4.6
+    profiles: ["antivirus"]
+    environment:
+      CLAMD_CONF_StreamMaxLength: 600M
+    ports:
+      - "127.0.0.1:3310:3310"
+    volumes:
+      - clamav_dev:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "clamdcheck.sh"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 60s
+
+volumes:
+  postgres_dev:
+  clamav_dev:

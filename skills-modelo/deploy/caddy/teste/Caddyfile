@@ -1,0 +1,24 @@
+# Caddyfile mínimo só para validar deploy/caddy/seguranca.caddy (não é o da instalação). Na pasta skills-modelo:
+#   docker run --rm -v "$PWD/deploy/caddy:/etc/caddy" caddy:2 caddy validate --config /etc/caddy/teste/Caddyfile --adapter caddyfile
+# Para ver os cabeçalhos: troque "validate" por "run", publique a porta (-p 8080:8080) e rode
+#   curl -sI http://localhost:8080/          (CSP do SPA)
+#   curl -sI http://localhost:8080/api/x     (CSP da API mantida)
+{
+	auto_https off
+	admin off
+}
+
+import ../seguranca.caddy
+
+# Faz o papel do Caddy da instalação: aplica o snippet e encaminha para a "API".
+:8080 {
+	import seguranca
+	reverse_proxy 127.0.0.1:8081
+}
+
+# Faz o papel da API: /api/* já responde com a CSP própria; o resto (SPA) vem sem CSP.
+:8081 {
+	header /api/* Content-Security-Policy "default-src 'none'"
+	header X-Powered-By "Express"
+	respond "ok"
+}

@@ -16,9 +16,11 @@ const ROTULO_PAPEL: Record<Papel, string> = { COLABORADOR: 'Colaborador', GESTOR
 function LinhaColaborador({ colaborador }: { colaborador: Colaborador }) {
   const queryClient = useQueryClient()
   const [rascunho, setRascunho] = useState(String(colaborador.cargaDiariaMinutos))
+  // a nova carga vale a partir desta data (padrão: hoje) e não altera o saldo de dias anteriores
+  const [vigenteDesde, setVigenteDesde] = useState(() => new Date().toLocaleDateString('en-CA'))
 
   const salvarMutation = useMutation({
-    mutationFn: (minutos: number) => atualizarCargaDiaria(colaborador.id, minutos),
+    mutationFn: (minutos: number) => atualizarCargaDiaria(colaborador.id, minutos, vigenteDesde || undefined),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['colaboradores'] }),
   })
 
@@ -45,6 +47,13 @@ function LinhaColaborador({ colaborador }: { colaborador: Colaborador }) {
             value={rascunho}
             onChange={(evento) => setRascunho(evento.target.value)}
           />
+          <label htmlFor={`carga-vigente-desde-${colaborador.id}`}>A partir de</label>
+          <input
+            id={`carga-vigente-desde-${colaborador.id}`}
+            type="date"
+            value={vigenteDesde}
+            onChange={(evento) => setVigenteDesde(evento.target.value)}
+          />
           <button
             type="button"
             disabled={!mudou || salvarMutation.isPending}
@@ -54,7 +63,7 @@ function LinhaColaborador({ colaborador }: { colaborador: Colaborador }) {
           </button>
         </div>
         <p className="cartao-item-meta">
-          Hoje: {formatarMinutos(colaborador.cargaDiariaMinutos)}
+          Hoje: {formatarMinutos(colaborador.cargaDiariaMinutos)} (a mudança vale só a partir da data escolhida; dias anteriores não mudam)
           {rascunhoValido && minutosRascunho !== colaborador.cargaDiariaMinutos && ` → ${formatarMinutos(minutosRascunho)}`}
         </p>
         {salvarMutation.isError && <p className="mensagem-erro">Não foi possível atualizar a carga diária.</p>}

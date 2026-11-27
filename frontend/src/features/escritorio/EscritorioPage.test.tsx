@@ -508,6 +508,23 @@ describe('EscritorioPage', () => {
     expect(await screen.findByRole('dialog', { name: /reuniões/i })).toBeInTheDocument()
   })
 
+  it('qualquer papel vê o botão 🧩 Skills no dock e ele abre o painel', async () => {
+    server.use(
+      http.get('/mapas/ativo', () => HttpResponse.json(MAPA_ATIVO)),
+      handlerPontoAberto(),
+      handlerHealthOk(),
+      http.get('/integracoes/google/estado', () => HttpResponse.json({ habilitado: false, conectado: false })),
+      http.get('/skills', () => HttpResponse.json([])),
+    )
+    renderPagina()
+    await screen.findByTestId('mundo-canvas-host')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Skills' }))
+
+    expect(await screen.findByRole('dialog', { name: /skills/i })).toBeInTheDocument()
+    expect(await screen.findByText('Nenhuma skill encontrada.')).toBeInTheDocument()
+  })
+
   it('mostra o mini chat sempre montado no canto superior esquerdo, com a conversa Geral na lista', async () => {
     // pedido do usuário: "eu quero que voce deixe um mini chat aberto na lateral esquerda no
     // topo, igual ao tempo mas do lado esquerdo... igual ao whats, mas em miniatura igual um

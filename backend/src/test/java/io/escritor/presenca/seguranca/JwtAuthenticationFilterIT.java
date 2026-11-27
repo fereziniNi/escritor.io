@@ -120,6 +120,35 @@ class JwtAuthenticationFilterIT {
                 .expectStatus().isUnauthorized();
     }
 
+    @Test
+    void mudancaDeCargaComDataFuturaGuardaHistoricoESoValeDali() {
+        String tokenAdmin = jwtService.gerarAccessToken(1L, Papel.ADMIN);
+        client().post()
+                .uri("/usuarios")
+                .header("Authorization", "Bearer " + tokenAdmin)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(corpoNovoUsuario("carga-historico@escritor.io"))
+                .exchange()
+                .expectStatus().isCreated();
+        Long id = jdbcTemplate.queryForObject("SELECT id FROM usuario WHERE email = ?", Long.class, "carga-historico@escritor.io");
+
+        client().patch()
+                .uri("/usuarios/" + id + "/carga-diaria")
+                .header("Authorization", "Bearer " + tokenAdmin)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"cargaDiariaMinutos\":480,\"vigenteDesde\":\"2099-01-01\"}")
+                .exchange()
+                .expectStatus().isOk();
+
+        Integer linhas = jdbcTemplate.queryForObject("SELECT count(*) FROM carga_diaria_historico WHERE usuario_id = ?", Integer.class, id);
+        Integer minutosHoje = jdbcTemplate.queryForObject("SELECT carga_diaria_minutos FROM usuario WHERE id = ?", Integer.class, id);
+        Integer minutosFuturo = jdbcTemplate.queryForObject(
+                "SELECT minutos FROM carga_diaria_historico WHERE usuario_id = ? AND vigente_desde = DATE '2099-01-01'", Integer.class, id);
+        org.assertj.core.api.Assertions.assertThat(linhas).isEqualTo(2);
+        org.assertj.core.api.Assertions.assertThat(minutosHoje).isEqualTo(360); // 2099 ainda não chegou
+        org.assertj.core.api.Assertions.assertThat(minutosFuturo).isEqualTo(480);
+    }
+
     private String corpoNovoUsuario(String email) {
         return """
                 {"nome":"Bruno Lima","email":"%s","papel":"COLABORADOR","cargaDiariaMinutos":360}

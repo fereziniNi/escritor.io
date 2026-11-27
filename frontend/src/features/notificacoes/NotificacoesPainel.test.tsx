@@ -29,12 +29,18 @@ describe('NotificacoesPainel', () => {
           notificacao({ id: 1, tipo: 'CONVITE_REUNIAO', texto: 'Ana te chamou para "Daily"' }),
           notificacao({ id: 2, tipo: 'TAREFA_CONCLUIDA', texto: 'Beto concluiu "Corrigir bug" em Site novo' }),
           notificacao({ id: 3, tipo: 'SORTEIO_HAPPY_HOUR', texto: '🎉 Roleta girou! Atividade escolhida: "Pizza"' }),
+          notificacao({ id: 4, tipo: 'SKILL_PROPOSTA', texto: 'Ana propôs mudanças em login-seguro' }),
+          notificacao({ id: 5, tipo: 'SKILL_APROVADA', texto: 'Sua proposta em login-seguro foi aprovada' }),
+          notificacao({ id: 6, tipo: 'SKILL_REJEITADA', texto: 'Sua proposta em login-seguro foi rejeitada' }),
         ]}
       />,
     )
     expect(screen.getByText(/📹.*Ana te chamou para "Daily"/)).toBeInTheDocument()
     expect(screen.getByText(/✅.*Beto concluiu "Corrigir bug" em Site novo/)).toBeInTheDocument()
     expect(screen.getByText(/🎉.*Roleta girou! Atividade escolhida: "Pizza"/)).toBeInTheDocument()
+    expect(screen.getByText(/🧩.*Ana propôs mudanças/)).toBeInTheDocument()
+    expect(screen.getByText(/🧩.*foi aprovada/)).toBeInTheDocument()
+    expect(screen.getByText(/🧩.*foi rejeitada/)).toBeInTheDocument()
   })
 
   it('pedido do usuário: "ver as últimas que chegaram" - mostra o tempo relativo de cada uma', () => {

@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "rootDir": ".",
+    "outDir": "dist",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "types": ["node"]
+  },
+  "include": ["src", "test", "vitest.config.mts", "drizzle.config.ts"]
+}

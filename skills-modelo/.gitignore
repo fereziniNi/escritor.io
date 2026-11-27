@@ -1,0 +1,8 @@
+# Gerados e locais: nunca versionar.
+node_modules/
+dist/
+coverage/
+test-results/
+playwright-report/
+*.tsbuildinfo
+.env

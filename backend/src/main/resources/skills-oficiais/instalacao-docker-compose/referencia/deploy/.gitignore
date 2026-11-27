@@ -1,0 +1,5 @@
+# origem: skills-modelo/deploy/.gitignore
+# Nunca versionar: segredos gerados, backups e o .env preenchido do servidor.
+segredos/
+backups/
+.env

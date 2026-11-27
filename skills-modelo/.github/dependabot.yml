@@ -1,0 +1,24 @@
+# Atualizações automáticas (skill seguranca): uma PR por semana por ecossistema. A CI roda em cada PR; só faça merge
+# com ela verde. Alertas de segurança do Dependabot abrem PR na hora, fora deste calendário.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    # Dependências de desenvolvimento agrupadas numa PR só.
+    groups:
+      desenvolvimento:
+        dependency-type: development
+    # O esqueleto fixa versões exatas (sem ^): o Dependabot mantém assim.
+    versioning-strategy: increase
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+# Com Dockerfile no repositório (skill instalacao-docker-compose), acrescente:
+#   - package-ecosystem: docker
+#     directory: /
+#     schedule:
+#       interval: weekly

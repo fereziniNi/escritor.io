@@ -1,0 +1,3 @@
+nome: Novo projeto Multiplica
+descricao: Cria o esqueleto padrão de um sistema Multiplica (monorepo pnpm com NestJS, React e contratos zod), com config validada no boot, logs com request-id, health com versão, testes com Postgres real e o CLAUDE.md do projeto.
+categoria: FUNDACAO

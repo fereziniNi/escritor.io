@@ -1,0 +1,14 @@
+# Fora do contexto do docker build: segredos, dependências e builds locais (a imagem refaz tudo do zero).
+.git
+**/.env
+**/.env.*
+!**/.env.example
+**/node_modules
+**/dist
+**/coverage
+**/test-results
+**/playwright-report
+**/*.tsbuildinfo
+deploy/segredos
+deploy/backups
+estagios

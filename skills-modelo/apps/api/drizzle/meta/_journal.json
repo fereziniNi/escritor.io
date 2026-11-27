@@ -1,0 +1,62 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1793915038030,
+      "tag": "0000_sparkling_typhoid_mary",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793916965805,
+      "tag": "0001_gifted_mephistopheles",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793918857142,
+      "tag": "0002_revogar_sessoes",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793920284385,
+      "tag": "0003_evento_auditoria",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793920285771,
+      "tag": "0004_imutabilidade_auditoria",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793923544968,
+      "tag": "0005_cliente",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793956699175,
+      "tag": "0006_indice_cliente_exportacao",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793972867689,
+      "tag": "0007_arquivo",
+      "breakpoints": true
+    }
+  ]
+}

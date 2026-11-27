@@ -20,6 +20,8 @@ export type PainelId =
   // do menu e deixar na parte superior... eu não quero que fique o botão! Inove") - abre pelo
   // `SinoDeNotificacoes` (flutuante, canto superior), ver `EscritorioPage.tsx`.
   | 'notificacoes'
+  // Catálogo de Skills (🧩) - visível a todos os papéis.
+  | 'skills'
 
 /**
  * Toolbar inferior - substitui o `.escritorio-dock` antigo (botões com texto+emoji lado a lado)
@@ -125,6 +127,15 @@ export function BarraFerramentas({
             📱
           </button>
         )}
+        <button
+          type="button"
+          className={`escritorio-toolbar-botao${painelAberto === 'skills' ? ' escritorio-toolbar-botao--ativo' : ''}`}
+          aria-label="Skills"
+          title="Skills"
+          onClick={() => aoAbrirPainel('skills')}
+        >
+          🧩
+        </button>
         {/* Pedido do usuário: "na ordem esse botao fique por ultimo" - sempre o último do grupo,
             depois de qualquer botão restrito por papel (GESTOR/ADMIN só veem os de cima). */}
         <button

@@ -1,0 +1,3 @@
+nome: IA com Claude e rastreio no Langfuse
+descricao: Cliente único de IA (SDK da Anthropic) desligado por padrão, modelo por tarefa, gateway LiteLLM opcional, custo por modelo e rastreio no Langfuse só com metadados, mais o Langfuse self-host no Docker Compose.
+categoria: IA

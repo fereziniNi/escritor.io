@@ -16,6 +16,10 @@ spring:
     password: presenca
     enabled: true
     locations: classpath:db/migration
+    # Produção já tem V54-V56 (padrão semanal da escala e registro manual de período) aplicadas por
+    # um código que não está neste repositório; sem `*:missing` o Flyway recusa subir ("applied
+    # migration not resolved locally"). O catálogo de skills usa V57/V58 por isso.
+    ignore-migration-patterns: "*:missing,*:future"
   jpa:
     open-in-view: false
     hibernate:

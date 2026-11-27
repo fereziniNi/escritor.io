@@ -1,7 +1,7 @@
 /** Espelha `NotificacoesResponse`/`NotificacaoResponse` do backend (`notificacao/web`). Só os
  * quatro tipos que já viravam toast/alerta passageiro - ver comentário do domínio no backend pra
  * por que mensagem de chat e "alguém está perto" ficam de fora. */
-export type TipoNotificacao = 'CONVITE_REUNIAO' | 'TAREFA_CONCLUIDA' | 'NOVA_TAREFA' | 'SORTEIO_HAPPY_HOUR'
+export type TipoNotificacao = 'CONVITE_REUNIAO' | 'TAREFA_CONCLUIDA' | 'NOVA_TAREFA' | 'SORTEIO_HAPPY_HOUR' | 'SKILL_PROPOSTA' | 'SKILL_APROVADA' | 'SKILL_REJEITADA'
 
 export interface Notificacao {
   id: number

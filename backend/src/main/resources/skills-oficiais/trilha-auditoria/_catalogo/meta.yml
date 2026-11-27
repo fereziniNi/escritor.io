@@ -1,0 +1,3 @@
+nome: Trilha de auditoria
+descricao: Registra quem fez o quê, quando e de onde numa tabela que só cresce (gatilho e papel de banco de runtime sem UPDATE/DELETE), com o serviço de registro, os eventos do login e dos usuários, a leitura só para administradores com filtros e a tela de auditoria com exportação em CSV.
+categoria: DADOS

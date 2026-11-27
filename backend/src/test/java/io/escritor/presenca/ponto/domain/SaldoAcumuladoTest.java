@@ -70,4 +70,19 @@ class SaldoAcumuladoTest {
 
         assertThat(SaldoAcumulado.calcular(porDia, 480)).isEqualTo(3 * 60 - 480);
     }
+
+    @Test
+    void cadaDiaUsaACargaQueValiaNele() {
+        // 30/11 (segunda) com carga 360 e 01/12 (terça) com carga 480; os dois dias com 7h trabalhadas
+        List<Marcacao> segunda = List.of(
+                marcacao(ENTRADA, "2026-11-30T09:00:00Z"), marcacao(SAIDA, "2026-11-30T16:00:00Z"));
+        List<Marcacao> terca = List.of(
+                marcacao(ENTRADA, "2026-12-01T09:00:00Z"), marcacao(SAIDA, "2026-12-01T16:00:00Z"));
+        Map<LocalDate, List<Marcacao>> porDia =
+                Map.of(LocalDate.of(2026, 11, 30), segunda, LocalDate.of(2026, 12, 1), terca);
+
+        long saldo = SaldoAcumulado.calcular(porDia, data -> data.isBefore(LocalDate.of(2026, 12, 1)) ? 360 : 480);
+
+        assertThat(saldo).isEqualTo((7 * 60 - 360) + (7 * 60 - 480)); // +60 e -60
+    }
 }
