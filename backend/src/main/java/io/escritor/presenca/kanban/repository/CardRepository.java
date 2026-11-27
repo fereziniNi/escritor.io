@@ -16,6 +16,9 @@ public interface CardRepository extends JpaRepository<Card, Long> {
 
     List<Card> findByColunaOrderByPosicaoAsc(Coluna coluna);
 
+    /** "Minhas tarefas": cards em que a pessoa é a responsável, em qualquer projeto. */
+    List<Card> findByResponsavelAndArquivadoFalse(Usuario responsavel);
+
     /** "O que fez" (Relatórios/Estatísticas) - tarefas concluídas por uma pessoa num período,
      * mais recente primeiro. Só {@code concluidoEm} importa aqui (não {@code criadoEm}) - uma
      * tarefa criada antes do período mas concluída dentro dele conta. */
