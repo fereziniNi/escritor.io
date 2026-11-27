@@ -3,6 +3,7 @@ package io.escritor.presenca.kanban.service;
 import io.escritor.presenca.identidade.domain.Projeto;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.ProjetoRepository;
+import io.escritor.presenca.identidade.service.ProjetoService;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.Coluna;
@@ -35,18 +36,21 @@ public class TarefaService {
     private final ProjetoRepository projetoRepository;
     private final ProjetoPessoalService projetoPessoalService;
     private final CardService cardService;
+    private final ProjetoService projetoService;
 
     public TarefaService(
             CardRepository cardRepository,
             ColunaRepository colunaRepository,
             ProjetoRepository projetoRepository,
             ProjetoPessoalService projetoPessoalService,
-            CardService cardService) {
+            CardService cardService,
+            ProjetoService projetoService) {
         this.cardRepository = cardRepository;
         this.colunaRepository = colunaRepository;
         this.projetoRepository = projetoRepository;
         this.projetoPessoalService = projetoPessoalService;
         this.cardService = cardService;
+        this.projetoService = projetoService;
     }
 
     /** Lista plana (o front agrupa por estado): por estado, prazo crescente (nulo por último) e
@@ -82,11 +86,19 @@ public class TarefaService {
     /** {@code projetoIdOuNull} nulo = tarefa pessoal (projeto pessoal criado na primeira vez). */
     public TarefaResponse criar(
             Usuario usuario, String titulo, Long projetoIdOuNull, LocalDate prazo, Integer estimativaMinutos) {
-        Projeto projeto = projetoIdOuNull == null
-                ? projetoPessoalService.obterOuCriar(usuario)
-                : projetoRepository
-                        .findById(projetoIdOuNull)
-                        .orElseThrow(() -> new RecursoNaoEncontradoException("Projeto não encontrado: " + projetoIdOuNull));
+        Projeto projeto;
+        if (projetoIdOuNull == null) {
+            projeto = projetoPessoalService.obterOuCriar(usuario);
+        } else {
+            // Acesso primeiro: quem não vê o projeto recebe 404 igual ao de projeto inexistente,
+            // antes de qualquer outra regra (ex.: "sem colunas") revelar que ele existe.
+            if (!projetoService.usuarioPodeVer(projetoIdOuNull, usuario)) {
+                throw new RecursoNaoEncontradoException("Projeto não encontrado: " + projetoIdOuNull);
+            }
+            projeto = projetoRepository
+                    .findById(projetoIdOuNull)
+                    .orElseThrow(() -> new RecursoNaoEncontradoException("Projeto não encontrado: " + projetoIdOuNull));
+        }
         List<Coluna> colunas = colunaRepository.findByProjetoOrderByOrdemAsc(projeto);
         if (colunas.isEmpty()) {
             throw new ProjetoSemColunasException(projeto.getId());
@@ -109,6 +121,11 @@ public class TarefaService {
         Card card = cardRepository
                 .findById(cardId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Card não encontrado: " + cardId));
+        // Acesso antes de qualquer outra regra (inclusive o 409): quem não vê o projeto do card
+        // recebe 404, como se o card não existisse. Qualquer membro pode mudar o estado (como CardService#mover).
+        if (!projetoService.usuarioPodeVer(card.getColuna().getProjeto().getId(), usuario)) {
+            throw new RecursoNaoEncontradoException("Card não encontrado: " + cardId);
+        }
         if (card.getConcluidoEm() != null) {
             throw new TarefaJaFinalizadaException(cardId);
         }

@@ -6,7 +6,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -15,6 +17,8 @@ import io.escritor.presenca.identidade.domain.Projeto;
 import io.escritor.presenca.identidade.domain.StatusProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
 import io.escritor.presenca.identidade.repository.ProjetoRepository;
+import io.escritor.presenca.identidade.service.ProjetoService;
+import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
 import io.escritor.presenca.kanban.domain.Card;
 import io.escritor.presenca.kanban.domain.Coluna;
 import io.escritor.presenca.kanban.domain.EstadoTarefa;
@@ -55,6 +59,9 @@ class TarefaServiceTest {
     @Mock
     private CardService cardService;
 
+    @Mock
+    private ProjetoService projetoService;
+
     private final Usuario usuario = usuarioComId(1L);
     private final Projeto projeto = projetoComId(10L, "Site");
     private final Coluna aFazer = colunaComId(projeto, 100L, "A fazer", 0);
@@ -91,7 +98,8 @@ class TarefaServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TarefaService(cardRepository, colunaRepository, projetoRepository, projetoPessoalService, cardService);
+        service = new TarefaService(cardRepository, colunaRepository, projetoRepository, projetoPessoalService, cardService, projetoService);
+        lenient().when(projetoService.usuarioPodeVer(any(), any())).thenReturn(true);
     }
 
     private void colunasDoProjeto() {
@@ -273,5 +281,34 @@ class TarefaServiceTest {
                 .isInstanceOf(EstadoTarefaIndisponivelException.class)
                 .hasMessageContaining("Em andamento");
         verify(cardService, never()).mover(any(), any(), anyInt(), any());
+    }
+
+    @Test
+    void criarEmProjetoQueOUsuarioNaoVeLanca404SemRevelarColunas() {
+        when(projetoService.usuarioPodeVer(10L, usuario)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.criar(usuario, "Tarefa", 10L, null, null))
+                .isInstanceOf(RecursoNaoEncontradoException.class);
+        verifyNoInteractions(projetoRepository, colunaRepository, cardService, projetoPessoalService);
+    }
+
+    @Test
+    void criarEmProjetoInexistenteLanca404() {
+        when(projetoService.usuarioPodeVer(99L, usuario)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.criar(usuario, "Tarefa", 99L, null, null))
+                .isInstanceOf(RecursoNaoEncontradoException.class);
+        verifyNoInteractions(colunaRepository, cardService);
+    }
+
+    @Test
+    void mudarEstadoSemAcessoAoProjetoLanca404MesmoComTarefaFinalizada() {
+        Card c = card(7L, feito, null, Instant.now(), Instant.now());
+        when(cardRepository.findById(7L)).thenReturn(Optional.of(c));
+        when(projetoService.usuarioPodeVer(10L, usuario)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.mudarEstado(7L, EstadoTarefa.A_FAZER, usuario))
+                .isInstanceOf(RecursoNaoEncontradoException.class);
+        verifyNoInteractions(colunaRepository, cardService);
     }
 }
