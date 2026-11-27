@@ -591,6 +591,7 @@ describe('EscritorioPage', () => {
             prazo: null,
             estimativaMinutos: null,
             concluidoEm: null,
+            estadosDisponiveis: ['A_FAZER', 'EM_ANDAMENTO', 'FEITO'],
           },
         ]),
       ),

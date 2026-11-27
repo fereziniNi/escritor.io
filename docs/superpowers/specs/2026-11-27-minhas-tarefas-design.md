@@ -70,6 +70,14 @@ Para tarefas sem projeto:
 1. **Estado vem da posição da coluna** no projeto: primeira = A fazer, última = Feito, do meio =
    Em andamento. Projeto com 1 coluna: tudo A fazer. Com 2: só A fazer e Feito. Também é Feito
    quem tem `concluidoEm` preenchido, mesmo fora da última coluna.
+
+   > **Emendado (estado por nome):** a regra posicional não resistiu aos quadros reais, que não seguem
+   > a ordem A fazer / Em andamento / Feito (ex.: `Fazendo, Feito, Backlog`, com Backlog por último e Feito
+   > no meio; ou um único `Fazendo`): Backlog aparecia como Feito, Feito como Em andamento e a troca de
+   > estado falhava com 400. Agora o estado vem do **nome da coluna** (Feito/Concluído, Fazendo/Andamento,
+   > A fazer/Backlog/Pendente...), com a posição só como fallback para nomes não reconhecidos. A troca
+   > de estado move para a primeira coluna cujo nome representa o destino, e a API expõe
+   > `estadosDisponiveis` para o front mostrar só as etapas que o projeto tem.
 2. Entram só cards com **responsável = eu** e não arquivados. Card sem responsável não aparece.
 3. Ordem dentro do grupo: prazo mais próximo primeiro, sem prazo por último, depois mais antigo.
    Prazo de hoje ou vencido aparece em vermelho.
