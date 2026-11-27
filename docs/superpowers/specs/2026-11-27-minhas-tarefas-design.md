@@ -78,6 +78,13 @@ Para tarefas sem projeto:
    > A fazer/Backlog/Pendente...), com a posição só como fallback para nomes não reconhecidos. A troca
    > de estado move para a primeira coluna cujo nome representa o destino, e a API expõe
    > `estadosDisponiveis` para o front mostrar só as etapas que o projeto tem.
+
+   > **Emendado (o seletor sempre funciona):** escolher um estado que o projeto não tem cria a coluna
+   > padrão automaticamente, só se quem pede vê o projeto (senão continua 400): nome = "A fazer",
+   > "Em andamento" ou "Feito"; `ordem` = menor existente - 1 para A fazer (nova primeira coluna) e
+   > maior existente + 1 para Em andamento/Feito (no fim); sem limite WIP. Por isso
+   > `estadosDisponiveis` agora traz sempre os três estados e o front mostra o seletor completo e
+   > habilitado (só desabilitado em tarefa finalizada). Não existe botão "Concluir" na lista.
 2. Entram só cards com **responsável = eu** e não arquivados. Card sem responsável não aparece.
 3. Ordem dentro do grupo: prazo mais próximo primeiro, sem prazo por último, depois mais antigo.
    Prazo de hoje ou vencido aparece em vermelho.

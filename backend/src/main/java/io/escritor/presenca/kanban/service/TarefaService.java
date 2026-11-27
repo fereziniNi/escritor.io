@@ -22,6 +22,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 
@@ -65,7 +66,7 @@ public class TarefaService {
             Projeto projeto = card.getColuna().getProjeto();
             List<Coluna> colunas = colunasPorProjeto.computeIfAbsent(
                     projeto.getId(), id -> colunaRepository.findByProjetoOrderByOrdemAsc(projeto));
-            linhas.add(new Linha(card, estadoDe(card, colunas), disponiveisDe(colunas)));
+            linhas.add(new Linha(card, estadoDe(card, colunas)));
         }
 
         Comparator<Linha> abertas = Comparator.<Linha, LocalDate>comparing(
@@ -81,7 +82,7 @@ public class TarefaService {
             doEstado = estado == EstadoTarefa.FEITO
                     ? doEstado.sorted(feitas).limit(LIMITE_FEITAS)
                     : doEstado.sorted(abertas);
-            doEstado.forEach(l -> resultado.add(paraResponse(l.card(), l.estado(), l.disponiveis())));
+            doEstado.forEach(l -> resultado.add(paraResponse(l.card(), l.estado())));
         }
         return resultado;
     }
@@ -117,7 +118,7 @@ public class TarefaService {
         Card card = cardRepository
                 .findById(criado.id())
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Card não encontrado: " + criado.id()));
-        return paraResponse(card, estadoDe(card, colunas), disponiveisDe(colunas));
+        return paraResponse(card, estadoDe(card, colunas));
     }
 
     public TarefaResponse mudarEstado(Long cardId, EstadoTarefa destino, Usuario usuario) {
@@ -137,16 +138,28 @@ public class TarefaService {
         if (colunas.isEmpty()) {
             throw new ProjetoSemColunasException(card.getColuna().getProjeto().getId());
         }
-        int indiceDaColuna = EstadoTarefa.indiceDoDestino(destino, nomesDe(colunas))
-                .orElseThrow(() -> new EstadoTarefaIndisponivelException(rotuloDe(destino)));
-        Coluna colunaDestino = colunas.get(indiceDaColuna);
+        Coluna colunaDestino = EstadoTarefa.indiceDoDestino(destino, nomesDe(colunas))
+                .map(colunas::get)
+                .orElseGet(() -> criarColunaPadrao(card.getColuna().getProjeto(), destino, colunas, usuario));
         // "Fim da coluna": quantidade de cards que ficam lá sem contar o próprio (se já estava).
         int indice = (int) cardRepository.findByColunaOrderByPosicaoAsc(colunaDestino).stream()
                 .filter(outro -> !outro.getId().equals(cardId))
                 .count();
         cardService.mover(cardId, colunaDestino.getId(), indice, usuario);
-        // O destino existe por construção (indiceDoDestino), então o estado devolvido é o pedido.
-        return paraResponse(card, destino, disponiveisDe(colunas));
+        // O destino existe (já havia ou foi criado agora), então o estado devolvido é o pedido.
+        return paraResponse(card, destino);
+    }
+
+    /** O projeto não tem coluna para o estado pedido: cria a coluna padrão (nome = rótulo do estado,
+     * que {@link EstadoTarefa#porNome} reconhece). A fazer vira a primeira coluna; Em andamento e
+     * Feito entram no fim. Só quem vê o projeto mexe na estrutura do quadro (menor privilégio). */
+    private Coluna criarColunaPadrao(Projeto projeto, EstadoTarefa destino, List<Coluna> colunas, Usuario usuario) {
+        if (!projetoService.usuarioPodeVer(projeto.getId(), usuario)) {
+            throw new EstadoTarefaIndisponivelException(rotuloDe(destino));
+        }
+        IntStream ordens = colunas.stream().mapToInt(Coluna::getOrdem);
+        int ordem = destino == EstadoTarefa.A_FAZER ? ordens.min().orElse(0) - 1 : ordens.max().orElse(0) + 1;
+        return colunaRepository.save(new Coluna(projeto, rotuloDe(destino), ordem, null));
     }
 
     private static EstadoTarefa estadoDe(Card card, List<Coluna> colunas) {
@@ -173,10 +186,6 @@ public class TarefaService {
         return colunas.stream().map(Coluna::getNome).toList();
     }
 
-    private static List<EstadoTarefa> disponiveisDe(List<Coluna> colunas) {
-        return EstadoTarefa.disponiveis(nomesDe(colunas));
-    }
-
     private static String rotuloDe(EstadoTarefa estado) {
         return switch (estado) {
             case A_FAZER -> "A fazer";
@@ -185,7 +194,7 @@ public class TarefaService {
         };
     }
 
-    private static TarefaResponse paraResponse(Card card, EstadoTarefa estado, List<EstadoTarefa> disponiveis) {
+    private static TarefaResponse paraResponse(Card card, EstadoTarefa estado) {
         Projeto projeto = card.getColuna().getProjeto();
         return new TarefaResponse(
                 card.getId(),
@@ -197,8 +206,8 @@ public class TarefaService {
                 card.getPrazo(),
                 card.getEstimativaMinutos(),
                 card.getConcluidoEm(),
-                disponiveis);
+                List.of(EstadoTarefa.values()));
     }
 
-    private record Linha(Card card, EstadoTarefa estado, List<EstadoTarefa> disponiveis) {}
+    private record Linha(Card card, EstadoTarefa estado) {}
 }

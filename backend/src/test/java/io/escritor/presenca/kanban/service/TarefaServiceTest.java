@@ -37,6 +37,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -272,18 +273,6 @@ class TarefaServiceTest {
     }
 
     @Test
-    void mudarEstadoParaEmAndamentoEmProjetoSemEtapaLancaIndisponivel() {
-        Card c = card(7L, aFazer, null, Instant.now(), null);
-        when(cardRepository.findById(7L)).thenReturn(Optional.of(c));
-        when(colunaRepository.findByProjetoOrderByOrdemAsc(projeto)).thenReturn(List.of(aFazer, feito));
-
-        assertThatThrownBy(() -> service.mudarEstado(7L, EstadoTarefa.EM_ANDAMENTO, usuario))
-                .isInstanceOf(EstadoTarefaIndisponivelException.class)
-                .hasMessageContaining("Em andamento");
-        verify(cardService, never()).mover(any(), any(), anyInt(), any());
-    }
-
-    @Test
     void criarEmProjetoQueOUsuarioNaoVeLanca404SemRevelarColunas() {
         when(projetoService.usuarioPodeVer(10L, usuario)).thenReturn(false);
 
@@ -314,16 +303,96 @@ class TarefaServiceTest {
     }
 
 
+    private ArgumentCaptor<Coluna> capturarColunaSalva() {
+        ArgumentCaptor<Coluna> captor = ArgumentCaptor.forClass(Coluna.class);
+        when(colunaRepository.save(captor.capture())).thenAnswer(inv -> {
+            Coluna salva = inv.getArgument(0);
+            ReflectionTestUtils.setField(salva, "id", 900L);
+            return salva;
+        });
+        return captor;
+    }
+
     @Test
-    void mudarEstadoEmProjetoDeUmaColunaFazendoParaEstadoAusenteLancaIndisponivel() {
+    void feitoEmQuadroSoComFazendoCriaColunaFeitoNoFimEMoveOCard() {
         Coluna fazendo = colunaComId(projeto, 103L, "Fazendo", 0);
         Card c = card(7L, fazendo, null, Instant.now(), null);
         when(cardRepository.findById(7L)).thenReturn(Optional.of(c));
         when(colunaRepository.findByProjetoOrderByOrdemAsc(projeto)).thenReturn(List.of(fazendo));
+        ArgumentCaptor<Coluna> captor = capturarColunaSalva();
 
-        assertThatThrownBy(() -> service.mudarEstado(7L, EstadoTarefa.FEITO, usuario))
+        TarefaResponse resposta = service.mudarEstado(7L, EstadoTarefa.FEITO, usuario);
+
+        Coluna criada = captor.getValue();
+        assertThat(criada.getNome()).isEqualTo("Feito");
+        assertThat(criada.getOrdem()).isEqualTo(1);
+        assertThat(criada.getLimiteWip()).isNull();
+        assertThat(criada.getProjeto()).isSameAs(projeto);
+        verify(cardService).mover(7L, 900L, 0, usuario);
+        assertThat(resposta.estado()).isEqualTo(EstadoTarefa.FEITO);
+        assertThat(resposta.estadosDisponiveis())
+                .containsExactly(EstadoTarefa.A_FAZER, EstadoTarefa.EM_ANDAMENTO, EstadoTarefa.FEITO);
+    }
+
+    @Test
+    void aFazerEmQuadroSoComFazendoCriaColunaAntesDeTodas() {
+        Coluna fazendo = colunaComId(projeto, 103L, "Fazendo", 0);
+        Card c = card(7L, fazendo, null, Instant.now(), null);
+        when(cardRepository.findById(7L)).thenReturn(Optional.of(c));
+        when(colunaRepository.findByProjetoOrderByOrdemAsc(projeto)).thenReturn(List.of(fazendo));
+        ArgumentCaptor<Coluna> captor = capturarColunaSalva();
+
+        service.mudarEstado(7L, EstadoTarefa.A_FAZER, usuario);
+
+        assertThat(captor.getValue().getNome()).isEqualTo("A fazer");
+        assertThat(captor.getValue().getOrdem()).isEqualTo(-1);
+        verify(cardService).mover(7L, 900L, 0, usuario);
+    }
+
+    @Test
+    void emAndamentoNoQuadroCambIA2CriaColunaEmAndamentoNoFim() {
+        Coluna a = colunaComId(projeto, 201L, "A fazer", 0);
+        Coluna f = colunaComId(projeto, 202L, "Feito", 1);
+        Coluna b = colunaComId(projeto, 203L, "Backlog", 2);
+        Card c = card(7L, a, null, Instant.now(), null);
+        when(cardRepository.findById(7L)).thenReturn(Optional.of(c));
+        when(colunaRepository.findByProjetoOrderByOrdemAsc(projeto)).thenReturn(List.of(a, f, b));
+        ArgumentCaptor<Coluna> captor = capturarColunaSalva();
+
+        service.mudarEstado(7L, EstadoTarefa.EM_ANDAMENTO, usuario);
+
+        assertThat(captor.getValue().getNome()).isEqualTo("Em andamento");
+        assertThat(captor.getValue().getOrdem()).isEqualTo(3);
+        verify(cardService).mover(7L, 900L, 0, usuario);
+        assertThat(EstadoTarefa.porNome("Em andamento")).contains(EstadoTarefa.EM_ANDAMENTO);
+    }
+
+    @Test
+    void responsavelNaoMembroPedindoEtapaAusenteLevaIndisponivelENadaEhSalvo() {
+        Usuario responsavel = usuarioComId(5L);
+        Coluna fazendo = colunaComId(projeto, 103L, "Fazendo", 0);
+        Card c = cardDeOutroResponsavel(7L, fazendo, responsavel);
+        when(cardRepository.findById(7L)).thenReturn(Optional.of(c));
+        lenient().when(projetoService.usuarioPodeVer(10L, responsavel)).thenReturn(false);
+        when(colunaRepository.findByProjetoOrderByOrdemAsc(projeto)).thenReturn(List.of(fazendo));
+
+        assertThatThrownBy(() -> service.mudarEstado(7L, EstadoTarefa.FEITO, responsavel))
                 .isInstanceOf(EstadoTarefaIndisponivelException.class);
+        verify(colunaRepository, never()).save(any());
         verify(cardService, never()).mover(any(), any(), anyInt(), any());
+    }
+
+    @Test
+    void etapaExistenteNaoCriaColuna() {
+        colunasDoProjeto();
+        Card c = card(7L, aFazer, null, Instant.now(), null);
+        when(cardRepository.findById(7L)).thenReturn(Optional.of(c));
+        when(cardRepository.findByColunaOrderByPosicaoAsc(andamento)).thenReturn(List.of());
+
+        service.mudarEstado(7L, EstadoTarefa.EM_ANDAMENTO, usuario);
+
+        verify(colunaRepository, never()).save(any());
+        verify(cardService).mover(7L, 101L, 0, usuario);
     }
 
     @Test

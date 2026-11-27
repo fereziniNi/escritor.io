@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { listarProjetos } from '../organizacao/api'
-import { concluirTarefa, criarTarefa, listarMinhasTarefas, mudarEstadoTarefa } from './api'
+import { criarTarefa, listarMinhasTarefas, mudarEstadoTarefa } from './api'
 import { corDoProjeto } from './corDoProjeto'
 import type { EstadoTarefa, Tarefa } from './types'
 import './MinhasTarefas.css'
@@ -35,10 +35,6 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
   const [projetoNovo, setProjetoNovo] = useState('')
   const [prazoNovo, setPrazoNovo] = useState('')
 
-  // Tarefa cujo mini-formulário de conclusão está aberto (uma por vez) e o texto digitado
-  const [concluindoId, setConcluindoId] = useState<number | null>(null)
-  const [descricaoConclusao, setDescricaoConclusao] = useState('')
-
   const tarefasQuery = useQuery({ queryKey: ['tarefas'], queryFn: listarMinhasTarefas })
   const projetosQuery = useQuery({ queryKey: ['projetos'], queryFn: listarProjetos })
 
@@ -46,31 +42,6 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
     mutationFn: ({ cardId, estado }: { cardId: number; estado: EstadoTarefa }) => mudarEstadoTarefa(cardId, estado),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['tarefas'] }),
   })
-
-  const concluirMutation = useMutation({
-    mutationFn: ({ cardId, descricao }: { cardId: number; descricao: string }) => concluirTarefa(cardId, descricao),
-    onSuccess: (_dados, variaveis) => {
-      // só fecha o formulário se ele ainda for o da tarefa enviada
-      if (concluindoId === variaveis.cardId) {
-        setConcluindoId(null)
-        setDescricaoConclusao('')
-      }
-    },
-    // em qualquer desfecho a lista é recarregada (uma linha desatualizada vira Feito)
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['tarefas'] }),
-  })
-
-  function abrirConclusao(cardId: number) {
-    concluirMutation.reset()
-    setDescricaoConclusao('')
-    setConcluindoId(cardId)
-  }
-
-  function cancelarConclusao() {
-    concluirMutation.reset()
-    setConcluindoId(null)
-    setDescricaoConclusao('')
-  }
 
   const criarMutation = useMutation({
     mutationFn: criarTarefa,
@@ -102,20 +73,9 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
 
   function itemDaTarefa(t: Tarefa) {
     const cor = corDoProjeto(t.projetoId)
-    const opcoes = ESTADOS.filter((e) => e.valor === t.estado || (t.estadosDisponiveis ?? []).includes(e.valor))
     const urgente = t.estado !== 'FEITO' && t.prazo !== null && t.prazo <= hoje
+    // Tarefa formalmente finalizada sempre responde 409 à troca de estado
     const finalizada = t.concluidoEm !== null
-    const etapaUnica = opcoes.length === 1
-    const rotuloEtapa = opcoes[0]?.rotulo
-    const dicaId = `tarefa-dica-${t.cardId}`
-    let dicaSeletor: string | undefined
-    if (finalizada) dicaSeletor = 'Tarefa já finalizada'
-    else if (etapaUnica) dicaSeletor = `Este projeto só tem a etapa "${rotuloEtapa}". Use "Concluir" para finalizar a tarefa.`
-    const dicaVisivel = !finalizada && etapaUnica ? `Só existe a etapa "${rotuloEtapa}" neste projeto. Use "Concluir" para finalizar.` : null
-    const concluindo = concluindoId === t.cardId && t.estado !== 'FEITO'
-    const pendente = concluirMutation.isPending
-    const erroId = `concluir-erro-${t.cardId}`
-    const erroDaLinha = concluirMutation.isError && concluirMutation.variables?.cardId === t.cardId ? concluirMutation.error.message : null
     return (
       <li key={t.cardId} className="tarefa-item">
         <div className="tarefa-item-linha">
@@ -125,23 +85,17 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
           <select
             aria-label={`Estado de ${t.titulo}`}
             value={t.estado}
-            disabled={etapaUnica || finalizada}
-            title={dicaSeletor}
-            aria-describedby={dicaVisivel ? dicaId : undefined}
+            disabled={finalizada}
+            title={finalizada ? 'Tarefa já finalizada' : undefined}
             onChange={(e) => estadoMutation.mutate({ cardId: t.cardId, estado: e.target.value as EstadoTarefa })}
           >
-            {opcoes.map((e) => (
+            {ESTADOS.map((e) => (
               <option key={e.valor} value={e.valor}>
                 {e.rotulo}
               </option>
             ))}
           </select>
         </div>
-        {dicaVisivel && (
-          <p id={dicaId} className="tarefa-dica">
-            {dicaVisivel}
-          </p>
-        )}
         <div className="tarefa-item-meta">
           {!t.pessoal && t.projetoNome && (
             <span className="badge tarefa-etiqueta" style={{ background: cor.fundo, color: cor.texto }}>
@@ -153,53 +107,7 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
               Prazo: {formatarPrazo(t.prazo)}
             </span>
           )}
-          {t.estado !== 'FEITO' && !concluindo && (
-            <button type="button" className="tarefa-concluir" disabled={pendente} onClick={() => abrirConclusao(t.cardId)}>
-              Concluir
-            </button>
-          )}
         </div>
-        {concluindo && (
-          <form
-            className="tarefa-concluir-form"
-            onSubmit={(e) => {
-              e.preventDefault()
-              const descricao = descricaoConclusao.trim()
-              if (!descricao || concluirMutation.isPending) return
-              concluirMutation.mutate({ cardId: t.cardId, descricao })
-            }}
-          >
-            <label htmlFor={`concluir-${t.cardId}`}>O que foi feito?</label>
-            <input
-              id={`concluir-${t.cardId}`}
-              aria-label={`Descrição da conclusão de ${t.titulo}`}
-              value={descricaoConclusao}
-              onChange={(e) => setDescricaoConclusao(e.target.value)}
-              aria-describedby={erroDaLinha ? erroId : undefined}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape' && !pendente) cancelarConclusao()
-              }}
-              autoFocus
-            />
-            {erroDaLinha && (
-              <p id={erroId} className="mensagem-erro" role="alert">
-                {erroDaLinha}
-              </p>
-            )}
-            <div className="tarefa-concluir-acoes">
-              <button
-                type="submit"
-                className="tarefa-concluir tarefa-concluir--confirmar"
-                disabled={!descricaoConclusao.trim() || concluirMutation.isPending}
-              >
-                Confirmar conclusão
-              </button>
-              <button type="button" className="tarefa-concluir" disabled={pendente} onClick={cancelarConclusao}>
-                Cancelar
-              </button>
-            </div>
-          </form>
-        )}
       </li>
     )
   }

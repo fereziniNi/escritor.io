@@ -130,15 +130,4 @@ class EstadoTarefaTest {
     void indiceDoDestinoSemColunasEhVazio() {
         assertThat(EstadoTarefa.indiceDoDestino(A_FAZER, List.of())).isEmpty();
     }
-
-    @Test
-    void disponiveisParaCadaQuadroReal() {
-        assertThat(EstadoTarefa.disponiveis(BEYOND_COMITE)).containsExactly(A_FAZER, EM_ANDAMENTO, FEITO);
-        assertThat(EstadoTarefa.disponiveis(CAMBIA)).containsExactly(A_FAZER, FEITO);
-        assertThat(EstadoTarefa.disponiveis(FINANZANALYST)).containsExactly(A_FAZER, EM_ANDAMENTO, FEITO);
-        assertThat(EstadoTarefa.disponiveis(NPS)).containsExactly(A_FAZER, EM_ANDAMENTO, FEITO);
-        assertThat(EstadoTarefa.disponiveis(CONTROLE_DE_ATIVOS)).containsExactly(A_FAZER, EM_ANDAMENTO, FEITO);
-        assertThat(EstadoTarefa.disponiveis(CHAMADOS)).containsExactly(EM_ANDAMENTO);
-        assertThat(EstadoTarefa.disponiveis(List.of())).isEmpty();
-    }
 }
