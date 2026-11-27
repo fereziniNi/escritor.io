@@ -40,3 +40,15 @@ export async function mudarEstadoTarefa(cardId: number, estado: EstadoTarefa): P
   }
   return response.json()
 }
+
+/** Conclui a tarefa (mesmo endpoint do detalhe do card), com mensagens de erro específicas. */
+export async function concluirTarefa(cardId: number, descricao: string): Promise<void> {
+  const response = await apiFetch(`/cards/${cardId}/cronometro/finalizar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ descricao }),
+  })
+  if (response.status === 409) throw new Error('Essa tarefa já foi finalizada')
+  if (response.status === 404) throw new Error('Você não tem acesso a esta tarefa')
+  if (!response.ok) throw new Error('Não foi possível concluir a tarefa')
+}

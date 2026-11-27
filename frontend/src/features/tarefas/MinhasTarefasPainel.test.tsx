@@ -395,7 +395,7 @@ describe('MinhasTarefasPainel', () => {
     await user.type(screen.getByLabelText('Descrição da conclusão de Chamado'), 'Texto importante')
     await user.click(screen.getByRole('button', { name: 'Confirmar conclusão' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível finalizar a tarefa')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível concluir a tarefa')
     expect(screen.getByLabelText('Descrição da conclusão de Chamado')).toHaveValue('Texto importante')
   })
 
@@ -431,6 +431,119 @@ describe('MinhasTarefasPainel', () => {
     expect(screen.getByRole('button', { name: 'Concluir' })).toBeInTheDocument()
     await new Promise((resolve) => setTimeout(resolve, 100))
     expect(chamou).toBe(false)
+  })
+
+  it('etapaUnicaMostraDicaVisivelLigadaAoSeletor', async () => {
+    mockar([tarefa({ cardId: 1, titulo: 'Chamado', estado: 'EM_ANDAMENTO', estadosDisponiveis: ['EM_ANDAMENTO'] })])
+    renderPainel()
+
+    const seletor = await screen.findByLabelText('Estado de Chamado')
+    const dica = screen.getByText('Só existe a etapa "Em andamento" neste projeto. Use "Concluir" para finalizar.')
+    expect(dica).toBeVisible()
+    expect(dica).toHaveClass('tarefa-dica')
+    expect(seletor).toHaveAttribute('aria-describedby', dica.id)
+    expect(document.querySelector('.sr-only')).toBeNull()
+  })
+
+  async function abrirFormulario(user: ReturnType<typeof userEvent.setup>, titulo = 'Chamado') {
+    await screen.findByText(titulo)
+    await user.click(screen.getByRole('button', { name: 'Concluir' }))
+    return screen.getByLabelText(`Descrição da conclusão de ${titulo}`)
+  }
+
+  it('conclusao409MostraErroNoFormularioERecarregaALista', async () => {
+    let buscas = 0
+    server.use(
+      http.get('/tarefas/minhas', () => {
+        buscas++
+        return HttpResponse.json([tarefa({ cardId: 1, titulo: 'Chamado' })])
+      }),
+      http.get('/projetos', () => HttpResponse.json(PROJETOS)),
+      http.post('/cards/1/cronometro/finalizar', () => new HttpResponse(null, { status: 409 })),
+    )
+    const user = userEvent.setup()
+    renderPainel()
+    const campo = await abrirFormulario(user)
+    await user.type(campo, 'abc')
+    await user.click(screen.getByRole('button', { name: 'Confirmar conclusão' }))
+
+    const alerta = await screen.findByRole('alert')
+    expect(alerta).toHaveTextContent('Essa tarefa já foi finalizada')
+    expect(screen.getByLabelText('Descrição da conclusão de Chamado').closest('form')).toContainElement(alerta)
+    expect(screen.getByLabelText('Descrição da conclusão de Chamado')).toHaveAttribute('aria-describedby', alerta.id)
+    await vi.waitFor(() => expect(buscas).toBeGreaterThanOrEqual(2))
+  })
+
+  it('conclusao404MostraMensagemDeSemAcesso', async () => {
+    server.use(
+      http.get('/tarefas/minhas', () => HttpResponse.json([tarefa({ cardId: 1, titulo: 'Chamado' })])),
+      http.get('/projetos', () => HttpResponse.json(PROJETOS)),
+      http.post('/cards/1/cronometro/finalizar', () => new HttpResponse(null, { status: 404 })),
+    )
+    const user = userEvent.setup()
+    renderPainel()
+    await user.type(await abrirFormulario(user), 'abc')
+    await user.click(screen.getByRole('button', { name: 'Confirmar conclusão' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Você não tem acesso a esta tarefa')
+  })
+
+  it('enterEnviaAConclusao', async () => {
+    let corpo: unknown = null
+    server.use(
+      http.get('/tarefas/minhas', () => HttpResponse.json([tarefa({ cardId: 1, titulo: 'Chamado' })])),
+      http.get('/projetos', () => HttpResponse.json(PROJETOS)),
+      http.post('/cards/1/cronometro/finalizar', async ({ request }) => {
+        corpo = await request.json()
+        return HttpResponse.json({})
+      }),
+    )
+    const user = userEvent.setup()
+    renderPainel()
+    await user.type(await abrirFormulario(user), 'pronto{Enter}')
+    await vi.waitFor(() => expect(corpo).toEqual({ descricao: 'pronto' }))
+  })
+
+  it('escapeCancelaSemRequisicao', async () => {
+    let chamou = false
+    server.use(
+      http.get('/tarefas/minhas', () => HttpResponse.json([tarefa({ cardId: 1, titulo: 'Chamado' })])),
+      http.get('/projetos', () => HttpResponse.json(PROJETOS)),
+      http.post('/cards/1/cronometro/finalizar', () => {
+        chamou = true
+        return HttpResponse.json({})
+      }),
+    )
+    const user = userEvent.setup()
+    renderPainel()
+    await user.type(await abrirFormulario(user), 'abc{Escape}')
+    expect(screen.queryByLabelText('Descrição da conclusão de Chamado')).not.toBeInTheDocument()
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    expect(chamou).toBe(false)
+  })
+
+  it('enquantoPendenteDesabilitaCancelarEOutrosConcluir', async () => {
+    server.use(
+      http.get('/tarefas/minhas', () =>
+        HttpResponse.json([tarefa({ cardId: 1, titulo: 'Chamado' }), tarefa({ cardId: 2, titulo: 'Outra' })]),
+      ),
+      http.get('/projetos', () => HttpResponse.json(PROJETOS)),
+      http.post('/cards/1/cronometro/finalizar', async () => {
+        await new Promise((resolve) => setTimeout(resolve, 300))
+        return HttpResponse.json({})
+      }),
+    )
+    const user = userEvent.setup()
+    renderPainel()
+    await screen.findByText('Chamado')
+    await user.click(screen.getAllByRole('button', { name: 'Concluir' })[0])
+    await user.type(screen.getByLabelText('Descrição da conclusão de Chamado'), 'abc')
+    await user.click(screen.getByRole('button', { name: 'Confirmar conclusão' }))
+
+    expect(screen.getByRole('button', { name: 'Cancelar' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Concluir' })).toBeDisabled()
+    await user.type(screen.getByLabelText('Descrição da conclusão de Chamado'), '{Escape}')
+    expect(screen.getByLabelText('Descrição da conclusão de Chamado')).toBeInTheDocument()
+    await vi.waitFor(() => expect(screen.queryByLabelText('Descrição da conclusão de Chamado')).not.toBeInTheDocument())
   })
 
   it('clicarNoTituloChamaAoAbrirTarefa', async () => {

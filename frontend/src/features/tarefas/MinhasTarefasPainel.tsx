@@ -1,8 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { listarProjetos } from '../organizacao/api'
-import { criarTarefa, listarMinhasTarefas, mudarEstadoTarefa } from './api'
-import { finalizarCronometro } from '../kanban/api'
+import { concluirTarefa, criarTarefa, listarMinhasTarefas, mudarEstadoTarefa } from './api'
 import { corDoProjeto } from './corDoProjeto'
 import type { EstadoTarefa, Tarefa } from './types'
 import './MinhasTarefas.css'
@@ -49,12 +48,16 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
   })
 
   const concluirMutation = useMutation({
-    mutationFn: ({ cardId, descricao }: { cardId: number; descricao: string }) => finalizarCronometro(cardId, descricao),
-    onSuccess: async () => {
-      setConcluindoId(null)
-      setDescricaoConclusao('')
-      await queryClient.invalidateQueries({ queryKey: ['tarefas'] })
+    mutationFn: ({ cardId, descricao }: { cardId: number; descricao: string }) => concluirTarefa(cardId, descricao),
+    onSuccess: (_dados, variaveis) => {
+      // só fecha o formulário se ele ainda for o da tarefa enviada
+      if (concluindoId === variaveis.cardId) {
+        setConcluindoId(null)
+        setDescricaoConclusao('')
+      }
     },
+    // em qualquer desfecho a lista é recarregada (uma linha desatualizada vira Feito)
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['tarefas'] }),
   })
 
   function abrirConclusao(cardId: number) {
@@ -108,7 +111,11 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
     let dicaSeletor: string | undefined
     if (finalizada) dicaSeletor = 'Tarefa já finalizada'
     else if (etapaUnica) dicaSeletor = `Este projeto só tem a etapa "${rotuloEtapa}". Use "Concluir" para finalizar a tarefa.`
-    const concluindo = concluindoId === t.cardId
+    const dicaVisivel = !finalizada && etapaUnica ? `Só existe a etapa "${rotuloEtapa}" neste projeto. Use "Concluir" para finalizar.` : null
+    const concluindo = concluindoId === t.cardId && t.estado !== 'FEITO'
+    const pendente = concluirMutation.isPending
+    const erroId = `concluir-erro-${t.cardId}`
+    const erroDaLinha = concluirMutation.isError && concluirMutation.variables?.cardId === t.cardId ? concluirMutation.error.message : null
     return (
       <li key={t.cardId} className="tarefa-item">
         <div className="tarefa-item-linha">
@@ -120,7 +127,7 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
             value={t.estado}
             disabled={etapaUnica || finalizada}
             title={dicaSeletor}
-            aria-describedby={dicaSeletor ? dicaId : undefined}
+            aria-describedby={dicaVisivel ? dicaId : undefined}
             onChange={(e) => estadoMutation.mutate({ cardId: t.cardId, estado: e.target.value as EstadoTarefa })}
           >
             {opcoes.map((e) => (
@@ -129,12 +136,12 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
               </option>
             ))}
           </select>
-          {dicaSeletor && (
-            <span id={dicaId} className="sr-only">
-              {dicaSeletor}
-            </span>
-          )}
         </div>
+        {dicaVisivel && (
+          <p id={dicaId} className="tarefa-dica">
+            {dicaVisivel}
+          </p>
+        )}
         <div className="tarefa-item-meta">
           {!t.pessoal && t.projetoNome && (
             <span className="badge tarefa-etiqueta" style={{ background: cor.fundo, color: cor.texto }}>
@@ -147,7 +154,7 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
             </span>
           )}
           {t.estado !== 'FEITO' && !concluindo && (
-            <button type="button" className="tarefa-concluir" onClick={() => abrirConclusao(t.cardId)}>
+            <button type="button" className="tarefa-concluir" disabled={pendente} onClick={() => abrirConclusao(t.cardId)}>
               Concluir
             </button>
           )}
@@ -168,8 +175,17 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
               aria-label={`Descrição da conclusão de ${t.titulo}`}
               value={descricaoConclusao}
               onChange={(e) => setDescricaoConclusao(e.target.value)}
+              aria-describedby={erroDaLinha ? erroId : undefined}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape' && !pendente) cancelarConclusao()
+              }}
               autoFocus
             />
+            {erroDaLinha && (
+              <p id={erroId} className="mensagem-erro" role="alert">
+                {erroDaLinha}
+              </p>
+            )}
             <div className="tarefa-concluir-acoes">
               <button
                 type="submit"
@@ -178,7 +194,7 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
               >
                 Confirmar conclusão
               </button>
-              <button type="button" className="tarefa-concluir" onClick={cancelarConclusao}>
+              <button type="button" className="tarefa-concluir" disabled={pendente} onClick={cancelarConclusao}>
                 Cancelar
               </button>
             </div>
@@ -231,7 +247,6 @@ export function MinhasTarefasPainel({ aoAbrirTarefa }: { aoAbrirTarefa: (projeto
       </div>
 
       {estadoMutation.isError && <p className="mensagem-erro" role="alert">{estadoMutation.error.message}</p>}
-      {concluirMutation.isError && <p className="mensagem-erro" role="alert">{concluirMutation.error.message}</p>}
       {tarefasQuery.isError && <p className="mensagem-erro" role="alert">{tarefasQuery.error.message}</p>}
 
       {tarefasQuery.isSuccess && visiveis.length === 0 && <p className="cartao-item-meta">Você não tem tarefas.</p>}

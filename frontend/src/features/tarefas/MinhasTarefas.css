@@ -191,3 +191,9 @@
 .tarefa-concluir-acoes .tarefa-concluir {
   margin-left: 0;
 }
+
+.tarefa-dica {
+  margin: 0.3rem 0 0;
+  font-size: 0.75rem;
+  color: var(--cor-texto-suave);
+}
