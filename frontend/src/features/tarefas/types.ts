@@ -10,5 +10,6 @@ export interface Tarefa {
   prazo: string | null
   estimativaMinutos: number | null
   concluidoEm: string | null
-  estadosDisponiveis: EstadoTarefa[]
+  /** Sem uso no front: o backend sempre devolve os três estados (mantido por compatibilidade). */
+  estadosDisponiveis?: EstadoTarefa[]
 }
