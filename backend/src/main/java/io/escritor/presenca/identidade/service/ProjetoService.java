@@ -64,7 +64,9 @@ public class ProjetoService {
     public List<ProjetoResponse> listarVisiveis(Usuario usuario) {
         Set<Long> projetoIds = projetoIdsDoUsuario(usuario);
 
+        // Projeto pessoal (lista "Minhas tarefas") não aparece nas listas; o dono ainda o abre via buscarDetalhe.
         return projetoRepository.findAll().stream()
+                .filter(projeto -> !projeto.isPessoal())
                 .filter(projeto -> RegraVisibilidadeProjeto.visivel(projeto.getId(), projetoIds))
                 .map(ProjetoResponse::de)
                 .toList();
