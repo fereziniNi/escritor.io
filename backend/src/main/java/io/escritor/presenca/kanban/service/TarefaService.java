@@ -37,6 +37,7 @@ public class TarefaService {
     private final ProjetoPessoalService projetoPessoalService;
     private final CardService cardService;
     private final ProjetoService projetoService;
+    private final AcessoAoCard acessoAoCard;
 
     public TarefaService(
             CardRepository cardRepository,
@@ -44,13 +45,15 @@ public class TarefaService {
             ProjetoRepository projetoRepository,
             ProjetoPessoalService projetoPessoalService,
             CardService cardService,
-            ProjetoService projetoService) {
+            ProjetoService projetoService,
+            AcessoAoCard acessoAoCard) {
         this.cardRepository = cardRepository;
         this.colunaRepository = colunaRepository;
         this.projetoRepository = projetoRepository;
         this.projetoPessoalService = projetoPessoalService;
         this.cardService = cardService;
         this.projetoService = projetoService;
+        this.acessoAoCard = acessoAoCard;
     }
 
     /** Lista plana (o front agrupa por estado): por estado, prazo crescente (nulo por último) e
@@ -122,8 +125,9 @@ public class TarefaService {
                 .findById(cardId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Card não encontrado: " + cardId));
         // Acesso antes de qualquer outra regra (inclusive o 409): quem não vê o projeto do card
-        // recebe 404, como se o card não existisse. Qualquer membro pode mudar o estado (como CardService#mover).
-        if (!projetoService.usuarioPodeVer(card.getColuna().getProjeto().getId(), usuario)) {
+        // e não é o responsável recebe 404, como se o card não existisse. Membro ou responsável
+        // pode mudar o estado (como CardService#mover).
+        if (!acessoAoCard.podeAgir(card, usuario)) {
             throw new RecursoNaoEncontradoException("Card não encontrado: " + cardId);
         }
         if (card.getConcluidoEm() != null) {

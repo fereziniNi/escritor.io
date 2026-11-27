@@ -139,7 +139,7 @@ class CardServiceTest {
     void setUp() {
         service = new CardService(
                 cardRepository, colunaRepository, usuarioRepository, projetoWebSocketHandler, cardEventoRepository,
-                presencaWebSocketHandler, notificacaoService, projetoService, envioWhatsApp);
+                presencaWebSocketHandler, notificacaoService, projetoService, envioWhatsApp, new AcessoAoCard(projetoService));
         // Auditoria de segurança (VULN-02): default permissivo pra não obrigar toda fatia deste
         // arquivo (nenhuma delas testa autorização, testam posição/WIP/eventos/notificação) a
         // stubar `usuarioPodeVer` na mão - os testes dedicados de acesso abaixo sobrescrevem isto.
@@ -872,6 +872,51 @@ class CardServiceTest {
         verify(cardRepository, never()).save(any());
         verify(colunaRepository, never()).findById(2L);
         verify(projetoWebSocketHandler, never()).broadcastCardMovido(any(), any());
+    }
+
+    @Test
+    void responsavelForaDoProjetoPodeMoverOCard() {
+        Coluna destino = outraColunaMesmoProjeto(coluna, 2L, "Feito");
+        Usuario responsavel = usuarioComId(50L);
+        Card card = new Card(coluna, "Card 10", null, 1024.0, responsavel, null, null, criadoPor);
+        ReflectionTestUtils.setField(card, "id", 10L);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(colunaRepository.findById(2L)).thenReturn(Optional.of(destino));
+        lenient().when(projetoService.usuarioPodeVer(coluna.getProjeto().getId(), responsavel)).thenReturn(false);
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        var resposta = service.mover(10L, 2L, 0, responsavel);
+
+        assertThat(resposta.colunaId()).isEqualTo(2L);
+        verify(cardRepository).save(card);
+    }
+
+    @Test
+    void naoResponsavelForaDoProjetoContinuaTomando403MesmoQueOCardTenhaResponsavel() {
+        Usuario responsavel = usuarioComId(50L);
+        Usuario semAcesso = usuarioComId(99L);
+        Card card = new Card(coluna, "Card 10", null, 1024.0, responsavel, null, null, criadoPor);
+        ReflectionTestUtils.setField(card, "id", 10L);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(projetoService.usuarioPodeVer(coluna.getProjeto().getId(), semAcesso)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.mover(10L, 2L, 0, semAcesso)).isInstanceOf(AcessoNegadoException.class);
+
+        verify(cardRepository, never()).save(any());
+        verifyNoInteractions(notificacaoService, envioWhatsApp);
+        verify(projetoWebSocketHandler, never()).broadcastCardMovido(any(), any());
+    }
+
+    @Test
+    void membroQueNaoEResponsavelContinuaMovendoOCard() {
+        Coluna destino = outraColunaMesmoProjeto(coluna, 2L, "Feito");
+        Card card = new Card(coluna, "Card 10", null, 1024.0, usuarioComId(50L), null, null, criadoPor);
+        ReflectionTestUtils.setField(card, "id", 10L);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(colunaRepository.findById(2L)).thenReturn(Optional.of(destino));
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        assertThat(service.mover(10L, 2L, 0, usuarioComId(7L)).colunaId()).isEqualTo(2L);
     }
 
     /**

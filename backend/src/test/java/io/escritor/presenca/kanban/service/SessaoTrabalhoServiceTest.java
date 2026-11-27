@@ -70,7 +70,7 @@ class SessaoTrabalhoServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SessaoTrabalhoService(cardRepository, sessaoTrabalhoRepository, cardEventoRepository, projetoService, RELOGIO_FIXO);
+        service = new SessaoTrabalhoService(cardRepository, sessaoTrabalhoRepository, cardEventoRepository, new AcessoAoCard(projetoService), RELOGIO_FIXO);
         Projeto projeto = new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null);
         ReflectionTestUtils.setField(projeto, "id", 5L);
         Coluna coluna = new Coluna(projeto, "A fazer", 0, null);
@@ -246,6 +246,43 @@ class SessaoTrabalhoServiceTest {
 
     @Test
     void membroDoProjetoConsultaNormalmente() {
+        when(sessaoTrabalhoRepository.findByCardAndFimIsNull(card)).thenReturn(Optional.empty());
+        when(sessaoTrabalhoRepository.findByCardOrderByInicioAsc(card)).thenReturn(List.of());
+
+        assertThat(service.consultar(10L, autor).cardId()).isEqualTo(10L);
+    }
+
+    @Test
+    void responsavelForaDoProjetoAindaConsultaEIniciaOCronometro() {
+        Usuario responsavel = usuarioComId(3L);
+        ReflectionTestUtils.setField(card, "responsavel", responsavel);
+        lenient().when(projetoService.usuarioPodeVer(5L, responsavel)).thenReturn(false);
+        when(sessaoTrabalhoRepository.findByUsuarioAndFimIsNull(responsavel)).thenReturn(Optional.empty());
+        when(sessaoTrabalhoRepository.findByCardAndFimIsNull(card)).thenReturn(Optional.empty());
+        when(sessaoTrabalhoRepository.findByCardOrderByInicioAsc(card)).thenReturn(List.of());
+        when(sessaoTrabalhoRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThat(service.consultar(10L, responsavel).cardId()).isEqualTo(10L);
+        service.iniciar(10L, responsavel);
+
+        verify(sessaoTrabalhoRepository).save(any());
+    }
+
+    @Test
+    void naoResponsavelForaDoProjetoContinuaComNegativa404MesmoHavendoOutroResponsavel() {
+        ReflectionTestUtils.setField(card, "responsavel", usuarioComId(3L));
+        Usuario forasteiro = usuarioComId(2L);
+        when(projetoService.usuarioPodeVer(5L, forasteiro)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.iniciar(10L, forasteiro)).isInstanceOf(RecursoNaoEncontradoException.class);
+
+        verify(sessaoTrabalhoRepository, never()).save(any());
+        verify(cardEventoRepository, never()).save(any());
+    }
+
+    @Test
+    void membroQueNaoEResponsavelContinuaConsultando() {
+        ReflectionTestUtils.setField(card, "responsavel", usuarioComId(3L));
         when(sessaoTrabalhoRepository.findByCardAndFimIsNull(card)).thenReturn(Optional.empty());
         when(sessaoTrabalhoRepository.findByCardOrderByInicioAsc(card)).thenReturn(List.of());
 

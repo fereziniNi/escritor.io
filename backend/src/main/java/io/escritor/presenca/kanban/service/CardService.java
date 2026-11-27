@@ -44,6 +44,7 @@ public class CardService {
     private final NotificacaoService notificacaoService;
     private final ProjetoService projetoService;
     private final EnvioWhatsApp envioWhatsApp;
+    private final AcessoAoCard acessoAoCard;
 
     public CardService(
             CardRepository cardRepository,
@@ -54,7 +55,8 @@ public class CardService {
             PresencaWebSocketHandler presencaWebSocketHandler,
             NotificacaoService notificacaoService,
             ProjetoService projetoService,
-            EnvioWhatsApp envioWhatsApp) {
+            EnvioWhatsApp envioWhatsApp,
+            AcessoAoCard acessoAoCard) {
         this.cardRepository = cardRepository;
         this.colunaRepository = colunaRepository;
         this.usuarioRepository = usuarioRepository;
@@ -64,6 +66,7 @@ public class CardService {
         this.notificacaoService = notificacaoService;
         this.projetoService = projetoService;
         this.envioWhatsApp = envioWhatsApp;
+        this.acessoAoCard = acessoAoCard;
     }
 
     public CardResponse criar(
@@ -136,7 +139,11 @@ public class CardService {
         // resolver a coluna de destino (não só depois) - quem não pode ver o projeto do card não
         // aprende nada sobre a coluna de destino também, nem que ela exista.
         Projeto projetoDoCard = card.getColuna().getProjeto();
-        verificarAcesso(projetoDoCard, autor);
+        // Acesso ao card (não só ao projeto): o responsável de uma tarefa pode movê-la mesmo sem
+        // ser membro do projeto. Quem não tem nenhum dos dois continua levando 403.
+        if (!acessoAoCard.podeAgir(card, autor)) {
+            throw new AcessoNegadoException("Usuário não tem acesso a este projeto");
+        }
 
         Coluna novaColuna = colunaRepository
                 .findById(novaColunaId)
