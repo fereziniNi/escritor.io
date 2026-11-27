@@ -88,6 +88,31 @@ class CardRepositoryIT {
         assertThat(sessaoTrabalhoRepository.findById(sessaoId)).isEmpty();
     }
 
+    /** Tarefa pessoal nunca vaza pro relatório diário (WhatsApp) nem pras Estatísticas. */
+    @Test
+    void concluidasNaoIncluemCardDeProjetoPessoal() {
+        Usuario ana = usuarioRepository.saveAndFlush(new Usuario("Ana Souza", "ana@escritor.io", Papel.COLABORADOR, 480));
+        Projeto normal = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
+        Projeto pessoal = projetoRepository.saveAndFlush(Projeto.pessoalDe(ana, LocalDate.now()));
+        Coluna colNormal = colunaRepository.saveAndFlush(new Coluna(normal, "Feito", 0, null));
+        Coluna colPessoal = colunaRepository.saveAndFlush(new Coluna(pessoal, "Feito", 0, null));
+        Instant agora = Instant.now();
+        Card doNormal = new Card(colNormal, "Tarefa normal", null, 1024.0, ana, null, null, ana);
+        doNormal.finalizar("ok", agora);
+        Card doPessoal = new Card(colPessoal, "Tarefa pessoal", null, 1024.0, ana, null, null, ana);
+        doPessoal.finalizar("ok", agora);
+        cardRepository.saveAndFlush(doNormal);
+        cardRepository.saveAndFlush(doPessoal);
+        entityManager.clear();
+
+        Instant inicio = agora.minusSeconds(3600);
+        Instant fim = agora.plusSeconds(3600);
+
+        assertThat(cardRepository.findByResponsavelAndConcluidoEmGreaterThanEqualAndConcluidoEmLessThanOrderByConcluidoEmDesc(ana, inicio, fim))
+                .extracting(Card::getTitulo).containsExactly("Tarefa normal");
+        assertThat(cardRepository.countByResponsavelAndConcluidoEmGreaterThanEqualAndConcluidoEmLessThan(ana, inicio, fim)).isEqualTo(1);
+    }
+
     @Test
     void persisteERecuperaCard() {
         Projeto projeto = projetoRepository.saveAndFlush(new Projeto("Backlog", "Cliente Teste", StatusProjeto.ATIVO, LocalDate.now(), null));
