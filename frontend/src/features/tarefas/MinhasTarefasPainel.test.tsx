@@ -208,6 +208,8 @@ describe('MinhasTarefasPainel', () => {
     await screen.findByText('Você não tem tarefas.')
     await user.type(screen.getByLabelText('Título da nova tarefa'), '   ')
     await user.click(screen.getByRole('button', { name: 'Adicionar' }))
+    // dá tempo de um POST assíncrono (regressão do trim) chegar ao servidor antes de afirmar
+    await new Promise((resolve) => setTimeout(resolve, 150))
     expect(chamou).toBe(false)
   })
 
@@ -229,7 +231,7 @@ describe('MinhasTarefasPainel', () => {
     await screen.findByText('Mover')
     await user.selectOptions(screen.getByLabelText('Estado de Mover'), 'Em andamento')
 
-    expect(corpo).toEqual({ estado: 'EM_ANDAMENTO' })
+    await vi.waitFor(() => expect(corpo).toEqual({ estado: 'EM_ANDAMENTO' }))
     const secao = await screen.findByRole('region', { name: 'Em andamento' })
     expect(await within(secao).findByText('Mover')).toBeInTheDocument()
   })
