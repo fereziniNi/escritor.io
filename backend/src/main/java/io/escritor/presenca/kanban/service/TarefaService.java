@@ -104,7 +104,7 @@ public class TarefaService {
             throw new ProjetoSemColunasException(projeto.getId());
         }
         CardResponse criado = cardService.criar(
-                colunas.get(0).getId(),
+                colunaInicial(colunas).getId(),
                 titulo == null ? null : titulo.strip(),
                 null,
                 usuario.getId(),
@@ -155,6 +155,14 @@ public class TarefaService {
         }
         return EstadoTarefa.estadoDaColuna(
                 colunas.get(posicao).getNome(), posicao, colunas.size(), card.getConcluidoEm() != null);
+    }
+
+    /** Primeira coluna (por ordem) que representa A fazer; sem nenhuma (ex.: quadro só com "Fazendo"),
+     * a primeira coluna. */
+    private static Coluna colunaInicial(List<Coluna> colunas) {
+        return EstadoTarefa.indiceDoDestino(EstadoTarefa.A_FAZER, nomesDe(colunas))
+                .map(colunas::get)
+                .orElse(colunas.get(0));
     }
 
     private static List<String> nomesDe(List<Coluna> colunas) {

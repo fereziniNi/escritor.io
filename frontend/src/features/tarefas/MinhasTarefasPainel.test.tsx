@@ -292,6 +292,17 @@ describe('MinhasTarefasPainel', () => {
     expect(seletor).toHaveValue('A_FAZER')
   })
 
+  it('tarefaSemEstadosDisponiveisDeBackendAntigoMostraSoOEstadoAtual', async () => {
+    const semCampo = { ...tarefa({ cardId: 1, titulo: 'Legada', estado: 'EM_ANDAMENTO' }) } as Partial<Tarefa>
+    delete semCampo.estadosDisponiveis
+    mockar([semCampo as Tarefa])
+    renderPainel()
+
+    const seletor = await screen.findByLabelText('Estado de Legada')
+    expect(within(seletor).getAllByRole('option').map((o) => o.textContent)).toEqual(['Em andamento'])
+    expect(seletor).toBeDisabled()
+  })
+
   it('erroAoTrocarEstadoMostraMensagem', async () => {
     server.use(
       http.get('/tarefas/minhas', () => HttpResponse.json([tarefa({ cardId: 1, titulo: 'Mover' })])),

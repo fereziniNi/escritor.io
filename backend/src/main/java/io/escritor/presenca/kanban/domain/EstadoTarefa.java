@@ -3,6 +3,7 @@ package io.escritor.presenca.kanban.domain;
 import java.text.Normalizer;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.stream.IntStream;
 
@@ -26,7 +27,7 @@ public enum EstadoTarefa {
         if (nomeDaColuna == null) {
             return Optional.empty();
         }
-        String nome = Normalizer.normalize(nomeDaColuna.trim().toLowerCase(), Normalizer.Form.NFD)
+        String nome = Normalizer.normalize(nomeDaColuna.trim().toLowerCase(Locale.ROOT), Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "");
         // A ordem importa: "a fazer" não pode cair em "fazendo" e vice-versa.
         if (contemAlgum(nome, TERMOS_FEITO)) {

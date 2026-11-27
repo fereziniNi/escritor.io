@@ -39,6 +39,18 @@ class EstadoTarefaTest {
     }
 
     @Test
+    void porNomeNaoDependeDoLocaleDaMaquina() {
+        java.util.Locale original = java.util.Locale.getDefault();
+        try {
+            java.util.Locale.setDefault(java.util.Locale.forLanguageTag("tr-TR"));
+            assertThat(EstadoTarefa.porNome("FINALIZADO")).contains(FEITO);
+            assertThat(EstadoTarefa.porNome("BACKLOG")).contains(A_FAZER);
+        } finally {
+            java.util.Locale.setDefault(original);
+        }
+    }
+
+    @Test
     void porNomeOutrosSinonimos() {
         assertThat(EstadoTarefa.porNome("Done")).contains(FEITO);
         assertThat(EstadoTarefa.porNome("Finalizadas")).contains(FEITO);
