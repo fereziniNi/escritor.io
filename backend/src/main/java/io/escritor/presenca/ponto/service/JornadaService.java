@@ -118,12 +118,12 @@ public class JornadaService {
         List<Marcacao> marcacoesDeHoje = marcacoesPorDia.getOrDefault(hoje, List.of());
         Instant inicioDoDia = hoje.atStartOfDay(clock.getZone()).toInstant();
         Instant fimDoDia = hoje.plusDays(1).atStartOfDay(clock.getZone()).toInstant();
-        int cargaDiariaMinutos = usuario.getCargaDiariaMinutos();
+        int cargaDiariaMinutos = usuario.cargaDiariaEm(hoje);
 
         EstadoDia estado = EstadoDia.calcular(marcacoesDeHoje, fimDoDia, agora);
         long minutosTrabalhados = JornadaDiaria.minutosTrabalhados(marcacoesDeHoje);
         long saldoDia = JornadaDiaria.saldo(marcacoesDeHoje, cargaDiariaMinutos);
-        long saldoAcumuladoNoPeriodo = SaldoAcumulado.calcular(marcacoesPorDia, cargaDiariaMinutos);
+        long saldoAcumuladoNoPeriodo = SaldoAcumulado.calcular(marcacoesPorDia, usuario::cargaDiariaEm);
         long totalApontadoMinutos = sessaoTrabalhoRepository
                 .findByUsuarioAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(usuario, inicioDoDia, fimDoDia)
                 .stream()
@@ -172,7 +172,6 @@ public class JornadaService {
     }
 
     private EspelhoMesResponse montarEspelho(Usuario usuario, Map<LocalDate, List<Marcacao>> marcacoesPorDia, Instant agora) {
-        int cargaDiariaMinutos = usuario.getCargaDiariaMinutos();
 
         List<EspelhoDiaResponse> dias = marcacoesPorDia.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
@@ -182,12 +181,12 @@ public class JornadaService {
                     Instant fimDoDia = data.plusDays(1).atStartOfDay(clock.getZone()).toInstant();
                     EstadoDia estado = EstadoDia.calcular(marcacoesDoDia, fimDoDia, agora);
                     long minutosTrabalhados = JornadaDiaria.minutosTrabalhados(marcacoesDoDia);
-                    long saldoDia = JornadaDiaria.saldo(marcacoesDoDia, cargaDiariaMinutos);
+                    long saldoDia = JornadaDiaria.saldo(marcacoesDoDia, usuario.cargaDiariaEm(data));
                     return new EspelhoDiaResponse(data, estado, minutosTrabalhados, saldoDia);
                 })
                 .toList();
 
-        long saldoAcumuladoNoPeriodo = SaldoAcumulado.calcular(marcacoesPorDia, cargaDiariaMinutos);
+        long saldoAcumuladoNoPeriodo = SaldoAcumulado.calcular(marcacoesPorDia, usuario::cargaDiariaEm);
 
         return new EspelhoMesResponse(dias, saldoAcumuladoNoPeriodo);
     }

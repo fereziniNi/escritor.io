@@ -66,7 +66,9 @@ public class FechamentoMesService {
         Map<LocalDate, List<Marcacao>> marcacoesPorDia = JornadaService.agruparPorDia(
                 registroPontoRepository.findByUsuarioAndMomentoGreaterThanEqualAndMomentoLessThanOrderByMomentoAsc(usuario, inicio, fim),
                 clock.getZone());
-        int cargaDiariaMinutos = usuario.getCargaDiariaMinutos();
+        // carga exibida = a que vale no último dia já alcançado do mês (fim do mês, ou hoje se o mês está em curso)
+        LocalDate referencia = mes.atEndOfMonth().isBefore(hoje) ? mes.atEndOfMonth() : hoje;
+        int cargaDiariaMinutos = usuario.cargaDiariaEm(referencia);
 
         long minutosTrabalhados = 0;
         int diasTrabalhados = 0;
@@ -89,7 +91,7 @@ public class FechamentoMesService {
                 cargaDiariaMinutos,
                 diasTrabalhados,
                 minutosTrabalhados,
-                SaldoAcumulado.calcular(marcacoesPorDia, cargaDiariaMinutos),
+                SaldoAcumulado.calcular(marcacoesPorDia, usuario::cargaDiariaEm),
                 diasUteisSemMarcacao(usuario, mes, hoje, marcacoesPorDia),
                 diasInconsistentes);
     }
