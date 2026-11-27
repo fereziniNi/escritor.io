@@ -3,9 +3,11 @@ package io.escritor.presenca.kanban.service;
 import io.escritor.presenca.escritorio.ws.PresencaWebSocketHandler;
 import io.escritor.presenca.escritorio.ws.PresencaWebSocketHandler.NovaTarefaWs;
 import io.escritor.presenca.escritorio.ws.PresencaWebSocketHandler.TarefaConcluidaWs;
+import io.escritor.presenca.identidade.domain.MembroProjeto;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Projeto;
 import io.escritor.presenca.identidade.domain.Usuario;
+import io.escritor.presenca.identidade.repository.MembroProjetoRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.identidade.service.ProjetoService;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
@@ -45,6 +47,7 @@ public class CardService {
     private final ProjetoService projetoService;
     private final EnvioWhatsApp envioWhatsApp;
     private final AcessoAoCard acessoAoCard;
+    private final MembroProjetoRepository membroProjetoRepository;
 
     public CardService(
             CardRepository cardRepository,
@@ -56,7 +59,8 @@ public class CardService {
             NotificacaoService notificacaoService,
             ProjetoService projetoService,
             EnvioWhatsApp envioWhatsApp,
-            AcessoAoCard acessoAoCard) {
+            AcessoAoCard acessoAoCard,
+            MembroProjetoRepository membroProjetoRepository) {
         this.cardRepository = cardRepository;
         this.colunaRepository = colunaRepository;
         this.usuarioRepository = usuarioRepository;
@@ -67,6 +71,7 @@ public class CardService {
         this.projetoService = projetoService;
         this.envioWhatsApp = envioWhatsApp;
         this.acessoAoCard = acessoAoCard;
+        this.membroProjetoRepository = membroProjetoRepository;
     }
 
     public CardResponse criar(
@@ -88,6 +93,8 @@ public class CardService {
                 .map(Card::getPosicao)
                 .orElse(null);
         double posicao = CalculadoraPosicao.entre(ultimaPosicao, null);
+
+        garantirMembro(coluna.getProjeto(), responsavel);
 
         Card novo = new Card(coluna, titulo, descricao, posicao, responsavel, prazo, estimativaMinutos, criadoPor);
         Card salvo = cardRepository.save(novo);
@@ -216,6 +223,8 @@ public class CardService {
         Usuario responsavelAnterior = card.getResponsavel();
         Usuario novoResponsavel = responsavelId == null ? null : buscarUsuario(responsavelId);
 
+        garantirMembro(card.getColuna().getProjeto(), novoResponsavel);
+
         card.editar(titulo, descricao, novoResponsavel, prazo, estimativaMinutos);
         Card salvo = cardRepository.save(card);
 
@@ -325,6 +334,19 @@ public class CardService {
             if (destinatario.getWhatsapp() != null && !destinatario.getWhatsapp().isBlank()) {
                 envioWhatsApp.enviar(destinatario.getWhatsapp(), textoConcluida);
             }
+        }
+    }
+
+    /** Quem vira responsável de um card passa a ser membro do projeto (pra enxergá-lo e
+     * trabalhar nele). Idempotente; sem responsável, nada; projeto pessoal nunca ganha membro (o
+     * dono é o único) - ali o responsável age só pelo {@link AcessoAoCard}. Sem aviso nem
+     * evento de histórico. */
+    private void garantirMembro(Projeto projeto, Usuario responsavel) {
+        if (responsavel == null || projeto.isPessoal()) {
+            return;
+        }
+        if (!membroProjetoRepository.existsByProjetoAndUsuario(projeto, responsavel)) {
+            membroProjetoRepository.save(new MembroProjeto(projeto, responsavel));
         }
     }
 

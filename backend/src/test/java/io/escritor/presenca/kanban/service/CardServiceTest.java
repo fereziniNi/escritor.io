@@ -1,10 +1,12 @@
 package io.escritor.presenca.kanban.service;
 
 import io.escritor.presenca.escritorio.ws.PresencaWebSocketHandler;
+import io.escritor.presenca.identidade.domain.MembroProjeto;
 import io.escritor.presenca.identidade.domain.Papel;
 import io.escritor.presenca.identidade.domain.Projeto;
 import io.escritor.presenca.identidade.domain.StatusProjeto;
 import io.escritor.presenca.identidade.domain.Usuario;
+import io.escritor.presenca.identidade.repository.MembroProjetoRepository;
 import io.escritor.presenca.identidade.repository.UsuarioRepository;
 import io.escritor.presenca.identidade.service.ProjetoService;
 import io.escritor.presenca.identidade.service.RecursoNaoEncontradoException;
@@ -79,6 +81,9 @@ class CardServiceTest {
     @Mock
     private EnvioWhatsApp envioWhatsApp;
 
+    @Mock
+    private MembroProjetoRepository membroProjetoRepository;
+
     private final Coluna coluna = colunaComId(1L);
     private final Usuario criadoPor = usuarioComId(1L);
 
@@ -139,7 +144,8 @@ class CardServiceTest {
     void setUp() {
         service = new CardService(
                 cardRepository, colunaRepository, usuarioRepository, projetoWebSocketHandler, cardEventoRepository,
-                presencaWebSocketHandler, notificacaoService, projetoService, envioWhatsApp, new AcessoAoCard(projetoService));
+                presencaWebSocketHandler, notificacaoService, projetoService, envioWhatsApp, new AcessoAoCard(projetoService),
+                membroProjetoRepository);
         // Auditoria de segurança (VULN-02): default permissivo pra não obrigar toda fatia deste
         // arquivo (nenhuma delas testa autorização, testam posição/WIP/eventos/notificação) a
         // stubar `usuarioPodeVer` na mão - os testes dedicados de acesso abaixo sobrescrevem isto.
@@ -1060,5 +1066,92 @@ class CardServiceTest {
 
         verify(cardRepository, never()).delete(any());
         verify(projetoWebSocketHandler, never()).broadcastCardExcluido(any(), any());
+    }
+
+    // ---- Responsável vira membro do projeto ----
+
+    @Test
+    void criarComResponsavelNaoMembroAdicionaComoMembroDoProjeto() {
+        Usuario responsavel = usuarioComId(2L);
+        when(colunaRepository.findById(1L)).thenReturn(Optional.of(coluna));
+        when(cardRepository.findFirstByColunaOrderByPosicaoDesc(coluna)).thenReturn(Optional.empty());
+        when(usuarioRepository.findById(2L)).thenReturn(Optional.of(responsavel));
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        service.criar(1L, "Tarefa", null, 2L, null, null, criadoPor);
+
+        var captor = ArgumentCaptor.forClass(MembroProjeto.class);
+        verify(membroProjetoRepository).save(captor.capture());
+        assertThat(captor.getValue().getProjeto()).isSameAs(coluna.getProjeto());
+        assertThat(captor.getValue().getUsuario()).isSameAs(responsavel);
+    }
+
+    @Test
+    void criarComResponsavelJaMembroNaoDuplicaMembro() {
+        Usuario responsavel = usuarioComId(2L);
+        when(colunaRepository.findById(1L)).thenReturn(Optional.of(coluna));
+        when(cardRepository.findFirstByColunaOrderByPosicaoDesc(coluna)).thenReturn(Optional.empty());
+        when(usuarioRepository.findById(2L)).thenReturn(Optional.of(responsavel));
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+        when(membroProjetoRepository.existsByProjetoAndUsuario(coluna.getProjeto(), responsavel)).thenReturn(true);
+
+        service.criar(1L, "Tarefa", null, 2L, null, null, criadoPor);
+
+        verify(membroProjetoRepository, never()).save(any());
+    }
+
+    @Test
+    void criarSemResponsavelNaoAdicionaMembro() {
+        when(colunaRepository.findById(1L)).thenReturn(Optional.of(coluna));
+        when(cardRepository.findFirstByColunaOrderByPosicaoDesc(coluna)).thenReturn(Optional.empty());
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        service.criar(1L, "Tarefa", null, null, null, null, criadoPor);
+
+        verify(membroProjetoRepository, never()).save(any());
+    }
+
+    @Test
+    void criarEmProjetoPessoalComOutroResponsavelNaoAdicionaMembro() {
+        Coluna pessoal = colunaPessoal(1L, criadoPor);
+        Usuario outro = usuarioComId(2L);
+        when(colunaRepository.findById(1L)).thenReturn(Optional.of(pessoal));
+        when(cardRepository.findFirstByColunaOrderByPosicaoDesc(pessoal)).thenReturn(Optional.empty());
+        when(usuarioRepository.findById(2L)).thenReturn(Optional.of(outro));
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        service.criar(1L, "Tarefa", null, 2L, null, null, criadoPor);
+
+        verify(membroProjetoRepository, never()).save(any());
+    }
+
+    @Test
+    void atualizarTrocandoResponsavelParaNaoMembroAdicionaComoMembro() {
+        Card card = cardComId(10L, coluna, 1024.0);
+        Usuario novoResponsavel = usuarioComId(2L);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(usuarioRepository.findById(2L)).thenReturn(Optional.of(novoResponsavel));
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        service.atualizar(10L, "Título", null, 2L, null, null, criadoPor);
+
+        var captor = ArgumentCaptor.forClass(MembroProjeto.class);
+        verify(membroProjetoRepository).save(captor.capture());
+        assertThat(captor.getValue().getProjeto()).isSameAs(coluna.getProjeto());
+        assertThat(captor.getValue().getUsuario()).isSameAs(novoResponsavel);
+    }
+
+    @Test
+    void atualizarEmProjetoPessoalNaoAdicionaMembro() {
+        Coluna pessoal = colunaPessoal(1L, criadoPor);
+        Card card = cardComId(10L, pessoal, 1024.0);
+        Usuario outro = usuarioComId(2L);
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(usuarioRepository.findById(2L)).thenReturn(Optional.of(outro));
+        when(cardRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        service.atualizar(10L, "Título", null, 2L, null, null, criadoPor);
+
+        verify(membroProjetoRepository, never()).save(any());
     }
 }
