@@ -6,7 +6,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 /** {@code projetoNome} é nulo para tarefa pessoal (o projeto pessoal não aparece como projeto).
- * {@code estadosDisponiveis} são os estados que o quadro do projeto suporta. */
+ * {@code estadosDisponiveis} é sempre A fazer, Em andamento e Feito: o estado
+ * que o projeto não tiver ganha a coluna padrão ao ser escolhido (campo mantido por compatibilidade). */
 public record TarefaResponse(
         Long cardId,
         String titulo,

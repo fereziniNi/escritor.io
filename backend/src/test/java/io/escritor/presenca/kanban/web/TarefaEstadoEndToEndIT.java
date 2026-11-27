@@ -124,6 +124,41 @@ class TarefaEstadoEndToEndIT {
                 .isEqualTo(feito.getId());
     }
 
+    @Test
+    void quadroSoComFazendoCriaFeitoEDepoisAFazerAoMudarOEstado() {
+        Usuario nicolas = novoUsuario("e2e-chamados@escritor.io");
+        Projeto p = projetoComMembro("Chamados", nicolas);
+        Coluna fazendo = coluna(p, "Fazendo", 0);
+        Card c = card(fazendo, nicolas, "Chamado qualquer");
+
+        patchEstado(nicolas, c.getId(), "FEITO", 200);
+
+        var colunas = colunaRepository.findByProjetoOrderByOrdemAsc(p);
+        Coluna feito = colunas.stream().filter(x -> x.getNome().equals("Feito")).findFirst().orElseThrow();
+        org.assertj.core.api.Assertions.assertThat(feito.getOrdem()).isGreaterThan(fazendo.getOrdem());
+        org.assertj.core.api.Assertions.assertThat(cardRepository.findById(c.getId()).orElseThrow().getColuna().getId())
+                .isEqualTo(feito.getId());
+
+        patchEstado(nicolas, c.getId(), "A_FAZER", 200);
+
+        var depois = colunaRepository.findByProjetoOrderByOrdemAsc(p);
+        Coluna aFazer = depois.stream().filter(x -> x.getNome().equals("A fazer")).findFirst().orElseThrow();
+        org.assertj.core.api.Assertions.assertThat(depois.get(0).getId()).isEqualTo(aFazer.getId());
+        org.assertj.core.api.Assertions.assertThat(depois).hasSize(3);
+        org.assertj.core.api.Assertions.assertThat(cardRepository.findById(c.getId()).orElseThrow().getColuna().getId())
+                .isEqualTo(aFazer.getId());
+
+        String token = jwtService.gerarAccessToken(nicolas.getId(), nicolas.getPapel());
+        client().get().uri("/tarefas/minhas").header("Authorization", "Bearer " + token)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].estado").isEqualTo("A_FAZER")
+                .jsonPath("$[0].estadosDisponiveis[0]").isEqualTo("A_FAZER")
+                .jsonPath("$[0].estadosDisponiveis[1]").isEqualTo("EM_ANDAMENTO")
+                .jsonPath("$[0].estadosDisponiveis[2]").isEqualTo("FEITO");
+    }
+
     private org.springframework.test.web.servlet.client.RestTestClient.ResponseSpec chamar(
             Usuario u, String metodo, String uri, String corpo) {
         String token = jwtService.gerarAccessToken(u.getId(), u.getPapel());

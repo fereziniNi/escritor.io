@@ -1,7 +1,6 @@
 package io.escritor.presenca.kanban.domain;
 
 import java.text.Normalizer;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -74,12 +73,5 @@ public enum EstadoTarefa {
                 .filter(i -> estadoDaColuna(nomesDasColunasOrdenadas.get(i), i, total, false) == destino)
                 .boxed()
                 .findFirst();
-    }
-
-    /** Estados que o quadro suporta (os das suas colunas), na ordem A fazer, Em andamento, Feito. */
-    public static List<EstadoTarefa> disponiveis(List<String> nomesDasColunasOrdenadas) {
-        return Arrays.stream(values())
-                .filter(e -> indiceDoDestino(e, nomesDasColunasOrdenadas).isPresent())
-                .toList();
     }
 }
