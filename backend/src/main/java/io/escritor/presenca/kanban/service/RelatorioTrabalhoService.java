@@ -57,8 +57,13 @@ public class RelatorioTrabalhoService {
                 .collect(Collectors.groupingBy(s -> s.getCard().getId(), Collectors.summingLong(SessaoTrabalho::getMinutos)));
         // um card só pode ter um título por vez - qualquer sessão dele serve pra pegar o título
         // atual, não precisa reduzir/escolher entre várias.
+        // Tarefa pessoal vista por outra pessoa (gestor/admin): só as horas contam, o título não vaza.
+        boolean outroUsuario = !java.util.Objects.equals(usuarioAlvo.getId(), usuarioAutenticado.getId());
         Map<Long, String> tituloPorCardId = sessoesDoPeriodo.stream()
-                .collect(Collectors.toMap(s -> s.getCard().getId(), s -> s.getCard().getTitulo(), (primeiro, segundo) -> primeiro));
+                .collect(Collectors.toMap(
+                        s -> s.getCard().getId(),
+                        s -> outroUsuario && s.getCard().getColuna().getProjeto().isPessoal() ? "Tarefa pessoal" : s.getCard().getTitulo(),
+                        (primeiro, segundo) -> primeiro));
 
         return totalPorCardId.entrySet().stream()
                 .map(entrada -> new TotalPorCardResponse(entrada.getKey(), tituloPorCardId.get(entrada.getKey()), entrada.getValue()))

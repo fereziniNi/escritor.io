@@ -151,4 +151,46 @@ class RelatorioTrabalhoServiceTest {
         assertThatThrownBy(() -> service.totalApontadoPorProjeto(999L, INICIO_PERIODO, FIM_PERIODO))
                 .isInstanceOf(RecursoNaoEncontradoException.class);
     }
+
+    @Test
+    void listarTotalPorCardMascaraTituloDeCardPessoalQuandoQuemVeNaoEODono() {
+        Usuario dono = usuarioComId(2L);
+        Usuario gestor = usuarioComId(3L);
+        Projeto pessoal = Projeto.pessoalDe(dono, LocalDate.now());
+        ReflectionTestUtils.setField(pessoal, "id", 9L);
+        Coluna colunaPessoal = new Coluna(pessoal, "A fazer", 0, null);
+        Card cardPessoal = cardComId(colunaPessoal, "Consulta no dentista", dono, 30L);
+        Card cardNormal = cardComId(coluna, "Corrigir bug", dono, 10L);
+        SessaoTrabalho s1 = new SessaoTrabalho(cardPessoal, dono, Instant.parse("2026-01-10T09:00:00Z"));
+        s1.pausar(Instant.parse("2026-01-10T10:00:00Z"));
+        SessaoTrabalho s2 = new SessaoTrabalho(cardNormal, dono, Instant.parse("2026-01-11T09:00:00Z"));
+        s2.pausar(Instant.parse("2026-01-11T09:30:00Z"));
+        when(visibilidadeUsuarioService.resolverAlvo(eq(2L), eq(gestor), any())).thenReturn(dono);
+        when(sessaoTrabalhoRepository.findByUsuarioAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(dono, INICIO_PERIODO, FIM_PERIODO))
+                .thenReturn(List.of(s1, s2));
+
+        List<TotalPorCardResponse> resultado = service.listarTotalPorCard(2L, INICIO_PERIODO, FIM_PERIODO, gestor);
+
+        assertThat(resultado).hasSize(2);
+        assertThat(resultado.get(0).cardId()).isEqualTo(30L);
+        assertThat(resultado.get(0).cardTitulo()).isEqualTo("Tarefa pessoal");
+        assertThat(resultado.get(0).totalMinutos()).isEqualTo(60);
+        assertThat(resultado.get(1).cardTitulo()).isEqualTo("Corrigir bug");
+    }
+
+    @Test
+    void listarTotalPorCardMostraTituloRealDeCardPessoalParaODono() {
+        Projeto pessoal = Projeto.pessoalDe(usuario, LocalDate.now());
+        ReflectionTestUtils.setField(pessoal, "id", 9L);
+        Card cardPessoal = cardComId(new Coluna(pessoal, "A fazer", 0, null), "Consulta no dentista", usuario, 30L);
+        SessaoTrabalho s = new SessaoTrabalho(cardPessoal, usuario, Instant.parse("2026-01-10T09:00:00Z"));
+        s.pausar(Instant.parse("2026-01-10T10:00:00Z"));
+        when(visibilidadeUsuarioService.resolverAlvo(isNull(), eq(usuario), any())).thenReturn(usuario);
+        when(sessaoTrabalhoRepository.findByUsuarioAndFimIsNotNullAndInicioGreaterThanEqualAndInicioLessThan(usuario, INICIO_PERIODO, FIM_PERIODO))
+                .thenReturn(List.of(s));
+
+        List<TotalPorCardResponse> resultado = service.listarTotalPorCard(null, INICIO_PERIODO, FIM_PERIODO, usuario);
+
+        assertThat(resultado.get(0).cardTitulo()).isEqualTo("Consulta no dentista");
+    }
 }

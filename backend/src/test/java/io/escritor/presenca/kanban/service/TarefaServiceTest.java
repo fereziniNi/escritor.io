@@ -311,4 +311,16 @@ class TarefaServiceTest {
                 .isInstanceOf(RecursoNaoEncontradoException.class);
         verifyNoInteractions(colunaRepository, cardService);
     }
+
+    @Test
+    void mudarEstadoEmProjetoDeUmaColunaDevolveOEstadoRealEmVezDoPedido() {
+        Card c = card(7L, aFazer, null, Instant.now(), null);
+        when(cardRepository.findById(7L)).thenReturn(Optional.of(c));
+        when(colunaRepository.findByProjetoOrderByOrdemAsc(projeto)).thenReturn(List.of(aFazer));
+        when(cardRepository.findByColunaOrderByPosicaoAsc(aFazer)).thenReturn(List.of(c));
+
+        TarefaResponse resposta = service.mudarEstado(7L, EstadoTarefa.FEITO, usuario);
+
+        assertThat(resposta.estado()).isEqualTo(EstadoTarefa.A_FAZER);
+    }
 }

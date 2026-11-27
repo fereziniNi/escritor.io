@@ -259,4 +259,16 @@ class ProjetoServiceTest {
 
         assertThat(detalhe.nome()).isEqualTo("Pessoal");
     }
+
+    @Test
+    void adicionarMembroEmProjetoPessoalLancaAcessoNegadoMesmoParaAdmin() {
+        Projeto pessoal = Projeto.pessoalDe(usuario, LocalDate.now());
+        ReflectionTestUtils.setField(pessoal, "id", 2L);
+        when(projetoRepository.findById(2L)).thenReturn(Optional.of(pessoal));
+
+        assertThatThrownBy(() -> service.adicionarMembro(2L, new AdicionarMembroProjetoRequest(admin.getId()), admin))
+                .isInstanceOf(AcessoNegadoException.class);
+
+        verify(membroProjetoRepository, never()).save(any());
+    }
 }

@@ -142,7 +142,8 @@ public class TarefaService {
                 .filter(outro -> !outro.getId().equals(cardId))
                 .count();
         cardService.mover(cardId, colunaDestino.getId(), indice, usuario);
-        return paraResponse(card, destino);
+        // Estado real: em projeto de 1 coluna pedir FEITO deixa o card em A_FAZER.
+        return paraResponse(card, EstadoTarefa.de(indiceDaColuna, colunas.size(), false));
     }
 
     private static EstadoTarefa estadoDe(Card card, List<Coluna> colunas) {
