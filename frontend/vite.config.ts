@@ -29,6 +29,7 @@ export default defineConfig({
           '/mapas',
           '/relatorios',
           '/notificacoes',
+          '/tarefas',
           '/skills',
         ].map((path) => [path, process.env.VITE_BACKEND_URL ?? 'http://localhost:8080']),
       ),
